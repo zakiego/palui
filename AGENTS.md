@@ -50,13 +50,15 @@ pnpm cli owner invite    # single-use owner link (15 min)
 pnpm test && pnpm typecheck && pnpm build
 pnpm eval:reminders      # 60-phrase parse eval, live against CLIProxyAPI (needs PALUI_EVAL_KEY)
 pnpm release check       # package.json version and changelog agree
+pnpm release suggest     # the bump Unreleased calls for
+pnpm release ship minor  # cut, commit, push main, tag (after the owner says yes)
 ```
 
 ## Versions and changelog
 
 - SemVer. The version lives only in the root `package.json` `"version"`. `packages/core/src/version.ts` reads it, and `GET /health` reports it for the app and the runtime.
 - The changelog is `apps/site/content/docs/changelog.mdx` (https://palui.zakiego.com/docs/changelog). Every user-visible PR adds its bullet under `## Unreleased` in the same PR. `apps/site/lib/changelog.test.ts` fails when the changelog and the version disagree.
-- Releases go through `pnpm release prepare|tag` (`scripts/release.ts`) and are tagged `vX.Y.Z` on main. Never bump the version by hand. While on `0.x`, the v1 scope is still being built; `1.0.0` means v1 is done.
+- The owner doesn't pick versions. After a user-visible PR merges, the agent runs `pnpm release suggest`, asks the owner once, then `pnpm release ship <bump>` commits, pushes main and tags `vX.Y.Z` from the local machine (`palui-release`). PRs never bump the version. Never bump it by hand. While on `0.x`, the v1 scope is still being built; `1.0.0` means v1 is done, and only the owner calls that.
 
 ## Skills
 

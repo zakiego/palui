@@ -14,7 +14,7 @@ description: Open a pull request in zakiego/palui the repo's way. Branches from 
    (cd <package> && npx tsc --noEmit && npx vitest run)
    ```
    For `apps/site`, typecheck is `pnpm typecheck` (it runs `next typegen` first). Run `pnpm build` only when the change touches build config, the Dockerfile or bundling.
-4. Changelog: if the change is user-visible, `## Unreleased` in `apps/site/content/docs/changelog.mdx` has its bullet (`palui-changelog`). `pnpm release check` passes.
+4. Changelog: if the change is user-visible, `## Unreleased` in `apps/site/content/docs/changelog.mdx` has its bullet (`palui-changelog`). `pnpm release check` passes. Don't bump the version in the PR: that happens on main after it merges (`palui-release`).
 5. Schema changed? `src/migrations.gen.ts` is regenerated and committed (`palui-schema-change`).
 6. Visible dashboard change? It passed `palui-ui-check`, and you have before and after screenshots.
 7. No em dashes in code, comments, docs or the PR. English everywhere except bot-facing copy, which is casual Indonesian.
@@ -46,3 +46,5 @@ TL;DR: <one or two sentences on what changes for the owner running Palui>
 ```
 
 When the user asked for the PR, push and create it without showing a draft first, then send the link. Otherwise show the title and body and wait.
+
+If the PR adds a changelog line, end the reply with the release it will become, e.g. "After merge this ships as 0.2.0 (minor). I'll ask before releasing." Once it merges, run `palui-release`.
