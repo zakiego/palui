@@ -95,10 +95,11 @@ function FlowRow({ flow, timezone }: { flow: Flow; timezone: string }) {
   )
   const triggers = flow.triggers.map((x) => x.summary).join(" · ")
   return (
-    <TableRow>
+    // The name links to the flow; its ::after stretches over the row, so the whole row opens it.
+    <TableRow className="relative">
       <TableCell className="max-w-0 whitespace-normal">
         <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <Link to="/flows/$id" params={{ id: flow.id }} dir="auto" className="min-w-0 text-left font-medium break-words underline-offset-4 hover:underline">
+          <Link to="/flows/$id" params={{ id: flow.id }} dir="auto" className="min-w-0 text-left font-medium break-words underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:after:rounded-md focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset">
             {flow.name}
           </Link>
           <FlowBadges flow={flow} />
@@ -135,7 +136,8 @@ function FlowRow({ flow, timezone }: { flow: Flow; timezone: string }) {
       <TableCell className="hidden max-w-0 align-top whitespace-normal @3xl/main:table-cell">
         {last ? (
           <span className="flex min-w-0 flex-col gap-1">
-            <Link to="/activity/runs/$id" params={{ id: last.id }} className="inline-flex max-w-full min-w-0">
+            {/* Above the row's cover link, so it opens the run, not the flow. */}
+            <Link to="/activity/runs/$id" params={{ id: last.id }} className="relative z-10 inline-flex max-w-full min-w-0">
               {lastStatus}
             </Link>
             <span className="text-caption text-muted-foreground tabular-nums">
