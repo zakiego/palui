@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { eq } from "drizzle-orm"
-import { chats, memoryDb } from "@palui/db"
+import { chats, connectors, memoryDb } from "@palui/db"
 import { AgentError, agentContainer, assignAgent, createAgent, deleteAgent, getDefaultAgent, listAgents, updateAgent } from "./agents"
 import { ensureChat, getChat } from "./chats"
 import { createInstruction, listInstructions } from "./notes/service"
@@ -61,8 +61,20 @@ describe("agents", () => {
     // Back to Palui still turns the chat on: Palui answers the owner there.
     expect(assignAgent(db, group.id, null).chat).toMatchObject({ agentId: null, allowed: true })
     assignAgent(db, group.id, chef.id)
+    const other = createAgent(db, { slug: "cs", name: "CS", persona: "p" })
+    db.insert(connectors).values([
+      { id: "mcp-a", type: "mcp", kind: "tools", label: "A", enabled: true, agentId: other.id, createdAt: 1, updatedAt: 1 },
+      { id: "mcp-b", type: "mcp", kind: "tools", label: "B", enabled: true, agentId: chef.id, createdAt: 1, updatedAt: 1 },
+      { id: "mcp-c", type: "mcp", kind: "tools", label: "C", enabled: true, createdAt: 1, updatedAt: 1 },
+    ]).run()
     deleteAgent(db, chef.id)
     expect(getChat(db, group.id)!.agentId).toBeNull()
+    // Its own MCP keeps the dead owner (serves nobody, never everyone) and pauses.
+    expect(db.select({ id: connectors.id, agentId: connectors.agentId, enabled: connectors.enabled }).from(connectors).all()).toEqual([
+      { id: "mcp-a", agentId: other.id, enabled: true },
+      { id: "mcp-b", agentId: chef.id, enabled: false },
+      { id: "mcp-c", agentId: null, enabled: true },
+    ])
     expect(listInstructions(db, { agentId: chef.id })).toEqual([])
   })
 

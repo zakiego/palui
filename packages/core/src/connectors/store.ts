@@ -48,6 +48,8 @@ export type UpsertInput = {
   secrets?: Record<string, string>
   trust?: Trust
   enabled?: boolean
+  // The agent that owns it (null: global). Left out, it's kept.
+  agentId?: string | null
 }
 
 // Create or update a connector row. New rows start as `not_set_up` drafts so the
@@ -79,6 +81,7 @@ export function upsertConnector(db: DB, input: UpsertInput, masterKey: string, n
         config,
         secrets: secretsBlob,
         configHash: hash,
+        agentId: input.agentId ?? null,
         createdAt: now,
         updatedAt: now,
       })
@@ -94,11 +97,24 @@ export function upsertConnector(db: DB, input: UpsertInput, masterKey: string, n
       configHash: hash,
       trust: input.trust ?? existing.trust,
       enabled: input.enabled ?? existing.enabled,
+      ...(input.agentId !== undefined ? { agentId: input.agentId } : {}),
       updatedAt: now,
     })
     .where(eq(connectors.id, input.id))
     .returning()
     .get()
+}
+
+// Make a connector global (null) or owned by one agent. The runtime reads the
+// row on every turn, so this applies from the next one.
+export function setConnectorOwner(db: DB, id: string, agentId: string | null, now = Date.now()): ConnectorRow | undefined {
+  return db.update(connectors).set({ agentId, updatedAt: now }).where(eq(connectors.id, id)).returning().get()
+}
+
+// Whether an agent's turn gets this connector's tools: a global one serves
+// everyone, an owned one only its owner. A turn with no agent gets globals only.
+export function connectorServesAgent(row: Pick<ConnectorRow, "agentId">, agentId: string | undefined | null): boolean {
+  return !row.agentId || row.agentId === agentId
 }
 
 // Connect: mark desired = on. The supervisor moves it through connecting -> on|error.

@@ -2,6 +2,7 @@
 // the desired state through @palui/core/connectors/store, then pokes the runtime.
 // The write is the source of truth, so a down runtime never undoes it: the
 // supervisor reconciles on start and every 30 s.
+import { listAgents } from "@palui/core/agents"
 import type { ControlClient } from "@palui/core/control"
 import type { ConnectorManifest } from "@palui/core/connectors/define"
 import {
@@ -103,6 +104,8 @@ export type DraftInput = {
   // Only keys sent are replaced; an empty string deletes that secret.
   secrets?: Record<string, string>
   trust?: "own" | "external"
+  // The agent that owns it (null: global). Left out, it's kept.
+  agentId?: string | null
 }
 
 // Saves wizard progress as a `not_set_up` draft (PLAN 11.5), or updates the
@@ -142,7 +145,10 @@ export function saveDraft(deps: ConnectorDeps, input: DraftInput, now = Date.now
   if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(input.id)) throw new ConnectorError("Connector ids use lowercase letters, digits and dashes.")
   const existing = getConnector(deps.db, input.id)
   if (existing && existing.type !== m.id) throw new ConnectorError(`"${input.id}" is already used by another connector.`)
-  return upsertConnector(deps.db, { id: input.id, manifest: m, label: input.label, config, secrets, trust: input.trust }, deps.masterKey, now)
+  // Only tool connectors have an owner, and only an agent that exists.
+  if (input.agentId && !listAgents(deps.db).some((a) => a.id === input.agentId)) throw new ConnectorError("That agent doesn't exist anymore.")
+  const agentId = m.kind === "tools" ? input.agentId : undefined
+  return upsertConnector(deps.db, { id: input.id, manifest: m, label: input.label, config, secrets, trust: input.trust, agentId }, deps.masterKey, now)
 }
 
 // What's still missing before Connect: required config fields and secrets.
@@ -192,6 +198,7 @@ export function listConnectorItems(deps: Pick<ConnectorDeps, "db" | "masterKey">
       status: row.status,
       statusDetail: row.statusDetail,
       trust: row.trust,
+      agentId: row.agentId,
       config: row.config,
       secrets,
       secretsError,

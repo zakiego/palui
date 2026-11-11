@@ -61,6 +61,11 @@ function ConnectorCard({ item, live, onOpen }: { item: ConnectorItem; live: Conn
       <CardFooter className="flex-wrap gap-2 border-t pt-(--card-spacing) pb-(--card-spacing)">
         <ConnectorStatusBadge status={item.status} />
         {item.trust === "external" && <Badge variant="outline">{t("connectors.external")}</Badge>}
+        {item.ownerName !== null && (
+          <Badge variant="outline" className="max-w-full">
+            <span className="truncate">{item.ownerName ? t("agents.tools.scopeOnly", { name: item.ownerName }) : t("connectors.agentsNoneShort")}</span>
+          </Badge>
+        )}
         {detail && (
           <span className="min-w-0 flex-1 basis-32 truncate text-caption text-muted-foreground" title={detail}>
             {detail}

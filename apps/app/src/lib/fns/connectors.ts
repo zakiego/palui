@@ -1,7 +1,8 @@
 // Connectors page: list, pause/resume, the connect wizard, test, actions, remove.
 import { config, masterKey } from "@palui/core/config"
 import { getOwner, setWhatsAppOwner } from "@palui/core/owner"
-import { getConnector } from "@palui/core/connectors/store"
+import { getConnector, setConnectorOwner } from "@palui/core/connectors/store"
+import { listAgents } from "@palui/core/agents"
 import { listEvents } from "@palui/core/events"
 import { getSetting } from "@palui/core/settings"
 import { createServerFn } from "@tanstack/react-start"
@@ -21,7 +22,9 @@ function deps(db: Parameters<typeof listConnectorItems>[0]["db"]) {
 
 export const getConnectorsPage = createServerFn({ method: "GET" }).handler(async () => {
   const { db } = await requireUser()
-  const items = listConnectorItems(deps(db)).map((c) => ({ ...c, config: asJson<JsonObject>(c.config) }))
+  const names = new Map(listAgents(db).map((a) => [a.id, a.name]))
+  // ownerName: the agent that owns a scoped connector ("" once that agent is gone); null when global.
+  const items = listConnectorItems(deps(db)).map((c) => ({ ...c, config: asJson<JsonObject>(c.config), ownerName: c.agentId ? (names.get(c.agentId) ?? "") : null }))
   let live: Record<string, { running: boolean; status: string; detail: string | null }> = {}
   let runtimeUp = true
   try {
@@ -30,7 +33,9 @@ export const getConnectorsPage = createServerFn({ method: "GET" }).handler(async
   } catch {
     runtimeUp = false
   }
-  return { items, live, runtimeUp, appUrl: config().appUrl }
+  // For the "Which agents" choice on a tool connector.
+  const agents = listAgents(db).map((a) => ({ id: a.id, name: a.name, isDefault: a.isDefault, avatarImage: a.avatarImage, avatarIcon: a.avatarIcon, avatarColor: a.avatarColor }))
+  return { items, live, runtimeUp, appUrl: config().appUrl, agents }
 })
 
 export const getConnectorDetail = createServerFn({ method: "GET" })
@@ -92,6 +97,7 @@ const draft = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
   secrets: z.record(z.string(), z.string().max(4000)).optional(),
   trust: z.enum(["own", "external"]).optional(),
+  agentId: z.string().min(1).max(100).nullable().optional(),
 })
 
 export const saveConnectorDraft = createServerFn({ method: "POST" })
@@ -148,4 +154,18 @@ export const setWhatsAppOwnerFn = createServerFn({ method: "POST" })
     const { db } = await requireWriter()
     const row = setWhatsAppOwner(db, data.phone)
     return { jid: row.externalId }
+  })
+
+// Make a tool connector global (null) or owned by one agent, from the agent
+// page. The runtime reads the row each turn, so no poke is needed.
+export const setConnectorOwnerFn = createServerFn({ method: "POST" })
+  .validator(z.object({ id, agentId: z.string().min(1).max(100).nullable() }))
+  .handler(async ({ data }) => {
+    const { db } = await requireWriter()
+    const row = getConnector(db, data.id)
+    if (!row) throw new Error("That connector doesn't exist anymore.")
+    if (row.kind !== "tools") throw new Error("Only tool connectors can belong to an agent.")
+    if (data.agentId && !listAgents(db).some((a) => a.id === data.agentId)) throw new Error("That agent doesn't exist anymore.")
+    setConnectorOwner(db, data.id, data.agentId)
+    return { ok: true }
   })

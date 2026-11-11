@@ -1,5 +1,6 @@
 // The agent turn (PLAN 8.4 to 8.8): context, tools, AI SDK loop within the
 // budget, approvals, reply, bookkeeping.
+import { connectorServesAgent } from "../connectors/store"
 import { and, asc, eq, inArray, like } from "drizzle-orm"
 import { isStepCount, streamText, type ModelMessage, type SystemModelMessage, type ToolApprovalResponse } from "ai"
 import { events, jobs, messages, newId, pendingApprovals, runs, sessions, toolCalls, type DB, type RunStatus, type RunTrigger } from "@palui/db"
@@ -95,11 +96,13 @@ export function sendToChat(ctx: EngineCtx, chat: ChatRow, text: string, source: 
 
 // One line per enabled skill or tool connector. With tool search on, a connector
 // with tools still to load names them, so the model knows they exist.
-function capabilityList(ctx: EngineCtx, tools: CollectedTools): string[] {
+function capabilityList(ctx: EngineCtx, tools: CollectedTools, agentId: string): string[] {
   const out: string[] = []
   const active = new Set(tools.active)
   for (const e of ctx.host.running()) {
     if (e.row.kind === "model" || e.row.kind === "channel") continue
+    // Another agent's own MCP server isn't named either: this agent can't use it.
+    if (!connectorServesAgent(e.row, agentId)) continue
     const metas = Object.values(tools.meta).filter((m) => m.connectorId === e.id)
     const loaded = metas.filter((m) => active.has(m.name)).length
     const waiting = metas.filter((m) => !active.has(m.name)).map((m) => m.tool)
@@ -285,7 +288,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
           persona: agent.persona,
           channel: chat.channel,
           chat: { id: chat.id, externalId: chat.externalId, kind: chat.kind, sessionId: chat.sessionId },
-          capabilities: capabilityList(ctx, tools),
+          capabilities: capabilityList(ctx, tools, agent.id),
           toolSearch: tools.deferred.length > 0,
           notes: notesPrompt(db, agent),
           trigger: origin,

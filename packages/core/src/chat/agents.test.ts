@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest"
 import { chats, memoryDb, messages, outbox, pendingApprovals, reports, runs, type DB } from "@palui/db"
 import { createAgent, getDefaultAgent, updateAgent } from "../agents"
 import { setReplyMode } from "../chats"
+import { setConnectorOwner } from "../connectors/store"
 import { listEvents } from "../events"
 import { createInstruction, notesPrompt, setPreference } from "../notes/service"
 import { claimOwner, createClaim } from "../owner"
@@ -200,6 +201,21 @@ describe("agents: reply mode in groups", () => {
     await h.engine.inbound(tgMessage("/reply all"))
     await h.engine.idle()
     expect(outboxRows(h.db).at(-1)!.payload.text).toBe("Di chat pribadi semua pesan selalu dijawab. /reply cuma buat grup.")
+  })
+})
+
+describe("agents: their own MCP servers", () => {
+  it("names another agent's own MCP server to nobody else, and gives it to its owner", async () => {
+    const h = await world([say("a"), say("b")], { registry: { crmx: toolsRuntime("crmx", () => ({ deals: { tool: fnTool("deals", () => "[]"), class: "read" } })) }, rows: { crmx: "tools" } })
+    setConnectorOwner(h.db, "crmx", h.chef.id)
+    await h.engine.inbound(tgMessage("halo"))
+    await h.engine.idle()
+    expect(promptText(h.m.prompts[0])).not.toContain("crmx")
+    await h.engine.inbound(tgMessage("/agent chef"))
+    await h.engine.idle()
+    await h.engine.inbound(tgMessage("halo chef"))
+    await h.engine.idle()
+    expect(promptText(h.m.prompts.at(-1))).toContain("crmx")
   })
 })
 

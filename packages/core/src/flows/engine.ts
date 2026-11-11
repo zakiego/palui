@@ -13,6 +13,7 @@
 // A step finishes in one transaction: its step row, its output into vars, any
 // outbox row, any flow state write and the cursor move. Nothing lives in memory,
 // so a restart only delays the next sweep.
+import { getDefaultAgent } from "../agents"
 import { and, desc, eq, inArray, isNotNull, isNull, lte, max, min, or, sql } from "drizzle-orm"
 import { flowRuns, flows, flowStepRuns, flowTriggers, newId, runs, toolCalls, type DB, type FlowPollState, type FlowRunStatus, type FlowSkipReason, type OutboxPayload } from "@palui/db"
 import { addUsage, budgetTokens, dayKey, getUsage } from "../budget"
@@ -481,7 +482,7 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
     const spec = definitionOf(version).triggers.find((t) => t.id === row.triggerId)
     if (spec?.kind !== "poll") return
     const prev: FlowPollState = row.pollState ?? {}
-    const turn: TurnInfo = { runId: `poll_${row.id}`, chatId: flow.chatId, channel: getChat(db, flow.chatId)?.channel ?? null, trigger: "flow", tz: flow.tz, now, flowId: flow.id }
+    const turn: TurnInfo = { runId: `poll_${row.id}`, chatId: flow.chatId, channel: getChat(db, flow.chatId)?.channel ?? null, trigger: "flow", tz: flow.tz, now, flowId: flow.id, agentId: flow.agentId ?? getDefaultAgent(db).id }
     let state: FlowPollState
     let untrusted = false
     let value: unknown = null
@@ -837,7 +838,8 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
   // --- Steps ------------------------------------------------------------------------------
 
   function turnInfo(c: RunContext): TurnInfo {
-    return { runId: c.run.id, chatId: c.flow.chatId, channel: getChat(db, c.flow.chatId)?.channel ?? null, trigger: "flow", tz: c.flow.tz, now: c.now, flowId: c.flow.id }
+    // The flow's agent (null means Palui), so a step only reaches tools that agent may use.
+    return { runId: c.run.id, chatId: c.flow.chatId, channel: getChat(db, c.flow.chatId)?.channel ?? null, trigger: "flow", tz: c.flow.tz, now: c.now, flowId: c.flow.id, agentId: c.flow.agentId ?? getDefaultAgent(db).id }
   }
 
   function stepIf(c: RunContext, step: Extract<FlowStep, { kind: "if" }>): Transition {

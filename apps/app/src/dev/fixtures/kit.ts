@@ -12,6 +12,7 @@ import { localToUtc, utcToLocal } from "@palui/core/reminders/time"
 import {
   agents,
   chats,
+  connectors,
   events,
   flowRuns,
   flows,
@@ -121,6 +122,11 @@ export function createKit(db: DB, now = Date.now()) {
       db.insert(agents).values({ id, ...row, createdAt: now, updatedAt: now }).run()
       if (tokensToday) addUsage(db, usageKeys.agent(id, now, getSetting(db, "timezone")), tokensToday, now)
       return id
+    },
+
+    // The agent that owns a tool connector (an agent-scoped MCP server).
+    ownConnector(id: string, agentId: string) {
+      db.update(connectors).set({ agentId }).where(eq(connectors.id, id)).run()
     },
 
     // A chat answered by an agent (PLAN 19.2).

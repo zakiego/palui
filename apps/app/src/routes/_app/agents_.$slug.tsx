@@ -5,7 +5,7 @@
 // they do on Notes and Chats. Memory and Tools ask the runtime when opened.
 import * as React from "react"
 import { createFileRoute, Link, useBlocker, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon, AtSignIcon, BrainIcon, CircleAlertIcon, GlobeIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessageCircleIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, SendIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
+import { ArrowLeftIcon, AtSignIcon, BotIcon, BrainIcon, CircleAlertIcon, GlobeIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessageCircleIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, SendIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
 import { z } from "zod"
 import { toast } from "sonner"
 
@@ -46,6 +46,7 @@ import { StatusText } from "@/components/ui/status-text"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useLiveRefresh } from "@/hooks/use-live-events"
+import { setConnectorOwnerFn } from "@/lib/fns/connectors"
 import { deleteAgentFn, getAgentMemoryFn, getAgentPage, getAgentToolsFn, saveAgentFn, setChatAllowedFn, setChatReplyModeFn } from "@/lib/fns/agents"
 import { ago, errorMessage } from "@/lib/format"
 import { useLabel, useT } from "@/lib/i18n"
@@ -736,6 +737,23 @@ function ToolsTab({ agent }: { agent: Agent }) {
   const label = useLabel()
   const [query, setQuery] = React.useState("")
   const { data, error } = useTabData(() => getAgentToolsFn({ data: { id: agent.id } }), agent.id)
+  // Owners changed here, on top of what the tab loaded; the list stays put.
+  const [owners, setOwners] = React.useState<Record<string, string | null>>({})
+  const ownerOf = (id: string) => (id in owners ? owners[id]! : (data?.scopes[id] ?? null))
+
+  // Global (every agent) or owned by this agent. Saves at once.
+  const setScope = async (connectorId: string, scope: string) => {
+    if (scope !== "all" && scope !== "only") return
+    const before = ownerOf(connectorId)
+    const next = scope === "all" ? null : agent.id
+    setOwners((o) => ({ ...o, [connectorId]: next }))
+    try {
+      await setConnectorOwnerFn({ data: { id: connectorId, agentId: next } })
+    } catch (err) {
+      setOwners((o) => ({ ...o, [connectorId]: before }))
+      toast.error(errorMessage(err))
+    }
+  }
   const tools = data?.tools ?? null
   const guestSafe = tools?.filter((x) => x.guestSafe).length ?? 0
 
@@ -760,6 +778,21 @@ function ToolsTab({ agent }: { agent: Agent }) {
         <Rule icon={<UsersIcon />} label={t("agents.tools.groups")} value={inGroups} />
         <Rule icon={<MessagesSquareIcon />} label={t("agents.tools.others")} value={others} />
       </ItemGroup>
+
+      <div className="flex flex-wrap items-center gap-3">
+        {tools && tools.length > 12 && (
+          <InputGroup className="max-w-sm min-w-0 flex-1">
+            <InputGroupAddon>
+              <SearchIcon aria-hidden="true" />
+            </InputGroupAddon>
+            <InputGroupInput type="search" aria-label={t("agents.tools.search")} placeholder={t("agents.tools.search")} value={query} onChange={(e) => setQuery(e.target.value)} />
+          </InputGroup>
+        )}
+        <Button variant="outline" size="sm" className="ms-auto" render={<Link to="/connectors/new" search={{ agent: agent.id }} />}>
+          <PlusIcon data-icon="inline-start" />
+          {t("agents.tools.addMcp")}
+        </Button>
+      </div>
 
       {error && <LoadError message={error} />}
       {data?.error && <LoadError message={data.error} />}
@@ -788,14 +821,6 @@ function ToolsTab({ agent }: { agent: Agent }) {
       )}
       {tools && tools.length > 0 && (
         <div className="flex flex-col gap-6">
-          {tools.length > 12 && (
-            <InputGroup className="max-w-sm">
-              <InputGroupAddon>
-                <SearchIcon aria-hidden="true" />
-              </InputGroupAddon>
-              <InputGroupInput type="search" aria-label={t("agents.tools.search")} placeholder={t("agents.tools.search")} value={query} onChange={(e) => setQuery(e.target.value)} />
-            </InputGroup>
-          )}
           {groups.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">{t("agents.tools.searchEmpty")}</p>}
           {groups.map((list) => {
             const head = list[0]!
@@ -807,6 +832,9 @@ function ToolsTab({ agent }: { agent: Agent }) {
                   </Link>
                   {head.connectorType === "mcp" && <Badge variant="outline">MCP</Badge>}
                   <span className="text-caption text-muted-foreground tabular-nums">{list.length.toLocaleString()}</span>
+                  {data && head.connectorId in data.scopes && (
+                    <ScopeSelect connectorLabel={head.connectorLabel} scope={ownerOf(head.connectorId)} onChange={(v) => void setScope(head.connectorId, v)} />
+                  )}
                 </div>
                 <ul className="flex flex-col divide-y">
                   {list.map((x) => (
@@ -845,6 +873,18 @@ function ToolsTab({ agent }: { agent: Agent }) {
       )}
     </>
   )
+}
+
+// Whether an MCP server this agent can use is global or its own. A server
+// another agent owns never shows here: this agent doesn't get its tools.
+function ScopeSelect({ connectorLabel, scope, onChange }: { connectorLabel: string; scope: string | null; onChange: (v: string) => void }) {
+  const t = useT()
+  const value = scope === null ? "all" : "only"
+  const options = [
+    { value: "all", label: t("agents.tools.scopeAll"), icon: <GlobeIcon aria-hidden="true" /> },
+    { value: "only", label: t("agents.tools.scopeHere"), icon: <BotIcon aria-hidden="true" /> },
+  ]
+  return <SimpleSelect size="sm" className="ms-auto w-fit max-w-full min-w-0" aria-label={t("agents.tools.scopeFor", { name: connectorLabel })} value={value} options={options} onChange={onChange} />
 }
 
 function Rule({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {

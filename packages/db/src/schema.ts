@@ -126,6 +126,11 @@ export const connectors = sqliteTable("connectors", {
   statusDetail: text("status_detail"),
   trust: text("trust").$type<Trust>().notNull().default("own"),
   config: json<Record<string, unknown>>("config").notNull().default({}),
+  // The one agent that owns this connector (an agent-scoped MCP server): only its
+  // turns get the tools. Null means global, every agent. Never more than one
+  // owner: two agents that need the same server with different logins get a
+  // copy each.
+  agentId: text("agent_id"),
   // AES-256-GCM blob (packages/db/src/crypto.ts) of a JSON object, or null.
   secrets: text("secrets"),
   configHash: text("config_hash").notNull().default(""),

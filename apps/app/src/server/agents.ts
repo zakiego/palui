@@ -57,7 +57,9 @@ export async function agentTools(db: DB, a: AgentRow, now = Date.now()) {
     .where(and(eq(runs.agentId, a.id), eq(toolCalls.status, "ok"), gte(toolCalls.createdAt, now - 7 * DAY)))
     .groupBy(toolCalls.tool)
     .all()
-  return { tools, error, used: Object.fromEntries(used.map((u) => [u.tool, u.n])) as Record<string, number> }
+  // Tool connectors (MCP servers and the like) and their owner agent; null means global.
+  const scopes = Object.fromEntries(listConnectors(db).filter((c) => c.kind === "tools").map((c) => [c.id, c.agentId])) as Record<string, string | null>
+  return { tools, error, used: Object.fromEntries(used.map((u) => [u.tool, u.n])) as Record<string, number>, scopes }
 }
 
 type ContainerStats = { container: string; memories: number; documents: number; lastActivity: number | null }

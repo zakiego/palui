@@ -186,8 +186,13 @@ export function worst(k: Kit) {
     telegramConnectorId: "tgbot-arisan",
   })
   // An uploaded photo: a small gradient PNG, the shape a browser-resized photo has.
-  k.agent({ slug: "cs", name: "CS", persona: "Jawab pertanyaan pelanggan Vorneo.", guestTools: "none", avatarImage: gradientAvatar() })
+  const cs = k.agent({ slug: "cs", name: "CS", persona: "Jawab pertanyaan pelanggan Vorneo.", guestTools: "none", avatarImage: gradientAvatar() })
   k.assign(family, arisan)
+  // Agent-scoped MCP: one owned by the agent with the longest name, one by CS,
+  // and one whose owner was deleted (serves nobody).
+  k.ownConnector("mcp-files", arisan)
+  k.ownConnector("mcp-vorneo", cs)
+  k.ownConnector("mcp-keuangan", "agt_deleted")
   // The agent page (/agents/<slug>): instructions at the limits, and (below)
   // a chat with no title and a chat it no longer answers in.
   k.instruction({

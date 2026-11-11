@@ -2,6 +2,7 @@
 // by kind. A connector with presets (the MCP server) gets its own section that
 // splits "Custom" (any URL, set up by hand) from its ready-made presets.
 // Picking one opens its page, /connectors/<id>, as a draft until it's saved.
+import { z } from "zod"
 import * as React from "react"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { ArrowLeftIcon, PlusIcon, SearchIcon } from "lucide-react"
@@ -26,6 +27,8 @@ import { presetHost, type Preset } from "@/lib/presets"
 import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_app/connectors_/new")({
+  // Set when adding from an agent's page: the new tool connector serves only it.
+  validateSearch: z.object({ agent: z.string().max(100).optional().catch(undefined) }),
   loader: () => getConnectorsPage(),
   head: () => ({ meta: [{ title: "Add connector · Palui" }] }),
   component: NewConnectorPage,
@@ -39,13 +42,14 @@ function NewConnectorPage() {
   const data = Route.useLoaderData()
   const t = useT()
   const navigate = useNavigate()
+  const { agent } = Route.useSearch()
   const [query, setQuery] = React.useState("")
   const q = query.trim().toLowerCase()
 
   const pick = (m: ConnectorManifest, preset?: Preset) => {
     const existing = !m.multiple ? data.items.find((i) => i.type === m.id) : undefined
     if (existing) return void navigate({ to: "/connectors/$id", params: { id: existing.id } })
-    void navigate({ to: "/connectors/$id", params: { id: newConnectorId(m, data.items, preset) }, search: { type: m.id, preset: preset?.id } })
+    void navigate({ to: "/connectors/$id", params: { id: newConnectorId(m, data.items, preset) }, search: { type: m.id, preset: preset?.id, agent: m.kind === "tools" ? agent : undefined } })
   }
   const isAdded = (m: ConnectorManifest) => !m.multiple && data.items.some((i) => i.type === m.id)
 

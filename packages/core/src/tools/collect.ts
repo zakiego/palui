@@ -3,6 +3,7 @@
 // only a core set is active up front (tools loaded earlier in the session, then
 // skills, memory and the rest) and the others are loadable through tool search
 // (`palui__cari_tool`), so nothing is dropped however many connectors are on.
+import { connectorServesAgent } from "../connectors/store"
 import { asSchema, tool, type Tool } from "ai"
 import { z } from "zod"
 import type { ToolClass } from "@palui/db"
@@ -82,7 +83,8 @@ export type CollectOptions = {
 export async function collectTools(running: RunningEntry[], opts: CollectOptions): Promise<CollectedTools> {
   const out = emptyTools()
   const entries = running
-    .filter((e) => e.handle.tools && (!opts.scope || opts.scope.includes(e.id)))
+    // An agent-scoped connector (an MCP server for one agent) only serves its agents.
+    .filter((e) => e.handle.tools && (!opts.scope || opts.scope.includes(e.id)) && connectorServesAgent(e.row, opts.turn.agentId))
     .sort((a, b) => (KIND_ORDER[a.row.kind] ?? 9) - (KIND_ORDER[b.row.kind] ?? 9))
   const order: string[] = []
   for (const e of entries) {

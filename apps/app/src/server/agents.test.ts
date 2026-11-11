@@ -64,7 +64,7 @@ describe("agentTools", () => {
     call("run_a:4", "run_a", "ok", NOW - 8 * DAY)
     call("run_b:1", "run_b", "ok", NOW - DAY)
     setRuntime(upRuntime({ agentTools: async () => ({ tools: [] }) }))
-    expect(await agentTools(db, chef, NOW)).toEqual({ tools: [], error: null, used: { web__fetch: 2 } })
+    expect(await agentTools(db, chef, NOW)).toEqual({ tools: [], error: null, used: { web__fetch: 2 }, scopes: {} })
   })
 
   it("still shows usage when the runtime is down", async () => {

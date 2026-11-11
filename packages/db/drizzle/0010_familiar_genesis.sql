@@ -1,0 +1,1 @@
+ALTER TABLE `connectors` ADD `agent_id` text;

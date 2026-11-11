@@ -39,5 +39,9 @@ export const migrations: { name: string; sql: string }[] = [
   {
     "name": "0009_tense_toxin",
     "sql": "ALTER TABLE `chats` ADD `reply_mode` text DEFAULT 'mention' NOT NULL;"
+  },
+  {
+    "name": "0010_familiar_genesis",
+    "sql": "ALTER TABLE `connectors` ADD `agent_id` text;"
   }
 ]

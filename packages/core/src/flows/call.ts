@@ -5,6 +5,7 @@
 //   2. passes the flow's chat (and the flow id) in the tool context, so chat-scoped
 //      built-in tools (reminders, notes, flows) act on the right chat.
 // The turn's maxTools and tool search don't apply: a flow may use any enabled tool.
+import { connectorServesAgent } from "../connectors/store"
 import { asSchema } from "ai"
 import type { PaluiTool, TurnInfo } from "../connectors/define"
 import type { RunningEntry } from "../connectors/supervisor"
@@ -78,6 +79,8 @@ export function connectorFlowCaller(running: () => RunningEntry[]): FlowToolCall
     const out: { info: ToolInfo; pt: PaluiTool }[] = []
     for (const e of running()) {
       if (only && e.id !== only) continue
+      // Another agent's own MCP server is out of reach for this flow's agent.
+      if (!connectorServesAgent(e.row, turn.agentId)) continue
       for (const [name, pt] of Object.entries(await toolsOf(e, turn))) if (pt?.tool) out.push({ info: infoOf(e, name, pt), pt })
     }
     return out

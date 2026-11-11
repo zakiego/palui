@@ -1,5 +1,6 @@
 import { connectConnector, getConnector, getSecrets, upsertConnector } from "@palui/core/connectors/store"
 import { events, memoryDb } from "@palui/db"
+import { createAgent } from "@palui/core/agents"
 import { describe, expect, it } from "vitest"
 import { manifestFor } from "@/lib/manifests"
 import { connectConnectorAction, describeField, listConnectorItems, pauseConnectorAction, removeConnectorAction, resumeConnectorAction, ConnectorError, saveDraft } from "./connectors"
@@ -104,5 +105,24 @@ describe("connector wizard", () => {
     expect(describeField(shape.baseUrl)).toEqual({ kind: "string", optional: true, defaultValue: "http://host.docker.internal:8317" })
     const mcp = (manifestFor("mcp")!.config as unknown as { shape: Record<string, never> }).shape
     expect(describeField(mcp.authMode)).toMatchObject({ kind: "enum", options: ["none", "bearer", "header"] })
+  })
+})
+
+describe("agent-scoped connectors", () => {
+  it("saves a tool connector's owner agent, refuses a missing one, and ignores it elsewhere", () => {
+    const db = memoryDb()
+    const deps = { db, rt: upRuntime(), masterKey: TEST_MASTER_KEY }
+    const chef = createAgent(db, { slug: "chef", name: "Chef", persona: "p" })
+    saveDraft(deps, { id: "mcp-crm", type: "mcp", config: { url: "https://crm.example.com/mcp" }, agentId: chef.id })
+    expect(getConnector(db, "mcp-crm")!.agentId).toBe(chef.id)
+    expect(() => saveDraft(deps, { id: "mcp-crm", type: "mcp", agentId: "agt_gone" })).toThrow("doesn't exist")
+    // Left out, the owner stays; null makes it global.
+    saveDraft(deps, { id: "mcp-crm", type: "mcp", label: "CRM" })
+    expect(getConnector(db, "mcp-crm")!.agentId).toBe(chef.id)
+    saveDraft(deps, { id: "mcp-crm", type: "mcp", agentId: null })
+    expect(getConnector(db, "mcp-crm")!.agentId).toBeNull()
+    // A channel never gets an owner.
+    saveDraft(deps, { id: "telegram", type: "telegram", secrets: { botToken: TOKEN }, agentId: chef.id })
+    expect(getConnector(db, "telegram")!.agentId).toBeNull()
   })
 })

@@ -39,6 +39,14 @@ Each server gets an instance id like `mcp-<slug>`, and its tools reach the model
   A turn loads about 64 tools up front. With more servers on, Palui loads the rest when it needs them: it searches by keyword with `palui__cari_tool`, then calls what it found, and those tools stay loaded for the rest of the conversation. That costs one extra step the first time, so turning off tools you don't use still helps.
 </Callout>
 
+## Global or one agent
+
+An MCP server is global by default: every agent gets its tools. It can also belong to one agent, and then only that agent gets them. Open the connector and pick "One agent" under "Who can use it". From an agent's Tools tab you can switch a server between global and that agent, or press "Add MCP" to add one that agent owns.
+
+A server never has two owners. When two agents need the same server with different logins, add it twice, give each copy its own token, and give each copy to its agent. Each copy has its own id, so their tools never mix.
+
+Other agents don't get an owned server's tools, don't see it in their list of what they can do, and can't call it from a flow. A flow source still reads any server, since you set those up yourself. Delete an agent and the servers it owned pause and serve nobody until you make them global or give them to another agent.
+
 ## Pause and remove
 
 Pausing applies from the next turn. Tool calls already running finish. Removing asks first and deletes the stored token.

@@ -2,7 +2,7 @@
 // container and daily cap. Exactly one is the default (Palui), the owner's
 // personal agent; it never answers in a shared chat.
 import { asc, desc, eq, isNull } from "drizzle-orm"
-import { agents, chats, instructions, newId, type DB, type GuestTools, type OwnerPowers } from "@palui/db"
+import { agents, chats, connectors, instructions, newId, type DB, type GuestTools, type OwnerPowers } from "@palui/db"
 import type { ChatRow } from "./chats"
 import { isOwner } from "./owner"
 import { getSetting } from "./settings"
@@ -229,6 +229,9 @@ export function deleteAgent(db: DB, id: string): boolean {
   if (row.isDefault) throw new AgentError("Palui is the default agent and can't be deleted.")
   db.transaction((tx) => {
     tx.update(chats).set({ agentId: null }).where(eq(chats.agentId, id)).run()
+    // Connectors it owned keep the old owner id, so they serve nobody (never
+    // everyone), and pause until the owner makes them global or gives them a new agent.
+    tx.update(connectors).set({ enabled: false }).where(eq(connectors.agentId, id)).run()
     tx.delete(instructions).where(eq(instructions.agentId, id)).run()
     tx.delete(agents).where(eq(agents.id, id)).run()
   })

@@ -3,7 +3,7 @@
 // the danger area. Leaving the page with unsaved edits keeps them as a draft.
 import * as React from "react"
 import { Link, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon } from "lucide-react"
+import { ArrowLeftIcon, BotIcon, GlobeIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { ConnectorManifest, SetupStep } from "@palui/core/connectors/define"
 
@@ -27,7 +27,9 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { StatusText } from "@/components/ui/status-text"
 import { Button } from "@/components/ui/button"
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet, FieldLegend, FieldTitle } from "@/components/ui/field"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { AgentAvatar } from "@/components/agent-avatar"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -42,13 +44,19 @@ import { type FieldStep, type WizardField, wizardFieldInfo as fieldInfo, wizardI
 
 type ActionStep = Extract<SetupStep, { action: string }>
 
-export function ConnectorDetail({ target, manifest: m, appUrl }: { target: ConnectorTarget; manifest: ConnectorManifest; appUrl: string }) {
+type ScopeAgent = { id: string; name: string; isDefault: boolean; avatarImage: string | null; avatarIcon: string | null; avatarColor: string | null }
+
+export function ConnectorDetail({ target, manifest: m, appUrl, agents }: { target: ConnectorTarget; manifest: ConnectorManifest; appUrl: string; agents: ScopeAgent[] }) {
   const t = useT()
   const router = useRouter()
   const navigate = useNavigate()
   const [values, setValues] = React.useState(() => wizardInitialValues(m, target.config))
   const [label, setLabel] = React.useState(target.label)
   const [trust, setTrust] = React.useState(target.trust)
+  const [owner, setOwner] = React.useState(target.agentId)
+  // Sent only once changed here (or set by "Add MCP" on a new one), so a save
+  // never undoes an owner picked on the agent page meanwhile.
+  const [ownerTouched, setOwnerTouched] = React.useState(target.isNew && target.agentId !== null)
   const [dirty, setDirty] = React.useState(false)
   const [errors, setErrors] = React.useState<Record<string, string>>({})
   const [busy, setBusy] = React.useState<null | "save" | "test" | "connect" | "remove">(null)
@@ -75,7 +83,7 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
 
   const payload = () => {
     const { config, secrets } = wizardPayload(m, values)
-    return { id: target.id, type: m.id, label: label.trim() || m.name, config, secrets, trust: m.multiple ? trust : undefined }
+    return { id: target.id, type: m.id, label: label.trim() || m.name, config, secrets, trust: m.multiple ? trust : undefined, agentId: m.kind === "tools" && ownerTouched ? owner : undefined }
   }
 
   const clearSecretInputs = () =>
@@ -276,6 +284,19 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
         </Field>
       )}
 
+      {m.kind === "tools" && (
+        <AgentScope
+          id={target.id}
+          agents={agents}
+          value={owner}
+          onChange={(v) => {
+            setOwner(v)
+            setOwnerTouched(true)
+            setDirty(true)
+          }}
+        />
+      )}
+
       {actionSteps.map((step) => (
         <FieldSet key={step.action} className="gap-3">
           <FieldLegend variant="label">{step.label}</FieldLegend>
@@ -376,6 +397,47 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
         </div>
       </div>
     </>
+  )
+}
+
+// Global (every agent gets its tools) or owned by one agent. Never two owners:
+// two agents that need different logins get a copy each. Choice cards, title only.
+function AgentScope({ id, agents, value, onChange }: { id: string; agents: ScopeAgent[]; value: string | null; onChange: (v: string | null) => void }) {
+  const t = useT()
+  // Back to "One agent" after "Global" picks the last owner again.
+  const last = React.useRef(value)
+  if (value !== null) last.current = value
+  const gone = value !== null && !agents.some((a) => a.id === value)
+  return (
+    <FieldSet className="gap-3">
+      <FieldLegend variant="label">{t("connectors.agents")}</FieldLegend>
+      <RadioGroup value={value === null ? "all" : "one"} onValueChange={(v) => onChange(v === "one" ? (value ?? last.current ?? agents[0]?.id ?? null) : null)} className="grid grid-cols-1 gap-3 @md/main:grid-cols-2">
+        {(["all", "one"] as const).map((v) => (
+          <FieldLabel key={v} htmlFor={`${id}-agents-${v}`}>
+            <Field orientation="horizontal" className="items-center gap-3">
+              {v === "all" ? <GlobeIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /> : <BotIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
+              <FieldContent>
+                <FieldTitle>{t(v === "all" ? "connectors.agentsAll" : "connectors.agentsOne")}</FieldTitle>
+              </FieldContent>
+              <RadioGroupItem value={v} id={`${id}-agents-${v}`} />
+            </Field>
+          </FieldLabel>
+        ))}
+      </RadioGroup>
+      {value !== null && (
+        <Field>
+          <FieldLabel htmlFor={`${id}-owner`} className="sr-only">
+            {t("connectors.owner")}
+          </FieldLabel>
+          <SimpleSelect
+            id={`${id}-owner`}
+            value={gone ? "" : value}
+            options={[...(gone ? [{ value: "", label: t("connectors.ownerGone") }] : []), ...agents.map((a) => ({ value: a.id, label: a.name, icon: <AgentAvatar agent={a} size="xs" /> }))]}
+            onChange={(v) => v && onChange(v)}
+          />
+        </Field>
+      )}
+    </FieldSet>
   )
 }
 
