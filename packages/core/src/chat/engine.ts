@@ -10,7 +10,7 @@ import { silentLogger, type Logger } from "../log"
 import { claimOwner, isOwner } from "../owner"
 import type { ConnectorServices, InboundMessage } from "../connectors/define"
 import { turnBus, type TurnBus } from "./bus"
-import { runCommand, switchAgent } from "./commands"
+import { runCommand, switchAgent, type CommandReply } from "./commands"
 import { maybeCompact } from "./compaction"
 import type { StoredContent } from "./context"
 import type { EngineDeps } from "./deps"
@@ -143,12 +143,13 @@ export function createEngine(opts: EngineOptions) {
           break
         case "command": {
           handled(row.id)
-          const reply = await runCommand(ctx, chat, r.name, r.args)
-          const out = sendToChat(ctx, chat, reply.text, "system", { ...(reply.actions ? { actions: reply.actions } : {}), ...(reply.format ? { format: reply.format } : {}) })
+          const reply = await runCommand(ctx, chat, r.name, r.args, { id: row.id, text: row.text, replyToChannelMsgId: row.replyToChannelMsgId })
+          const out = reply.text ? sendToChat(ctx, chat, reply.text, "system", { ...(reply.actions ? { actions: reply.actions } : {}), ...(reply.format ? { format: reply.format } : {}) }) : undefined
           if (reply.after) {
-            await waitSent(out.id, opts.sendWaitMs ?? 5_000)
+            if (out) await waitSent(out.id, opts.sendWaitMs ?? 5_000)
             await reply.after()
           }
+          if (reply.later) runLater(chat, r.name, reply.later)
           break
         }
         case "approval":
@@ -175,6 +176,22 @@ export function createEngine(opts: EngineOptions) {
       log.error("dispatch failed", { chat_id: chat.id, message_id: messageId, error: e })
       return null
     }
+  }
+
+  // A command's slow part (CommandReply.later). Not awaited: routing for this
+  // chat goes on, so `/stop` still lands while a `/btw` answer is being written.
+  function runLater(chat: ChatRow, name: string, later: NonNullable<CommandReply["later"]>) {
+    const work = later.queued ? queue.runInChat(chat.id, later.run) : later.run()
+    void track(
+      work
+        .then((text) => {
+          if (text) sendToChat(ctx, chat, text, "system", later.format ? { format: later.format } : {})
+        })
+        .catch((e) => {
+          log.error("command failed", { chat_id: chat.id, command: name, error: e })
+          sendToChat(ctx, chat, `/${name} gagal jalan. Coba lagi ya.`, "system")
+        }),
+    )
   }
 
   function answerCallback(chat: ChatRow, callbackId: string) {

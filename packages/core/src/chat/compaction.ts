@@ -12,11 +12,23 @@ import type { EngineCtx } from "./turn"
 
 export const COMPACT_AFTER = 40
 export const KEEP_AFTER_COMPACTION = 20
+// `/compact`: fold everything but the last few messages, however short the session.
+export const KEEP_AFTER_MANUAL = 6
 
+// `short`: nothing old enough to fold. `no_model`: no fast model is running.
+export type CompactResult = { status: "ok"; folded: number } | { status: "short" | "no_model" | "failed" | "no_session" }
+
+// After a turn: compact once the session is past COMPACT_AFTER messages.
 export async function maybeCompact(ctx: EngineCtx, sessionId: string): Promise<boolean> {
+  return (await compactSession(ctx, sessionId, { after: COMPACT_AFTER, keep: KEEP_AFTER_COMPACTION })).status === "ok"
+}
+
+// Fold the session's messages into its summary when there are more than
+// `after`, keeping the newest `keep` in context.
+export async function compactSession(ctx: EngineCtx, sessionId: string, opts: { after: number; keep: number }): Promise<CompactResult> {
   const { db, log } = ctx
   const session = getSession(db, sessionId)
-  if (!session) return false
+  if (!session) return { status: "no_session" }
   const rows = db
     .select()
     .from(messages)
@@ -31,13 +43,13 @@ export async function maybeCompact(ctx: EngineCtx, sessionId: string): Promise<b
     )
     .orderBy(asc(messages.createdAt), asc(messages.id))
     .all()
-  if (rows.length <= COMPACT_AFTER) return false
-  const fold = rows.slice(0, rows.length - KEEP_AFTER_COMPACTION)
+  if (rows.length <= opts.after) return { status: "short" }
+  const fold = rows.slice(0, rows.length - opts.keep)
   const until = fold.at(-1)!.createdAt
   const chain = resolveChain(db, ctx.host, "fast")
   if (!chain.length) {
     log.warn("compaction skipped: no fast model running", { session_id: sessionId })
-    return false
+    return { status: "no_model" }
   }
   const transcript = fold.map((m) => `${m.role === "user" ? "Owner" : "Palui"}: ${m.text}`).join("\n")
   try {
@@ -50,12 +62,12 @@ export async function maybeCompact(ctx: EngineCtx, sessionId: string): Promise<b
       abortSignal: AbortSignal.timeout(60_000),
     })
     const summary = r.text.trim()
-    if (!summary) return false
+    if (!summary) return { status: "failed" }
     db.update(sessions).set({ summary, summarizedUntil: until }).where(eq(sessions.id, sessionId)).run()
   } catch (e) {
     log.warn("compaction failed", { session_id: sessionId, error: e })
-    return false
+    return { status: "failed" }
   }
   await autoSave(db, findMemory(ctx.host.running()), sessionId, log, until)
-  return true
+  return { status: "ok", folded: fold.length }
 }

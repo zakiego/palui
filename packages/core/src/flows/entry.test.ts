@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { hooks } from "@palui/db"
+import { flowCommands } from "../chat/commands-info"
 import { route } from "../chat/router"
 import { getChat } from "../chats"
 import { createHook } from "../hooks/index"
@@ -36,6 +37,13 @@ describe("chat triggers", () => {
     await h.run(h.now())
     expect(runsOf(h.db, flow.id).map((r) => r.runKey).sort()).toEqual(["chat:msg_1", "chat:msg_2"])
     expect(sentTexts(h.db).map((s) => s.text).sort()).toEqual(["Dicatat: -", "Dicatat: listrik november"])
+  })
+
+  it("lists a chat's flow commands for /help, phrases and other chats left out", () => {
+    const h = flowHarness()
+    h.create(BERES)
+    expect(flowCommands(h.db, h.chatId)).toEqual([{ command: "/beres", flow: "Beres" }])
+    expect(flowCommands(h.db, h.otherChatId)).toEqual([])
   })
 
   it("only matches in the flow's own chat", async () => {

@@ -5,6 +5,7 @@
 // connectors with its class. Problems come back as sentences with a JSON path,
 // for cek_flow and every write. The derived `writeCalls` list is what the owner
 // approves for a version.
+import { BUILTIN_COMMANDS } from "../chat/command-names"
 import { isValidZone } from "../reminders/time"
 import { ExprError, parseExpr, parsePath, pathsOf, type PathNode } from "./expr"
 import { edgesOf, findCycle, reachable } from "./graph"
@@ -61,8 +62,6 @@ export type Validated = {
   tools: Record<string, ToolInfo>
   writeCalls: WriteCall[]
 }
-
-const BUILTIN_COMMANDS = ["/new", "/stop", "/status", "/connectors", "/agent", "/report", "/start", "/help"]
 
 export function parseDefinition(raw: unknown): { definition: FlowDefinition | null; problems: Problem[] } {
   const up = upgradeDefinition(raw)

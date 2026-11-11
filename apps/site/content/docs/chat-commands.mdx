@@ -1,20 +1,29 @@
 ---
 title: Chat commands
-description: Reference for /connectors, /new, /stop, /status, /report and /agent, plus the approval and reminder replies Palui understands on every channel.
+description: Reference for every chat command, from /help and /status to /model, /btw, /id and /report, plus the approval and reminder replies Palui understands on every channel.
 ---
 
-Commands start with a slash. The router handles them before anything else, so they never reach the model and work even when every model connector is paused. Only the owner can use them. From anyone else they're plain text: in a chat with an agent they go to the agent as a normal message, and anywhere else they're dropped.
+Commands start with a slash. The router handles them before anything else, so they never start a turn, and all but `/btw` and `/compact` work even when every model connector is paused. Only the owner can use them. From anyone else they're plain text: in a chat with an agent they go to the agent as a normal message, and anywhere else they're dropped.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
+| `/help` | Lists the commands, including the ones your flows in this chat answer to. |
 | `/connectors` | Lists every connector with its state. On Telegram each one has an inline button to flip it. |
 | `/connectors on <id>` | Turns a connector on (resumes it). |
 | `/connectors off <id>` | Pauses a connector. Credentials are kept. |
 | `/new` | Starts a new session in this chat. recall auto-save runs for the one you just closed. |
 | `/stop` | Aborts the turn that's running in this chat. |
+| `/compact` | Folds the older messages of this session into its summary now. The last 6 stay as they are. |
+| `/btw <question>` | Asks a side question. The session is the context, but the question and the answer stay out of it. |
 | `/status` | Shows the model in use, tokens used today and connector states. |
+| `/usage` | Shows today's tokens and runs, by model and by agent, for this chat, and the last 7 days. |
+| `/model` | Shows the model chain of each role (`default`, `fast`, `vision`). |
+| `/model <name>` | Puts that model first for `default`. `/model fast <name>` and `/model vision <name>` set the other roles. |
+| `/models` | Lists the models each model connector offers. `/models <word>` filters, `/models <id>` shows one connector. |
+| `/tools` | Counts the tools a turn in this chat would get, per connector and class. `/tools <id>` lists one connector's tools. |
+| `/id` | Shows the chat, session and message ids. Quote a message to get its ids. |
 | `/report` | Replies with a debug snapshot of this chat to paste into a coding agent. |
 | `/report <note>` | Same, with your note on what went wrong at the top. |
 | `/agent` | Shows which agent answers in this chat and lists the agents. |
@@ -31,6 +40,38 @@ Commands start with a slash. The router handles them before anything else, so th
 ```
 
 Connecting a new connector and removing one stay in the dashboard. Chat only pauses and resumes. Pausing applies from the next turn. See [Connectors](/docs/concepts/connectors).
+
+### /model and /models
+
+```text
+/models claude
+/model opus
+/model fast cliproxy/claude-haiku-4-5-20251001
+```
+
+`/model <name>` takes a full model id or a part of one. If the part matches several models, the reply lists them and nothing changes. The model goes first in the role's chain on every running connector that offers it, and the old chain stays behind it as the fallback. Write `<connector>/<model>` to pick one connector.
+
+This is the same setting as Models on the dashboard's Settings page, so it holds for every chat and agent, from the next message on. Messages with images use the `vision` role, which `/model <name>` doesn't touch.
+
+### /btw
+
+```text
+/btw itu tadi hotel yang mana?
+```
+
+A side question gets one answer from the `default` model with no tools. It sees the session's summary and latest messages, but nothing is added to the session, so the next turn reads the same history as before. Its tokens count toward the daily cap. It answers while a turn is running too.
+
+### /compact
+
+Palui compacts a session on its own past about 40 messages. `/compact` does it now, whatever the length, and waits for a running turn to finish first. Unlike `/new`, the session goes on: the `fast` model writes the summary and the last 6 messages stay as they are.
+
+### /id
+
+```text
+/id
+```
+
+Without a quote it shows the chat id, the session id, the agent and the id of the `/id` message itself. Quote any message and send `/id` to see that message's id, its run and its session. For something Palui sent without a turn (a command reply, a reminder, an approval prompt) it shows the outbox id and what sent it.
 
 ### /report
 
@@ -66,7 +107,7 @@ If the only model connector is paused, any normal message gets this fixed reply:
 Model lagi off. Nyalakan: /connectors on cliproxy
 ```
 
-(The model is off. Turn it on with this command.) Commands and plain reminders keep working.
+(The model is off. Turn it on with this command.) `/btw` gets the same reply. The other commands and plain reminders keep working.
 
 ## Approval answers
 

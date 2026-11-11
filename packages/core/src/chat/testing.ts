@@ -143,9 +143,9 @@ export function promptText(prompt: unknown): string {
   return JSON.stringify(prompt)
 }
 
-export function modelRuntime(id: string, model: () => MockLanguageModelV4): AnyRuntime {
+export function modelRuntime(id: string, model: () => MockLanguageModelV4, extra: Partial<RunningConnector> = {}): AnyRuntime {
   const m = defineManifest({ id, kind: "model", name: id, icon: "cpu", summary: "", config: z.object({}), secrets: {}, setup: [] })
-  return defineRuntime(m, { test: async () => ({ ok: true, detail: "" }), start: async () => ({ stop: async () => {}, model: () => model() }) })
+  return defineRuntime(m, { test: async () => ({ ok: true, detail: "" }), start: async () => ({ stop: async () => {}, model: () => model(), ...extra }) })
 }
 
 export function toolsRuntime(id: string, tools: () => Record<string, PaluiTool>, kind: "tools" | "skill" | "memory" = "tools", extra: Partial<RunningConnector> = {}): AnyRuntime {

@@ -9,23 +9,49 @@ import { rotateSession, type ChatRow } from "../chats"
 import { autoSave, findMemory } from "../memory"
 import { channelName, ownerChat, selfChannelOffUndo } from "../connectors/rules"
 import { getConnector, listConnectors, pauseConnector, resumeConnector } from "../connectors/store"
+import type { CommandName } from "./command-names"
+import { helpText, idText, toolsText, usageText } from "./commands-info"
+import { cmdBtw, cmdCompact, cmdModel, modelsText } from "./commands-model"
 import { createReport } from "./report"
-import type { CommandName } from "./router"
 import { sendToChat, type EngineCtx } from "./turn"
 
 export type CommandReply = {
+  // Empty when the whole answer comes from `later`.
   text: string
   actions?: { id: string; label: string }[]
   // "plain" skips the channel's markdown conversion (the default for replies).
   format?: "plain" | "markdown"
   // Runs after the reply was sent (turning off the channel the reply goes through).
   after?: () => Promise<void>
+  // Slow work (a model or network call): the router moves on to the next
+  // message and the text this returns is sent when it's done. `queued` runs it
+  // in the chat's order, so it never lands in the middle of a turn.
+  later?: { run: () => Promise<string>; queued?: boolean; format?: "plain" | "markdown" }
 }
+
+// The message that carried the command: /btw reads its text, /id its ids.
+export type CommandMessage = { id: string; text: string; replyToChannelMsgId?: string | null }
 
 const STATUS_LABEL: Record<string, string> = { on: "nyala", paused: "dijeda", error: "error", connecting: "nyambung...", not_set_up: "belum disetup" }
 
-export async function runCommand(ctx: EngineCtx, chat: ChatRow, name: CommandName, args: string[]): Promise<CommandReply> {
+export async function runCommand(ctx: EngineCtx, chat: ChatRow, name: CommandName, args: string[], msg?: CommandMessage): Promise<CommandReply> {
   switch (name) {
+    case "help":
+      return { text: helpText(ctx, chat) }
+    case "id":
+      return { text: idText(ctx, chat, msg) }
+    case "usage":
+      return { text: usageText(ctx, chat) }
+    case "tools":
+      return { text: "", later: { run: () => toolsText(ctx, chat, args) } }
+    case "models":
+      return { text: "", later: { run: () => modelsText(ctx, args) } }
+    case "model":
+      return cmdModel(ctx, chat, args)
+    case "btw":
+      return cmdBtw(ctx, chat, msg)
+    case "compact":
+      return cmdCompact(ctx, chat)
     case "new":
       return cmdNew(ctx, chat)
     case "stop":

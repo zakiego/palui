@@ -8,10 +8,11 @@ import { askedIn, pendingForChat } from "../approvals/store"
 import { ensureChat, findChat, type ChatRow } from "../chats"
 import { isOwner } from "../owner"
 import type { InboundMessage } from "../connectors/define"
+import { COMMANDS, type CommandName } from "./command-names"
 import type { StoredContent } from "./context"
 import type { FlowActions, ReminderActions } from "./deps"
 
-export type CommandName = "new" | "stop" | "status" | "connectors" | "agent" | "report"
+export type { CommandName } from "./command-names"
 
 export type Route =
   | { kind: "ignore"; reason: string }
@@ -73,14 +74,12 @@ export function chatCheck(chat: ChatRow): string | null {
   return null
 }
 
-const COMMANDS: Record<string, CommandName> = { "/new": "new", "/stop": "stop", "/status": "status", "/connectors": "connectors", "/agent": "agent", "/report": "report" }
-
 export function parseCommand(text: string): { name: CommandName; args: string[] } | null {
   const t = text.trim()
   if (!t.startsWith("/")) return null
   const [head, ...args] = t.split(/\s+/)
   // Telegram adds @botname in groups: /status@palui_bot
-  const name = COMMANDS[head!.toLowerCase().replace(/@\S+$/, "")]
+  const name = (COMMANDS as Record<string, CommandName>)[head!.toLowerCase().replace(/@\S+$/, "")]
   return name ? { name, args } : null
 }
 

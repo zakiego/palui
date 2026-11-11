@@ -91,6 +91,7 @@ describe("expressions and templates", () => {
   it("checks wait, chat commands, events and deadline next", () => {
     expect(problems(base([{ id: "w", kind: "wait" }]))[0]).toMatch(/exactly one of minutes or until/)
     expect(problems(base([{ id: "m", kind: "message", text: "x" }], [{ id: "c", kind: "chat", start: "m", command: "/status" }]))[0]).toMatch(/built-in command/)
+    for (const command of ["/help", "/usage", "/btw", "/id", "/start"]) expect(problems(base([{ id: "m", kind: "message", text: "x" }], [{ id: "c", kind: "chat", start: "m", command }]))[0]).toMatch(/built-in command/)
     expect(problems(base([{ id: "m", kind: "message", text: "x" }], [{ id: "e", kind: "event", start: "m", event: "run.failed" }]))[0]).toMatch(/own run.failed/)
     const manualNext = base([{ id: "a", kind: "checkin", text: "?" }])
     expect(problems(manualNext)[0]).toMatch(/deadline "next"/)
