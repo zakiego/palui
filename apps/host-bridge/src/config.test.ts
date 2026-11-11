@@ -54,6 +54,27 @@ describe("parseConfig", () => {
     expect(() => parseConfig({ token: TOKEN, commands: [{ description: "x", class: "read", command: "/bin/echo" }] })).toThrow(/commands\[0\]\.name/)
   })
 
+  it("keeps dangerouslyAllowAnyCommand off unless asked", () => {
+    expect(parseConfig({ token: TOKEN }).dangerouslyAllowAnyCommand).toBeUndefined()
+    expect(parseConfig({ token: TOKEN, dangerouslyAllowAnyCommand: false }).dangerouslyAllowAnyCommand).toBeUndefined()
+  })
+
+  it("fills dangerouslyAllowAnyCommand defaults from true or an object", () => {
+    const on = parseConfig({ token: TOKEN, dangerouslyAllowAnyCommand: true }).dangerouslyAllowAnyCommand!
+    expect(on.shell).toMatch(/^\//)
+    expect(on).toMatchObject({ timeoutMs: 120_000, maxOutputBytes: 16_384 })
+    const tuned = parseConfig({ token: TOKEN, dangerouslyAllowAnyCommand: { shell: "/bin/sh", cwd: "/tmp", timeoutMs: 5000 } }).dangerouslyAllowAnyCommand!
+    expect(tuned).toMatchObject({ shell: "/bin/sh", cwd: "/tmp", timeoutMs: 5000 })
+    expect(() => parseConfig({ token: TOKEN, dangerouslyAllowAnyCommand: { shell: "sh" } })).toThrow(/absolute path/)
+    expect(() => parseConfig({ token: TOKEN, dangerouslyAllowAnyCommand: { timeout: 1 } })).toThrow(/Unrecognized key/)
+  })
+
+  it("reserves the shell name when dangerouslyAllowAnyCommand is on", () => {
+    const cmd = { name: "shell", description: "x", class: "read", command: "/bin/echo" }
+    expect(() => parseConfig({ token: TOKEN, commands: [cmd] })).not.toThrow()
+    expect(() => parseConfig({ token: TOKEN, dangerouslyAllowAnyCommand: true, commands: [cmd] })).toThrow(/taken by dangerouslyAllowAnyCommand/)
+  })
+
   it("expands ~ in command and cwd", () => {
     const c = command({ command: "~/bin/tool", cwd: "~/work" })
     expect(c.command).not.toContain("~")

@@ -118,14 +118,20 @@ async function main(): Promise<void> {
   }
   const issues = problems(config)
 
+  const danger = config.dangerouslyAllowAnyCommand
+  const dangerLine = danger
+    ? `DANGER: dangerouslyAllowAnyCommand is on. The "shell" tool runs any command as this user through ${danger.shell} -lc.`
+    : null
+
   if (cmd === "check") {
+    if (dangerLine) console.error(dangerLine)
     for (const c of config.commands) {
       const params = Object.keys(c.params)
       console.log(`${c.name} [${c.class}] ${c.command} ${c.args.join(" ")}${params.length ? `  params: ${params.join(", ")}` : ""}`)
     }
     for (const p of issues) console.error(`warning: ${p}`)
     if (issues.length) fail(`fix the warnings above, then restart the bridge:\n  ${restartHint()}`)
-    console.log(`config OK: ${config.commands.length} commands on ${config.host}:${config.port}`)
+    console.log(`config OK: ${config.commands.length} commands${danger ? " plus shell" : ""} on ${config.host}:${config.port}`)
     console.log(`Restart the bridge to apply changes:\n  ${restartHint()}`)
     console.log("Then in Palui: open the connector, press Reload in the tool table, check the classes and Save tool settings.")
     return
@@ -133,6 +139,7 @@ async function main(): Promise<void> {
 
   if (cmd !== "serve") fail(`unknown command ${cmd}`)
   for (const p of issues) console.error(`warning: ${p}`)
+  if (dangerLine) console.error(dangerLine)
   const bridge = await startBridge(config)
   console.log(`palui-host-bridge on ${bridge.url} with ${config.commands.length} commands (config ${path})`)
   const stop = () => {

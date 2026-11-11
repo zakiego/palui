@@ -1,7 +1,8 @@
 // The bridge's config file: the token and the allowlist of commands. Nothing
 // runs that isn't listed here, commands run without a shell, and the model can
 // only fill in declared params, each checked against an enum or a pattern.
-import { readFileSync } from "node:fs"
+// The one exception is dangerouslyAllowAnyCommand, which the owner turns on by hand.
+import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import { z } from "zod"
@@ -102,6 +103,29 @@ function argRefs(arg: string): { name: string; spread: boolean }[] {
   return [...arg.matchAll(PLACEHOLDER)].map((m) => ({ name: m[1]!, spread: false }))
 }
 
+// The tool that dangerouslyAllowAnyCommand adds. Commands can't use this name.
+export const SHELL_TOOL = "shell"
+
+function defaultShell(): string {
+  const shell = process.env.SHELL
+  if (shell && isAbsolute(shell) && existsSync(shell)) return shell
+  return existsSync("/bin/zsh") ? "/bin/zsh" : "/bin/sh"
+}
+
+// Opt-in escape hatch: one `shell` tool that runs any command line through a
+// login shell (`<shell> -lc "<command>"`), so the allowlist no longer limits
+// anything. Its annotations always say destructive, so Palui asks before every call.
+const dangerousSchema = z.strictObject({
+  note: z.string().optional(),
+  // Default: $SHELL, else /bin/zsh, else /bin/sh. A login shell, so PATH comes from your profile.
+  shell: z.string().min(1).transform(expandHome).refine(isAbsolute, "shell must be an absolute path").optional(),
+  cwd: z.string().transform(expandHome).default(homedir()),
+  timeoutMs: z.number().int().min(100).max(600_000).default(120_000),
+  maxOutputBytes: z.number().int().min(1024).max(1_048_576).default(16_384),
+})
+
+export type DangerousSpec = Omit<z.infer<typeof dangerousSchema>, "shell"> & { shell: string }
+
 const configSchema = z
   .strictObject({
     note: z.string().optional(),
@@ -111,11 +135,18 @@ const configSchema = z
     port: z.number().int().min(1).max(65_535).default(DEFAULT_PORT),
     token: z.string().min(32, "use a token of at least 32 characters"),
     commands: z.array(commandSchema).default([]),
+    // true for the defaults, an object to tune them, false or absent for off.
+    dangerouslyAllowAnyCommand: z
+      .preprocess((v) => (v === true ? {} : v === false ? undefined : v), dangerousSchema.optional())
+      .transform((d): DangerousSpec | undefined => (d ? { ...d, shell: d.shell ?? defaultShell() } : undefined)),
   })
   .superRefine((c, ctx) => {
     const seen = new Set<string>()
     for (const cmd of c.commands) {
       if (seen.has(cmd.name)) ctx.addIssue({ code: "custom", message: `duplicate command name "${cmd.name}"` })
+      if (cmd.name === SHELL_TOOL && c.dangerouslyAllowAnyCommand) {
+        ctx.addIssue({ code: "custom", message: `"${SHELL_TOOL}" is taken by dangerouslyAllowAnyCommand, rename the command` })
+      }
       seen.add(cmd.name)
     }
   })

@@ -101,6 +101,30 @@ describe("host bridge", () => {
     expect(t.length).toBeLessThan(1200)
   })
 
+  it("has no shell tool unless dangerouslyAllowAnyCommand is on", async () => {
+    const client = await connect()
+    const { tools } = await client.listTools()
+    expect(tools.some((t) => t.name === "shell")).toBe(false)
+  })
+
+  it("runs any command line through a login shell when dangerouslyAllowAnyCommand is on", async () => {
+    bridge = await startBridge(
+      { ...config, port: 0, dangerouslyAllowAnyCommand: { shell: "/bin/sh", cwd: "/tmp", timeoutMs: 300, maxOutputBytes: 16_384 } },
+      createLogger({}, (l) => logs.push(l)),
+    )
+    const client = await connect()
+    const shell = (await client.listTools()).tools.find((t) => t.name === "shell")!
+    expect(shell.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true })
+    const r = await client.callTool({ name: "shell", arguments: { command: "echo $((1 + 2)) | tr 3 x\npwd" } })
+    expect(r.isError).toBe(false)
+    expect(text(r)).toMatch(/^exit 0\n--- stdout ---\nx\n(\/private)?\/tmp\n$/)
+    const sub = await client.callTool({ name: "shell", arguments: { command: "pwd", cwd: "/" } })
+    expect(text(sub)).toBe("exit 0\n--- stdout ---\n/\n")
+    const slow = await client.callTool({ name: "shell", arguments: { command: "sleep 5" } })
+    expect(text(slow)).toMatch(/^timed out after 300 ms/)
+    expect(logs.some((l) => l.includes('"msg":"shell call"'))).toBe(true)
+  })
+
   it("treats okExitCodes as success", async () => {
     const client = await connect()
     const r = await client.callTool({ name: "nomatch", arguments: {} })

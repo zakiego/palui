@@ -4,11 +4,13 @@
 import { createHash, timingSafeEqual } from "node:crypto"
 import http from "node:http"
 import type { AddressInfo } from "node:net"
+import { homedir } from "node:os"
+import { isAbsolute, join, resolve } from "node:path"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
 import { createLogger, type Logger } from "@palui/core/log"
 import { z } from "zod"
-import { ArgError, buildArgv, type BridgeConfig, type CommandSpec, type ParamSpec } from "./config.ts"
+import { ArgError, buildArgv, SHELL_TOOL, type BridgeConfig, type CommandSpec, type DangerousSpec, type ParamSpec } from "./config.ts"
 import { formatResult, runCommand } from "./run.ts"
 
 export type Bridge = {
@@ -26,6 +28,7 @@ export async function startBridge(config: BridgeConfig, log: Logger = createLogg
   const expected = digest(`Bearer ${config.token}`)
   // Built once. Only the McpServer is per request: the SDK binds one to one transport.
   const tools = config.commands.map((spec) => toolDef(spec, log))
+  if (config.dangerouslyAllowAnyCommand) tools.push(shellToolDef(config.dangerouslyAllowAnyCommand, log))
   const server = http.createServer(async (req, res) => {
     const pathname = new URL(req.url ?? "/", "http://x").pathname
     if (pathname === "/health" && req.method === "GET") {
@@ -93,6 +96,48 @@ function toolDef(spec: CommandSpec, log: Logger): ToolDef {
       return { content: [{ type: "text", text: formatResult(r, spec.timeoutMs) }], isError: !r.ok }
     },
   }
+}
+
+// dangerouslyAllowAnyCommand: any command line, through a login shell. No param
+// checks on purpose; the owner's approval in Palui is the only gate.
+function shellToolDef(d: DangerousSpec, log: Logger): ToolDef {
+  const base: CommandSpec = {
+    name: SHELL_TOOL,
+    description: "",
+    class: "destructive",
+    command: d.shell,
+    args: [],
+    params: {},
+    cwd: d.cwd,
+    env: {},
+    timeoutMs: d.timeoutMs,
+    maxOutputBytes: d.maxOutputBytes,
+    okExitCodes: [0],
+  }
+  return {
+    name: SHELL_TOOL,
+    config: {
+      title: "Run any shell command on the host",
+      description: `Run a command line on the host with ${d.shell} -lc, as the owner's user, with full access. Pipes, redirects and multi-line scripts work. Default working directory ${d.cwd}. Times out after ${Math.round(d.timeoutMs / 1000)} s. Prefer a dedicated tool when one fits.`,
+      inputSchema: {
+        command: z.string().min(1).describe("The command line to run, e.g. `ls -la ~/Downloads | head`"),
+        cwd: z.string().min(1).optional().describe("Working directory. Absolute, ~/..., or relative to the default"),
+      },
+      annotations: annotationsFor("destructive"),
+    },
+    async run(input) {
+      const command = String(input.command ?? "")
+      const cwd = typeof input.cwd === "string" ? resolveCwd(d.cwd, input.cwd) : d.cwd
+      const r = await runCommand({ ...base, cwd }, ["-lc", command])
+      log.warn("shell call", { command, cwd, exit: r.exitCode, timedOut: r.timedOut, ms: r.durationMs })
+      return { content: [{ type: "text", text: formatResult(r, d.timeoutMs) }], isError: !r.ok }
+    },
+  }
+}
+
+function resolveCwd(base: string, cwd: string): string {
+  if (cwd === "~" || cwd.startsWith("~/")) return join(homedir(), cwd.slice(1))
+  return isAbsolute(cwd) ? cwd : resolve(base, cwd)
 }
 
 function annotationsFor(cls: CommandSpec["class"]): { readOnlyHint: boolean; destructiveHint: boolean } {
