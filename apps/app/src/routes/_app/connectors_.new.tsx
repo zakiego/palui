@@ -1,7 +1,7 @@
 // Add connector page: the catalog of every connector Palui can set up, grouped
 // by kind. A connector with presets (the MCP server) gets its own section that
 // splits "Custom" (any URL, set up by hand) from its ready-made presets.
-// Picking one goes back to /connectors, which opens the setup sheet.
+// Picking one opens its page, /connectors/<id>, as a draft until it's saved.
 import * as React from "react"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { ArrowLeftIcon, PlusIcon, SearchIcon } from "lucide-react"
@@ -10,6 +10,7 @@ import type { ConnectorManifest } from "@palui/core/connectors/define"
 import { AppError } from "@/components/app-error"
 import { connectorIcon } from "@/components/connector-icon"
 import { CONNECTOR_GROUPS } from "@/components/connectors/shared"
+import { newConnectorId } from "@/components/connectors/targets"
 import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending } from "@/components/page-pending"
 import { Badge } from "@/components/ui/badge"
@@ -41,8 +42,11 @@ function NewConnectorPage() {
   const [query, setQuery] = React.useState("")
   const q = query.trim().toLowerCase()
 
-  const pick = (m: ConnectorManifest, preset?: Preset) =>
-    void navigate({ to: "/connectors", search: { add: m.id, preset: preset?.id } })
+  const pick = (m: ConnectorManifest, preset?: Preset) => {
+    const existing = !m.multiple ? data.items.find((i) => i.type === m.id) : undefined
+    if (existing) return void navigate({ to: "/connectors/$id", params: { id: existing.id } })
+    void navigate({ to: "/connectors/$id", params: { id: newConnectorId(m, data.items, preset) }, search: { type: m.id, preset: preset?.id } })
+  }
   const isAdded = (m: ConnectorManifest) => !m.multiple && data.items.some((i) => i.type === m.id)
 
   const sections = CONNECTOR_GROUPS.flatMap(({ kind, label }) => {

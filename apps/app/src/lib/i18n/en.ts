@@ -168,6 +168,7 @@ export const en = {
   "connectors.catalog": "Search connectors",
   "connectors.external": "external",
   "connectors.added": "added",
+  "connectors.notFound": "This connector doesn't exist. It may have been removed.",
   "connectors.custom": "Custom {name}",
   "connectors.customHint": "Set it up yourself with your own URL and token",
   "connectors.customGroup": "Custom",
