@@ -21,6 +21,7 @@ A label in the prompt ("the following is untrusted") isn't counted as a control.
 | [Web fetch](/docs/connectors/web-fetch) results | Anyone can write a web page |
 | [Inbound webhook](/docs/connectors/webhooks) payloads | The sender is a third-party service |
 | Results from an `external` [MCP server](/docs/connectors/mcp) | You don't control what it returns |
+| Messages read from another chat ([Chat history](/docs/connectors/chat-history)) | Quoted text, group titles and webhook payloads come from other people |
 
 Each MCP server has a trust flag: `own` for servers you run, `external` for everything else. Only `external` results taint a turn.
 
