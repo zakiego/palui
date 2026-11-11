@@ -43,6 +43,34 @@ function renderBlock(b: Block, key: number): React.ReactNode {
         </ul>
       )
     }
+    case "table":
+      // A wide table scrolls inside the bubble; the bubble never grows past the transcript.
+      return (
+        <div key={key} className="max-w-full overflow-x-auto">
+          <table className="w-max min-w-full border-collapse text-start text-[0.9375em] tabular-nums">
+            <thead>
+              <tr>
+                {b.head.map((cell, i) => (
+                  <th key={i} scope="col" className="border-b border-foreground/20 px-2 py-1 text-start align-bottom font-semibold first:ps-0 last:pe-0">
+                    {renderInline(cell)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {b.rows.map((row, r) => (
+                <tr key={r}>
+                  {row.map((cell, i) => (
+                    <td key={i} className="max-w-[24rem] border-b border-foreground/10 px-2 py-1 align-top first:ps-0 last:pe-0">
+                      {renderInline(cell)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
   }
 }
 
