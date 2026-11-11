@@ -34,7 +34,7 @@ export default function HomePage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="lp-intro">
         <h1 className="lp-h1">An agent friend you host yourself</h1>
-        <p className="lp-lede">A simple, friendly agent that keeps you company.</p>
+        <p className="lp-lede">A simple, friendly agent that keeps you company</p>
         <div className="lp-cta-row">
           <Link href="/docs" className="lp-cta">
             Read the docs
