@@ -7,8 +7,6 @@ export default defineManifest({
   name: "Reminders",
   icon: "alarm-clock",
   summary: "Set, list, move and snooze reminders from chat.",
-  description:
-    "Palui reads phrases like \"ingetin bayar listrik besok jam 9\" or \"remind me every Monday 8am\" and echoes the time back so a wrong read shows right away. Reminders fire on time with Done and Snooze buttons (on WhatsApp, reply \"done\" or \"tunda 1j\" quoting the reminder). Plain reminders never call the model.",
   builtin: true,
   config: z.object({}),
   secrets: {},

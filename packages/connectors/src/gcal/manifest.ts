@@ -6,9 +6,7 @@ export default defineManifest({
   kind: "tools",
   name: "Google Calendar",
   icon: "calendar",
-  summary: "Let Palui read your Google Calendar. Read only.",
-  description:
-    "Palui can look at your events (calendar.readonly scope) but never create, change or delete them. You bring your own Google OAuth client: create a Web application client in Google Cloud Console and add the redirect URI shown in the setup.",
+  summary: "Let Palui read your Google Calendar.",
   config: z.object({
     calendarIds: z.array(z.string().trim().min(1)).min(1).default(["primary"]),
     // Learned after sign-in (the primary calendar id is the account email).
@@ -20,12 +18,12 @@ export default defineManifest({
     refreshToken: z.string().min(10).optional(),
   },
   setup: [
-    { field: "clientId", label: "OAuth client ID", placeholder: "1234-abc.apps.googleusercontent.com", help: "Google Cloud Console, APIs and Services, Credentials. Type: Web application." },
+    { field: "clientId", label: "OAuth client ID", placeholder: "1234-abc.apps.googleusercontent.com", help: "A Web application client from Google Cloud Console." },
     { field: "clientSecret", label: "OAuth client secret", secret: true },
-    { action: "oauth", label: "Connect with Google", help: "Redirect URI to register: <APP_URL>/api/oauth/google/callback" },
+    { action: "oauth", label: "Connect with Google", help: "Add this redirect URI in Google: <APP_URL>/api/oauth/google/callback" },
   ],
   trust: "own",
-  removeWarning: "This deletes the Google tokens from Palui. To revoke access fully, also remove Palui at myaccount.google.com/permissions.",
+  removeWarning: "This deletes the Google tokens. Revoke Palui at myaccount.google.com/permissions too.",
   docs: {
     notes: [
       "Tool: lihat_kalender (read). Times are shown in your timezone.",

@@ -21,18 +21,16 @@ export default defineManifest({
   name: "MCP server",
   icon: "plug",
   summary: "Give Palui the tools of an MCP server you run or trust.",
-  description:
-    "Connects one MCP server over Streamable HTTP. Every tool gets its own Switch and a class: read, write or destructive. Destructive tools always ask before running, and tools from an external server taint the turn so writes ask too.",
   multiple: true,
   trust: "external",
   config: mcpConfig,
   secrets: { token: z.string().min(1).optional() },
   setup: [
-    { field: "url", label: "Server URL", placeholder: "https://example.com/api/mcp", help: "Streamable HTTP endpoint. SSE-only servers aren't supported." },
-    { field: "authMode", label: "Auth", help: "none, bearer (Authorization: Bearer <token>) or header (a custom header)" },
-    { field: "headerName", label: "Header name", optional: true, placeholder: "x-api-key", help: "Only for the custom header mode" },
+    { field: "url", label: "Server URL", placeholder: "https://example.com/api/mcp", help: "Streamable HTTP only, not SSE." },
+    { field: "authMode", label: "Auth" },
+    { field: "headerName", label: "Header name", optional: true, placeholder: "x-api-key", help: "Only for header auth." },
     { field: "token", label: "Token", secret: true, optional: true },
-    { action: "listTools", label: "Pick which tools Palui may use", help: "Read-only tools are prefilled as read, the rest as write or destructive from the server's hints." },
+    { action: "listTools", label: "Pick which tools Palui may use" },
   ],
   presets: [
     { id: "vorneo", label: "Vorneo", config: { url: "https://vorneo.id/api/mcp/", authMode: "bearer" }, secretFields: ["token"] },
@@ -54,7 +52,7 @@ export default defineManifest({
       trust: "own",
     },
   ],
-  removeWarning: "This removes the server and its token from Palui. The server itself isn't touched.",
+  removeWarning: "This removes the token from Palui. The server isn't touched.",
   docs: {
     notes: [
       "Tools are namespaced <connector id>__<tool>, for example mcp-vorneo__search_listings.",
