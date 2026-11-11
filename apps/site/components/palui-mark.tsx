@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn"
 // kopiah over two dots and a satisfied smile on a plain tile. Every shape is
 // filled (no strokes) so it renders the same in browsers, Satori and
 // ImageMagick. The same paths are in lib/og.tsx. The favicons are the
-// mascot's head instead (scripts/favicon.mjs).
+// mascot's head instead (scripts/brand-icons.mjs).
 export const MARK_TILE = "M0 8a8 8 0 0 1 8-8h16a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8H8a8 8 0 0 1-8-8Z"
 export const MARK_CAP =
   "M10.2 6h11.6a1.2 1.2 0 0 1 1.17.93l1.5 6.6a1.2 1.2 0 0 1-1.17 1.47H8.7a1.2 1.2 0 0 1-1.17-1.47l1.5-6.6A1.2 1.2 0 0 1 10.2 6Z"
