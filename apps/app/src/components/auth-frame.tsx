@@ -10,12 +10,7 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
         <ThemeToggle />
       </div>
       <main className="stagger-in relative flex w-full max-w-sm flex-col gap-6">
-        <span
-          aria-hidden="true"
-          className="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-[0_1px_2px_oklch(0_0_0/0.12),inset_0_1px_0_oklch(1_0_0/0.15)]"
-        >
-          <PaluiMark className="size-8" />
-        </span>
+        <PaluiMark className="mx-auto size-12" />
         {children}
       </main>
     </div>

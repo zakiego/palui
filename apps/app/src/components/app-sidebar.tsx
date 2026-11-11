@@ -37,9 +37,7 @@ export function AppSidebar({ username, onLogout, ...props }: { username: string;
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link to="/" onClick={close} />} tooltip={t("app.name")}>
-              <span aria-hidden="true" className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <PaluiMark className="size-6" />
-              </span>
+              <PaluiMark className="size-8" />
               <span className="grid flex-1 text-start text-sm leading-tight">
                 <span className="truncate font-heading font-semibold text-foreground">{t("app.name")}</span>
                 <span className="truncate text-xs text-muted-foreground">{t("app.tagline")}</span>

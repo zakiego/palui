@@ -7,7 +7,6 @@ import { CircleAlertIcon, PlugIcon, PlugZapIcon } from "lucide-react"
 
 import { connectorIcon } from "@/components/connector-icon"
 import { ConnectorStatusBadge } from "@/components/connector-status"
-import { IconTile } from "@/components/icon-tile"
 import { PaluiMark } from "@/components/palui-mark"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -34,9 +33,7 @@ export function ConnectorBoard({ items, live, onOpen }: ConnectorLayoutProps) {
         <span aria-hidden="true" className="hidden h-px flex-1 bg-border-strong @5xl/main:block" />
         <Card size="sm" className="w-full max-w-[16rem] shrink-0 @5xl/main:w-auto @5xl/main:max-w-none @5xl/main:min-w-0 @5xl/main:flex-[0_1_12rem]">
           <CardHeader className="grid-cols-[auto_1fr] items-center gap-x-3">
-            <IconTile size="lg" tone="brand" className="row-span-2">
-              <PaluiMark />
-            </IconTile>
+            <PaluiMark className="row-span-2 size-10" />
             <CardTitle>{t("app.name")}</CardTitle>
             <CardDescription className="tabular-nums">{t("home.map.on", { n: on, total: setUp })}</CardDescription>
           </CardHeader>
