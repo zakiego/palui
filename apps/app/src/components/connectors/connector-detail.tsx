@@ -191,9 +191,12 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
 
   const fieldSteps = m.setup.filter((s): s is FieldStep => "field" in s)
   const settingUp = status === "not_set_up"
-  const requiredSteps = fieldSteps.filter((s) => !fieldInfo(m, s).optional || errors[s.field])
-  const hiddenCount = settingUp && !showAll && requiredSteps.length > 0 ? fieldSteps.length - requiredSteps.length : 0
-  const shownSteps = hiddenCount > 0 ? requiredSteps : fieldSteps
+  // A field tied to another one (MCP's token to its auth mode) shows only while it applies.
+  const applies = (s: FieldStep) => !s.showIf || s.showIf.in.includes(String(values[s.showIf.field] ?? ""))
+  const activeSteps = fieldSteps.filter(applies)
+  const requiredSteps = activeSteps.filter((s) => !fieldInfo(m, s).optional || s.askFirst || errors[s.field])
+  const hiddenCount = settingUp && !showAll && requiredSteps.length > 0 ? activeSteps.length - requiredSteps.length : 0
+  const shownSteps = hiddenCount > 0 ? requiredSteps : activeSteps
   const actionSteps = m.setup.filter((s): s is ActionStep => "action" in s)
   const live = detail.data?.live ?? {}
 
@@ -251,6 +254,7 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
             info={fieldInfo(m, step)}
             value={values[step.field]}
             stored={target.secrets[step.field]}
+            appUrl={appUrl}
             error={errors[step.field]}
             onChange={(v) => set(step.field, v)}
           />
@@ -381,6 +385,7 @@ function WizardField({
   info,
   value,
   stored,
+  appUrl,
   error,
   onChange,
 }: {
@@ -389,10 +394,11 @@ function WizardField({
   info: WizardField
   value: string | boolean | undefined
   stored: string | undefined
+  appUrl: string
   error: string | undefined
   onChange: (v: string | boolean) => void
 }) {
-  const describedBy = [step.help ? `${id}-help` : null, step.command && info.secret && stored ? `${id}-stored` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined
+  const describedBy = [step.help ? `${id}-help` : null, info.secret && stored ? `${id}-stored` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined
   if (info.kind === "boolean") {
     return (
       <Field orientation="horizontal" data-invalid={!!error}>
@@ -409,6 +415,7 @@ function WizardField({
     return (
       <Field data-invalid={!!error}>
         <FieldLabel htmlFor={id}>{step.label}</FieldLabel>
+        {step.help && <FieldDescription id={`${id}-help`}>{step.help}</FieldDescription>}
         <SimpleSelect
           id={id}
           className="w-full"
@@ -416,7 +423,6 @@ function WizardField({
           options={info.options.map((o) => ({ value: o, label: o }))}
           onChange={(v) => onChange(v)}
         />
-        {step.help && <FieldDescription id={`${id}-help`}>{step.help}</FieldDescription>}
         {error && <FieldError id={`${id}-error`}>{error}</FieldError>}
       </Field>
     )
@@ -425,15 +431,11 @@ function WizardField({
     <Field data-invalid={!!error}>
       <FieldLabel htmlFor={id}>
         {step.label}
-        {info.optional && <span className="font-normal text-muted-foreground">(optional)</span>}
+        {info.optional && !step.showIf && <span className="font-normal text-muted-foreground">(optional)</span>}
       </FieldLabel>
-      {/* A step with a command is a guide: run this, then paste. Show it first. */}
-      {step.command && (
-        <>
-          {step.help && <FieldDescription id={`${id}-help`}>{step.help}</FieldDescription>}
-          <CommandBlock command={step.command} />
-        </>
-      )}
+      {/* Guide first: where the value comes from, then the box to paste it into. */}
+      {step.help && <FieldDescription id={`${id}-help`}>{step.help}</FieldDescription>}
+      {step.command && <CommandBlock command={step.command.replaceAll("{appUrl}", appUrl)} />}
       <Input
         id={id}
         type={info.secret ? "password" : info.kind === "number" ? "number" : "text"}
@@ -448,20 +450,13 @@ function WizardField({
         onChange={(e) => onChange(e.target.value)}
         className={info.secret || info.kind !== "string" ? "font-mono" : undefined}
       />
-      {step.command
-        ? info.secret && stored && <FieldDescription id={`${id}-stored`}>Saved as {stored}. Leave empty to keep it.</FieldDescription>
-        : (step.help || (info.secret && stored)) && (
-            <FieldDescription id={`${id}-help`}>
-              {step.help}
-              {info.secret && stored ? `${step.help ? " " : ""}Saved as ${stored}. Leave empty to keep it.` : ""}
-            </FieldDescription>
-          )}
+      {info.secret && stored && <FieldDescription id={`${id}-stored`}>Saved as {stored}. Leave empty to keep it.</FieldDescription>}
       {error && <FieldError id={`${id}-error`}>{error}</FieldError>}
     </Field>
   )
 }
 
-// A command the field's help asks you to run, with a copy button so nobody has
+// A command (or value) the field's help asks you to run or paste, with a copy button so nobody has
 // to select it out of a sentence.
 function CommandBlock({ command }: { command: string }) {
   return (

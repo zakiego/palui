@@ -16,11 +16,18 @@ export type SetupStep =
       field: string
       label: string
       help?: string
-      // A shell command the help refers to, shown as a copyable block under it.
+      // A command or value the help refers to, shown as a copyable block between
+      // the help and the input (guide first, then the box to paste into).
+      // `{appUrl}` is replaced with the dashboard's URL.
       command?: string
       secret?: boolean
       placeholder?: string
       optional?: boolean
+      // Before the first connect the page shows only required fields. This
+      // shows an optional one there too (MCP's auth mode and token).
+      askFirst?: boolean
+      // Show the field only while another field has one of these values.
+      showIf?: { field: string; in: string[] }
     }
   // Wizard actions the dashboard renders specially.
   | { action: "claimOwner" | "pairWhatsApp" | "ownerPhone" | "pickContainer" | "listTools" | "oauth"; label: string; help?: string }
