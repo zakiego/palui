@@ -1,11 +1,10 @@
-// One flow (RFC flows 10), read-only: its triggers, the steps as a vertical list
-// with their branches, what it may change, the version history with what each
+// One flow (RFC flows 10), read-only: its triggers, the steps as a graph with
+// their branches, what it may change, the version history with what each
 // version changed, and recent runs (each opens its step log on the run page).
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon, CornerDownRightIcon, MessagesSquareIcon, SearchXIcon } from "lucide-react"
+import { ArrowLeftIcon, MessagesSquareIcon, SearchXIcon } from "lucide-react"
 
 import { AppError } from "@/components/app-error"
-import { ClampText } from "@/components/clamp-text"
 import { PagePending, SkeletonText } from "@/components/page-pending"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -19,6 +18,7 @@ import { getFlowFn } from "@/lib/fns/flows"
 import { ago, inZone } from "@/lib/format"
 import { useLabel, useT } from "@/lib/i18n"
 import { FLOW_RUN_TONE, FlowBadges } from "@/components/flow-badges"
+import { FlowGraph } from "@/components/flow-graph"
 
 export const Route = createFileRoute("/_app/flows_/$id")({
   loader: ({ params }) => getFlowFn({ data: { id: params.id } }),
@@ -172,11 +172,10 @@ function Triggers({ flow, timezone }: { flow: Flow; timezone: string }) {
   )
 }
 
-// The definition as a vertical list: each step with its kind, what it does and
-// where it goes next. Branch targets are step ids, so they read as links down the list.
+// The definition as a graph (components/flow-graph.tsx): triggers on top,
+// branches as labelled arrows, and the picked step in full below it.
 function Steps({ flow }: { flow: Flow }) {
   const t = useT()
-  const label = useLabel()
   return (
     <Card size="sm">
       <CardHeader>
@@ -185,48 +184,7 @@ function Steps({ flow }: { flow: Flow }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <ol className="flex flex-col">
-          {flow.steps.map((s, i) => (
-            <li key={s.id} id={`step-${s.id}`} className="relative flex min-w-0 gap-3 pb-4 last:pb-0">
-              <span aria-hidden="true" className="flex w-6 shrink-0 flex-col items-center">
-                <span className="flex size-6 items-center justify-center rounded-full border font-mono text-caption tabular-nums">{i + 1}</span>
-                {i < flow.steps.length - 1 && <span className="mt-1 w-px flex-1 bg-border" />}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-mono text-sm break-all">{s.id}</span>
-                  <Badge variant="outline">{label("flow.kind", s.kind)}</Badge>
-                  {s.write && <StatusText tone="warning">{t("flow.write")}</StatusText>}
-                  {s.startOf.length > 0 && <span className="text-caption text-muted-foreground">{t("flow.startOf", { triggers: s.startOf.join(", ") })}</span>}
-                </span>
-                {s.name && (
-                  <span dir="auto" className="text-sm font-medium break-words">
-                    {s.name}
-                  </span>
-                )}
-                <ClampText text={s.summary} lines={3} className={`text-sm break-words whitespace-pre-wrap text-muted-foreground ${s.kind === "if" || s.kind === "tool" || s.kind === "set" || s.kind === "each" ? "font-mono text-xs" : ""}`} />
-                <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-muted-foreground">
-                  {s.edges.map((e) =>
-                    e.to ? (
-                      <a key={`${e.label}-${e.to}`} href={`#step-${e.to}`} className="inline-flex min-w-0 items-center gap-1 underline-offset-4 hover:underline">
-                        <CornerDownRightIcon aria-hidden="true" className="size-3 shrink-0" />
-                        <span className="break-all">
-                          {e.label} → {e.to}
-                        </span>
-                      </a>
-                    ) : (
-                      <span key={`${e.label}-end`} className="inline-flex items-center gap-1">
-                        <CornerDownRightIcon aria-hidden="true" className="size-3 shrink-0" />
-                        {e.label} → {t("flow.ends")}
-                      </span>
-                    ),
-                  )}
-                  {s.ends && <span>{t("flow.ends")}</span>}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ol>
+        <FlowGraph steps={flow.steps} triggers={flow.triggers} />
       </CardContent>
     </Card>
   )

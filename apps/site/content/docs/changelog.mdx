@@ -19,6 +19,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 - A flow check-in's deadline can now be computed. `{kind:"at", at:"{{steps.nextp.data.next.timestamp}}", plusMin:-10}` stops it 10 minutes before a time a tool returned, `{kind:"next", plusMin:-10}` stops it 10 minutes before the schedule's next occurrence, and `after` takes a template like `"{{vars.left}}"`. A deadline that has already passed skips the ask and takes `onMissed`, so a reminder chain like "last reminder 10 minutes before the next prayer" works whatever the gap between prayers is.
 
+### Changed
+
+- A flow's page now draws its steps as a graph: triggers on top, each step as a card, branches as labelled arrows, and an "ends" mark wherever a run can finish. Click a step to read it in full under the graph.
+
 ### Fixed
 
 - A turn that runs out of time no longer ends in silence. When the next step probably won't fit in the time left, or it's the last allowed step, the model is told to answer now with no tools. If a turn still times out, the chat gets a short note saying what ran, whether anything changed, and to say "lanjut" to continue, and the next turn sees that note too.
