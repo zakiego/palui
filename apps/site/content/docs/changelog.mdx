@@ -11,6 +11,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.4.0 (2026-11-11)
+
 ### Added
 
 - Tool search. When more tools are enabled than Tools per turn (Settings, Limits), Palui loads a core set and lists the rest by name. It finds what it needs with `palui__cari_tool` (keywords in any language or exact names), calls it in the same turn, and keeps it loaded for the rest of the conversation. However many skills and MCP servers you add, none of their tools get dropped. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
