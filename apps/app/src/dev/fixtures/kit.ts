@@ -10,10 +10,12 @@ import {
   chats,
   events,
   hooks,
+  instructions,
   jobs,
   messages,
   newId,
   pendingApprovals,
+  preferences,
   reminders,
   runs,
   schema,
@@ -150,6 +152,16 @@ export function createKit(db: DB, now = Date.now()) {
           createdAt: values.createdAt === null ? null : new Date(values.createdAt ?? now),
         })
         .run()
+    },
+
+    instruction(values: { title: string; body: string; enabled?: boolean; createdAt?: number }) {
+      const at = values.createdAt ?? now
+      db.insert(instructions).values({ id: newId("ins"), title: values.title, body: values.body, enabled: values.enabled ?? true, createdAt: at, updatedAt: at }).run()
+    },
+
+    // Raw insert: fixtures may use values the service would normalize or refuse.
+    preference(prefKey: string, value: string) {
+      db.insert(preferences).values({ key: prefKey, value, updatedAt: now }).run()
     },
 
     // Fake bytes behind the right magic number, so the type check passes.

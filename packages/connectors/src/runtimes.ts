@@ -7,8 +7,10 @@ import gcal from "./gcal/runtime"
 import hooks from "./hooks/runtime"
 import jobs from "./jobs/runtime"
 import mcp from "./mcp/runtime"
+import notes from "./notes/runtime"
 import recall from "./recall/runtime"
 import reminders from "./reminders/runtime"
+import remoteMcp from "./remote-mcp/runtime"
 import t3code from "./t3code/runtime"
 import telegram from "./telegram/runtime"
 import voice from "./voice/runtime"
@@ -28,6 +30,8 @@ export const runtimes: Record<string, AnyRuntime> = {
   t3code,
   reminders,
   jobs,
+  notes,
+  "remote-mcp": remoteMcp,
   attachments,
   voice,
   webfetch,

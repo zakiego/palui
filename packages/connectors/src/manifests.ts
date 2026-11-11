@@ -8,8 +8,10 @@ import gcal from "./gcal/manifest"
 import hooks from "./hooks/manifest"
 import jobs from "./jobs/manifest"
 import mcp from "./mcp/manifest"
+import notes from "./notes/manifest"
 import recall from "./recall/manifest"
 import reminders from "./reminders/manifest"
+import remoteMcp from "./remote-mcp/manifest"
 import t3code from "./t3code/manifest"
 import telegram from "./telegram/manifest"
 import voice from "./voice/manifest"
@@ -30,6 +32,8 @@ export const manifests: Record<string, ConnectorManifest> = {
   t3code,
   reminders,
   jobs,
+  notes,
+  "remote-mcp": remoteMcp,
   attachments,
   voice,
   webfetch,

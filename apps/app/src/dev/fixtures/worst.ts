@@ -12,7 +12,7 @@ import { D, H, MIN, type Kit } from "./kit"
 // Limits the dashboard enforces (the zod schemas in src/lib/fns). A value that
 // claims to be "at the limit" is checked against it, so the fixture can't
 // drift past what the forms accept.
-const LIMITS = { attachmentTitle: 200, attachmentDescription: 1000, attachmentFilename: 200, connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500 }
+const LIMITS = { attachmentTitle: 200, attachmentDescription: 1000, attachmentFilename: 200, connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500, instructionTitle: 80, instructionBody: 1000, preferenceKey: 40, preferenceValue: 300 }
 
 function within(value: string, limit: number): string {
   if (value.length > limit) throw new Error(`fixture value is ${value.length} characters, over the limit of ${limit}: ${value.slice(0, 40)}`)
@@ -136,6 +136,21 @@ export function worst(k: Kit) {
   k.connector("attachments", "attachments", { status: "on" })
   k.connector("voice", "voice", { status: "not_set_up" })
   k.connector("hooks", "hooks", { status: "on" })
+  k.connector("notes", "notes", { status: "on" })
+  k.connector("remote-mcp", "remote-mcp", { status: "paused" })
+
+  // --- owner notes: at the limits, a URL that never breaks, mixed scripts -------
+  k.instruction({
+    title: within("Jadwal sholat untuk kota default, atau koordinat kalau sedang di luar Indonesia", LIMITS.instructionTitle),
+    body: fill("Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.zakiego.com/api/v1/jadwal?kota=banjarmasin&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\n\n", LIMITS.instructionBody),
+    createdAt: k.now - 40 * D,
+  })
+  k.instruction({ title: "J", body: "Selalu jawab singkat.", createdAt: k.now - 2 * D })
+  k.instruction({ title: "خادم الملفات: الملخص اليومي", body: "Ringkas file baru di server berkas setiap pagi.", enabled: false, createdAt: k.now - D })
+  k.preference(within("default_city_when_travelling_outside_kal", LIMITS.preferenceKey), "Banjarmasin")
+  k.preference("home_coordinates", within(fill("-3.3194374, 114.5907765; ", LIMITS.preferenceValue), LIMITS.preferenceValue))
+  k.preference("x", "y")
+  k.preference("nama_panggilan", "Đặng Thị Ngọc Hân 🌴")
 
   // --- chats: names of every shape, and every age a "last message" can have ----
   const web = k.webChat()

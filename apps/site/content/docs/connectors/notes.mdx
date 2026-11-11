@@ -1,0 +1,46 @@
+---
+title: Instructions & preferences
+description: Standing instructions and key-value defaults that Palui reads at the start of every turn, saved from chat or the Notes page.
+---
+
+Kind: `skill`, builtin. Palui keeps two kinds of notes about you, and both go into the system prompt of every turn in every chat:
+
+- Instructions: short rules Palui follows from now on, like "for prayer times, use the jadwal-sholat MCP server".
+- Preferences: plain key-value defaults, like `default_city = Banjarmasin` or `home_lat = -3.3194`.
+
+## Connect
+
+Nothing to enter. It's on from the first boot. Edit both lists on the Notes page in the dashboard, or ask Palui in chat:
+
+```text
+inget ya, kota default aku Banjarmasin
+simpan instruksi: kalau aku tanya jadwal sholat, pakai server jadwal-sholat
+```
+
+## Settings
+
+None. Limits: 20 instructions of up to 1000 characters, and 50 preferences of up to 300 characters. Preference keys are snake_case and start with a letter (`default_city`, `home_lat`, `timezone`).
+
+## Tools
+
+| Tool | Class | What it does |
+|---|---|---|
+| `simpan_instruksi` | `destructive` | Save a new instruction, or update one by id. |
+| `daftar_instruksi` | `read` | List instructions with their ids. |
+| `hapus_instruksi` | `destructive` | Delete an instruction. |
+| `simpan_preferensi` | `write` | Set a preference (replaces the old value). |
+| `lihat_preferensi` | `read` | List preferences. |
+| `hapus_preferensi` | `write` | Delete a preference. |
+
+## Safety
+
+<Callout type="warn" title="Instructions change every later turn">
+  An instruction is persistent prompt text, so a web page or MCP result that talked Palui into saving one would stick around. That's why saving or deleting an instruction is `destructive`: it always asks you first, shows the full text in the approval, and scheduled jobs and hooks can't do it at all.
+</Callout>
+
+- Preferences are shown to the model as data, not instructions. Setting one is a `write`, so it asks first whenever the turn is tainted.
+- Every change made from chat is logged on the Activity page.
+
+## Pause and remove
+
+Pausing hides the tools. Saved instructions and preferences still go into the prompt. Turn an instruction off with its switch on the Notes page, or delete it there.

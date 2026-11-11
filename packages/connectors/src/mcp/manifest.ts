@@ -13,6 +13,9 @@ export const mcpConfig = z.object({
   // Per-tool Switch and class, saved from the listTools wizard step. A tool with
   // no entry is offered to the model as `destructive` (fail closed).
   toolPrefs: z.record(z.string(), mcpToolPref).default({}),
+  // Set when Palui added the server from chat (the remote-mcp skill). Such a
+  // server only ever talks to public addresses, checked on every request.
+  addedFromChat: z.boolean().optional(),
 })
 
 export default defineManifest({

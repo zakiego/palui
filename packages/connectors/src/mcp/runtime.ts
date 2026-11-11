@@ -1,5 +1,6 @@
 import type { ToolClass } from "@palui/db"
 import { defineRuntime, type ConfigOf, type PaluiTool, type SecretsOf } from "@palui/core/connectors/define"
+import { publicOnlyFetch } from "@palui/core/net/ssrf"
 import { authHeaders, McpConnection, suggestClass, type McpEndpoint, type McpToolDef } from "./client"
 import manifest from "./manifest"
 
@@ -24,7 +25,9 @@ export type McpToolListing = {
 export function endpointFor(config: Config, secrets: Secrets, fetchImpl?: typeof fetch): McpEndpoint {
   if (config.authMode !== "none" && !secrets.token) throw new Error("This server needs a token")
   if (config.authMode === "header" && !config.headerName) throw new Error("Set the header name for the custom header auth mode")
-  return { url: config.url, headers: authHeaders({ authMode: config.authMode, headerName: config.headerName, token: secrets.token }), fetch: fetchImpl }
+  // A server added from chat never gets to reach the compose network or the host.
+  const guarded = config.addedFromChat ? publicOnlyFetch(fetchImpl ?? fetch) : fetchImpl
+  return { url: config.url, headers: authHeaders({ authMode: config.authMode, headerName: config.headerName, token: secrets.token }), fetch: guarded }
 }
 
 export function listingFor(defs: McpToolDef[], prefs: ToolPrefs = {}): McpToolListing[] {

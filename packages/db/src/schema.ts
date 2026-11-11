@@ -478,3 +478,23 @@ export const usage = sqliteTable("usage", {
   value: integer("value").notNull().default(0),
   updatedAt: integer("updated_at").notNull(),
 })
+
+// --- Owner notes ---------------------------------------------------------------------
+
+// Standing instructions the owner saved (from chat after approval, or the
+// dashboard). Every turn's system prompt carries the enabled ones.
+export const instructions = sqliteTable("instructions", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  enabled: bool("enabled").notNull().default(true),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+})
+
+// The owner's defaults as plain key-value pairs ("default_city" -> "Banjarmasin").
+export const preferences = sqliteTable("preferences", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+})

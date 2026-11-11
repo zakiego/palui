@@ -13,6 +13,7 @@ import { failoverModel, resolveChain } from "../models/failover"
 import { enqueueOutbox, notifyOutbox } from "../outbox/enqueue"
 import type { TurnInfo } from "../connectors/define"
 import type { Supervisor } from "../connectors/supervisor"
+import { notesPrompt } from "../notes/service"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
@@ -208,6 +209,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         tz: settings.timezone,
         channel: chat.channel,
         capabilities: capabilityList(ctx, tools),
+        notes: notesPrompt(db),
         recall,
         summary: input.trigger === "message" ? session?.summary : null,
         trigger: origin,

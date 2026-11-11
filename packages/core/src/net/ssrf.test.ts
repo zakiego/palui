@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { assertPublicUrl, blockedAddressReason, isBlockedAddress, resolvePublic, SsrfError, type Resolver } from "./ssrf"
+import { assertPublicUrl, blockedAddressReason, isBlockedAddress, publicOnlyFetch, resolvePublic, SsrfError, type Resolver } from "./ssrf"
 
 describe("blockedAddressReason", () => {
   it.each([
@@ -134,5 +134,28 @@ describe("resolvePublic", () => {
   it("reports DNS failures", async () => {
     await expect(resolvePublic("nope.test", resolver({}))).rejects.toMatchObject({ code: "dns" })
     await expect(resolvePublic("empty.test", resolver({ "empty.test": [] }))).rejects.toMatchObject({ code: "dns" })
+  })
+})
+
+describe("publicOnlyFetch", () => {
+  const ok = (async () => new Response("ok")) as unknown as typeof fetch
+  it("passes public targets through without following redirects", async () => {
+    let seen: RequestInit | undefined
+    const base = (async (_: unknown, init?: RequestInit) => {
+      seen = init
+      return new Response("ok")
+    }) as unknown as typeof fetch
+    const f = publicOnlyFetch(base, async () => [{ address: "93.184.216.34", family: 4 }])
+    expect(await (await f("https://example.com/mcp", { method: "POST" })).text()).toBe("ok")
+    expect(seen).toMatchObject({ method: "POST", redirect: "error" })
+  })
+
+  it("re-checks the address on every call", async () => {
+    let address = "93.184.216.34"
+    const f = publicOnlyFetch(ok, async () => [{ address, family: 4 }])
+    await f("https://example.com/mcp")
+    address = "192.168.1.10"
+    await expect(f("https://example.com/mcp")).rejects.toBeInstanceOf(SsrfError)
+    await expect(f("http://127.0.0.1/mcp")).rejects.toBeInstanceOf(SsrfError)
   })
 })

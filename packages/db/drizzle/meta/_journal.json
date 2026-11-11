@@ -15,6 +15,13 @@
       "when": 1794396133404,
       "tag": "0001_brief_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794397388974,
+      "tag": "0002_tan_legion",
+      "breakpoints": true
     }
   ]
 }

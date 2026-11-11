@@ -17,6 +17,13 @@ export function demo(k: Kit) {
   k.connector("reminders", "reminders", { status: "on" })
   k.connector("jobs", "jobs", { status: "paused" })
   k.connector("webfetch", "webfetch", { status: "on" })
+  k.connector("notes", "notes", { status: "on" })
+  k.connector("remote-mcp", "remote-mcp", { status: "on" })
+  k.connector("mcp-jadwal-sholat", "mcp", { label: "jadwal-sholat", status: "on", trust: "external", config: { url: "https://sholat.zakiego.com/mcp", authMode: "none", addedFromChat: true } })
+  k.instruction({ title: "Jadwal sholat", body: "Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai JSON API di https://sholat.zakiego.com/api/v1 lewat web fetch.", createdAt: now - 3 * H })
+  k.instruction({ title: "Ringkasan pagi", body: "Mulai dengan cuaca, lalu agenda, lalu pengingat hari ini.", enabled: false, createdAt: now - 2 * H })
+  k.preference("default_city", "Banjarmasin")
+  k.preference("timezone", "Asia/Makassar")
   k.connector("attachments", "attachments", { status: "on" })
   k.connector("voice", "voice", { status: "not_set_up" })
 

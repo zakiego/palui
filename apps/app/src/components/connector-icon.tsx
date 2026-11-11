@@ -11,9 +11,11 @@ import {
   MicIcon,
   MonitorIcon,
   NetworkIcon,
+  NotebookPenIcon,
   PaperclipIcon,
   PlugIcon,
   SendIcon,
+  ServerCogIcon,
   SquareTerminalIcon,
   WebhookIcon,
   type LucideIcon,
@@ -34,6 +36,8 @@ const ICONS: Record<string, LucideIcon> = {
   globe: GlobeIcon,
   webhook: WebhookIcon,
   "square-terminal": SquareTerminalIcon,
+  "notebook-pen": NotebookPenIcon,
+  "server-cog": ServerCogIcon,
   paperclip: PaperclipIcon,
 }
 

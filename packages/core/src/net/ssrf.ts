@@ -243,3 +243,16 @@ export async function resolvePublic(hostname: string, resolver: Resolver = syste
   }
   return rows[0] as ResolvedAddress
 }
+
+// A fetch that refuses internal targets on every request, for long-lived clients
+// (an MCP connection) whose URL came from chat. The host is re-resolved each call,
+// so a name that later starts pointing inside is refused too. Redirects are not
+// followed: a public server could otherwise bounce the request inward.
+export function publicOnlyFetch(base: typeof fetch = fetch, resolver: Resolver = systemResolver): typeof fetch {
+  return async (input, init) => {
+    const raw = input instanceof Request ? input.url : String(input)
+    const url = assertPublicUrl(raw)
+    await resolvePublic(hostOf(url), resolver)
+    return base(input, { ...init, redirect: "error" })
+  }
+}

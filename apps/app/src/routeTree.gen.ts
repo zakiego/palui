@@ -18,6 +18,7 @@ import { Route as AppAttachmentsRouteImport } from './routes/_app/attachments'
 import { Route as AppChatsRouteImport } from './routes/_app/chats'
 import { Route as AppConnectorsRouteImport } from './routes/_app/connectors'
 import { Route as AppJobsRouteImport } from './routes/_app/jobs'
+import { Route as AppNotesRouteImport } from './routes/_app/notes'
 import { Route as AppRemindersRouteImport } from './routes/_app/reminders'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
@@ -72,6 +73,11 @@ const AppConnectorsRoute = AppConnectorsRouteImport.update({
 const AppJobsRoute = AppJobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNotesRoute = AppNotesRouteImport.update({
+  id: '/notes',
+  path: '/notes',
   getParentRoute: () => AppRoute,
 } as any)
 const AppRemindersRoute = AppRemindersRouteImport.update({
@@ -139,6 +145,7 @@ export interface FileRoutesByFullPath {
   '/chats': typeof AppChatsRoute
   '/connectors': typeof AppConnectorsRoute
   '/jobs': typeof AppJobsRoute
+  '/notes': typeof AppNotesRoute
   '/reminders': typeof AppRemindersRoute
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/chats': typeof AppChatsRoute
   '/connectors': typeof AppConnectorsRoute
   '/jobs': typeof AppJobsRoute
+  '/notes': typeof AppNotesRoute
   '/reminders': typeof AppRemindersRoute
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -182,6 +190,7 @@ export interface FileRoutesById {
   '/_app/chats': typeof AppChatsRoute
   '/_app/connectors': typeof AppConnectorsRoute
   '/_app/jobs': typeof AppJobsRoute
+  '/_app/notes': typeof AppNotesRoute
   '/_app/reminders': typeof AppRemindersRoute
   '/_app/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -206,6 +215,7 @@ export interface FileRouteTypes {
     | '/chats'
     | '/connectors'
     | '/jobs'
+    | '/notes'
     | '/reminders'
     | '/settings'
     | '/invite/$token'
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/chats'
     | '/connectors'
     | '/jobs'
+    | '/notes'
     | '/reminders'
     | '/settings'
     | '/invite/$token'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '/_app/chats'
     | '/_app/connectors'
     | '/_app/jobs'
+    | '/_app/notes'
     | '/_app/reminders'
     | '/_app/settings'
     | '/invite/$token'
@@ -340,6 +352,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppJobsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/notes': {
+      id: '/_app/notes'
+      path: '/notes'
+      fullPath: '/notes'
+      preLoaderRoute: typeof AppNotesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/reminders': {
       id: '/_app/reminders'
       path: '/reminders'
@@ -426,6 +445,7 @@ interface AppRouteChildren {
   AppChatsRoute: typeof AppChatsRoute
   AppConnectorsRoute: typeof AppConnectorsRoute
   AppJobsRoute: typeof AppJobsRoute
+  AppNotesRoute: typeof AppNotesRoute
   AppRemindersRoute: typeof AppRemindersRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -439,6 +459,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppChatsRoute: AppChatsRoute,
   AppConnectorsRoute: AppConnectorsRoute,
   AppJobsRoute: AppJobsRoute,
+  AppNotesRoute: AppNotesRoute,
   AppRemindersRoute: AppRemindersRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,

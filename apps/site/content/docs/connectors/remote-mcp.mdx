@@ -1,0 +1,57 @@
+---
+title: Remote MCP setup
+description: Let Palui add, list and remove public MCP servers from chat, behind an approval and an SSRF guard. Includes the Jadwal Sholat example.
+---
+
+Kind: `skill`, builtin. Ask Palui to add a public MCP server and it checks the URL, connects once to list the tools, then asks you before saving it. The server becomes a normal [MCP server](/docs/connectors/mcp) connector with the id `mcp-<name>`, so it shows up on the Connectors page and you can change its tools there.
+
+## Connect
+
+Nothing to enter. It's on from the first boot.
+
+## Settings
+
+None.
+
+## Tools
+
+| Tool | Class | What it does |
+|---|---|---|
+| `tambah_server_mcp` | `destructive` | Check a URL, list its tools and add the server. |
+| `daftar_server_mcp` | `read` | List MCP servers, their status and how many tools are on. Never shows tokens. |
+| `hapus_server_mcp` | `destructive` | Remove a server that was added from chat. |
+
+## Safety
+
+- Only `https` URLs on public addresses. Private, loopback, link-local and Docker-internal targets are refused, and the host is resolved again on every request, so a name that later points inside is refused too. Redirects aren't followed.
+- No auth from chat. A server that needs a token is added on the Connectors page, so the token never goes through a chat message, an approval prompt or the logs.
+- Adding and removing always ask first. Scheduled jobs and hooks can't do either.
+- Servers added from chat get external trust: their results taint the turn, so later writes in that turn ask first. Tools start with the class their own hints suggest (read-only hints become `read`, everything else `write` or `destructive`). Review them on the Connectors page.
+- From chat, Palui can only remove servers it added from chat. Others are removed on the Connectors page.
+
+## Pause and remove
+
+Pausing hides the three tools. Servers already added keep running.
+
+## Example: Jadwal Sholat
+
+[Jadwal Sholat](https://sholat.zakiego.com) is a public prayer times service with an MCP endpoint (Streamable HTTP, stateless, no auth) and a JSON API.
+
+1. Add the server. In chat:
+   ```text
+   tambahin MCP server jadwal-sholat, url https://sholat.zakiego.com/mcp
+   ```
+   Approve the request. Palui saves it as `mcp-jadwal-sholat`. You can also add it yourself on the Connectors page: MCP server, URL `https://sholat.zakiego.com/mcp`, auth `none`.
+2. Save your default location as a preference, so Palui doesn't ask every time. Use your own city, or coordinates when you're outside Indonesia:
+   ```text
+   inget ya, kota default aku <kota kamu>
+   ```
+   That sets `default_city`. Outside Indonesia, ask Palui to save `home_lat` and `home_lng` instead. You can also set them on the Notes page.
+3. Optionally save an instruction so the routing sticks:
+   ```text
+   simpan instruksi: untuk jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau servernya mati, pakai https://sholat.zakiego.com/api/v1 lewat web fetch.
+   ```
+4. Ask away:
+   ```text
+   maghrib jam berapa hari ini?
+   ```

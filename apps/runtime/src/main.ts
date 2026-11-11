@@ -89,6 +89,7 @@ export async function startRuntime(opts: RuntimeOptions = {}): Promise<Runtime> 
   engineRef = engine
   if (typeof opts.deps === "function") Object.assign(deps, opts.deps({ db, engine, log, supervisor }))
   Object.assign(services, engine.services)
+  services.reconcile = () => supervisor.poke()
   const worker = createOutboxWorker({ db, channel: (ch) => supervisor.channel(ch), log })
   const control = createControlServer({ db, token: getControlToken(cfg), engine, supervisor, deps, bus, log, startedAt })
 

@@ -177,6 +177,9 @@ export type ConnectorServices = {
   claimOwner(input: { channel: Channel; nonce: string; externalId: string; displayName?: string }): Promise<boolean>
   // Whether this sender is the owner (also learns the WhatsApp LID).
   isOwner(input: { channel: Channel; externalId: string; altId?: string }): boolean
+  // Reconcile connector rows now instead of on the next 30 s tick (a tool added
+  // or removed a connector). Optional so test hosts can leave it out.
+  reconcile?(): void
 }
 
 export type ConnectorContext<C = Record<string, unknown>, S = Record<string, string | undefined>> = {
