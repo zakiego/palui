@@ -8,6 +8,7 @@ import jobs from "./jobs/runtime"
 import mcp from "./mcp/runtime"
 import recall from "./recall/runtime"
 import reminders from "./reminders/runtime"
+import t3code from "./t3code/runtime"
 import telegram from "./telegram/runtime"
 import voice from "./voice/runtime"
 import web from "./web/runtime"
@@ -23,6 +24,7 @@ export const runtimes: Record<string, AnyRuntime> = {
   recall,
   mcp,
   gcal,
+  t3code,
   reminders,
   jobs,
   voice,

@@ -1,0 +1,51 @@
+---
+title: T3 Code
+description: Start coding threads in T3 Code from chat, follow them, and get a message when they finish.
+---
+
+Kind: `tools`. T3 Code connects Palui to the T3 Code server on your Mac. Ask Palui in chat to work on something in one of your projects and it starts a T3 Code thread for it, in its own git worktree by default. When that thread finishes, Palui messages the same chat with the agent's reply and the thread link. It also tells you once if the thread stops to wait for your answer.
+
+## Connect
+
+1. On the Mac running T3 Code, make a pairing code:
+
+   ```bash
+   t3 auth pairing create --ttl 10m
+   ```
+
+2. On the Connectors page, add T3 Code and paste the code. Keep the URL at `http://host.docker.internal:3773` when Palui runs in Docker on the same Mac.
+3. Press Test. Palui trades the code for a token and lists your projects.
+
+The token is full access, so threads Palui starts run like the ones you start yourself. It lasts 30 days and T3 Code can't renew it. When it runs out, the connector goes to `error` and Palui tells you. Make a new pairing code and paste it.
+
+## Settings
+
+| Field | Notes |
+|---|---|
+| T3 Code URL | The server as the runtime sees it. Default `http://host.docker.internal:3773`. |
+| Pairing code | Secret. Used once to get the token, which is stored encrypted and never shown. |
+| Default base branch | New worktrees branch off this. Default `main`. |
+| Model | `provider/model`, for example `claudeAgent/claude-sonnet-5-5`. Used for projects without a default model. Empty: the first model T3 Code offers. |
+
+## Tools
+
+| Tool | Class | What it does |
+|---|---|---|
+| `daftar_proyek` | `read` | Lists your T3 Code projects. |
+| `daftar_thread` | `read` | Lists recent threads, in one project or all of them. |
+| `mulai_thread` | `write` | Starts a thread with a task, in a new worktree unless you ask for the project's own checkout. |
+| `kirim_ke_thread` | `write` | Sends a follow-up to a thread. An idle thread starts working on it. |
+| `lihat_thread` | `read` | Shows a thread's status, branch, pull requests and latest messages. |
+| `hentikan_thread` | `destructive` | Interrupts a thread's running turn. Always asks first. |
+
+`write` tools run right away in your own chat. They ask first after [untrusted content](/docs/concepts/taint-rule) in the same turn, and in scheduled jobs and hooks.
+
+## Safety
+
+- Threads run with full access on your Mac, like the ones you start yourself. Palui starts them only when you ask in your own chat. After untrusted content in the same turn, and in scheduled jobs and hooks, starting or messaging a thread asks for your approval first. Stopping a thread always asks.
+- New threads get their own git worktree, so your checkout stays as it was unless you ask Palui to work in place.
+- The token is stored encrypted and never shown. The pairing code works once, so a leaked old code is useless.
+
+## Pause and remove
+
+Pausing hides the tools from the next turn and holds the finish messages until you resume (Palui stops watching a thread 24 hours after it started it). Threads already running in T3 Code keep going. Removing deletes the stored token. To cut Palui off on the T3 Code side too, revoke its session in T3 Code's settings.
