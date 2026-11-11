@@ -29,6 +29,8 @@ import {
 } from "@palui/core/routines/service"
 import { nextLocalTime, refreshToolSource, upcoming, type Occurrence, type ToolCaller } from "@palui/core/routines/sources"
 import { getSetting } from "@palui/core/settings"
+import { routineMode } from "@palui/core/flows/migrate"
+import { flowBackedRoutineTools } from "./flows"
 import manifest from "./manifest"
 
 type Fail = { ok: false; error: string }
@@ -346,6 +348,11 @@ export default defineRuntime(manifest, {
   },
   start: async (ctx) => ({
     stop: async () => {},
-    tools: async (turn) => routineTools(ctx.db, turn, { callTool: ctx.services.callTool?.bind(ctx.services) }),
+    tools: async (turn) => {
+      const tools = routineTools(ctx.db, turn, { callTool: ctx.services.callTool?.bind(ctx.services) })
+      if (routineMode(ctx.db) !== "flows") return tools
+      // After the handover the routine tools edit flows; the preview stays as it is.
+      return { ...flowBackedRoutineTools(ctx.db, turn), pratinjau_rutinitas: tools.pratinjau_rutinitas! }
+    },
   }),
 })

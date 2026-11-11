@@ -6,6 +6,7 @@
 import type { LanguageModel, Tool } from "ai"
 import type { z } from "zod"
 import type { Channel, ConnectorKind, DB, OutboxPayload, ToolClass, Trust } from "@palui/db"
+import type { FlowToolCaller } from "../flows/call"
 import type { Logger } from "../log"
 import type { ModelRole } from "../settings"
 
@@ -83,7 +84,8 @@ export type TurnInfo = {
   runId: string
   chatId: string
   channel: Channel | null
-  trigger: "message" | "schedule" | "hook" | "approval" | "reminder"
+  // flow: a flow's tool or prompt step (RFC flows 5.1, 5.6).
+  trigger: "message" | "schedule" | "hook" | "approval" | "reminder" | "flow"
   tz: string
   now: number
   jobId?: string
@@ -93,6 +95,8 @@ export type TurnInfo = {
   batchRunId?: string
   // The agent answering (PLAN 19). Tools with per-agent data (instructions) use it.
   agentId?: string
+  // The flow whose tool step is calling (RFC flows 5.1). Built-in flow tools default to it.
+  flowId?: string
 }
 
 // A tool plus its connector metadata. `class` drives approvals (PLAN 10); `untrusted`
@@ -106,6 +110,9 @@ export type PaluiTool = {
   // May run in a turn started by someone other than the owner (PLAN 19.4).
   // Unmarked means no: guests only get tools that can't reach the owner's data.
   guestSafe?: boolean
+  // Write tools in flows (RFC flows 7.2): "version" (default) is approved once per
+  // flow version; "every_run" asks on every run (email, posts others read).
+  flowApproval?: "version" | "every_run"
 }
 
 export type InboundMedia = {
@@ -209,6 +216,9 @@ export type ConnectorServices = {
   // Call a read-only tool of another running connector, server-side (routines).
   // Throws when the connector isn't running, the tool is missing or not `read`.
   callTool?(connectorId: string, tool: string, args: Record<string, unknown>): Promise<unknown>
+  // Every running connector's tools with their class, for flow saves and dry
+  // runs (RFC flows 5.1). Resolves the class before any call.
+  flowTools?: FlowToolCaller
 }
 
 export type ConnectorContext<C = Record<string, unknown>, S = Record<string, string | undefined>> = {

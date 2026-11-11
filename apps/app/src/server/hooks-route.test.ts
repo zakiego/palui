@@ -98,3 +98,35 @@ describe("POST /api/hooks/:slug", () => {
     expect(sent).toBeLessThan(10)
   })
 })
+
+describe("a hook in flow mode (RFC flows 4.1)", () => {
+  it("starts the listening flow with the payload as tainted trigger data, once per delivery", async () => {
+    const { db, hook, secret, deps, poke } = setup()
+    const { createFlow, getFlow } = await import("@palui/core/flows/service")
+    const { flowRuns, hooks } = await import("@palui/db")
+    const saved = createFlow(
+      db,
+      {
+        chatId: hook.chatId,
+        createdBy: "test",
+        definition: { name: "PR", triggers: [{ id: "gh", kind: "webhook", hookId: hook.id, start: "say" }], steps: [{ id: "say", kind: "message", text: "PR {{trigger.payload.number}}" }] },
+      },
+      NOW,
+    )
+    expect(db.select().from(hooks).where(eq(hooks.id, hook.id)).get()!.mode).toBe("flow")
+    const payload = JSON.stringify({ number: 46 })
+    const send = (ts: string) =>
+      handleHookRequest(post(hook.slug, payload, { [HOOK_TIMESTAMP_HEADER]: ts, [HOOK_SIGNATURE_HEADER]: signHookBody(secret, ts, payload), "x-github-delivery": "d-123", "x-github-event": "pull_request" }), hook.slug, deps)
+    const res = await send(TS)
+    expect(res.status).toBe(202)
+    expect(await res.json()).toEqual({ ok: true, runs: 1 })
+    expect(poke).toHaveBeenCalledOnce()
+    // GitHub redelivers with a new signature but the same delivery id: no second run.
+    expect(await (await send(String(Number(TS) + 1))).json()).toEqual({ ok: true, runs: 0 })
+    const runs = db.select().from(flowRuns).where(eq(flowRuns.flowId, saved.flow.id)).all()
+    expect(runs).toHaveLength(1)
+    expect(runs[0]).toMatchObject({ triggerKind: "webhook", runKey: "hook:d-123", taint: ["trigger"], status: "queued", trigger: { payload: { number: 46 }, headers: { "x-github-event": "pull_request" } } })
+    expect(db.select().from(messages).all()).toEqual([])
+    expect(getFlow(db, saved.flow.id)).toBeTruthy()
+  })
+})

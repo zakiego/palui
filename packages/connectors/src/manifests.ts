@@ -12,6 +12,7 @@ import mcp from "./mcp/manifest"
 import notes from "./notes/manifest"
 import recall from "./recall/manifest"
 import reminders from "./reminders/manifest"
+import flows from "./flows/manifest"
 import routines from "./routines/manifest"
 import remoteMcp from "./remote-mcp/manifest"
 import t3code from "./t3code/manifest"
@@ -35,6 +36,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   gcal,
   t3code,
   reminders,
+  flows,
   routines,
   jobs,
   chats: chatHistory,

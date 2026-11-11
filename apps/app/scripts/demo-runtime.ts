@@ -31,16 +31,18 @@ const DEMO_TOOLS = [
   { name: "uptime", title: "Host uptime and load", description: "Show how long the host has been up and its load average.", suggestedClass: "read" },
   { name: "restart_service", title: "Restart a service on the Mac mini", description: "Restart one of the allowlisted launchd services.", suggestedClass: "destructive" },
   { name: "list_deals", description: "List deals in a stage, with no title from the server.", suggestedClass: "write" },
+  { name: "send_email_to_a_customer_with_a_long_tool_name", title: "Send an email to a customer", description: "Sends an email from the sales inbox. Other people read it, so flows should ask every run.", suggestedClass: "write" },
 ]
 
 function listTools(id: string) {
-  const prefs = ((getConnector(db, id)?.config ?? {}) as { toolPrefs?: Record<string, { enabled: boolean; class: string }> }).toolPrefs ?? {}
+  const prefs = ((getConnector(db, id)?.config ?? {}) as { toolPrefs?: Record<string, { enabled: boolean; class: string; flowApproval?: string }> }).toolPrefs ?? {}
   return {
     tools: DEMO_TOOLS.map((t) => ({
       ...t,
       enabled: prefs[t.name]?.enabled ?? true,
       class: prefs[t.name]?.class ?? t.suggestedClass,
       saved: Boolean(prefs[t.name]),
+      flowApproval: prefs[t.name]?.flowApproval ?? "version",
     })),
   }
 }

@@ -55,6 +55,11 @@ const PRODUCT_TABLES = [
   schema.savedAttachments,
   schema.usage,
   schema.settings,
+  schema.flowStepRuns,
+  schema.flowRuns,
+  schema.flowTriggers,
+  schema.flowVersions,
+  schema.flows,
 ] as const
 
 function clearProductData(db: DB) {

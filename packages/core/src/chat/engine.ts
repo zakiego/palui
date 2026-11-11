@@ -4,6 +4,7 @@ import { and, asc, eq } from "drizzle-orm"
 import { messages, outbox, type DB } from "@palui/db"
 import { approvalsForRun, decide, expireDue, getApproval, markResumed, pendingForChat, readyToResume, APPROVAL_TTL_MS } from "../approvals/store"
 import { getChat, type ChatRow } from "../chats"
+import { isFlowRunId, wakeFlowRun } from "../flows/service"
 import { logEvent } from "../events"
 import { silentLogger, type Logger } from "../log"
 import { claimOwner, isOwner } from "../owner"
@@ -127,8 +128,10 @@ export function createEngine(opts: EngineOptions) {
         content,
         text: row.text,
         replyToChannelMsgId: row.replyToChannelMsgId ?? undefined,
+        messageId: row.id,
         reminderActions: ctx.deps.reminderActions,
         routineActions: ctx.deps.routineActions,
+        flowActions: ctx.deps.flowActions,
         fromOwner: row.fromOwner,
         now: ctx.clock(),
       })
@@ -159,6 +162,9 @@ export function createEngine(opts: EngineOptions) {
           break
         case "hook":
           await handleHook(chat, row.id, r.hook, r.text)
+          break
+        case "handled":
+          handled(row.id)
           break
         case "turn":
           queue.push(chat.id, { kind: "message", messageId: row.id })
@@ -282,6 +288,11 @@ export function createEngine(opts: EngineOptions) {
   function maybeResume(runId: string) {
     const rows = approvalsForRun(db, runId)
     if (!rows.length || rows.some((r) => r.status === "pending")) return
+    // A flow run's write step asked (RFC flows 7.2): the flow engine continues it.
+    if (isFlowRunId(runId)) {
+      wakeFlowRun(db, runId, ctx.clock())
+      return
+    }
     const chatId = rows[0]!.chatId
     // Where the owner was asked: a shared chat's requests are asked in the owner's DM.
     const askChatId = rows[0]!.askChatId ?? chatId

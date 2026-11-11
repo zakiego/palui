@@ -356,6 +356,29 @@ describe("turn", () => {
     expect(outboxTexts(h.db).length).toBe(before)
   })
 
+  it("runs a flow prompt step with its own run id, only the tools it allowed, and no destructive ones", async () => {
+    const seen: string[][] = []
+    const h = await basic([say("ok"), say("NOTHING")], {
+      registry: {
+        alpha: toolsRuntime("alpha", () => ({ read: { tool: fnTool("r", () => 1), class: "read" }, other: { tool: fnTool("o", () => 1), class: "read" }, nuke: { tool: fnTool("n", () => 1), class: "destructive" } })),
+      },
+      rows: { alpha: "tools" },
+    })
+    const orig = h.m.model.doStream.bind(h.m.model)
+    h.m.model.doStream = async (o) => {
+      seen.push((o.tools ?? []).map((t) => t.name))
+      return orig(o)
+    }
+    const chat = h.db.select().from(chats).get() ?? (await h.engine.inbound(tgMessage("init")), h.db.select().from(chats).get()!)
+    await h.engine.idle()
+    const r = await h.engine.runTurn({ chatId: chat.id, trigger: "flow", prompt: "x", runId: "run_flowstep1", toolNames: ["alpha__read", "alpha__nuke"], deliver: false, untrustedInput: true })
+    expect(r).toMatchObject({ runId: "run_flowstep1", status: "ok", tainted: true })
+    expect(seen.at(-1)).toEqual(["alpha__read"])
+    const all = await h.engine.runTurn({ chatId: chat.id, trigger: "flow", prompt: "y", toolNames: ["*"], silentToken: "NOTHING" })
+    expect(all.status).toBe("ok")
+    expect(seen.at(-1)).toEqual(["alpha__read", "alpha__other"])
+  })
+
   it("shows later turns the tool calls earlier turns made, so the model needn't re-check its own work", async () => {
     const add = fnTool("add", (i) => ({ sum: Number(i.a) + Number(i.b) }))
     const h = await basic([callTool("alpha__add", { a: 1, b: 2 }, "c1"), say("hasilnya 3"), say("sama-sama"), say("halo lagi")], {
@@ -1258,6 +1281,16 @@ describe("tool search", () => {
     const result = h.db.select().from(toolCalls).where(eq(toolCalls.tool, "palui__cari_tool")).get()!
     expect(result.resultPreview).not.toContain("prayer_alarm")
     expect(promptText(h.m.prompts[0])).not.toContain("mcp-off")
+  })
+
+  it("tells a flow search each tool's class and trust, and leaves destructive ones out", async () => {
+    const extra = toolsRuntime("mcp-ops", () => ({ prayer_wipe: { tool: fnTool("Wipe prayer data", () => "ok"), class: "destructive" as const }, prayer_log: { tool: fnTool("Log a prayer", () => "ok"), class: "write" as const } }))
+    const h = await setup([callTool("palui__cari_tool", { query: "prayer", for: "flow" }), say("ok")], [], { "mcp-ops": extra })
+    await h.engine.inbound(tgMessage("cari tool sholat buat flow"))
+    await h.engine.idle()
+    const result = h.db.select().from(toolCalls).where(eq(toolCalls.tool, "palui__cari_tool")).get()!
+    expect(result.resultPreview).toContain('"class":"write","untrusted"')
+    expect(result.resultPreview).not.toContain("prayer_wipe")
   })
 
   it("loads everything up front when the tools fit", async () => {

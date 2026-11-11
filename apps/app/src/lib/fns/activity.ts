@@ -4,6 +4,7 @@ import { listConnectors } from "@palui/core/connectors/store"
 import { createServerFn } from "@tanstack/react-start"
 import { z } from "zod"
 import { eventCount, eventList, recentRuns, runCount, runDetail, usage } from "@/server/queries"
+import { flowRunDetail } from "@/server/flows"
 import { requireUser } from "@/server/session"
 
 const level = z.enum(["debug", "info", "warn", "error"])
@@ -29,7 +30,9 @@ export const getRun = createServerFn({ method: "GET" })
   .validator(z.object({ id: z.string().max(64) }))
   .handler(async ({ data }) => {
     const { db } = await requireUser()
-    return { run: runDetail(db, data.id), timezone: getSetting(db, "timezone") }
+    // A flow run (flr_...) shows its step log on the same page (RFC flows 10).
+    if (data.id.startsWith("flr_")) return { run: null, flowRun: flowRunDetail(db, data.id), timezone: getSetting(db, "timezone") }
+    return { run: runDetail(db, data.id), flowRun: null, timezone: getSetting(db, "timezone") }
   })
 
 export const getUsage = createServerFn({ method: "GET" }).handler(async () => {

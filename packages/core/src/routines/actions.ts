@@ -6,6 +6,10 @@
 // jawab_checkin.
 import { and, eq, like } from "drizzle-orm"
 import { outbox, type DB } from "@palui/db"
+import { answerFlowCheckin } from "../flows/checkin"
+import { runForLegacyOccurrence } from "../flows/migrate"
+import { FlowError } from "../flows/service"
+import { getSetting } from "../settings"
 import { answerCheckin, configOf, getOccurrence, getRoutine, matchAnswer, RoutineError } from "./service"
 
 const CALLBACK_RE = /^rt:([A-Za-z0-9_-]+):([a-z0-9_]{1,20})$/
@@ -26,6 +30,19 @@ function allowedChat(db: DB, occurrenceId: string, chatId: string): string | nul
 }
 
 function record(db: DB, occurrenceId: string, answer: string, chatId: string, now: number, text?: string): string {
+  // After the handover the occurrence lives on as a flow run (RFC flows 3.6):
+  // old buttons and quoted replies still answer it there.
+  if (getSetting(db, "routineMode") === "flows") {
+    const run = runForLegacyOccurrence(db, occurrenceId)
+    if (run) {
+      try {
+        return answerFlowCheckin(db, { chatId, runId: run.id, answer, text }, now).reply
+      } catch (e) {
+        if (e instanceof FlowError) return `Gagal: ${e.message}`
+        throw e
+      }
+    }
+  }
   const owner = allowedChat(db, occurrenceId, chatId)
   if (!owner) return "Check-in itu nggak ketemu di chat ini."
   try {

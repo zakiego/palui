@@ -16,6 +16,7 @@ import { enqueueOutbox, notifyOutbox } from "../outbox/enqueue"
 import type { TurnInfo } from "../connectors/define"
 import type { Supervisor } from "../connectors/supervisor"
 import { notesPrompt } from "../notes/service"
+import { flowCheckinsPrompt } from "../flows/checkin"
 import { checkinsPrompt } from "../routines/service"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, emptyTools, SEARCH_TOOL, STICKY_MAX, type CollectedTools } from "../tools/collect"
@@ -68,9 +69,14 @@ export type TurnOptions = {
   silentToken?: string
   noTools?: boolean
   untrustedInput?: boolean
+  // Flow prompt steps (RFC flows 5.6): a run id chosen before the call, the
+  // agent whose persona answers, and namespaced tools allowed ("*": all).
+  runId?: string
+  agentId?: string | null
+  toolNames?: string[] | null
 }
 
-export type TurnResult = { runId: string; text: string; status: string }
+export type TurnResult = { runId: string; text: string; status: string; tainted?: boolean }
 
 export type ExecInput = TurnOptions & {
   batchIds?: string[]
@@ -119,7 +125,8 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   const settings = getAllSettings(db)
   // The agent and whether this is a shared chat (PLAN 19). The default agent
   // in a group the owner never gave an agent keeps the old owner-only rules.
-  const agent: AgentRow = (input.resume?.context.agentId ? getAgent(db, input.resume.context.agentId) : undefined) ?? agentForChat(db, chat)
+  const agentId = input.resume?.context.agentId ?? input.agentId
+  const agent: AgentRow = (agentId ? getAgent(db, agentId) : undefined) ?? agentForChat(db, chat)
   const shared = !agent.isDefault && isSharedChat(db, chat)
   const deliver = input.resume ? input.resume.context.deliver : (input.deliver ?? true)
   const origin: ResumeContext["originTrigger"] = input.resume ? input.resume.context.originTrigger : input.trigger === "approval" ? "message" : input.trigger
@@ -173,7 +180,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     return { runId: "", text: "", status: "no_model" }
   }
 
-  const runId = newId("run")
+  const runId = input.runId ?? newId("run")
   const rlog = tlog.child({ run_id: runId })
   db.insert(runs).values({ id: runId, chatId: chat.id, agentId: agent.id, jobId: jobId ?? null, trigger: input.trigger, status: "running", startedAt }).run()
   recordRunStart(db, startedAt)
@@ -208,12 +215,14 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     const guest = mode === "guest"
     const noTools = input.noTools || origin === "hook" || (guest && agent.guestTools === "none")
     const scope = input.resume ? input.resume.context.toolScope : input.toolScope
+    const toolNames = input.resume ? input.resume.context.toolNames : input.toolNames
     const tools: CollectedTools = noTools
       ? emptyTools()
       : await collectTools(ctx.host.running(), {
           turn: turnInfo,
           maxTools: settings.budgets.maxTools,
           scope,
+          only: toolNames,
           excludeDestructive: unattended(origin),
           sticky: session?.loadedTools,
           onLoad: (names) => {
@@ -258,7 +267,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         toolSearch: tools.deferred.length > 0,
         notes: notesPrompt(db, agent),
         // Routine check-ins are the owner's; a shared chat never sees them.
-        checkins: input.trigger === "message" && !shared ? checkinsPrompt(db, chat.id, startedAt) : null,
+        checkins: input.trigger === "message" && !shared ? [checkinsPrompt(db, chat.id, startedAt), flowCheckinsPrompt(db, chat.id, startedAt)].filter(Boolean).join("\n\n") || null : null,
         recall,
         recallAbout: agent.isDefault ? "owner" : "chats",
         summary: input.trigger === "message" ? session?.summary : null,
@@ -395,6 +404,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         originTrigger: origin,
         jobId,
         toolScope: scope ?? null,
+        toolNames: toolNames ?? null,
         modelRole: role,
         deliver,
         silentToken: input.resume?.context.silentToken ?? input.silentToken,
@@ -481,13 +491,13 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   }
   ctx.bus.publish({ type: "turn-end", chatId: chat.id, runId, status: interrupted ? "aborted" : status, error })
   rlog.info("turn finished", { status: interrupted ? "interrupted" : status, steps, tokens_in: tokensIn, tokens_out: tokensOut, ms, tainted: state.tainted, connector_id: served?.connectorId })
-  return { runId, text: interrupted ? "" : text, status: interrupted ? "interrupted" : status }
+  return { runId, text: interrupted ? "" : text, status: interrupted ? "interrupted" : status, tainted: state.tainted }
 }
 
-// Jobs and smart reminders run with nobody watching (PLAN 7): no destructive
-// tools, and every write tool needs approval.
+// Jobs, smart reminders and flow prompt steps run with nobody watching (PLAN 7):
+// no destructive tools, and every write tool needs approval.
 function unattended(origin: ResumeContext["originTrigger"]): boolean {
-  return origin === "schedule" || origin === "reminder"
+  return origin === "schedule" || origin === "reminder" || origin === "flow"
 }
 
 // The heartbeat answers its silent token ("NOTHING") when nothing matters. Only

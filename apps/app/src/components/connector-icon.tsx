@@ -20,6 +20,7 @@ import {
   ServerCogIcon,
   SquareTerminalIcon,
   WebhookIcon,
+  WorkflowIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -43,6 +44,7 @@ const ICONS: Record<string, LucideIcon> = {
   "server-cog": ServerCogIcon,
   paperclip: PaperclipIcon,
   repeat: RepeatIcon,
+  workflow: WorkflowIcon,
 }
 
 export function connectorIcon(name: string | undefined): LucideIcon {

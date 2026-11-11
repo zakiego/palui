@@ -84,6 +84,9 @@ await fetch(url, {
 |---|---|---|
 | `forward` | The event text is sent to the chat as is | Not called |
 | `summarize` | One turn summarizes the event for you | Called, with zero tools. The turn is tainted. |
+| `flow` | The body starts every [flow](/docs/connectors/flows) whose webhook trigger names this hook, as `trigger.payload`. A redelivery with the same `x-palui-delivery` or `X-GitHub-Delivery` header starts nothing new. | Only if the flow has a prompt step. |
+
+A hook switches to `flow` when a flow with a webhook trigger on it is saved. You can also create one in that mode: `palui hook create <name> --chat <chatId> --mode flow`.
 
 Either way, the payload is treated as an untrusted message in the hook's chat. It never runs as a command, and a summary turn has no tools to misuse. See [The taint rule](/docs/concepts/taint-rule).
 

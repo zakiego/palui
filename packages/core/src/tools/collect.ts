@@ -60,6 +60,8 @@ export type CollectOptions = {
   maxTools: number
   // Connector ids allowed (jobs); null or undefined means all.
   scope?: string[] | null
+  // Namespaced tool names allowed (flow prompt steps); "*" or null means all.
+  only?: string[] | null
   // Jobs and hooks never get destructive tools (PLAN 7, 10).
   excludeDestructive?: boolean
   // Names loaded earlier in the session, most recent first. Active before the rest.
@@ -96,6 +98,7 @@ export async function collectTools(running: RunningEntry[], opts: CollectOptions
       if (opts.excludeDestructive && cls === "destructive") continue
       if (opts.guestOnly && !pt.guestSafe) continue
       const name = namespaced(e.id, toolName)
+      if (opts.only && !opts.only.includes("*") && !opts.only.includes(name)) continue
       const meta: ToolMeta = { name, connectorId: e.id, tool: toolName, class: cls, untrusted: !!pt.untrusted || e.row.trust === "external", title: pt.title, label: e.row.label }
       out.tools[name] = wrapTool(pt.tool, meta, opts)
       out.meta[name] = meta
@@ -148,9 +151,10 @@ function searchTool(out: CollectedTools, order: string[], opts: CollectOptions):
     inputSchema: z.object({
       query: z.string().max(200).optional().describe("Keywords, e.g. 'jadwal sholat' or 'prayer times'"),
       names: z.array(z.string().max(100)).max(SEARCH_LIMIT).optional().describe("Exact tool names to load"),
+      for: z.enum(["turn", "flow"]).optional().describe('"flow" when picking a tool for a flow step: destructive tools are left out, since flows never run them.'),
     }),
-    execute: async ({ query, names }) => {
-      const docs: SearchDoc[] = order.map((n) => {
+    execute: async ({ query, names, for: purpose }) => {
+      const docs: SearchDoc[] = order.filter((n) => purpose !== "flow" || out.meta[n]!.class !== "destructive").map((n) => {
         const m = out.meta[n]!
         return { name: n, connectorId: m.connectorId, connectorLabel: m.label ?? m.connectorId, tool: m.tool, title: m.title, description: descriptionOf(out.tools[n]) }
       })
@@ -173,7 +177,8 @@ function searchTool(out: CollectedTools, order: string[], opts: CollectOptions):
         loaded: await Promise.all(
           loaded.map(async (n) => {
             const m = out.meta[n]!
-            return { name: n, connector: m.label ?? m.connectorId, class: m.class, description: descriptionOf(out.tools[n]), input: await inputSchemaOf(out.tools[n]) }
+            // class says whether a flow step needs approval; untrusted whether its output taints.
+            return { name: n, connector: m.label ?? m.connectorId, class: m.class, untrusted: m.untrusted, description: descriptionOf(out.tools[n]), input: await inputSchemaOf(out.tools[n]) }
           }),
         ),
         note: "These tools are loaded. Call them directly.",

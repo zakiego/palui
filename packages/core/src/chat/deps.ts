@@ -11,10 +11,16 @@ export type ReminderActions = {
   fromText(db: DB, text: string, replyToChannelMsgId: string | undefined, chatId: string, now?: number): Promise<string | null>
 }
 
+// Same shape, plus chat triggers (a command or phrase that starts a flow run).
+export type FlowActions = ReminderActions & {
+  fromChat?(db: DB, input: { text: string; chatId: string; messageId: string; fromOwner: boolean }, now?: number): Promise<boolean>
+}
+
 export type EngineDeps = {
   reminderActions?: ReminderActions
   // Same shape: Telegram "rt:" buttons and quoted replies to routine check-ins.
   routineActions?: ReminderActions
+  flowActions?: FlowActions
   parseReminder?: (text: string, tz: string, now: number, model: LanguageModel) => Promise<ParsedReminder>
   scheduler?: { start(): void | Promise<void>; stop(): Promise<void>; poke(): void }
   jobs?: { runNow(jobId: string): Promise<{ ok: boolean; runId?: string; detail?: string }> }

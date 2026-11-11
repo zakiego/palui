@@ -126,3 +126,28 @@ describe("routine tools", () => {
     await running.stop()
   })
 })
+
+describe("routine tools after the handover to flows", () => {
+  it("create and edit flows of the routine shape, and find migrated routines by their old id", async () => {
+    const { setRoutineMode, syncRoutineFlows, flowForRoutine, handover } = await import("@palui/core/flows/migrate")
+    const { createRoutine } = await import("@palui/core/routines/service")
+    const { listFlows } = await import("@palui/core/flows/service")
+    const { flowBackedRoutineTools } = await import("./flows")
+    const { db, turn } = setup()
+    const old = createRoutine(db, turn.chatId, MEDICINE_ROUTINE, NOW)
+    syncRoutineFlows(db, NOW)
+    setRoutineMode(db, "flows", NOW)
+    expect(handover(db, NOW)).toBe(1)
+    const tools = flowBackedRoutineTools(db, turn, () => NOW)
+    expect(Object.keys(tools)).not.toContain("jawab_checkin")
+
+    const made = await call(tools.buat_rutinitas, { name: "Jalan pagi", source: { kind: "times", times: [{ time: "06:30" }] }, action: { kind: "message", text: "Ayo jalan pagi" } })
+    expect(made).toMatchObject({ ok: true, message: 'Oke, rutinitas "Jalan pagi" aktif.' })
+    expect(listFlows(db, turn.chatId).map((f) => f.name).sort()).toEqual(["Jalan pagi", "Minum obat"])
+
+    const edited = await call(tools.ubah_rutinitas, { id: old.id, days: ["MO", "TU"] })
+    expect(edited).toMatchObject({ ok: true, routine: { id: flowForRoutine(db, old.id)!.id, config: { days: ["MO", "TU"] } } })
+    expect((await call(tools.daftar_rutinitas, {})).count).toBe(2)
+    expect(await call(tools.jeda_rutinitas, { id: made.id, paused: true })).toMatchObject({ ok: true, message: 'Rutinitas "Jalan pagi" dijeda.' })
+  })
+})

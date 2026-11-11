@@ -1,0 +1,103 @@
+---
+title: Flows
+description: The built-in Flows skill lets Palui build automations from chat out of triggers and steps, with every run logged step by step.
+---
+
+Kind: `skill`. Built in. A flow is a small automation: one or more triggers, and a list of steps that read tools, decide, ask, wait and send. Palui builds flows from chat, dry-runs them before saving, and logs every run with what each step saw and did. Nothing calls the model unless a step asks for it.
+
+Routines are flows now. A routine is a flow with one schedule trigger and one step (see [Routines become flows](#routines-become-flows)).
+
+## Connect
+
+Nothing to set up. Flows is a built-in skill and is created on first boot. Ask in chat:
+
+- "tiap pagi jam 6 kirim jadwal sholat, cuaca sama pengingat hari ini"
+- "kalau PR di palui di-merge, tunggu 5 menit, cek CI-nya, terus kabari aku"
+- "tiap jam 9 cek tagihan yang jatuh tempo 3 hari lagi, tanya aku udah bayar belum, jangan nanya dua kali buat tagihan yang sama"
+- "kenapa flow briefing tadi pagi nggak jalan?"
+
+Palui finds the tools it needs, checks the draft, runs it once with your real data but without sending anything, and shows you the triggers, the next times and anything it would change before it saves.
+
+## Triggers
+
+| Kind | Starts a run when | `trigger.*` |
+|---|---|---|
+| `schedule` | A time comes up: fixed times, a repeat rule, or times read daily from a tool (the routine time sources) | `at`, `time`, `date`, `label`, `key` |
+| `webhook` | A signed request reaches a [webhook](/docs/connectors/webhooks) in mode `flow` | `payload`, `headers`, `receivedAt` |
+| `chat` | You send a command (`/beres`) or an exact phrase in the flow's chat | `text`, `args` |
+| `poll` | A read tool's value changes (or becomes non-empty), checked every 5 to 1440 minutes | `value`, `previous` |
+| `event` | Another flow's check-in is answered or missed, or its run is done or failed | `event`, `flow`, `answer`, `error` |
+| manual | You ask Palui to run it now | `args` |
+
+Each trigger fires at most once per key (the occurrence, the webhook delivery id, the message), even across restarts. A schedule run more than an hour late after downtime is logged as skipped. A poll's first check only remembers the value, so a new "tell me when this changes" flow doesn't fire on the current one.
+
+## Steps
+
+| Kind | What it does |
+|---|---|
+| `tool` | Calls a tool server-side with your flow's chat in context. Read tools retry twice. |
+| `if` | Picks a branch from a condition like `daysUntil(item.due) < 3`. The run log keeps the values it compared. |
+| `set` | Sets a run variable, or a flow variable that persists across runs (16 KB at most). |
+| `message` | Sends a message to the flow's chat, or to another chat you allowed. |
+| `checkin` | Asks with answer buttons, re-asks until a closing answer or the deadline, and branches on the answer. |
+| `wait` | Sleeps for some minutes or until a time, up to 7 days. Survives restarts. |
+| `prompt` | Runs one model turn on data you pass in, for the parts that need wording. Fetched text goes in a separate data block the model is told never to follow. |
+| `each` | Runs part of the flow once per item of a list (a check-in per bill), deduped by a key across runs, 20 items by default and 50 at most. |
+
+Steps pass data with templates (`{{steps.weather.data.temp}}`, `{{now.date | date}}`). Templates only fill values: ids, tool names, branch targets and the prompt instruction are fixed when the flow is saved, so data can't change what a flow does.
+
+## Tools
+
+| Tool | What it does |
+|---|---|
+| `buat_flow` | Create a flow |
+| `ubah_flow` | Change a flow (a new version). Accepts a patch of one step |
+| `cek_flow` | Check a draft: problems with their place, resolved tools and what it may change |
+| `uji_flow` | Dry run: read tools run for real, messages and changes are only shown |
+| `daftar_flow` | List flows with their next time and last run |
+| `lihat_flow` | One flow with its versions and trigger state |
+| `jeda_flow` | Pause (optionally until a date) or resume |
+| `hapus_flow` | Delete a flow and its log (destructive, always asks) |
+| `jalankan_flow` | Run a flow now, for real |
+| `riwayat_flow` | Runs with status, skip reason, answers and counts |
+| `lihat_run` | The step log of one run |
+| `kenapa_flow` | Why a flow didn't run or send at a given time |
+| `jawab_checkin` | Record your answer to a check-in |
+| `batal_run` | Cancel a waiting run |
+| `ringkasan` | A recap of a flow's log (counts by answer and ready-to-send text), usable as a step |
+
+These are only offered in your own DMs and the web chat, never in a group or someone else's chat.
+
+## Approvals
+
+- Read tools run without asking.
+- A flow that calls write tools (or posts to another chat) asks you once per version: Palui sends the list of calls with their arguments as written, and you approve or decline. Until you approve, the read-only parts still run. An edit that changes no write call keeps the approval.
+- It asks again for a single run when an argument comes from outside data (a webhook body, a web page), when a tool's class changed since you approved, or when the tool is set to ask every run. Set that per tool on the MCP server's tool list ("In flows, ask: every run"). Those asks expire after 10 minutes like any other approval.
+- Destructive tools never run in a flow. A flow that needs something deleted asks you with a check-in, and you do it from chat.
+
+## Answering a check-in
+
+- Telegram: the answer buttons.
+- WhatsApp: quote the question and reply with an answer.
+- Anywhere: just say it. Open check-ins are in the model's context, so "udah" answers the newest one.
+
+## Routines become flows
+
+Your routines move to flows in two steps, and nothing fires twice or gets skipped:
+
+1. After the upgrade, each routine gets a flow that runs in shadow: it reads the same sources and computes the same times, but sends nothing. The routine engine keeps sending, and differences are logged. The Flows page shows the count.
+2. After a clean week, hand over with `docker compose exec app palui flows mode flows`. The flows take over where the routines were, open check-ins included, and old routine buttons keep working. `palui flows status` shows the shadow comparison, and `palui flows mode legacy` goes back to the routine engine alone.
+
+The routine tools keep working for one more release as wrappers around flows. The Routines page links each routine to its flow; after the handover, pausing or deleting a routine there acts on its flow, and its next times and open check-ins come from the flow.
+
+## Dashboard
+
+The Flows page lists every flow with its triggers, next time and last run. A flow's page shows its steps with their branches, what it may change, its versions and recent runs, and each run opens its step log on the run page. Flows are built and changed from chat; the dashboard only shows them.
+
+## Limits
+
+30 runs per flow per hour, 120 flow runs per hour in total, 5 messages per run, 100 step executions per run, 50k tokens per flow per day for prompt steps (up to 500k), runs live at most 8 days, step inputs and outputs are kept 30 days and runs 180 days.
+
+## Pause and remove
+
+Pausing the connector hides the flow tools from the model. Flows already saved keep running; pause one from chat to stop it. A flow pauses itself after five failed runs in a row and tells you once.

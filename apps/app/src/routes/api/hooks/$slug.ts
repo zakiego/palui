@@ -17,6 +17,7 @@ import {
   readHookBody,
   verifyHookSignature,
 } from "@palui/core/hooks/index"
+import { HOOK_HEADERS, ingestFlowHook } from "@palui/core/flows/entry"
 import { getDb } from "@/server/db"
 import { runtime } from "@/server/runtime"
 
@@ -50,6 +51,14 @@ export async function handleHookRequest(request: Request, slug: string, deps: Ho
   const headers = { signature: request.headers.get(HOOK_SIGNATURE_HEADER), timestamp: request.headers.get(HOOK_TIMESTAMP_HEADER) }
   const result = verifyHookSignature(found.hook, read.body, headers, deps.masterKey(), deps.now())
   if (!result.ok) return fail(result.status, result.error)
+  // Mode flow (RFC flows 4.1): the body starts the flows listening to this hook.
+  if (result.hook.mode === "flow") {
+    const raw = hookBodyText(read.body)
+    const headerMap = Object.fromEntries(HOOK_HEADERS.map((h) => [h, request.headers.get(h)]))
+    const r = ingestFlowHook(db, result.hook, raw, headerMap, deps.now())
+    deps.poke()
+    return Response.json({ ok: true, runs: r.started }, { status: 202 })
+  }
   const msg = ingestHook(db, result.hook, hookBodyText(read.body), deps.now())
   deps.poke()
   return Response.json({ ok: true, id: msg.id }, { status: 202 })

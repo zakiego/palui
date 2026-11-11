@@ -43,6 +43,13 @@
       "when": 1794403073322,
       "tag": "0005_milky_eternity",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794407435805,
+      "tag": "0006_naive_madame_web",
+      "breakpoints": true
     }
   ]
 }

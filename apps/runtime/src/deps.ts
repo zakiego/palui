@@ -1,6 +1,9 @@
 // Wires the reminders, scheduler and jobs modules into the engine (EngineDeps).
 import type { EngineDeps } from "@palui/core/chat/deps"
 import type { TurnOptions, TurnResult } from "@palui/core/chat/turn"
+import { flowActions } from "@palui/core/flows/actions"
+import { connectorFlowCaller } from "@palui/core/flows/call"
+import { createFlowEngine, SILENT_TOKEN as FLOW_SILENT, type PromptRequest, type PromptResponse } from "@palui/core/flows/engine"
 import { createJobRunner } from "@palui/core/jobs/runner"
 import { meterToBudget } from "@palui/core/models/meter"
 import { reminderActions } from "@palui/core/reminders/actions"
@@ -34,6 +37,25 @@ export async function runRoutinePrompt(runTurn: (o: TurnOptions) => Promise<Turn
   throw new Error(`routine prompt turn ended with status ${res.status}`)
 }
 
+// A flow's prompt step: an unattended turn with trigger "flow" in the flow's
+// chat, its own run id, the flow's agent and only the tools the step allowed.
+export async function runFlowPrompt(runTurn: (o: TurnOptions) => Promise<TurnResult>, r: PromptRequest): Promise<PromptResponse> {
+  const res = await runTurn({
+    chatId: r.chatId,
+    trigger: "flow",
+    prompt: r.prompt,
+    runId: r.turnRunId,
+    agentId: r.agentId,
+    toolNames: r.tools,
+    noTools: r.tools.length === 0,
+    deliver: r.send,
+    silentToken: FLOW_SILENT,
+    untrustedInput: r.tainted,
+    modelRole: r.modelRole,
+  })
+  return { status: res.status, text: res.text, runId: res.runId, tainted: res.tainted }
+}
+
 export const buildDeps: DepsFactory = ({ db, engine, log, supervisor }) => {
   const routines = createRoutineEngine({
     db,
@@ -41,6 +63,14 @@ export const buildDeps: DepsFactory = ({ db, engine, log, supervisor }) => {
     // Server-side, straight to the connector: never through a turn's tool list.
     callTool: connectorToolCaller(() => supervisor.running(), { tz: () => getSetting(db, "timezone") }),
     onPrompt: ({ routine, prompt, untrusted }) => runRoutinePrompt((o) => engine.runTurn(o), { chatId: routine.chatId, name: routine.name, prompt, untrusted }),
+  })
+  const flows = createFlowEngine({
+    db,
+    log: log.child({ component: "flows" }),
+    tools: connectorFlowCaller(() => supervisor.running()),
+    readSource: connectorToolCaller(() => supervisor.running(), { tz: () => getSetting(db, "timezone") }),
+    sourceUntrusted: (id) => supervisor.running().find((e) => e.id === id)?.row.trust === "external",
+    runPrompt: (r) => runFlowPrompt((o) => engine.runTurn(o), r),
   })
   const runner = createJobRunner({
     db,
@@ -55,11 +85,12 @@ export const buildDeps: DepsFactory = ({ db, engine, log, supervisor }) => {
     },
     // Smart reminders run their prompt as a turn in the reminder's chat.
     onSmartReminder: (r) => runSmartReminder((o) => engine.runTurn(o), r),
-    extensions: [routines],
+    extensions: [routines, flows],
   })
   const deps: EngineDeps = {
     reminderActions,
     routineActions,
+    flowActions,
     // Parse tokens count toward the daily cap like a turn's.
     parseReminder: (text, tz, now, model) => parseReminder(text, tz, now, meterToBudget(db, model)),
     scheduler: {

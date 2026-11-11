@@ -11,11 +11,13 @@ export type ApprovalRow = typeof pendingApprovals.$inferSelect
 
 // What a resume needs besides the messages (stored in `context`).
 export type ResumeContext = {
-  trigger: "message" | "schedule" | "hook" | "approval" | "reminder"
+  trigger: "message" | "schedule" | "hook" | "approval" | "reminder" | "flow"
   // The trigger of the turn that asked; schedule and hook keep their stricter policy on resume.
-  originTrigger: "message" | "schedule" | "hook" | "reminder"
+  originTrigger: "message" | "schedule" | "hook" | "reminder" | "flow"
   jobId?: string
   toolScope?: string[] | null
+  // Namespaced tools a flow prompt step allowed ("*": all), kept across resumes.
+  toolNames?: string[] | null
   modelRole: "default" | "fast" | "vision"
   deliver: boolean
   silentToken?: string

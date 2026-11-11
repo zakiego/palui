@@ -11,7 +11,7 @@ apps/host-bridge     Host-side MCP server (launchd, not Docker): an allowlist of
 apps/site            Next 16 static export + Fumadocs (Cloudflare Pages)
 apps/edge            Cloudflare Worker on palui.zakiego.com: app paths to the tunnel, the rest to Pages
 packages/db          Drizzle schema, migrations (bundled into src/migrations.gen.ts), openDb, crypto (AES-256-GCM), ids
-packages/core        Domain logic shared by app and runtime: config, log, events, settings, connectors, chat, models, tools, reminders, jobs, outbox, approvals
+packages/core        Domain logic shared by app and runtime: config, log, events, settings, connectors, chat, models, tools, reminders, routines, flows, jobs, outbox, approvals
 packages/connectors  One folder per connector: <type>/manifest.ts (zod + UI metadata) and <type>/runtime.ts (test/start)
 ```
 
@@ -28,7 +28,8 @@ packages/connectors  One folder per connector: <type>/manifest.ts (zod + UI meta
 - One SQLite file (`$DATA_DIR/palui.db`, WAL, busy_timeout 5000) shared by app and runtime through the same volume.
 - Inbound message: channel -> `services.inbound()` writes `messages` (status `pending`) -> router -> per-chat queue -> turn -> `outbox` -> outbox worker -> channel `send()` -> `sent`.
 - Inbound hooks: the app verifies `POST /api/hooks/:slug`, then inserts a `pending` message into the hook's chat whose `content` is `{ text, hook: { id, name, mode } }` and pokes the runtime. The engine treats it as untrusted: mode `forward` sends the text as is (no model), mode `summarize` runs a turn with zero tools, tainted.
-- Outbox actions use ids the router understands: `approve:<id>`, `deny:<id>`, `rem:done:<id>`, `rem:snooze:<id>:<10m|1h|tomorrow>`, `connector:<on|off>:<connectorId>`, `rt:<occurrenceId>:<answerId>` (routine check-in answers).
+- Outbox actions use ids the router understands: `approve:<id>`, `deny:<id>`, `rem:done:<id>`, `rem:snooze:<id>:<10m|1h|tomorrow>`, `connector:<on|off>:<connectorId>`, `rt:<occurrenceId>:<answerId>` (routine check-in answers, also after the handover to flows), `fl:<runId>:<answerId>` (flow check-in answers), `flowver:<approve|deny>:<versionId>` (flow version approvals). A flow run's per-run approval reuses `approve:`/`deny:` with a `flr_` run id.
+- Flows (PLAN 6c): `packages/core/src/flows` is the engine (a scheduler extension next to routines), `packages/connectors/src/flows` the agent tools. Hooks in mode `flow` start flow runs instead of writing a message; `chat` triggers are matched by the router before the model. The `routineMode` setting (`legacy`, `shadow`, `flows`) decides whether routines run on the routine engine or as flows.
 - Delivery is at least once. Never delete a reminder or outbox row before the channel acks.
 
 ## Conventions

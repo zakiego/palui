@@ -6,6 +6,7 @@ import { ArrowLeftIcon, CalendarClockIcon, MessagesSquareIcon, SearchXIcon } fro
 
 import { AppError } from "@/components/app-error"
 import { ClampText } from "@/components/clamp-text"
+import { FlowRunView } from "@/components/flow-run"
 import { Markdown } from "@/components/markdown"
 import { PagePending, SkeletonText } from "@/components/page-pending"
 import { ToolTrace } from "@/components/tool-trace"
@@ -42,8 +43,9 @@ function BackButton() {
 }
 
 function RunPage() {
-  const { run, timezone } = Route.useLoaderData()
+  const { run, flowRun, timezone } = Route.useLoaderData()
   const t = useT()
+  if (flowRun) return <FlowRunView run={flowRun} timezone={timezone} />
   if (!run) {
     return (
       <Empty className="border border-dashed">

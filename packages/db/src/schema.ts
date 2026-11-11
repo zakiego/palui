@@ -243,7 +243,8 @@ export const messages = sqliteTable(
 
 // --- Runs and tools ---------------------------------------------------------------
 
-export type RunTrigger = "message" | "schedule" | "hook" | "approval" | "reminder"
+// flow: a prompt step of a flow (RFC flows 5.6).
+export type RunTrigger = "message" | "schedule" | "hook" | "approval" | "reminder" | "flow"
 export type RunStatus = "running" | "ok" | "error" | "aborted" | "awaiting_approval" | "budget"
 
 export const runs = sqliteTable(
@@ -503,6 +504,156 @@ export const routineOccurrences = sqliteTable(
   ],
 )
 
+// --- Flows (RFC flows, PLAN 6c) ---------------------------------------------------------
+// A flow is a definition (triggers + steps) in immutable versions. Triggers are
+// derived per version so the scheduler can index due times; runs and their step
+// log record every firing, skips included. JSON columns are validated by zod in
+// core/flows, so a new step or trigger kind needs no migration.
+
+export type FlowState = { values: Record<string, unknown>; tainted: string[] }
+
+export const flows = sqliteTable(
+  "flows",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id").notNull(),
+    name: text("name").notNull(),
+    tz: text("tz").notNull(),
+    enabled: bool("enabled").notNull().default(true),
+    pausedUntil: integer("paused_until"),
+    currentVersionId: text("current_version_id"),
+    // The version whose write calls the owner approved, or null.
+    approvedVersionId: text("approved_version_id"),
+    state: json<FlowState>("state").notNull().default({ values: {}, tainted: [] }),
+    consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+    // The agent whose persona and model prompt steps use; null is the default agent.
+    agentId: text("agent_id"),
+    legacyRoutineId: text("legacy_routine_id").unique(),
+    // A migrated routine during the shadow week: computed, never sent.
+    shadow: bool("shadow").notNull().default(false),
+    lastError: text("last_error"),
+    // The local date the owner was last told about a failing run.
+    noticeFor: text("notice_for"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [uniqueIndex("flows_chat_name").on(t.chatId, t.name)],
+)
+
+export type FlowWriteCallJson = { stepId: string; kind: string } & Record<string, unknown>
+
+export const flowVersions = sqliteTable(
+  "flow_versions",
+  {
+    id: text("id").primaryKey(),
+    flowId: text("flow_id").notNull(),
+    n: integer("n").notNull(),
+    definition: json<Record<string, unknown>>("definition").notNull(),
+    hash: text("hash").notNull(),
+    writeCalls: json<FlowWriteCallJson[]>("write_calls").notNull().default([]),
+    // "agent:<runId>", "owner:dashboard", "migration"
+    createdBy: text("created_by").notNull(),
+    note: text("note"),
+    approvedAt: integer("approved_at"),
+    approvedVia: text("approved_via"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("flow_versions_n").on(t.flowId, t.n)],
+)
+
+export type FlowPollState = { lastHash?: string | null; lastValuePreview?: string | null; lastCheckedAt?: number | null; failures?: number; lastError?: string | null; seeded?: boolean }
+
+export const flowTriggers = sqliteTable(
+  "flow_triggers",
+  {
+    id: text("id").primaryKey(),
+    flowId: text("flow_id").notNull(),
+    triggerId: text("trigger_id").notNull(),
+    kind: text("kind").notNull(),
+    // Lookup key: the hook id (webhook), the normalized command (chat), the event name (event).
+    match: text("match"),
+    status: text("status").$type<"idle" | "firing">().notNull().default("idle"),
+    nextFireAt: integer("next_fire_at"),
+    nextOcc: json<{ at: number; key: string; label: string; fallback?: boolean } | null>("next_occ"),
+    cursor: json<RoutineCursor | null>("cursor"),
+    sourceState: json<RoutineSourceState>("source_state").notNull().default({}),
+    nextRefreshAt: integer("next_refresh_at"),
+    pollState: json<FlowPollState>("poll_state").notNull().default({}),
+    lastError: text("last_error"),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [uniqueIndex("flow_triggers_id").on(t.flowId, t.triggerId), index("flow_triggers_match").on(t.kind, t.match), index("flow_triggers_due").on(t.status, t.nextFireAt)],
+)
+
+export type FlowRunStatus = "queued" | "running" | "waiting" | "awaiting_approval" | "done" | "failed" | "skipped" | "cancelled"
+export type FlowSkipReason = "late" | "duplicate" | "paused" | "rate_limited" | "budget" | "not_approved" | "chain_depth" | "shadow"
+
+export const flowRuns = sqliteTable(
+  "flow_runs",
+  {
+    id: text("id").primaryKey(),
+    flowId: text("flow_id").notNull(),
+    versionId: text("version_id").notNull(),
+    chatId: text("chat_id").notNull(),
+    triggerId: text("trigger_id"),
+    triggerKind: text("trigger_kind").notNull(),
+    runKey: text("run_key").notNull(),
+    parentRunId: text("parent_run_id"),
+    itemIndex: integer("item_index"),
+    status: text("status").$type<FlowRunStatus>().notNull(),
+    skipReason: text("skip_reason").$type<FlowSkipReason>(),
+    trigger: json<Record<string, unknown>>("trigger").notNull().default({}),
+    vars: json<Record<string, unknown>>("vars").notNull().default({}),
+    taint: json<string[]>("taint").notNull().default([]),
+    // The step to run next; null when finished.
+    cursor: text("cursor"),
+    wait: json<Record<string, unknown> | null>("wait"),
+    wakeAt: integer("wake_at"),
+    leaseUntil: integer("lease_until"),
+    stepsDone: integer("steps_done").notNull().default(0),
+    messagesSent: integer("messages_sent").notNull().default(0),
+    scheduledAt: integer("scheduled_at"),
+    startedAt: integer("started_at").notNull(),
+    endedAt: integer("ended_at"),
+    error: text("error"),
+    legacyOccurrenceId: text("legacy_occurrence_id").unique(),
+    dryRun: bool("dry_run").notNull().default(false),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("flow_runs_key").on(t.flowId, t.runKey),
+    index("flow_runs_wake").on(t.status, t.wakeAt),
+    index("flow_runs_chat").on(t.chatId, t.status),
+    index("flow_runs_started").on(t.flowId, t.startedAt),
+    index("flow_runs_parent").on(t.parentRunId),
+  ],
+)
+
+export type FlowStepStatus = "running" | "ok" | "error" | "skipped" | "waiting" | "stubbed"
+
+export const flowStepRuns = sqliteTable(
+  "flow_step_runs",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id").notNull(),
+    seq: integer("seq").notNull(),
+    stepId: text("step_id").notNull(),
+    kind: text("kind").notNull(),
+    attempt: integer("attempt").notNull().default(1),
+    status: text("status").$type<FlowStepStatus>().notNull(),
+    input: json<unknown>("input"),
+    output: json<unknown>("output"),
+    tainted: bool("tainted").notNull().default(false),
+    branch: text("branch"),
+    toolCallId: text("tool_call_id"),
+    turnRunId: text("turn_run_id"),
+    error: text("error"),
+    startedAt: integer("started_at").notNull(),
+    ms: integer("ms"),
+  },
+  (t) => [uniqueIndex("flow_step_runs_seq").on(t.runId, t.seq), index("flow_step_runs_started").on(t.startedAt)],
+)
+
 // --- Outbox -----------------------------------------------------------------------
 
 export type OutboxStatus = "pending" | "sending" | "sent" | "failed" | "cancelled"
@@ -576,7 +727,8 @@ export const hooks = sqliteTable("hooks", {
   name: text("name").notNull(),
   // Encrypted HMAC secret.
   secret: text("secret").notNull(),
-  mode: text("mode").$type<"forward" | "summarize">().notNull().default("forward"),
+  // flow: the body starts a flow run (the flow's webhook trigger names this hook).
+  mode: text("mode").$type<"forward" | "summarize" | "flow">().notNull().default("forward"),
   chatId: text("chat_id").notNull(),
   enabled: bool("enabled").notNull().default(true),
   lastAt: integer("last_at"),

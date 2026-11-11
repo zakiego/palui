@@ -361,7 +361,10 @@ function PickContainer(props: WizardActionProps) {
 
 // `saved`: the owner has saved a pref for this tool. Until then the runtime
 // offers it as destructive, whatever the table shows (fail closed).
-type ToolRow = { name: string; title: string; description: string; suggestedClass: ToolClass; enabled: boolean; class: ToolClass; saved: boolean }
+// flowApproval (RFC flows 7.2): a flow's write step on this tool is approved once
+// per flow version, or asked on every run (a tool whose effects reach other people).
+type FlowApproval = "version" | "every_run"
+type ToolRow = { name: string; title: string; description: string; suggestedClass: ToolClass; enabled: boolean; class: ToolClass; saved: boolean; flowApproval: FlowApproval }
 type ToolClass = "read" | "write" | "destructive"
 const CLASSES: ToolClass[] = ["read", "write", "destructive"]
 const asClass = (v: Json | undefined): ToolClass => (v === "read" || v === "write" ? v : "destructive")
@@ -390,6 +393,7 @@ function ListTools(props: WizardActionProps) {
           enabled: t.enabled === true,
           class: asClass(t.class ?? t.suggestedClass),
           saved: t.saved === true,
+          flowApproval: (t.flowApproval === "every_run" ? "every_run" : "version") as FlowApproval,
         }))
         .filter((t) => t.name),
     )
@@ -405,7 +409,7 @@ function ListTools(props: WizardActionProps) {
     if (!tools) return
     setSaving(true)
     try {
-      const toolPrefs = Object.fromEntries(tools.map((t) => [t.name, { enabled: t.enabled, class: t.class }]))
+      const toolPrefs = Object.fromEntries(tools.map((t) => [t.name, { enabled: t.enabled, class: t.class, ...(t.flowApproval === "every_run" ? { flowApproval: t.flowApproval } : {}) }]))
       const res = await saveConnectorDraft({ data: { id: props.connectorId, type: "mcp", config: { toolPrefs } } })
       if (!res.ok) toast.error(res.message)
       else {
@@ -479,6 +483,22 @@ function ListTools(props: WizardActionProps) {
                   <span className="block font-mono text-caption break-all">{t.name}</span>
                   {t.description && <span className="line-clamp-2 text-caption text-muted-foreground">{t.description}</span>}
                   {t.class !== t.suggestedClass && <Badge variant="outline">suggested {t.suggestedClass}</Badge>}
+                  {t.class === "write" && (
+                    <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-caption text-muted-foreground">In flows, ask</span>
+                      <SimpleSelect
+                        aria-label={`Flow approval for ${t.name}`}
+                        size="sm"
+                        className="w-full max-w-48"
+                        value={t.flowApproval}
+                        options={[
+                          { value: "version", label: "per version" },
+                          { value: "every_run", label: "every run" },
+                        ]}
+                        onChange={(v) => update(t.name, { flowApproval: v as FlowApproval })}
+                      />
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <SimpleSelect aria-label={`Class for ${t.name}`} size="sm" className="w-full" value={t.class} options={CLASSES.map((c) => ({ value: c, label: c }))} onChange={(v) => update(t.name, { class: v as ToolClass })} />

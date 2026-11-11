@@ -15,6 +15,15 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 - A Routines page in the dashboard lists every routine across your chats with its schedule, next time, action, recap and anything that needs a look: a failing source, a source connector that's missing or off, or a check-in waiting for an answer. Open one to see it drawn as the steps it runs (when, ask or send, what happens with no answer, recap), its next times, done per item, and its log with counts per status, filtered by date. You can pause, pause until a time, resume or delete it there; creating and editing stays in chat.
 - Each agent now has its own page (`/app/agents/<slug>`), opened from its row on the Agents page. It holds the profile, the shared-chat rules, the daily cap with today's usage, the recall container, its standing instructions (add, edit, switch off and delete them right there) and the chats it answers in, each with its Answer here switch. New agent asks only for a name, slug and persona, then opens that page.
+- Flows: automations Palui builds from chat out of triggers and steps. A flow starts on a schedule, a webhook, a chat command or phrase, a value that changes, another flow's check-in or run, or by hand, and its steps call tools, branch on conditions, set variables, send messages, ask check-ins, wait, run a prompt, or repeat for each item in a list. Nothing calls the model unless a prompt step asks, and every run is logged step by step, skips included. Ask in chat; Palui checks and dry-runs a flow before saving it, and `kenapa_flow` explains why one didn't run. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
+- Write tools in a flow are approved once per flow version. A run still asks when an argument comes from outside data, when a tool's class changed, or when the tool is set to ask every run (the new "In flows, ask" setting on an MCP server's tool list). Destructive tools never run in a flow.
+- A read-only Flows page in the dashboard lists every flow with its next time and last run. A flow's page shows its steps and branches, versions and recent runs, and a flow run opens its step log on the run page.
+- Webhooks get a third mode, `flow`: the body starts the flows listening to that hook, deduped by the `x-palui-delivery` or `X-GitHub-Delivery` header. Saving a flow with a webhook trigger switches its hook to this mode.
+- `palui__cari_tool` results now say each tool's class and whether its output is untrusted.
+
+### Changed
+
+- Routines are moving to flows. After this upgrade each routine also gets a flow that runs in shadow: it computes the same times but sends nothing, and differences are logged (the Flows page and `palui flows status` show the count). The routine engine keeps sending until you run `palui flows mode flows`, which hands over with open check-ins and old buttons intact; `palui flows mode legacy` goes back. After the handover the routine tools edit flows, and the Routines page links each routine to its flow and pauses or deletes the flow along with it.
 
 ### Changed
 

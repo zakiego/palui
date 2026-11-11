@@ -5,7 +5,8 @@
 // (verifyHookSignature). ingestHook then writes a `pending` message into the hook's
 // chat whose content is `{ text, hook: { id, name, mode } }` and pokes the runtime.
 // The engine treats it as untrusted: `forward` sends the text as is, `summarize`
-// runs with zero tools.
+// runs with zero tools. A hook in mode `flow` skips the message and starts flow
+// runs instead (flows/entry.ts ingestFlowHook).
 //
 // Signing: x-palui-timestamp is the unix time in seconds, and x-palui-signature is
 // `sha256=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`. Timestamps more than 5
@@ -15,7 +16,8 @@ import { desc, eq } from "drizzle-orm"
 import { chats, connectors, hooks, messages, newId, randomToken, type DB } from "@palui/db"
 import { decrypt, encrypt, safeEqual } from "@palui/db/crypto"
 
-export type HookMode = "forward" | "summarize"
+// flow: the body starts the flows whose webhook trigger names this hook (RFC flows 4.1).
+export type HookMode = "forward" | "summarize" | "flow"
 export type HookRow = typeof hooks.$inferSelect
 // What the dashboard gets: never the secret, not even encrypted.
 export type HookView = Omit<HookRow, "secret">

@@ -57,7 +57,8 @@ describe("dev fixtures", () => {
   it("fills the huge fixture past every list limit", () => {
     const db = memoryDb()
     applyFixture(db, "huge")
-    expect(count(db, schema.chats)).toBe(HUGE.chats + 1)
+    expect(count(db, schema.chats)).toBe(HUGE.chats + 1 + HUGE.flowChats)
+    expect(count(db, schema.flows)).toBe(HUGE.flows)
     expect(count(db, schema.reminders)).toBe(HUGE.upcoming + HUGE.recurring + HUGE.done)
     expect(count(db, schema.events)).toBeGreaterThanOrEqual(HUGE.events)
   })

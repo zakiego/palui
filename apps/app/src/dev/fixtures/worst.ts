@@ -7,13 +7,14 @@
 // The different failures are spread across the first rows of each list, the
 // way real data mixes them, instead of stacked into one row.
 import { DEFAULT_PERSONA } from "@palui/core/settings"
+import { syncRoutineFlows } from "@palui/core/flows/migrate"
 import { D, H, MIN, gradientAvatar, type Kit } from "./kit"
 import { worstRoutines } from "./routines"
 
 // Limits the dashboard enforces (the zod schemas in src/lib/fns). A value that
 // claims to be "at the limit" is checked against it, so the fixture can't
 // drift past what the forms accept.
-const LIMITS = { agentName: 40, agentSlug: 24, attachmentTitle: 200, attachmentDescription: 1000, attachmentFilename: 200, connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500, instructionTitle: 80, instructionBody: 1000, preferenceKey: 40, preferenceValue: 300, botUsername: 32 }
+const LIMITS = { flowName: 80, flowDescription: 200, flowSteps: 40, flowTriggers: 8, flowError: 300, agentName: 40, agentSlug: 24, attachmentTitle: 200, attachmentDescription: 1000, attachmentFilename: 200, connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500, instructionTitle: 80, instructionBody: 1000, preferenceKey: 40, preferenceValue: 300, botUsername: 32 }
 
 function within(value: string, limit: number): string {
   if (value.length > limit) throw new Error(`fixture value is ${value.length} characters, over the limit of ${limit}: ${value.slice(0, 40)}`)
@@ -133,6 +134,7 @@ export function worst(k: Kit) {
   })
   k.connector("reminders", "reminders", { status: "on" })
   k.connector("jobs", "jobs", { status: "on" })
+  k.connector("flows", "flows", { status: "error", detail: "5 flows failing, 1 waiting for approval, 1 routine in its shadow week: the longest status a skill can report" })
   k.connector("chats", "chats", { status: "on" })
   k.connector("webfetch", "webfetch", { status: "on" })
   k.connector("attachments", "attachments", { status: "on" })
@@ -329,6 +331,82 @@ export function worst(k: Kit) {
   job({ name: "Đặng Thị Ngọc Hân nhắc việc", rrule: "FREQ=DAILY", tz: "Asia/Ho_Chi_Minh", prompt: "x", chatId: vietnamese.id, nextRunAt: now + H, lastRunAt: 0, lastStatus: "ok", lastResult: "ok" })
   job({ name: "Benachrichtigungseinstellungen-Synchronisierung", kind: "heartbeat", rrule: "FREQ=MINUTELY;INTERVAL=30", tz: "Europe/Berlin", prompt: "x", chatId: web.id, nextRunAt: now + 30 * MIN, lastRunAt: now - 30 * MIN, lastStatus: "running" })
 
+  // --- flows (RFC flows): the step and trigger caps, every run status, RTL, a shadow routine ---
+  {
+    const flowChat = family
+    const longName = within("Rekap-penjualan-harian-Vorneo-untuk-Banjarbaru-Martapura-dan-Hulu-Sungai-Selatan", LIMITS.flowName)
+    const steps = Array.from({ length: LIMITS.flowSteps }, (_, i) =>
+      i === 0
+        ? { id: "deals", kind: "tool", tool: TOOL_LONG, args: { department: "penjualan-dan-pemasaran-wilayah-kalimantan-selatan", week: "{{now.date}}", url: LONG_URL } }
+        : i === 1
+          ? { id: "big_enough", kind: "if", when: 'len(steps.deals.data.items) > 3 and not empty(steps.deals.data.items) and steps.deals.data.items.0.stage == "masuk" or daysUntil(steps.deals.data.items.0.due) <= 3', then: "s2", else: null }
+          : { id: `s${i}`, kind: "message", text: fill(`Langkah ${i}: ${PARAGRAPH}`, 400), name: i === 2 ? "Kirim ringkasan ke grup sebelum rapat Senin pagi, semua angka sudah dicek ulang" : undefined },
+    )
+    const triggers = [
+      { id: "main", kind: "schedule", start: "deals", source: { kind: "times", times: Array.from({ length: 12 }, (_, i) => ({ time: `${String(6 + i).padStart(2, "0")}:15`, label: `Cek ${i + 1}` })) } },
+      { id: "weekly", kind: "schedule", start: "deals", source: { kind: "rrule", rrule: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=7,12,17;BYMINUTE=0,30", start: "2026-11-02T07:00" } },
+      ...Array.from({ length: LIMITS.flowTriggers - 2 }, (_, i) => ({ id: `cmd${i}`, kind: "chat", command: `/rekap_penjualan_${i}_banjarbaru`, start: "deals" })),
+    ]
+    const big = k.flow(
+      flowChat,
+      { name: longName, description: within(fill("Ambil deal Vorneo, cek angka, kirim ringkasan ke grup keluarga dan tim. ", LIMITS.flowDescription), LIMITS.flowDescription), triggers, steps },
+      {
+        enabled: false,
+        failures: 5,
+        lastError: within(fill(`Step deals: ${STACK.split("\n")[0]} `, LIMITS.flowError), LIMITS.flowError),
+        versions: [
+          { definition: { name: longName, triggers, steps: steps.map((st, i) => (i === 39 ? { ...st, text: "Selesai." } : st)) }, note: within(fill("Ganti teks penutup biar lebih singkat. ", 200), 200) },
+          { definition: { name: longName, triggers, steps } , createdBy: "owner:dashboard" },
+        ],
+        state: { last_paid: "Listrik 2026-11-12", streak: 12, notified: Array.from({ length: 40 }, (_, i) => `pr-${1000 + i}`) },
+      },
+    )
+    const bigIo = { ok: true, data: { items: Array.from({ length: 200 }, (_, i) => ({ id: `deal_${i}`, title: PARAGRAPH.slice(0, 80), stage: "masuk" })) } }
+    k.flowRun(big, {
+      status: "failed",
+      triggerId: "main",
+      startedAt: now - 20 * MIN,
+      scheduledAt: now - 20 * MIN,
+      taint: ["steps.deals", "trigger"],
+      trigger: { kind: "schedule", label: "Cek 1", time: "06.15", payload: PASTED_BLOB },
+      error: within(fill(`Step s5: ${STACK} `, LIMITS.flowError), LIMITS.flowError),
+      steps: [
+        { stepId: "deals", kind: "tool", status: "error", error: "ECONNRESET", attempt: 1, ms: 20_000 },
+        { stepId: "deals", kind: "tool", status: "ok", tainted: true, attempt: 3, input: { tool: TOOL_LONG, args: { url: LONG_URL } }, output: { $truncated: true, preview: JSON.stringify(bigIo).slice(0, 4096) }, ms: 59_400 },
+        { stepId: "big_enough", kind: "if", status: "ok", branch: "then", input: { when: steps[1]!.when, explain: "len(steps.deals.data.items) = 200, steps.deals.data.items.0.stage = \"masuk\"" }, output: { result: true } },
+        ...Array.from({ length: 3 }, (_, i) => ({ stepId: `s${i + 2}`, kind: "message", status: "ok" as const, output: { text: fill(PARAGRAPH, 400) } })),
+        { stepId: "s5", kind: "message", status: "error", error: "More than 5 messages in one run." },
+      ],
+    })
+    k.flowRun(big, { status: "skipped", skipReason: "late", triggerId: "main", startedAt: now - 3 * H, scheduledAt: now - 6 * H })
+    k.flowRun(big, { status: "awaiting_approval", skipReason: "not_approved", triggerId: "cmd0", triggerKind: "chat", startedAt: now - 2 * H, steps: [{ stepId: "deals", kind: "tool", status: "waiting", error: "This version isn't approved yet." }] })
+
+    const rtl = k.flow(
+      flowChat,
+      {
+        name: "تذكير الاجتماع الأسبوعي للفريق",
+        triggers: [{ id: "main", kind: "schedule", start: "note", source: { kind: "times", times: [{ time: "09:00" }] } }],
+        steps: [{ id: "note", kind: "tool", tool: "mcp-notes__save_note_with_a_very_long_tool_name", args: { title: "{{now.date}}", body: fill(PARAGRAPH, 1500) } }],
+      },
+      { pausedUntil: now + 3 * D, enabled: false, unapprovedWrites: [{ stepId: "note", kind: "tool", connectorId: "mcp-northwind-industries-holdings-internal-knowledge-base-prod", tool: "save_note_with_a_very_long_tool_name", class: "write", args: { title: "{{now.date}}", body: fill(PARAGRAPH, 1500) } }] },
+    )
+    k.flowRun(rtl, { status: "cancelled", triggerId: "main", startedAt: now - D, error: "The owner didn't approve this version." })
+
+    const bills = k.flow(flowChat, {
+      name: "Tagihan",
+      triggers: [{ id: "daily", kind: "schedule", start: "bills", source: { kind: "times", times: [{ time: "09:00", label: "Cek tagihan" }] } }],
+      steps: [
+        { id: "bills", kind: "tool", tool: "mcp-keuangan__list_bills", args: { status: "unpaid" } },
+        { id: "per_bill", kind: "each", items: "steps.bills.data.items", where: "daysUntil(item.due) <= 3", key: "{{item.id}}:{{item.due}}", max: 50, body: "ask", next: null },
+        { id: "ask", kind: "checkin", text: "Tagihan {{item.name | truncate(40)}} jatuh tempo {{item.due | date}}. Udah bayar?", deadline: { kind: "after", minutes: 4320 }, next: null },
+      ],
+    })
+    const parent = k.flowRun(bills, { status: "done", triggerId: "daily", startedAt: now - 30 * MIN, steps: [{ stepId: "bills", kind: "tool", status: "ok" }, { stepId: "per_bill", kind: "each", status: "ok", error: "30 item(s) over max 50 were dropped.", output: { count: 80, started: 50, deduped: 0, dropped: 30 } }] })
+    for (let i = 0; i < 20; i++) {
+      k.flowRun(bills, { status: i % 3 ? "waiting" : "done", triggerId: "daily", parentRunId: parent, itemIndex: i, startedAt: now - 30 * MIN, wait: i % 3 ? { kind: "checkin", stepId: "ask", followUps: 2, nextFollowUpAt: now + H, deadlineAt: now + 3 * D, answers: [], askedAt: now - 30 * MIN } : null, wakeAt: i % 3 ? now + H : null, trigger: { label: `Tagihan ${i + 1}` }, steps: [{ stepId: "ask", kind: "checkin", status: i % 3 ? "waiting" : "ok", branch: i % 3 ? null : "next" }] })
+    }
+  }
+
   // --- runs: every status and trigger, the extremes of every number ------------
   // 142% of a 1,000 token cap, today.
   k.run({ chatId: family.id, jobId: cappedJob, trigger: "schedule", model: "claude-sonnet-4-6", tokensIn: 1300, tokensOut: 120, status: "budget", error: "Daily token cap reached for this job (1,420 of 1,000).", startedAt: now - 4 * MIN, ms: 59_999 })
@@ -438,4 +516,6 @@ export function worst(k: Kit) {
   k.attachment({ chatId: cjk.id, title: "身份证 王秀英 正反面", description: "身份证正反面照片，有效期至2036年。", kind: "jpeg", filename: "身份证_王秀英.jpg", size: 1536, createdAt: now - 12 * D })
 
   worstRoutines(k, { family: family.id, vietnamese: vietnamese.id, gone: "chat_0mhremoved0000000000" })
+  // The shadow week (RFC flows 12.6): each routine also has its shadow flow.
+  syncRoutineFlows(k.db, now)
 }

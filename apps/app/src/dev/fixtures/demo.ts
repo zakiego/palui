@@ -1,6 +1,8 @@
 // Dev only: the data the dashboard was designed against. Every connector
 // state, a few long names, a Markdown reply, a pending approval. It reads well
 // on purpose; `worst.ts` is the one that goes looking for trouble.
+import { handover, setRoutineMode, syncRoutineFlows } from "@palui/core/flows/migrate"
+import { BRIEFING, RECAP } from "@palui/core/flows/test-helpers"
 import { D, H, MIN, type Kit } from "./kit"
 import { demoRoutines } from "./routines"
 
@@ -18,6 +20,7 @@ export function demo(k: Kit) {
   k.connector("reminders", "reminders", { status: "on" })
   k.connector("routines", "routines", { status: "on" })
   k.connector("jobs", "jobs", { status: "paused" })
+  k.connector("flows", "flows", { status: "on" })
   k.connector("chats", "chats", { status: "on" })
   k.connector("webfetch", "webfetch", { status: "on" })
   k.connector("notes", "notes", { status: "on" })
@@ -59,6 +62,26 @@ export function demo(k: Kit) {
   const jobId = k.job({ name: "Daily briefing", kind: "briefing", rrule: "FREQ=DAILY;BYHOUR=7;BYMINUTE=0", tz: "Asia/Makassar", prompt: "Brief me.", chatId: tg.id, nextRunAt: now + 10 * H, lastRunAt: now - 14 * H, lastStatus: "ok", lastResult: "Pagi! Hari ini 2 pengingat, 3 deal Vorneo masuk, cuaca Banjarbaru cerah berawan 31°C.", dailyTokenCap: 50_000 })
   k.job({ name: "Heartbeat with a name long enough to wrap onto a second line on a phone", kind: "heartbeat", rrule: "FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9,10,11,12,13,14,15,16,17,18,19,20,21,22", tz: "Asia/Makassar", prompt: "NOTHING unless it matters.", chatId: tg.id, enabled: false, dailyTokenCap: 30_000 })
   k.run({ chatId: tg.id, jobId, trigger: "schedule", model: "claude-sonnet-4-6", tokensIn: 21000, tokensOut: 1400, status: "ok", startedAt: now - H, ms: 15000 })
+
+  // Flows (RFC flows): a morning briefing, a weekly recap and a migrated routine.
+  const briefing = k.flow(tg, BRIEFING)
+  k.flowRun(briefing, {
+    status: "done",
+    triggerId: "main",
+    startedAt: now - 4 * H,
+    scheduledAt: now - 4 * H,
+    taint: ["steps.weather"],
+    trigger: { kind: "schedule", label: "Briefing", time: "06.00" },
+    steps: [
+      { stepId: "prayer", kind: "tool", status: "ok", output: { ok: true, data: { times: { fajr: "04:39", dhuhr: "12:01" } } }, ms: 820 },
+      { stepId: "weather", kind: "tool", status: "ok", tainted: true, output: { ok: true, data: { current_condition: [{ temp_C: "27" }] } }, ms: 1450 },
+      { stepId: "reminders", kind: "tool", status: "ok", output: { ok: true, data: { reminders: [{ text: "Bayar listrik" }] } }, ms: 12 },
+      { stepId: "today", kind: "set", status: "ok", output: { count: 1 } },
+      { stepId: "send", kind: "message", status: "ok", output: { text: "Selamat pagi! Rabu 11 Nov\n\nSholat: Subuh 04:39, Zuhur 12:01" } },
+    ],
+  })
+  const recap = k.flow(tg, RECAP, { versions: [{ definition: { ...RECAP, description: "Rekap mingguan dengan semangat" }, note: "tambah deskripsi" }] })
+  k.flowRun(recap, { status: "failed", triggerId: "weekly", startedAt: now - 3 * D, error: "Step recap: Tool flows__ringkasan isn't available (connector off or tool removed).", steps: [{ stepId: "recap", kind: "tool", status: "error", error: "Tool flows__ringkasan isn't available (connector off or tool removed)." }] })
 
   const rem = (text: string, inHours: number, rrule: string | null = null, status: "pending" | "done" = "pending") => k.reminder({ chatId: tg.id, text, rrule, tz: "Asia/Makassar", fireAt: now + inHours * H, status })
   rem("Bayar listrik", 15)
@@ -107,4 +130,8 @@ export function demo(k: Kit) {
   k.attachment({ chatId: tg.id, title: "Struk servis motor", description: "Bengkel resmi Banjarbaru, ganti oli dan kampas rem, Rp 385.000.", kind: "pdf", filename: "struk_servis_2026-11-01.pdf", size: 96_000, createdAt: now - 9 * D })
 
   demoRoutines(k, { tg: tg.id, wa: wa.id, web: web.id })
+  // After the handover: the routines run as flows (RFC flows 3.6).
+  setRoutineMode(k.db, "flows", now)
+  syncRoutineFlows(k.db, now)
+  handover(k.db, now)
 }

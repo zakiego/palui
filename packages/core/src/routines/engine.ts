@@ -18,6 +18,7 @@ import type { Logger } from "../log"
 import { enqueueOutbox, notifyOutbox } from "../outbox/enqueue"
 import { notifyScheduleChanged } from "../reminders/signal"
 import { formatClock } from "../reminders/time"
+import { getSetting } from "../settings"
 import type { AnswerOption, CheckinAction, RoutineAction } from "./config"
 import {
   computeNext,
@@ -463,6 +464,8 @@ export function createRoutineEngine(opts: RoutineEngineOptions): RoutineEngine {
       db.update(routines).set({ status: "idle", updatedAt: now }).where(eq(routines.status, "firing")).run()
     },
     sweep(now) {
+      // Flows took over (RFC flows 12.6): this engine stands down.
+      if (getSetting(db, "routineMode") === "flows") return 0
       let n = 0
       for (const [name, step] of steps) {
         try {
@@ -478,6 +481,7 @@ export function createRoutineEngine(opts: RoutineEngineOptions): RoutineEngine {
       return n
     },
     nextDue() {
+      if (getSetting(db, "routineMode") === "flows") return null
       const vals = [
         db
           .select({ v: min(routines.nextFireAt) })

@@ -3,7 +3,10 @@ import { defineManifest } from "@palui/core/connectors/define"
 
 const toolClass = z.enum(["read", "write", "destructive"])
 
-export const mcpToolPref = z.object({ enabled: z.boolean(), class: toolClass })
+// flowApproval (RFC flows 7.2): how a flow's write step on this tool is approved,
+// once per flow version (default) or on every run (a tool whose effects reach
+// other people). Read at run time, so tightening it applies to existing flows.
+export const mcpToolPref = z.object({ enabled: z.boolean(), class: toolClass, flowApproval: z.enum(["version", "every_run"]).optional() })
 
 export const mcpConfig = z.object({
   url: z.url({ protocol: /^https?$/ }),

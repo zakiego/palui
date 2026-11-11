@@ -1,5 +1,6 @@
 // Routines page. Reads and writes go through server/routines.ts, which wraps the
 // same service the agent's routine tools use. Editing a routine stays in chat.
+import { routineMode } from "@palui/core/flows/migrate"
 import { getSetting } from "@palui/core/settings"
 import { createServerFn } from "@tanstack/react-start"
 import { z } from "zod"
@@ -11,7 +12,7 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 export const getRoutines = createServerFn({ method: "GET" }).handler(async () => {
   const { db } = await requireUser()
-  return { routines: routineList(db), timezone: getSetting(db, "timezone") }
+  return { routines: routineList(db), routineMode: routineMode(db), timezone: getSetting(db, "timezone") }
 })
 
 export const getRoutine = createServerFn({ method: "GET" })

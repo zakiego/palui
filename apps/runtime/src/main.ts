@@ -15,6 +15,7 @@ import { createOutboxWorker } from "@palui/core/outbox/worker"
 import type { AnyRuntime, ConnectorManifest, ConnectorServices } from "@palui/core/connectors/define"
 import type { ConnectorRow } from "@palui/core/connectors/store"
 import { createSupervisor, type Supervisor } from "@palui/core/connectors/supervisor"
+import { connectorFlowCaller } from "@palui/core/flows/call"
 import { connectorToolCaller } from "@palui/core/routines/call"
 import { getSetting } from "@palui/core/settings"
 import { createControlServer } from "./control"
@@ -93,6 +94,7 @@ export async function startRuntime(opts: RuntimeOptions = {}): Promise<Runtime> 
   Object.assign(services, engine.services)
   services.reconcile = () => supervisor.poke()
   services.callTool = connectorToolCaller(() => supervisor.running(), { tz: () => getSetting(db, "timezone") })
+  services.flowTools = connectorFlowCaller(() => supervisor.running())
   const worker = createOutboxWorker({ db, channel: (ch) => supervisor.channel(ch), connector: (id) => supervisor.get(id)?.handle.channel, log })
   const control = createControlServer({ db, token: getControlToken(cfg), engine, supervisor, deps, bus, log, startedAt })
 

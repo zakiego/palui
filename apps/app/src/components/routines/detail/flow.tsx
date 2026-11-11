@@ -5,7 +5,8 @@
 // by adding steps. Activity (next times, done per item) sits beside it and the
 // log is below.
 import type * as React from "react"
-import { ChartColumnIcon, CircleAlertIcon, CircleXIcon, ClockIcon, PlugZapIcon, RepeatIcon } from "lucide-react"
+import { Link } from "@tanstack/react-router"
+import { ChartColumnIcon, CircleAlertIcon, CircleXIcon, ClockIcon, PlugZapIcon, RepeatIcon, WorkflowIcon } from "lucide-react"
 
 import { actionIcon, useRecapText } from "@/components/routines/routine-parts"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -23,6 +24,7 @@ export function FlowLayout({ detail, timezone, setRange }: { detail: Detail; tim
   return (
     <div className="flex w-full max-w-5xl flex-col gap-8">
       <RoutineHeader detail={detail} timezone={timezone} />
+      <FlowNote detail={detail} />
       <Notices detail={detail} timezone={timezone} />
       <div className="grid items-start gap-8 @4xl/main:grid-cols-[minmax(0,1fr)_18rem]">
         {detail.config ? (
@@ -45,6 +47,25 @@ export function FlowLayout({ detail, timezone, setRange }: { detail: Detail; tim
       <LogCard detail={detail} timezone={timezone} setRange={setRange} />
       <RawConfig json={detail.rawJson} />
     </div>
+  )
+}
+
+// The flow this routine became: a shadow during the shadow week, the one that
+// runs it after the handover (whose log continues there).
+function FlowNote({ detail }: { detail: Detail }) {
+  const t = useT()
+  const flow = detail.routine.flow
+  if (!flow) return null
+  return (
+    <Alert role="note">
+      <WorkflowIcon aria-hidden="true" />
+      <AlertDescription>
+        {flow.shadow ? t("routines.shadowFlowNote") : t("routines.asFlowNote")}{" "}
+        <Link to="/flows/$id" params={{ id: flow.id }} className="underline underline-offset-4">
+          {t("flowrun.openFlow")}
+        </Link>
+      </AlertDescription>
+    </Alert>
   )
 }
 

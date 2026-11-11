@@ -9,7 +9,7 @@ import { ensureChat, findChat, type ChatRow } from "../chats"
 import { isOwner } from "../owner"
 import type { InboundMessage } from "../connectors/define"
 import type { StoredContent } from "./context"
-import type { ReminderActions } from "./deps"
+import type { FlowActions, ReminderActions } from "./deps"
 
 export type CommandName = "new" | "stop" | "status" | "connectors" | "agent"
 
@@ -22,6 +22,8 @@ export type Route =
   // A reminder or routine check-in action, answered without the model.
   | { kind: "reminder"; reply: string }
   | { kind: "hook"; hook: NonNullable<StoredContent["hook"]>; text: string }
+  // A flow's chat trigger took it: no reply, the flow answers (RFC flows 4.1).
+  | { kind: "handled" }
   | { kind: "turn" }
 
 // Which connector scope a chat lives in: an agent's own Telegram bot keeps its
@@ -115,8 +117,12 @@ export type RouteInput = {
   content: StoredContent
   text: string
   replyToChannelMsgId?: string
+  // The stored message id (chat triggers key their run on it).
+  messageId?: string
   reminderActions?: ReminderActions
   routineActions?: ReminderActions
+  // Flow check-in answers ("fl:") and version approvals ("flowver:"), and chat triggers.
+  flowActions?: FlowActions
   // false for a guest (PLAN 19.3): approvals, buttons, commands and reminder
   // actions are the owner's, so a guest's "ya" or "/new" is just a message.
   fromOwner?: boolean
@@ -147,6 +153,10 @@ export async function route(i: RouteInput): Promise<Route> {
       const reply = await i.routineActions.fromCallback(i.db, cb, i.chat.id, i.now)
       if (reply !== null) return { kind: "reminder", reply }
     }
+    if ((cb.startsWith("fl:") || cb.startsWith("flowver:")) && i.flowActions) {
+      const reply = await i.flowActions.fromCallback(i.db, cb, i.chat.id, i.now)
+      if (reply !== null) return { kind: "reminder", reply }
+    }
     return { kind: "ignore", reason: `Unknown button "${cb}".` }
   }
 
@@ -168,12 +178,20 @@ export async function route(i: RouteInput): Promise<Route> {
   const cmd = parseCommand(i.text)
   if (cmd) return { kind: "command", ...cmd }
 
+  if (i.flowActions?.fromChat && i.text.trim() && i.messageId) {
+    if (await i.flowActions.fromChat(i.db, { text: i.text, chatId: i.chat.id, messageId: i.messageId, fromOwner: true }, i.now)) return { kind: "handled" }
+  }
+
   if (i.reminderActions && i.text.trim()) {
     const reply = await i.reminderActions.fromText(i.db, i.text, i.replyToChannelMsgId, i.chat.id, i.now)
     if (reply !== null) return { kind: "reminder", reply }
   }
   if (i.routineActions && i.text.trim()) {
     const reply = await i.routineActions.fromText(i.db, i.text, i.replyToChannelMsgId, i.chat.id, i.now)
+    if (reply !== null) return { kind: "reminder", reply }
+  }
+  if (i.flowActions && i.text.trim()) {
+    const reply = await i.flowActions.fromText(i.db, i.text, i.replyToChannelMsgId, i.chat.id, i.now)
     if (reply !== null) return { kind: "reminder", reply }
   }
   if (!i.text.trim() && !(i.content.media ?? []).length) return { kind: "ignore", reason: "Empty message." }

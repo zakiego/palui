@@ -8,7 +8,7 @@ const FIRST = ["Aleksandra", "Budi", "Christopher", "Dewi", "Eka", "Fitri", "Gus
 const LAST = ["Wiśniewska-Kowalczyk", "Santoso", "Montgomery", "Lestari", "Pratama", "Handayani", "Ngurah", "Gunawan", "Permatasari", "Widodo", "Sari", "Hakim", "Fernández", "Hidayah", "Putri", "Wijaya", "Hidayat", "Aminah", "Rahman", "Ningsih"]
 const TASKS = ["Follow up deal", "Telepon pak RT soal iuran keamanan", "Bayar listrik", "Kirim laporan mingguan ke tim Vorneo", "Standup", "Cek pipeline", "Perpanjang domain", "Transfer arisan"]
 
-export const HUGE = { chats: 1284, transcript: 2000, upcoming: 1284, recurring: 300, done: 1284, jobs: 120, runs: 5000, events: 12_000, mcp: 50, hooks: 40, passkeys: 25 }
+export const HUGE = { flows: 120, flowRuns: 1000, flowChats: 2, chats: 1284, transcript: 2000, upcoming: 1284, recurring: 300, done: 1284, jobs: 120, runs: 5000, events: 12_000, mcp: 50, hooks: 40, passkeys: 25 }
 
 export function huge(k: Kit) {
   const { now } = k
@@ -62,4 +62,20 @@ export function huge(k: Kit) {
 
   for (let i = 0; i < HUGE.hooks; i++) k.hook({ name: `${LAST[i % LAST.length]} alerts ${i + 1}`, chatId: chatAt(i), mode: i % 2 ? "summarize" : "forward", lastAt: i % 5 ? now - i * H : null })
   for (let i = 0; i < HUGE.passkeys; i++) k.passkey({ name: `${name(i)}'s device ${i + 1}`, deviceType: i % 2 ? "singleDevice" : "multiDevice", createdAt: now - i * D })
+
+  // Flows: the 50-per-chat cap in a few chats, and a run log a year of use leaves.
+  const flowChats = [k.webChat(), ...Array.from({ length: HUGE.flowChats }, (_, i) => k.chat("telegram", `flowchat${i}`, `Flows ${i + 1}`))]
+  const flowIds: string[] = []
+  for (let i = 0; i < HUGE.flows; i++) {
+    flowIds.push(
+      k.flow(
+        flowChats[i % flowChats.length]!,
+        { name: `${TASKS[i % TASKS.length]} ${i + 1}`, triggers: [{ id: "main", kind: "schedule", start: "say", source: { kind: "times", times: [{ time: `${String(6 + (i % 14)).padStart(2, "0")}:${String((i * 7) % 60).padStart(2, "0")}` }] } }], steps: [{ id: "say", kind: "message", text: TASKS[i % TASKS.length]! }] },
+        { enabled: i % 9 !== 0, failures: i % 13 === 0 ? 2 : 0, createdAt: now - (HUGE.flows - i) * H },
+      ),
+    )
+  }
+  for (let i = 0; i < HUGE.flowRuns; i++) {
+    k.flowRun(flowIds[i % 7]!, { status: i % 11 === 0 ? "failed" : i % 17 === 0 ? "skipped" : "done", skipReason: i % 17 === 0 && i % 11 !== 0 ? "late" : null, triggerId: "main", startedAt: now - i * 37 * MIN, error: i % 11 === 0 ? "Step say: More than 5 messages in one run." : null, steps: [{ stepId: "say", kind: "message", status: i % 11 === 0 ? "error" : "ok" }] })
+  }
 }

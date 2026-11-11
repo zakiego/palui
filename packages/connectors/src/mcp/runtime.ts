@@ -20,6 +20,8 @@ export type McpToolListing = {
   class: ToolClass
   // Whether a pref is saved. Until it is, the runtime offers the tool as destructive.
   saved: boolean
+  // Flow write steps: approved once per version, or asked every run.
+  flowApproval: "version" | "every_run"
 }
 
 export function endpointFor(config: Config, secrets: Secrets, fetchImpl?: typeof fetch): McpEndpoint {
@@ -42,18 +44,19 @@ export function listingFor(defs: McpToolDef[], prefs: ToolPrefs = {}): McpToolLi
       enabled: pref?.enabled ?? true,
       class: pref?.class ?? suggested,
       saved: Boolean(pref),
+      flowApproval: pref?.flowApproval ?? "version",
     }
   })
 }
 
 // The tools a turn may see: enabled ones only, with their saved class. A tool the
 // owner hasn't classified yet is destructive (fail closed, PLAN 10).
-export function selectTools(defs: McpToolDef[], prefs: ToolPrefs = {}): { def: McpToolDef; class: ToolClass }[] {
-  const out: { def: McpToolDef; class: ToolClass }[] = []
+export function selectTools(defs: McpToolDef[], prefs: ToolPrefs = {}): { def: McpToolDef; class: ToolClass; flowApproval: "version" | "every_run" }[] {
+  const out: { def: McpToolDef; class: ToolClass; flowApproval: "version" | "every_run" }[] = []
   for (const def of defs) {
     const pref = prefs[def.name]
     if (pref && !pref.enabled) continue
-    out.push({ def, class: pref?.class ?? "destructive" })
+    out.push({ def, class: pref?.class ?? "destructive", flowApproval: pref?.flowApproval ?? "version" })
   }
   return out
 }
@@ -128,7 +131,7 @@ export default defineRuntime(manifest, {
         for (const p of picked) {
           const t = aiTools[p.def.name]
           if (!t) continue
-          out[p.def.name] = { tool: t, class: p.class, untrusted, title: p.def.title ?? p.def.annotations?.title ?? p.def.name }
+          out[p.def.name] = { tool: t, class: p.class, untrusted, flowApproval: p.flowApproval, title: p.def.title ?? p.def.annotations?.title ?? p.def.name }
         }
         return out
       },

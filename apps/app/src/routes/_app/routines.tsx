@@ -10,6 +10,7 @@ import { AppError } from "@/components/app-error"
 import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending, SkeletonText } from "@/components/page-pending"
 import { actionIcon, ConnectorNotice, RoutineActions, RoutineState, useKindLabel, useRecapText, type RoutineSummary } from "@/components/routines/routine-parts"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -38,6 +39,17 @@ function RoutinesPage() {
   return (
     <>
       <PageHeader title={t("routines.title")} description={t("routines.description")} />
+      {data.routineMode === "flows" && (
+        <Alert role="note">
+          <WorkflowIcon aria-hidden="true" />
+          <AlertDescription>
+            {t("routines.handedOver")}{" "}
+            <Link to="/flows" className="underline underline-offset-4">
+              {t("nav.flows")}
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
       {data.routines.length === 0 ? (
         <Empty className="border border-dashed">
           <EmptyHeader>
@@ -107,6 +119,13 @@ function RoutineRow({ routine: r, timezone }: { routine: RoutineSummary; timezon
           </p>
         )}
         <RowNotices routine={r} />
+        {r.flow && (
+          // Above the row's cover link, so it opens the flow, not the routine.
+          <Link to="/flows/$id" params={{ id: r.flow.id }} className="relative z-10 inline-flex items-center gap-1.5 self-start text-caption text-muted-foreground underline-offset-4 hover:underline">
+            <WorkflowIcon aria-hidden="true" className="size-3.5" />
+            {r.flow.shadow ? t("routines.shadowFlow") : t("routines.asFlow")}
+          </Link>
+        )}
       </ItemContent>
       {next && (
         <div className="hidden w-40 shrink-0 self-start text-end @2xl/main:block">

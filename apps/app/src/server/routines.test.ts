@@ -192,3 +192,39 @@ describe("routine writes", () => {
     expect(rt.reconcile).not.toHaveBeenCalled()
   })
 })
+
+describe("routines that became flows (RFC flows 3.6)", () => {
+  it("shows the shadow flow, and after the handover reads next times and open check-ins from the flow", async () => {
+    const { db, medicine } = await seed()
+    setRuntime(upRuntime())
+    const { syncRoutineFlows, setRoutineMode, handover } = await import("@palui/core/flows/migrate")
+    const { flowRuns, flows } = await import("@palui/db")
+    syncRoutineFlows(db, NOW)
+    const shadowRow = routineList(db, NOW).find((r) => r.id === medicine.id)!
+    expect(shadowRow.flow).toMatchObject({ shadow: true })
+
+    occ(db, medicine.id, "chat_wa", "pagi", NOW - HOUR, "open", { deadlineAt: NOW + HOUR })
+    setRoutineMode(db, "flows", NOW)
+    handover(db, NOW)
+    const row = routineList(db, NOW).find((r) => r.id === medicine.id)!
+    expect(row.flow).toMatchObject({ shadow: false })
+    expect(row.openCheckins).toBe(1)
+    expect(row.next[0]!.at).toBe(Date.UTC(2026, 10, 11, 12, 0))
+
+    // Answered on the flow: the routine's log follows the run, not its stale row.
+    const run = db.select().from(flowRuns).get()!
+    const { answerFlowCheckin } = await import("@palui/core/flows/checkin")
+    answerFlowCheckin(db, { chatId: "chat_wa", runId: run.id, answer: "taken" }, NOW)
+    const detail = routineDetail(db, medicine.id, {}, NOW)!
+    expect(detail.routine.openCheckins).toBe(0)
+    expect(detail.log[0]).toMatchObject({ status: "done", answer: "taken" })
+
+    // Pausing or deleting from the page acts on the flow that runs it.
+    pauseRoutine(db, medicine.id, null, NOW)
+    expect(db.select().from(flows).where(eq(flows.legacyRoutineId, medicine.id)).get()!.enabled).toBe(false)
+    resumeRoutine(db, medicine.id, NOW)
+    expect(db.select().from(flows).where(eq(flows.legacyRoutineId, medicine.id)).get()!.enabled).toBe(true)
+    removeRoutine(db, medicine.id)
+    expect(db.select().from(flows).where(eq(flows.legacyRoutineId, medicine.id)).get()).toBeUndefined()
+  })
+})

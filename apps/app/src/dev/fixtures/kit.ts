@@ -7,12 +7,17 @@ import { saveAttachment } from "@palui/core/attachments/service"
 import { setConnectorStatus, upsertConnector } from "@palui/core/connectors/store"
 import { getSetting, type Settings, setSetting } from "@palui/core/settings"
 import { addUsage, usageKeys } from "@palui/core/budget/index"
+import { createFlow, updateFlow } from "@palui/core/flows/service"
 import { localToUtc, utcToLocal } from "@palui/core/reminders/time"
 import { createRoutine, setPaused, type RoutineInput } from "@palui/core/routines/service"
 import {
   agents,
   chats,
   events,
+  flowRuns,
+  flows,
+  flowStepRuns,
+  flowVersions,
   hooks,
   instructions,
   jobs,
@@ -220,6 +225,105 @@ export function createKit(db: DB, now = Date.now()) {
       bytes.write(newId("fx"), magic.length)
       const mimeType = values.kind === "pdf" ? "application/pdf" : "image/jpeg"
       saveAttachment(db, { chatId: values.chatId, title: values.title, description: values.description, mimeType, filename: values.filename, bytes }, key, values.createdAt ?? now)
+    },
+
+    // A flow through the real store (validated, triggers derived), then the
+    // columns a fixture needs to force: paused, failing, a shadow routine, an
+    // unapproved version with write calls, flow variables.
+    flow(
+      chat: ChatRow,
+      definition: Record<string, unknown>,
+      opts: {
+        enabled?: boolean
+        pausedUntil?: number | null
+        failures?: number
+        lastError?: string | null
+        shadow?: boolean
+        routine?: boolean
+        unapprovedWrites?: { stepId: string; kind: "tool"; connectorId: string; tool: string; class: "write"; args: Record<string, unknown> }[]
+        versions?: { definition: Record<string, unknown>; note?: string; createdBy?: string }[]
+        state?: Record<string, unknown>
+        createdAt?: number
+      } = {},
+    ) {
+      const at = opts.createdAt ?? now - D
+      const saved = createFlow(db, { chatId: chat.id, definition, createdBy: opts.routine ? "migration" : "agent:run_fixture" }, at)
+      let versionId = saved.version.id
+      for (const [i, v] of (opts.versions ?? []).entries()) versionId = updateFlow(db, saved.flow.id, { definition: v.definition, note: v.note ?? null, createdBy: v.createdBy ?? "agent:run_fixture" }, at + (i + 1) * MIN).version.id
+      if (opts.unapprovedWrites) db.update(flowVersions).set({ writeCalls: opts.unapprovedWrites, approvedAt: null, approvedVia: null }).where(eq(flowVersions.id, versionId)).run()
+      db.update(flows)
+        .set({
+          enabled: opts.enabled ?? true,
+          pausedUntil: opts.pausedUntil ?? null,
+          consecutiveFailures: opts.failures ?? 0,
+          lastError: opts.lastError ?? null,
+          shadow: !!opts.shadow,
+          legacyRoutineId: opts.routine ? newId("rtn") : null,
+          approvedVersionId: opts.unapprovedWrites ? null : versionId,
+          state: { values: opts.state ?? {}, tainted: [] },
+        })
+        .where(eq(flows.id, saved.flow.id))
+        .run()
+      return saved.flow.id
+    },
+
+    // A run with its step log, straight into the tables.
+    flowRun(
+      flowId: string,
+      values: {
+        status: "queued" | "running" | "waiting" | "awaiting_approval" | "done" | "failed" | "skipped" | "cancelled"
+        startedAt: number
+        skipReason?: "late" | "duplicate" | "paused" | "rate_limited" | "budget" | "not_approved" | "chain_depth" | "shadow" | null
+        triggerKind?: string
+        triggerId?: string | null
+        scheduledAt?: number | null
+        endedAt?: number | null
+        error?: string | null
+        taint?: string[]
+        trigger?: Record<string, unknown>
+        vars?: Record<string, unknown>
+        parentRunId?: string | null
+        itemIndex?: number | null
+        wait?: Record<string, unknown> | null
+        wakeAt?: number | null
+        runKey?: string
+        steps?: { stepId: string; kind: string; status: "running" | "ok" | "error" | "skipped" | "waiting" | "stubbed"; branch?: string | null; error?: string | null; input?: unknown; output?: unknown; ms?: number | null; tainted?: boolean; attempt?: number }[]
+      },
+    ) {
+      const f = db.select().from(flows).where(eq(flows.id, flowId)).get()!
+      const id = newId("flr")
+      db.insert(flowRuns)
+        .values({
+          id,
+          flowId,
+          versionId: f.currentVersionId!,
+          chatId: f.chatId,
+          triggerId: values.triggerId ?? null,
+          triggerKind: values.triggerKind ?? "schedule",
+          runKey: values.runKey ?? `fx:${id}`,
+          parentRunId: values.parentRunId ?? null,
+          itemIndex: values.itemIndex ?? null,
+          status: values.status,
+          skipReason: values.skipReason ?? null,
+          trigger: values.trigger ?? {},
+          vars: values.vars ?? { steps: {}, vars: {} },
+          taint: values.taint ?? [],
+          cursor: null,
+          wait: values.wait ?? null,
+          wakeAt: values.wakeAt ?? null,
+          scheduledAt: values.scheduledAt ?? null,
+          startedAt: values.startedAt,
+          endedAt: values.endedAt ?? (["done", "failed", "skipped", "cancelled"].includes(values.status) ? values.startedAt + 1200 : null),
+          error: values.error ?? null,
+          updatedAt: values.startedAt,
+        })
+        .run()
+      for (const [i, st] of (values.steps ?? []).entries()) {
+        db.insert(flowStepRuns)
+          .values({ id: newId("fls"), runId: id, seq: i + 1, stepId: st.stepId, kind: st.kind, attempt: st.attempt ?? 1, status: st.status, input: st.input ?? null, output: st.output ?? null, tainted: !!st.tainted, branch: st.branch ?? null, error: st.error ?? null, startedAt: values.startedAt + i * 100, ms: st.ms ?? 40 })
+          .run()
+      }
+      return id
     },
 
     // Through the service, so the stored config and schedule are what the agent

@@ -18,6 +18,7 @@ import { Route as AppAgentsRouteImport } from './routes/_app/agents'
 import { Route as AppAttachmentsRouteImport } from './routes/_app/attachments'
 import { Route as AppChatsRouteImport } from './routes/_app/chats'
 import { Route as AppConnectorsRouteImport } from './routes/_app/connectors'
+import { Route as AppFlowsRouteImport } from './routes/_app/flows'
 import { Route as AppJobsRouteImport } from './routes/_app/jobs'
 import { Route as AppNotesRouteImport } from './routes/_app/notes'
 import { Route as AppRemindersRouteImport } from './routes/_app/reminders'
@@ -27,6 +28,7 @@ import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AppAgentsSlugRouteImport } from './routes/_app/agents_.$slug'
 import { Route as AppConnectorsIdRouteImport } from './routes/_app/connectors_.$id'
 import { Route as AppConnectorsNewRouteImport } from './routes/_app/connectors_.new'
+import { Route as AppFlowsIdRouteImport } from './routes/_app/flows_.$id'
 import { Route as AppRoutinesIdRouteImport } from './routes/_app/routines_.$id'
 import { Route as ApiAttachmentsIdRouteImport } from './routes/api/attachments/$id'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -80,6 +82,11 @@ const AppConnectorsRoute = AppConnectorsRouteImport.update({
   path: '/connectors',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFlowsRoute = AppFlowsRouteImport.update({
+  id: '/flows',
+  path: '/flows',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppJobsRoute = AppJobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
@@ -123,6 +130,11 @@ const AppConnectorsIdRoute = AppConnectorsIdRouteImport.update({
 const AppConnectorsNewRoute = AppConnectorsNewRouteImport.update({
   id: '/connectors_/new',
   path: '/connectors/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFlowsIdRoute = AppFlowsIdRouteImport.update({
+  id: '/flows_/$id',
+  path: '/flows/$id',
   getParentRoute: () => AppRoute,
 } as any)
 const AppRoutinesIdRoute = AppRoutinesIdRouteImport.update({
@@ -175,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/attachments': typeof AppAttachmentsRoute
   '/chats': typeof AppChatsRoute
   '/connectors': typeof AppConnectorsRoute
+  '/flows': typeof AppFlowsRoute
   '/jobs': typeof AppJobsRoute
   '/notes': typeof AppNotesRoute
   '/reminders': typeof AppRemindersRoute
@@ -184,6 +197,7 @@ export interface FileRoutesByFullPath {
   '/agents/$slug': typeof AppAgentsSlugRoute
   '/connectors/$id': typeof AppConnectorsIdRoute
   '/connectors/new': typeof AppConnectorsNewRoute
+  '/flows/$id': typeof AppFlowsIdRoute
   '/routines/$id': typeof AppRoutinesIdRoute
   '/api/attachments/$id': typeof ApiAttachmentsIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -201,6 +215,7 @@ export interface FileRoutesByTo {
   '/attachments': typeof AppAttachmentsRoute
   '/chats': typeof AppChatsRoute
   '/connectors': typeof AppConnectorsRoute
+  '/flows': typeof AppFlowsRoute
   '/jobs': typeof AppJobsRoute
   '/notes': typeof AppNotesRoute
   '/reminders': typeof AppRemindersRoute
@@ -211,6 +226,7 @@ export interface FileRoutesByTo {
   '/agents/$slug': typeof AppAgentsSlugRoute
   '/connectors/$id': typeof AppConnectorsIdRoute
   '/connectors/new': typeof AppConnectorsNewRoute
+  '/flows/$id': typeof AppFlowsIdRoute
   '/routines/$id': typeof AppRoutinesIdRoute
   '/api/attachments/$id': typeof ApiAttachmentsIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -230,6 +246,7 @@ export interface FileRoutesById {
   '/_app/attachments': typeof AppAttachmentsRoute
   '/_app/chats': typeof AppChatsRoute
   '/_app/connectors': typeof AppConnectorsRoute
+  '/_app/flows': typeof AppFlowsRoute
   '/_app/jobs': typeof AppJobsRoute
   '/_app/notes': typeof AppNotesRoute
   '/_app/reminders': typeof AppRemindersRoute
@@ -240,6 +257,7 @@ export interface FileRoutesById {
   '/_app/agents_/$slug': typeof AppAgentsSlugRoute
   '/_app/connectors_/$id': typeof AppConnectorsIdRoute
   '/_app/connectors_/new': typeof AppConnectorsNewRoute
+  '/_app/flows_/$id': typeof AppFlowsIdRoute
   '/_app/routines_/$id': typeof AppRoutinesIdRoute
   '/api/attachments/$id': typeof ApiAttachmentsIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -260,6 +278,7 @@ export interface FileRouteTypes {
     | '/attachments'
     | '/chats'
     | '/connectors'
+    | '/flows'
     | '/jobs'
     | '/notes'
     | '/reminders'
@@ -269,6 +288,7 @@ export interface FileRouteTypes {
     | '/agents/$slug'
     | '/connectors/$id'
     | '/connectors/new'
+    | '/flows/$id'
     | '/routines/$id'
     | '/api/attachments/$id'
     | '/api/auth/$'
@@ -286,6 +306,7 @@ export interface FileRouteTypes {
     | '/attachments'
     | '/chats'
     | '/connectors'
+    | '/flows'
     | '/jobs'
     | '/notes'
     | '/reminders'
@@ -296,6 +317,7 @@ export interface FileRouteTypes {
     | '/agents/$slug'
     | '/connectors/$id'
     | '/connectors/new'
+    | '/flows/$id'
     | '/routines/$id'
     | '/api/attachments/$id'
     | '/api/auth/$'
@@ -314,6 +336,7 @@ export interface FileRouteTypes {
     | '/_app/attachments'
     | '/_app/chats'
     | '/_app/connectors'
+    | '/_app/flows'
     | '/_app/jobs'
     | '/_app/notes'
     | '/_app/reminders'
@@ -324,6 +347,7 @@ export interface FileRouteTypes {
     | '/_app/agents_/$slug'
     | '/_app/connectors_/$id'
     | '/_app/connectors_/new'
+    | '/_app/flows_/$id'
     | '/_app/routines_/$id'
     | '/api/attachments/$id'
     | '/api/auth/$'
@@ -412,6 +436,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppConnectorsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/flows': {
+      id: '/_app/flows'
+      path: '/flows'
+      fullPath: '/flows'
+      preLoaderRoute: typeof AppFlowsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/jobs': {
       id: '/_app/jobs'
       path: '/jobs'
@@ -473,6 +504,13 @@ declare module '@tanstack/react-router' {
       path: '/connectors/new'
       fullPath: '/connectors/new'
       preLoaderRoute: typeof AppConnectorsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/flows_/$id': {
+      id: '/_app/flows_/$id'
+      path: '/flows/$id'
+      fullPath: '/flows/$id'
+      preLoaderRoute: typeof AppFlowsIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/routines_/$id': {
@@ -540,6 +578,7 @@ interface AppRouteChildren {
   AppAttachmentsRoute: typeof AppAttachmentsRoute
   AppChatsRoute: typeof AppChatsRoute
   AppConnectorsRoute: typeof AppConnectorsRoute
+  AppFlowsRoute: typeof AppFlowsRoute
   AppJobsRoute: typeof AppJobsRoute
   AppNotesRoute: typeof AppNotesRoute
   AppRemindersRoute: typeof AppRemindersRoute
@@ -549,6 +588,7 @@ interface AppRouteChildren {
   AppAgentsSlugRoute: typeof AppAgentsSlugRoute
   AppConnectorsIdRoute: typeof AppConnectorsIdRoute
   AppConnectorsNewRoute: typeof AppConnectorsNewRoute
+  AppFlowsIdRoute: typeof AppFlowsIdRoute
   AppRoutinesIdRoute: typeof AppRoutinesIdRoute
   AppActivityRunsIdRoute: typeof AppActivityRunsIdRoute
 }
@@ -559,6 +599,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAttachmentsRoute: AppAttachmentsRoute,
   AppChatsRoute: AppChatsRoute,
   AppConnectorsRoute: AppConnectorsRoute,
+  AppFlowsRoute: AppFlowsRoute,
   AppJobsRoute: AppJobsRoute,
   AppNotesRoute: AppNotesRoute,
   AppRemindersRoute: AppRemindersRoute,
@@ -568,6 +609,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAgentsSlugRoute: AppAgentsSlugRoute,
   AppConnectorsIdRoute: AppConnectorsIdRoute,
   AppConnectorsNewRoute: AppConnectorsNewRoute,
+  AppFlowsIdRoute: AppFlowsIdRoute,
   AppRoutinesIdRoute: AppRoutinesIdRoute,
   AppActivityRunsIdRoute: AppActivityRunsIdRoute,
 }

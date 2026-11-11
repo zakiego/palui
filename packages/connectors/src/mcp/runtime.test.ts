@@ -169,3 +169,19 @@ describe("mcp connector", () => {
     }
   })
 })
+
+describe("flow approval per tool (RFC flows 7.2)", () => {
+  it("defaults to once per version and carries every_run from the saved prefs", async () => {
+    const { listingFor, selectTools } = await import("./runtime")
+    const defs = [
+      { name: "send_email", description: "", inputSchema: { type: "object" as const }, annotations: { destructiveHint: false } },
+      { name: "list", description: "", inputSchema: { type: "object" as const }, annotations: { readOnlyHint: true } },
+    ]
+    const prefs = { send_email: { enabled: true, class: "write" as const, flowApproval: "every_run" as const }, list: { enabled: true, class: "read" as const } }
+    expect(selectTools(defs as never, prefs).map((t) => [t.def.name, t.flowApproval])).toEqual([
+      ["send_email", "every_run"],
+      ["list", "version"],
+    ])
+    expect(listingFor(defs as never, prefs).map((t) => t.flowApproval)).toEqual(["every_run", "version"])
+  })
+})

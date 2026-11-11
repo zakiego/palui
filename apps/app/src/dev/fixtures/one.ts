@@ -25,6 +25,9 @@ export function one(k: Kit) {
   k.reminder({ chatId: web.id, text: "Standup", rrule: "FREQ=DAILY", tz: "Asia/Makassar", fireAt: now + 2 * H, status: "pending" })
   k.reminder({ chatId: web.id, text: "Old one", tz: "Asia/Makassar", fireAt: now - H, status: "done", lastFiredAt: now - H })
 
+  const flow = k.flow(web, { name: "Air", triggers: [{ id: "main", kind: "schedule", start: "say", source: { kind: "times", times: [{ time: "11:00" }] } }], steps: [{ id: "say", kind: "message", text: "Minum air" }] })
+  k.flowRun(flow, { status: "done", triggerId: "main", startedAt: now - MIN, steps: [{ stepId: "say", kind: "message", status: "ok", output: { text: "Minum air" } }] })
+
   k.passkey({ name: "MacBook Air", createdAt: now - 24 * H })
   k.hook({ name: "Uptime", chatId: web.id, lastAt: now - H })
 }

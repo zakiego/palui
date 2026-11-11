@@ -8,6 +8,7 @@ import { getSecrets, listConnectors } from "@palui/core/connectors/store"
 import type { DB } from "@palui/db"
 import { decrypt } from "@palui/db/crypto"
 import { hooks } from "@palui/db"
+import { setRoutineMode, shadowReport, syncRoutineFlows } from "@palui/core/flows/migrate"
 import { backupDb } from "./backup"
 import { createHook } from "./hooks-bridge"
 import { createOwnerInvite, INVITE_TTL_MS, ownerExists } from "./owner-invite"
@@ -27,8 +28,12 @@ export const USAGE = `usage: palui <command> [--json]
   secrets-check [--require-some]
                                 decrypt every stored secret with MASTER_KEY, print counts only.
                                 --require-some also fails when there was nothing to decrypt
-  hook create <name> --chat <chatId> [--mode forward|summarize]
-                                create an inbound webhook and print its URL and secret once`
+  hook create <name> --chat <chatId> [--mode forward|summarize|flow]
+                                create an inbound webhook and print its URL and secret once
+  flows status                  who runs routines, and the shadow comparison of the last 7 days
+  flows mode <legacy|shadow|flows>
+                                hand routines to the flow engine (flows), keep comparing (shadow),
+                                or go back to the routine engine alone (legacy)`
 
 export type CliIo = {
   db: () => DB
@@ -212,13 +217,13 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     if (cmd === "hook" && sub === "create") {
       const name = rest.join(" ").trim()
       const chatId = values["--chat"]
-      const mode = (values["--mode"] ?? "forward") as "forward" | "summarize"
+      const mode = (values["--mode"] ?? "forward") as "forward" | "summarize" | "flow"
       if (!name || !chatId) {
-        io.err("usage: palui hook create <name> --chat <chatId> [--mode forward|summarize]")
+        io.err("usage: palui hook create <name> --chat <chatId> [--mode forward|summarize|flow]")
         return 1
       }
-      if (mode !== "forward" && mode !== "summarize") {
-        io.err("--mode must be forward or summarize")
+      if (mode !== "forward" && mode !== "summarize" && mode !== "flow") {
+        io.err("--mode must be forward, summarize or flow")
         return 1
       }
       const db = io.db()
@@ -234,6 +239,31 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
         io.out(secret)
         io.err("That secret is shown once. Send x-palui-timestamp (unix seconds) and x-palui-signature: sha256=<hex HMAC-SHA256 of '<timestamp>.<raw body>'> with it.")
       }
+      return 0
+    }
+
+    if (cmd === "flows" && sub === "status") {
+      const db = io.db()
+      const report = shadowReport(db, now() - 7 * 24 * 3600_000)
+      if (json) io.out(JSON.stringify(report))
+      else {
+        io.out(`routines run on: ${report.mode}`)
+        io.out(`shadow flows: ${report.flows}; compared ${report.compared} occurrences in 7 days, ${report.matches} matched, ${report.diffs.length} differed`)
+        for (const d of report.diffs.slice(0, 20)) io.out(`  ${d.flow} ${d.key}: ${d.result.replaceAll("_", " ")}`)
+      }
+      return 0
+    }
+
+    if (cmd === "flows" && sub === "mode") {
+      const mode = rest[0]
+      if (mode !== "legacy" && mode !== "shadow" && mode !== "flows") {
+        io.err("usage: palui flows mode <legacy|shadow|flows>")
+        return 1
+      }
+      const db = io.db()
+      setRoutineMode(db, mode, now())
+      if (mode === "shadow") syncRoutineFlows(db, now())
+      io.out(mode === "flows" ? "routines now run on the flow engine (the runtime hands over within a minute)" : mode === "shadow" ? "routines run on the routine engine; flows compute in shadow and compare" : "routines run on the routine engine alone")
       return 0
     }
 
