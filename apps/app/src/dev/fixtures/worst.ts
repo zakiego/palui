@@ -12,7 +12,7 @@ import { D, H, MIN, gradientAvatar, type Kit } from "./kit"
 // Limits the dashboard enforces (the zod schemas in src/lib/fns). A value that
 // claims to be "at the limit" is checked against it, so the fixture can't
 // drift past what the forms accept.
-const LIMITS = { agentName: 40, agentSlug: 24, attachmentTitle: 200, attachmentDescription: 1000, attachmentFilename: 200, connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500, instructionTitle: 80, instructionBody: 1000, preferenceKey: 40, preferenceValue: 300 }
+const LIMITS = { agentName: 40, agentSlug: 24, attachmentTitle: 200, attachmentDescription: 1000, attachmentFilename: 200, connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500, instructionTitle: 80, instructionBody: 1000, preferenceKey: 40, preferenceValue: 300, botUsername: 32 }
 
 function within(value: string, limit: number): string {
   if (value.length > limit) throw new Error(`fixture value is ${value.length} characters, over the limit of ${limit}: ${value.slice(0, 40)}`)
@@ -173,6 +173,8 @@ export function worst(k: Kit) {
   say(family, `Wkwkwk ${"😂".repeat(80)}`, now - 50_000)
 
   // --- agents (PLAN 19): a name and slug at the limit, a cap already hit, guests in a group ---
+  // Its own bot, with the longest username Telegram allows.
+  k.connector("tgbot-arisan", "tgbot", { label: "Arisan bot", status: "on", config: { botUsername: within("koordinator_arisan_haul_bani_bot", LIMITS.botUsername) }, secrets: { botToken: "123456789:AAbbccddeeffgghhiijjkkllmmnnooppqqrs" } })
   const arisan = k.agent({
     slug: within("koordinator-arisan-haul-", LIMITS.agentSlug),
     name: within("Koordinator Arisan & Haul Bani Abdurrahm", LIMITS.agentName),
@@ -183,15 +185,26 @@ export function worst(k: Kit) {
     dailyTokenCap: 250_000,
     tokensToday: 312_481,
     recallContainer: "agent-arisan-keluarga-bani-abdurrahman-siddiq-banjarmasin-2026",
+    telegramConnectorId: "tgbot-arisan",
   })
   // An uploaded photo: a small gradient PNG, the shape a browser-resized photo has.
   k.agent({ slug: "cs", name: "CS", persona: "Jawab pertanyaan pelanggan Vorneo.", guestTools: "none", avatarImage: gradientAvatar() })
   k.assign(family, arisan)
+  // The agent page (/agents/<slug>): instructions at the limits, and (below)
+  // a chat with no title and a chat it no longer answers in.
+  k.instruction({
+    agentId: arisan,
+    title: within("Rekap setoran arisan tiap tanggal 25, urut dari yang paling lama belum bayar ya.", LIMITS.instructionTitle),
+    body: fill("Kalau ada yang tanya siapa yang belum bayar, sebut nama dan jumlahnya, jangan sebut nomor HP. Daftar lengkap ada di https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_arisan_bani_abdurrahman/edit#gid=0 dan jangan dibagikan ke grup. ", LIMITS.instructionBody),
+    createdAt: k.now - 20 * D,
+  })
+  k.instruction({ agentId: arisan, title: "Haul", body: "Haul tahun ini hari Ahad.", enabled: false, createdAt: k.now - 3 * D })
   k.message(family, "user", "@palui_bot siapa yang belum bayar arisan bulan ini?", now - 40_000, { fromOwner: false, senderName: "Muhammad Fadhlurrahman Al-Banjari bin H. Abdurrahman Siddiq", senderId: "1000000099" })
   k.message(family, "user", "؟", now - 30_000, { fromOwner: false, senderName: null, senderId: "1000000100" })
 
   // No title yet: the list falls back to the raw JID.
   const noTitleGroup = k.chat("whatsapp", "120363041234567890123456@g.us", "", { kind: "group" })
+  k.assign(noTitleGroup, arisan)
   say(noTitleGroup, "**Rekap** minggu ini:\n\n1. *3 deal* masuk\n2. `bayar listrik` besok", now - 59 * MIN, "assistant")
   const noTitleDm = k.chat("whatsapp", "258431789012345678@lid", "")
   say(noTitleDm, "", now - 23 * H, "assistant")
@@ -229,6 +242,7 @@ export function worst(k: Kit) {
   say(irish, "9f8e7d6c-5b4a-4c3d-8e2f-1a0b9c8d7e6f", now - 10 * D)
   const link = k.chat("telegram", "-1009876543210", "t.me/northwind_industries_holdings_announcements_indonesia", { kind: "group" })
   say(link, "first.last+billing-notifications@example.com", now - 13 * D)
+  k.assign(link, arisan, false)
   // Not on the WhatsApp allowlist, and a chat that has never had a message.
   k.chat("whatsapp", "6281200000005@s.whatsapp.net", "Konstantin Oberhauser-Wettstein", { allowed: false, createdAt: now - 14 * D })
   k.chat("telegram", "1000000008", "María José de la Cruz y Fernández", { createdAt: now - 15 * D })

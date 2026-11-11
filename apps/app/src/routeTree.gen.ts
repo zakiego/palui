@@ -23,6 +23,7 @@ import { Route as AppNotesRouteImport } from './routes/_app/notes'
 import { Route as AppRemindersRouteImport } from './routes/_app/reminders'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
+import { Route as AppAgentsSlugRouteImport } from './routes/_app/agents_.$slug'
 import { Route as AppConnectorsIdRouteImport } from './routes/_app/connectors_.$id'
 import { Route as AppConnectorsNewRouteImport } from './routes/_app/connectors_.new'
 import { Route as ApiAttachmentsIdRouteImport } from './routes/api/attachments/$id'
@@ -102,6 +103,11 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppAgentsSlugRoute = AppAgentsSlugRouteImport.update({
+  id: '/agents_/$slug',
+  path: '/agents/$slug',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppConnectorsIdRoute = AppConnectorsIdRouteImport.update({
   id: '/connectors_/$id',
   path: '/connectors/$id',
@@ -162,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/reminders': typeof AppRemindersRoute
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/agents/$slug': typeof AppAgentsSlugRoute
   '/connectors/$id': typeof AppConnectorsIdRoute
   '/connectors/new': typeof AppConnectorsNewRoute
   '/api/attachments/$id': typeof ApiAttachmentsIdRoute
@@ -186,6 +193,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/': typeof AppIndexRoute
+  '/agents/$slug': typeof AppAgentsSlugRoute
   '/connectors/$id': typeof AppConnectorsIdRoute
   '/connectors/new': typeof AppConnectorsNewRoute
   '/api/attachments/$id': typeof ApiAttachmentsIdRoute
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/agents_/$slug': typeof AppAgentsSlugRoute
   '/_app/connectors_/$id': typeof AppConnectorsIdRoute
   '/_app/connectors_/new': typeof AppConnectorsNewRoute
   '/api/attachments/$id': typeof ApiAttachmentsIdRoute
@@ -238,6 +247,7 @@ export interface FileRouteTypes {
     | '/reminders'
     | '/settings'
     | '/invite/$token'
+    | '/agents/$slug'
     | '/connectors/$id'
     | '/connectors/new'
     | '/api/attachments/$id'
@@ -262,6 +272,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/invite/$token'
     | '/'
+    | '/agents/$slug'
     | '/connectors/$id'
     | '/connectors/new'
     | '/api/attachments/$id'
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/invite/$token'
     | '/_app/'
+    | '/_app/agents_/$slug'
     | '/_app/connectors_/$id'
     | '/_app/connectors_/new'
     | '/api/attachments/$id'
@@ -411,6 +423,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/agents_/$slug': {
+      id: '/_app/agents_/$slug'
+      path: '/agents/$slug'
+      fullPath: '/agents/$slug'
+      preLoaderRoute: typeof AppAgentsSlugRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/connectors_/$id': {
       id: '/_app/connectors_/$id'
       path: '/connectors/$id'
@@ -488,6 +507,7 @@ interface AppRouteChildren {
   AppRemindersRoute: typeof AppRemindersRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppAgentsSlugRoute: typeof AppAgentsSlugRoute
   AppConnectorsIdRoute: typeof AppConnectorsIdRoute
   AppConnectorsNewRoute: typeof AppConnectorsNewRoute
   AppActivityRunsIdRoute: typeof AppActivityRunsIdRoute
@@ -504,6 +524,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppRemindersRoute: AppRemindersRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppAgentsSlugRoute: AppAgentsSlugRoute,
   AppConnectorsIdRoute: AppConnectorsIdRoute,
   AppConnectorsNewRoute: AppConnectorsNewRoute,
   AppActivityRunsIdRoute: AppActivityRunsIdRoute,

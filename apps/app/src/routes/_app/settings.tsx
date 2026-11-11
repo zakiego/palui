@@ -160,10 +160,10 @@ function GeneralTab({ data }: { data: Data }) {
       </CardHeader>
       <CardContent>
         <FieldGroup>
-          {/* Persona moved to each agent (PLAN 19.7). */}
+          {/* Persona moved to each agent (PLAN 19.7). "palui" is the default agent's fixed slug. */}
           <p className="text-sm text-muted-foreground">
             {t("settings.personaMoved")}{" "}
-            <Link to="/agents" className="underline underline-offset-4">
+            <Link to="/agents/$slug" params={{ slug: "palui" }} className="underline underline-offset-4">
               {t("settings.personaMovedLink")}
             </Link>
           </p>

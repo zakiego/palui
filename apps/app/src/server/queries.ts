@@ -18,8 +18,9 @@ export function chatTitles(db: DB): Map<string, string> {
   return new Map(db.select({ id: chats.id, title: chats.title, externalId: chats.externalId }).from(chats).all().map((c) => [c.id, c.title || c.externalId]))
 }
 
-export function chatList(db: DB) {
-  const rows = db.select().from(chats).orderBy(desc(sql`coalesce(${chats.lastMessageAt}, ${chats.createdAt})`)).all()
+// Every chat, or only the ones `where` picks (an agent's chats).
+export function chatList(db: DB, where?: SQL) {
+  const rows = db.select().from(chats).where(where).orderBy(desc(sql`coalesce(${chats.lastMessageAt}, ${chats.createdAt})`)).all()
   return rows.map((c) => {
     const last = db
       .select({ text: messages.text, role: messages.role, createdAt: messages.createdAt })
@@ -33,6 +34,7 @@ export function chatList(db: DB) {
       channel: c.channel,
       title: c.title || c.externalId,
       kind: c.kind,
+      allowed: c.allowed,
       lastAt: last?.createdAt ?? c.lastMessageAt ?? c.createdAt,
       preview: last ? clip(last.text, 140) : "",
       previewRole: last?.role ?? null,

@@ -1,17 +1,20 @@
 // Agents page (PLAN 19.7): each agent's persona, shared-chat rules, daily cap,
 // recall container and Telegram bot. The runtime reads them at the start of
 // every turn, so writes go straight to the table.
-import { AgentError, AGENT_COLORS, AGENT_ICONS, MAX_AVATAR_IMAGE, agentContainer, assignAgent, createAgent, deleteAgent, listAgents, MAX_AGENT_NAME, MAX_PERSONA, updateAgent } from "@palui/core/agents"
-import { agentTokensToday } from "@palui/core/budget/index"
+import { AgentError, AGENT_COLORS, AGENT_ICONS, MAX_AVATAR_IMAGE, assignAgent, createAgent, deleteAgent, getAgentBySlug, listAgents, MAX_AGENT_NAME, MAX_PERSONA, updateAgent } from "@palui/core/agents"
 import { rotateSession } from "@palui/core/chats"
-import { listConnectors } from "@palui/core/connectors/store"
 import { listInstructions } from "@palui/core/notes/service"
 import { chats } from "@palui/db"
 import { createServerFn } from "@tanstack/react-start"
-import { eq } from "drizzle-orm"
+import { eq, isNull } from "drizzle-orm"
 import { z } from "zod"
+import { agentView, telegramBots } from "@/server/agents"
 import { callRuntime, isRuntimeDown, runtime } from "@/server/runtime"
+import { chatList } from "@/server/queries"
 import { requireUser, requireWriter } from "@/server/session"
+
+// Chats the agent page lists at once, newest first. Past this, the Chats page has search.
+const AGENT_CHATS_LIMIT = 100
 
 function rethrow(err: unknown): never {
   if (err instanceof AgentError) throw new Error(err.message)
@@ -21,30 +24,30 @@ function rethrow(err: unknown): never {
 export const getAgentsPage = createServerFn({ method: "GET" }).handler(async () => {
   const { db } = await requireUser()
   const all = db.select({ agentId: chats.agentId }).from(chats).all()
-  const agents = listAgents(db).map((a) => ({
-    id: a.id,
-    slug: a.slug,
-    name: a.name,
-    persona: a.persona,
-    isDefault: a.isDefault,
-    ownerPowers: a.ownerPowers,
-    guestTools: a.guestTools,
-    dailyTokenCap: a.dailyTokenCap,
-    recallContainer: a.recallContainer,
-    container: agentContainer(a) ?? null,
-    telegramConnectorId: a.telegramConnectorId,
-    avatarImage: a.avatarImage,
-    avatarIcon: a.avatarIcon,
-    avatarColor: a.avatarColor,
-    chats: all.filter((c) => c.agentId === a.id).length,
-    instructions: listInstructions(db, { agentId: a.id }).length,
-    tokensToday: agentTokensToday(db, a.id),
-  }))
-  const bots = listConnectors(db)
-    .filter((c) => c.type === "tgbot")
-    .map((c) => ({ id: c.id, label: c.label, username: typeof c.config.botUsername === "string" ? c.config.botUsername : null, status: c.status }))
-  return { agents, bots }
+  const agents = listAgents(db).map((a) => agentView(db, a, all.filter((c) => c.agentId === a.id).length))
+  return { agents, bots: telegramBots(db) }
 })
+
+// One agent's page (/agents/<slug>): its settings, its instructions and the
+// chats it answers in. `agent` is null when the slug doesn't exist.
+export const getAgentPage = createServerFn({ method: "GET" })
+  .validator(z.object({ slug: z.string().trim().min(1).max(64) }))
+  .handler(async ({ data }) => {
+    const { db } = await requireUser()
+    const row = getAgentBySlug(db, data.slug)
+    if (!row) return { agent: null }
+    // Palui answers every chat that has no agent of its own.
+    const own = chatList(db, row.isDefault ? isNull(chats.agentId) : eq(chats.agentId, row.id))
+    // A bot that belongs to another agent isn't offered.
+    const taken = new Set(listAgents(db).filter((a) => a.id !== row.id && a.telegramConnectorId).map((a) => a.telegramConnectorId))
+    return {
+      agent: agentView(db, row, own.length),
+      bots: telegramBots(db).filter((b) => !taken.has(b.id)),
+      instructions: listInstructions(db, { agentId: row.id }),
+      chats: own.slice(0, AGENT_CHATS_LIMIT).map((c) => ({ id: c.id, title: c.title, channel: c.channel, kind: c.kind, lastAt: c.lastAt, allowed: c.allowed })),
+      chatsTotal: own.length,
+    }
+  })
 
 const fields = z.object({
   name: z.string().trim().min(1).max(MAX_AGENT_NAME),

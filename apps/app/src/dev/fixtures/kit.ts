@@ -116,8 +116,8 @@ export function createKit(db: DB, now = Date.now()) {
     },
 
     // A chat answered by an agent (PLAN 19.2).
-    assign(chat: ChatRow, agentId: string) {
-      db.update(chats).set({ agentId, allowed: true }).where(eq(chats.id, chat.id)).run()
+    assign(chat: ChatRow, agentId: string, allowed = true) {
+      db.update(chats).set({ agentId, allowed }).where(eq(chats.id, chat.id)).run()
     },
 
     message(chat: ChatRow, role: "user" | "assistant", text: string, at: number, extra: Partial<typeof messages.$inferInsert> = {}) {
@@ -195,9 +195,10 @@ export function createKit(db: DB, now = Date.now()) {
         .run()
     },
 
-    instruction(values: { title: string; body: string; enabled?: boolean; createdAt?: number }) {
+    // No agentId means Palui's (PLAN 19.1).
+    instruction(values: { title: string; body: string; enabled?: boolean; agentId?: string; createdAt?: number }) {
       const at = values.createdAt ?? now
-      db.insert(instructions).values({ id: newId("ins"), title: values.title, body: values.body, enabled: values.enabled ?? true, createdAt: at, updatedAt: at }).run()
+      db.insert(instructions).values({ id: newId("ins"), title: values.title, body: values.body, enabled: values.enabled ?? true, agentId: values.agentId ?? null, createdAt: at, updatedAt: at }).run()
     },
 
     // Raw insert: fixtures may use values the service would normalize or refuse.
