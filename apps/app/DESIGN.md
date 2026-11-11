@@ -32,8 +32,11 @@ The contract is `docs/PLAN.md` section 11. This file records how the build meets
 | Agent reply | `.agent-in`: 150 ms opacity once when its text starts streaming. The owner's own messages never animate |
 | Command menu (⌘K) | none: opened from the keyboard many times a day, so it appears at once |
 | Tables, lists | none |
+| Skeletons | `.skeleton-shimmer`: one band of `--skeleton-highlight` crosses the viewport (gradient fixed to the viewport, `background-position` -100vw to 100vw in the first half of 1800 ms, linear, then rests), so every block lights up as one sweep. Static under reduced motion. Each page's skeleton is built from its real Card, Table, Item and Field pieces (`src/components/page-pending.tsx`) |
+| Slow page load | `PagePending` (every route's pendingComponent, shown after 300 ms): the skeleton fades in over 200 ms, and when it leaves `#main-content` fades from 0.4 to 1 in 200 ms (WAAPI), both on the emphasized curve. A fast switch never shows a skeleton, so it never fades: there's still no route entrance. "Loading <page>…" goes to the shell's `#page-status` live region |
+| Navigation wait | `RouteProgress`: a 2 px `--foreground` bar on the header's bottom edge, only after 150 ms and only when the URL changed (not `router.invalidate()` refreshes). Runs to 85% over 4 s on the emphasized curve, fills in 200 ms, fades 150 ms later |
 | Toasts | Sonner default |
-| Reduced motion | everything instant (the global rule in `app.css`); spinners keep turning |
+| Reduced motion | everything instant (the global rule in `app.css`); spinners keep turning; skeletons stay still and the page doesn't fade |
 
 ## Interaction (PLAN 11.5)
 
