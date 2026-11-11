@@ -7,7 +7,6 @@ export type RunResult = {
   exitCode: number | null
   signal: string | null
   timedOut: boolean
-  timeoutMs: number
   // Whether the exit code is in the command's okExitCodes.
   ok: boolean
   stdout: string
@@ -17,7 +16,6 @@ export type RunResult = {
 
 export function runCommand(spec: CommandSpec, argv: string[], now: () => number = Date.now): Promise<RunResult> {
   const started = now()
-  const base = { timeoutMs: spec.timeoutMs }
   return new Promise((resolve) => {
     let child: ReturnType<typeof spawn>
     try {
@@ -27,10 +25,9 @@ export function runCommand(spec: CommandSpec, argv: string[], now: () => number 
         stdio: ["ignore", "pipe", "pipe"],
         // Its own process group, so a timeout also kills anything it spawned.
         detached: true,
-        shell: false,
       })
     } catch (err) {
-      resolve({ ...base, exitCode: null, signal: null, timedOut: false, ok: false, stdout: "", stderr: (err as Error).message, durationMs: 0 })
+      resolve({ exitCode: null, signal: null, timedOut: false, ok: false, stdout: "", stderr: (err as Error).message, durationMs: 0 })
       return
     }
 
@@ -53,7 +50,6 @@ export function runCommand(spec: CommandSpec, argv: string[], now: () => number 
       clearTimeout(timer)
       const stderr = spawnError ? `${err.text("stderr")}${spawnError.message}` : err.text("stderr")
       resolve({
-        ...base,
         exitCode: code,
         signal,
         timedOut,
@@ -66,22 +62,19 @@ export function runCommand(spec: CommandSpec, argv: string[], now: () => number 
   })
 }
 
+// detached: true makes the child its group's leader, so -pid is the whole group.
 function killGroup(pid: number | undefined): void {
   if (!pid) return
   try {
     process.kill(-pid, "SIGKILL")
   } catch {
-    try {
-      process.kill(pid, "SIGKILL")
-    } catch {
-      // already gone
-    }
+    // already gone
   }
 }
 
 // Keeps the first and last max/2 bytes of a stream. Logs and build output put
 // the useful part (the error) at the end, so dropping the tail would hide it.
-export class HeadTail {
+class HeadTail {
   private head: Buffer[] = []
   private headSize = 0
   private tail: Buffer[] = []
@@ -127,16 +120,16 @@ export class HeadTail {
   }
 }
 
-export function bytes(n: number): string {
+function bytes(n: number): string {
   if (n < 1024) return `${Math.round(n)} B`
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
 // What the model sees: exit status first, then each non-empty stream.
-export function formatResult(r: RunResult): string {
+export function formatResult(r: RunResult, timeoutMs: number): string {
   const status = r.timedOut
-    ? `timed out after ${seconds(r.timeoutMs)} (killed)`
+    ? `timed out after ${seconds(timeoutMs)} (killed)`
     : r.exitCode !== null
       ? `exit ${r.exitCode}`
       : `killed by ${r.signal ?? "unknown"}`

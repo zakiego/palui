@@ -11,12 +11,12 @@
 import { randomBytes } from "node:crypto"
 import { accessSync, constants, existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
-import { defaultConfigPath, loadConfig, MissingConfigError, type BridgeConfig } from "./config.ts"
+import { DEFAULT_PORT, defaultConfigPath, loadConfig, MissingConfigError, type BridgeConfig } from "./config.ts"
 import { startBridge } from "./server.ts"
 
 const STARTER = (token: string) => ({
   host: "127.0.0.1",
-  port: 4893,
+  port: DEFAULT_PORT,
   token,
   commands: [
     {

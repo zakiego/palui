@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { createLogger } from "@palui/core/log"
 import { afterEach, describe, expect, it } from "vitest"
 import { parseConfig } from "./config.ts"
 import { startBridge, type Bridge } from "./server.ts"
@@ -27,7 +28,7 @@ afterEach(async () => {
 })
 
 async function connect(token = TOKEN): Promise<Client> {
-  bridge ??= await startBridge({ ...config, port: 0 }, (l) => logs.push(l))
+  bridge ??= await startBridge({ ...config, port: 0 }, createLogger({}, (l) => logs.push(l)))
   const client = new Client({ name: "test", version: "1.0.0" })
   await client.connect(new StreamableHTTPClientTransport(new URL(bridge.url), { requestInit: { headers: { authorization: `Bearer ${token}` } } }))
   return client
@@ -39,14 +40,14 @@ function text(r: Awaited<ReturnType<Client["callTool"]>>): string {
 
 describe("host bridge", () => {
   it("serves /health without a token", async () => {
-    bridge = await startBridge({ ...config, port: 0 })
+    bridge = await startBridge({ ...config, port: 0 }, createLogger({}, () => {}))
     const res = await fetch(bridge.url.replace("/mcp", "/health"))
     expect(res.status).toBe(200)
   })
 
   it("refuses a wrong token", async () => {
     await expect(connect("wrong")).rejects.toThrow()
-    expect(logs.some((l) => l.includes("401"))).toBe(true)
+    expect(logs.some((l) => l.includes('"status":401'))).toBe(true)
   })
 
   it("lists commands as tools with class annotations", async () => {
@@ -67,14 +68,14 @@ describe("host bridge", () => {
     const r = await client.callTool({ name: "say", arguments: { word: "palui" } })
     expect(r.isError).toBe(false)
     expect(text(r)).toBe("exit 0\n--- stdout ---\nhi palui\n")
-    expect(logs.at(-1)).toMatch(/say \["hi","palui"\] exit=0/)
+    expect(JSON.parse(logs.at(-1)!)).toMatchObject({ msg: "tool call", tool: "say", argv: ["hi", "palui"], exit: 0 })
   })
 
   it("rejects input that doesn't match the param", async () => {
     const client = await connect()
     const r = await client.callTool({ name: "say", arguments: { word: "$(id)" } })
     expect(r.isError).toBe(true)
-    expect(logs.some((l) => l.includes(" say "))).toBe(false)
+    expect(logs.some((l) => l.includes('"tool":"say"'))).toBe(false)
   })
 
   it("reports a non-zero exit as an error with stderr", async () => {

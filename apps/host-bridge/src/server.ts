@@ -6,21 +6,26 @@ import http from "node:http"
 import type { AddressInfo } from "node:net"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
+import { createLogger, type Logger } from "@palui/core/log"
 import { z } from "zod"
 import { ArgError, buildArgv, type BridgeConfig, type CommandSpec, type ParamSpec } from "./config.ts"
 import { formatResult, runCommand } from "./run.ts"
-
-const MAX_BODY = 1_048_576
-
-export type Logger = (line: string) => void
 
 export type Bridge = {
   url: string
   close(): Promise<void>
 }
 
-export async function startBridge(config: BridgeConfig, log: Logger = (l) => console.log(l)): Promise<Bridge> {
+type ToolDef = {
+  name: string
+  config: { title: string; description: string; inputSchema: Record<string, z.ZodType>; annotations: { readOnlyHint: boolean; destructiveHint: boolean } }
+  run: (input: Record<string, unknown>) => Promise<{ content: { type: "text"; text: string }[]; isError: boolean }>
+}
+
+export async function startBridge(config: BridgeConfig, log: Logger = createLogger({ svc: "host-bridge" })): Promise<Bridge> {
   const expected = digest(`Bearer ${config.token}`)
+  // Built once. Only the McpServer is per request: the SDK binds one to one transport.
+  const tools = config.commands.map((spec) => toolDef(spec, log))
   const server = http.createServer(async (req, res) => {
     const pathname = new URL(req.url ?? "/", "http://x").pathname
     if (pathname === "/health" && req.method === "GET") {
@@ -32,26 +37,20 @@ export async function startBridge(config: BridgeConfig, log: Logger = (l) => con
       return
     }
     if (!timingSafeEqual(digest(req.headers.authorization ?? ""), expected)) {
-      log(`${stamp()} 401 ${req.socket.remoteAddress ?? "?"}`)
+      log.warn("unauthorized", { status: 401, from: req.socket.remoteAddress })
       res.writeHead(401, { "content-type": "application/json" })
       res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32001, message: "missing or invalid token" }, id: null }))
       return
     }
-    let body: unknown
-    try {
-      body = await readJson(req)
-    } catch (err) {
-      res.writeHead(400, { "content-type": "application/json" })
-      res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: (err as Error).message }, id: null }))
-      return
-    }
-    const mcp = buildMcp(config, log)
+    const mcp = new McpServer({ name: "palui-host-bridge", version: "1.0.0" })
+    for (const t of tools) mcp.registerTool(t.name, t.config, t.run)
+    // The transport reads and parses the body itself (1 MB cap by default).
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
     try {
       await mcp.connect(transport)
-      await transport.handleRequest(req, res, body)
+      await transport.handleRequest(req, res)
     } catch (err) {
-      log(`${stamp()} error ${(err as Error).message}`)
+      log.error("request failed", { err })
       if (!res.headersSent) res.writeHead(500).end()
     } finally {
       void mcp.close()
@@ -72,35 +71,31 @@ export async function startBridge(config: BridgeConfig, log: Logger = (l) => con
   }
 }
 
-export function buildMcp(config: BridgeConfig, log: Logger): McpServer {
-  const mcp = new McpServer({ name: "palui-host-bridge", version: "1.0.0" })
-  for (const spec of config.commands) {
-    mcp.registerTool(
-      spec.name,
-      {
-        title: spec.title ?? `Host: ${spec.name}`,
-        description: spec.description,
-        inputSchema: inputShape(spec),
-        annotations: annotationsFor(spec.class),
-      },
-      async (input: Record<string, unknown>) => {
-        let argv: string[]
-        try {
-          argv = buildArgv(spec, input ?? {})
-        } catch (err) {
-          if (err instanceof ArgError) return { content: [{ type: "text" as const, text: err.message }], isError: true }
-          throw err
-        }
-        const r = await runCommand(spec, argv)
-        log(`${stamp()} ${spec.name} ${JSON.stringify(argv)} ${r.timedOut ? "timeout" : `exit=${r.exitCode}`} ${r.durationMs}ms`)
-        return { content: [{ type: "text" as const, text: formatResult(r) }], isError: !r.ok }
-      },
-    )
+function toolDef(spec: CommandSpec, log: Logger): ToolDef {
+  return {
+    name: spec.name,
+    config: {
+      title: spec.title ?? `Host: ${spec.name}`,
+      description: spec.description,
+      inputSchema: inputShape(spec),
+      annotations: annotationsFor(spec.class),
+    },
+    async run(input) {
+      let argv: string[]
+      try {
+        argv = buildArgv(spec, input ?? {})
+      } catch (err) {
+        if (err instanceof ArgError) return { content: [{ type: "text", text: err.message }], isError: true }
+        throw err
+      }
+      const r = await runCommand(spec, argv)
+      log.info("tool call", { tool: spec.name, argv, exit: r.exitCode, timedOut: r.timedOut, ms: r.durationMs })
+      return { content: [{ type: "text", text: formatResult(r, spec.timeoutMs) }], isError: !r.ok }
+    },
   }
-  return mcp
 }
 
-export function annotationsFor(cls: CommandSpec["class"]): { readOnlyHint: boolean; destructiveHint: boolean } {
+function annotationsFor(cls: CommandSpec["class"]): { readOnlyHint: boolean; destructiveHint: boolean } {
   if (cls === "read") return { readOnlyHint: true, destructiveHint: false }
   if (cls === "write") return { readOnlyHint: false, destructiveHint: false }
   return { readOnlyHint: false, destructiveHint: true }
@@ -121,30 +116,9 @@ function inputShape(spec: CommandSpec): Record<string, z.ZodType> {
 
 function valueSchema(p: ParamSpec): z.ZodType {
   if (p.enum) return z.enum(p.enum as [string, ...string[]])
-  return z.string().regex(new RegExp(`^(?:${p.pattern})$`))
+  return z.string().regex(p.pattern!)
 }
 
 function digest(s: string): Buffer {
   return createHash("sha256").update(s).digest()
-}
-
-async function readJson(req: http.IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = []
-  let size = 0
-  for await (const c of req) {
-    size += (c as Buffer).length
-    if (size > MAX_BODY) throw new Error("request body too large")
-    chunks.push(c as Buffer)
-  }
-  const raw = Buffer.concat(chunks).toString("utf8")
-  if (!raw) return undefined
-  try {
-    return JSON.parse(raw)
-  } catch {
-    throw new Error("request body isn't valid JSON")
-  }
-}
-
-function stamp(): string {
-  return new Date().toISOString()
 }

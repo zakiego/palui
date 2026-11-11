@@ -12,7 +12,7 @@ export function defaultConfigPath(): string {
   return process.env.PALUI_HOST_BRIDGE_CONFIG ?? join(homedir(), ".config", "palui", "host-bridge.json")
 }
 
-export function expandHome(path: string): string {
+function expandHome(path: string): string {
   return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(1)) : path
 }
 
@@ -30,7 +30,19 @@ const paramSchema = z
     note: z.string().optional(),
     // Exactly one of enum or pattern. A pattern is anchored: it must match the whole value.
     enum: z.array(z.string().min(1)).min(1).optional(),
-    pattern: z.string().min(1).optional(),
+    // Compiled once here, anchored, and used by both the tool's input schema and buildArgv.
+    pattern: z
+      .string()
+      .min(1)
+      .transform((src, ctx) => {
+        try {
+          return new RegExp(`^(?:${src})$`)
+        } catch {
+          ctx.addIssue({ code: "custom", message: "pattern isn't a valid regular expression" })
+          return z.NEVER
+        }
+      })
+      .optional(),
     optional: z.boolean().default(false),
     // A list of values, spread into separate args by `{...name}`.
     list: z.boolean().default(false),
@@ -39,15 +51,6 @@ const paramSchema = z
     allowDash: z.boolean().default(false),
   })
   .refine((p) => (p.enum ? 1 : 0) + (p.pattern ? 1 : 0) === 1, "a param needs exactly one of enum or pattern")
-  .refine((p) => {
-    if (!p.pattern) return true
-    try {
-      new RegExp(p.pattern)
-      return true
-    } catch {
-      return false
-    }
-  }, "pattern isn't a valid regular expression")
 
 export type ParamSpec = z.infer<typeof paramSchema>
 
@@ -77,19 +80,12 @@ const commandSchema = z
   .superRefine((c, ctx) => {
     const used = new Set<string>()
     for (const arg of c.args) {
-      const spread = SPREAD.exec(arg)
-      if (spread) {
-        const name = spread[1]!
+      for (const { name, spread } of argRefs(arg)) {
         used.add(name)
-        if (!c.params[name]) ctx.addIssue({ code: "custom", message: `arg "${arg}" uses an undeclared param` })
-        else if (!c.params[name].list) ctx.addIssue({ code: "custom", message: `"{...${name}}" needs a list param` })
-        continue
-      }
-      for (const m of arg.matchAll(PLACEHOLDER)) {
-        const name = m[1]!
-        used.add(name)
-        if (!c.params[name]) ctx.addIssue({ code: "custom", message: `arg "${arg}" uses an undeclared param` })
-        else if (c.params[name].list) ctx.addIssue({ code: "custom", message: `list param "${name}" must be a whole arg: "{...${name}}"` })
+        const p = c.params[name]
+        if (!p) ctx.addIssue({ code: "custom", message: `arg "${arg}" uses an undeclared param` })
+        else if (spread && !p.list) ctx.addIssue({ code: "custom", message: `"{...${name}}" needs a list param` })
+        else if (!spread && p.list) ctx.addIssue({ code: "custom", message: `list param "${name}" must be a whole arg: "{...${name}}"` })
       }
     }
     for (const name of Object.keys(c.params)) {
@@ -99,7 +95,14 @@ const commandSchema = z
 
 export type CommandSpec = z.infer<typeof commandSchema>
 
-export const configSchema = z
+// The params an arg mentions: the whole arg for `{...name}`, else each `{name}`.
+function argRefs(arg: string): { name: string; spread: boolean }[] {
+  const spread = SPREAD.exec(arg)
+  if (spread) return [{ name: spread[1]!, spread: true }]
+  return [...arg.matchAll(PLACEHOLDER)].map((m) => ({ name: m[1]!, spread: false }))
+}
+
+const configSchema = z
   .strictObject({
     note: z.string().optional(),
     // 127.0.0.1 is enough: Docker Desktop and OrbStack route host.docker.internal
@@ -204,5 +207,5 @@ function checkValue(name: string, p: ParamSpec, v: unknown): asserts v is string
   if (/[\u0000-\u001f\u007f]/.test(v)) throw new ArgError(`param "${name}" has control characters`)
   if (!p.allowDash && v.startsWith("-")) throw new ArgError(`param "${name}" can't start with "-"`)
   if (p.enum && !p.enum.includes(v)) throw new ArgError(`param "${name}" must be one of: ${p.enum.join(", ")}`)
-  if (p.pattern && !new RegExp(`^(?:${p.pattern})$`).test(v)) throw new ArgError(`param "${name}" doesn't match ${p.pattern}`)
+  if (p.pattern && !p.pattern.test(v)) throw new ArgError(`param "${name}" doesn't match ${p.pattern.source}`)
 }
