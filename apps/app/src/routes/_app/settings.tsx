@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import { StatusText } from "@/components/ui/status-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -597,7 +598,7 @@ function BackupCard({ backup }: { backup: Data["backup"] }) {
                 {fullDate(backup.at)} · {(backup.bytes / 1_048_576).toFixed(1)} MB
               </ItemDescription>
             </ItemContent>
-            <ItemActions>{stale ? <Badge variant="warning">{t("settings.backups.stale")}</Badge> : <Badge variant="success">{t("settings.backups.recent")}</Badge>}</ItemActions>
+            <ItemActions>{stale ? <StatusText tone="warning">{t("settings.backups.stale")}</StatusText> : <StatusText tone="success">{t("settings.backups.recent")}</StatusText>}</ItemActions>
           </Item>
         ) : (
           <Alert>
@@ -672,7 +673,7 @@ function HooksCard({ data }: { data: Data }) {
                       {h.name}
                     </span>
                     <Badge variant="outline">{label("hook.mode", h.mode)}</Badge>
-                    {!h.enabled && <Badge variant="secondary">{t("settings.hooks.off")}</Badge>}
+                    {!h.enabled && <StatusText tone="secondary">{t("settings.hooks.off")}</StatusText>}
                   </ItemTitle>
                   <ItemDescription className="font-mono break-all">{`${data.appUrl}/api/hooks/${h.slug}`}</ItemDescription>
                   <ItemDescription dir="auto" className="text-left break-words" title={chatTitle(h.chatId)}>

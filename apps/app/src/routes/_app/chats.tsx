@@ -13,6 +13,7 @@ import { Markdown } from "@/components/markdown"
 import { PageHeader } from "@/components/page-header"
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import { StatusText } from "@/components/ui/status-text"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -443,10 +444,10 @@ function ToolTrace({ tools }: { tools: (LiveTool & { args?: string })[] }) {
               <TraceTitle className="font-mono text-caption" title={x.tool}>
                 {x.tool}
               </TraceTitle>
-              <Badge variant={CLASS_TONE[x.class] ?? "destructive"}>{label("tool.class", x.class)}</Badge>
+              <StatusText tone={CLASS_TONE[x.class] ?? "destructive"} icon={null}>{label("tool.class", x.class)}</StatusText>
               {/* A word next to the color, so a failed call doesn't rely on red alone. */}
-              {x.status === "error" && <Badge variant="destructive">{t("tool.failed")}</Badge>}
-              {x.status === "denied" && <Badge variant="outline">{t("tool.denied")}</Badge>}
+              {x.status === "error" && <StatusText tone="destructive">{t("tool.failed")}</StatusText>}
+              {x.status === "denied" && <StatusText tone="outline">{t("tool.denied")}</StatusText>}
               {x.ms != null && <TraceDescription>{duration(x.ms)}</TraceDescription>}
             </TraceLine>
           </TraceCollapsibleTrigger>
@@ -490,7 +491,7 @@ function ApprovalCard({ approval, onDone }: { approval: { id: string; tool: stri
         <ShieldAlertIcon className="mt-0.5 shrink-0 text-warning-fg" aria-hidden="true" />
         <CardTitle className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">{t("chats.approvalTitle", { tool: approval.tool })}</CardTitle>
         <CardDescription className="col-start-2">
-          <Badge variant={CLASS_TONE[approval.class] ?? "destructive"}>{label("tool.class", approval.class)}</Badge>
+          <StatusText tone={CLASS_TONE[approval.class] ?? "destructive"} icon={null}>{label("tool.class", approval.class)}</StatusText>
         </CardDescription>
       </CardHeader>
       {approval.argsPreview && (

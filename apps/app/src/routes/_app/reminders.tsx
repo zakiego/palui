@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import { StatusText } from "@/components/ui/status-text"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -157,13 +158,12 @@ function ReminderTable({ rows, total, timezone, done, onNew }: { rows: Row[]; to
                       </span>
                     )}
                     {overdue && (
-                      <Badge variant="warning">
-                        <ClockAlertIcon aria-hidden="true" />
+                      <StatusText tone="warning" icon={<ClockAlertIcon aria-hidden="true" />}>
                         {t("reminders.overdue")}
-                      </Badge>
+                      </StatusText>
                     )}
-                    {r.status === "firing" && <Badge variant="outline">{label("reminder.status", r.status)}</Badge>}
-                    {done && <Badge variant={r.status === "done" ? "success" : "secondary"} className="sm:hidden">{label("reminder.status", r.status)}</Badge>}
+                    {r.status === "firing" && <StatusText tone="outline">{label("reminder.status", r.status)}</StatusText>}
+                    {done && <StatusText tone={r.status === "done" ? "success" : "secondary"} className="sm:hidden">{label("reminder.status", r.status)}</StatusText>}
                     {r.rrule && (
                       <Badge variant="outline" title={r.rrule}>
                         <RepeatIcon aria-hidden="true" />
@@ -183,7 +183,7 @@ function ReminderTable({ rows, total, timezone, done, onNew }: { rows: Row[]; to
                   </span>
                 </TableCell>
                 <TableCell className="font-mono text-caption whitespace-normal tabular-nums max-sm:hidden">
-                  {done ? <Badge variant={r.status === "done" ? "success" : "secondary"}>{label("reminder.status", r.status)}</Badge> : inZone(r.fireAt, timezone)}
+                  {done ? <StatusText tone={r.status === "done" ? "success" : "secondary"}>{label("reminder.status", r.status)}</StatusText> : inZone(r.fireAt, timezone)}
                   {!done && elsewhere && <span className="block text-caption break-words text-muted-foreground">{elsewhere}</span>}
                 </TableCell>
                 <TableCell dir="auto" className="max-w-0 truncate text-left max-md:hidden" title={chat}>
