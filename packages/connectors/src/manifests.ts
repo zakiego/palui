@@ -9,6 +9,7 @@ import jobs from "./jobs/manifest"
 import mcp from "./mcp/manifest"
 import recall from "./recall/manifest"
 import reminders from "./reminders/manifest"
+import t3code from "./t3code/manifest"
 import telegram from "./telegram/manifest"
 import voice from "./voice/manifest"
 import web from "./web/manifest"
@@ -25,6 +26,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   recall,
   mcp,
   gcal,
+  t3code,
   reminders,
   jobs,
   voice,
