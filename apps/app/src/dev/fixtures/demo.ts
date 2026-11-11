@@ -16,6 +16,7 @@ export function demo(k: Kit) {
   k.connector("mcp-linear", "mcp", { label: "Linear 🚀", status: "on", trust: "external", config: { url: "https://mcp.linear.app/mcp" } })
   k.connector("reminders", "reminders", { status: "on" })
   k.connector("jobs", "jobs", { status: "paused" })
+  k.connector("chats", "chats", { status: "on" })
   k.connector("webfetch", "webfetch", { status: "on" })
   k.connector("notes", "notes", { status: "on" })
   k.connector("remote-mcp", "remote-mcp", { status: "on" })

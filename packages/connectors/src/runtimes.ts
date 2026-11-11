@@ -1,6 +1,7 @@
 // Every connector runtime, keyed by manifest id. Imported by the runtime only.
 import type { AnyRuntime } from "@palui/core/connectors/define"
 import attachments from "./attachments/runtime"
+import chatHistory from "./chats/runtime"
 import aiGateway from "./ai-gateway/runtime"
 import cliproxy from "./cliproxy/runtime"
 import gcal from "./gcal/runtime"
@@ -30,6 +31,7 @@ export const runtimes: Record<string, AnyRuntime> = {
   t3code,
   reminders,
   jobs,
+  chats: chatHistory,
   notes,
   "remote-mcp": remoteMcp,
   attachments,

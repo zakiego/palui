@@ -2,6 +2,7 @@
 // import this, so it must stay free of runtime-only code.
 import type { ConnectorManifest } from "@palui/core/connectors/define"
 import attachments from "./attachments/manifest"
+import chatHistory from "./chats/manifest"
 import aiGateway from "./ai-gateway/manifest"
 import cliproxy from "./cliproxy/manifest"
 import gcal from "./gcal/manifest"
@@ -32,6 +33,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   t3code,
   reminders,
   jobs,
+  chats: chatHistory,
   notes,
   "remote-mcp": remoteMcp,
   attachments,

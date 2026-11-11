@@ -1,0 +1,41 @@
+---
+title: Chat history
+description: The built-in Chat history skill lets Palui find your other chats and read their recent messages, read-only.
+---
+
+Kind: `skill`. Built in. Ask Palui about another chat and it can look it up and read what was said there: "cari chat grup keluarga terus rangkum obrolan terakhirnya" or "apa yang dibilang di chat Telegram kemarin?". It never writes to another chat.
+
+## Connect
+
+Nothing to set up. Chat history is a built-in skill and is created on first boot.
+
+## What it can see
+
+Palui only reads what it stored for each chat:
+
+- Your messages and Palui's replies.
+- The text of a message you quoted, as a short `replyTo` preview.
+- Webhook events, marked with the hook's name.
+- Photos, voice notes and documents show up as a marker (`[gambar]`, `[audio]`, `[dokumen: tiket.pdf]`), never the file.
+
+Messages other people send in a chat aren't stored, so they can't be read either. Tool calls and internal summaries are skipped.
+
+## Tools
+
+| Tool | Class | What it does |
+|---|---|---|
+| `cari_chat` | `read` | Find chats by title, WhatsApp JID, Telegram chat id or chat id, with an optional channel (`whatsapp`, `telegram`, `web`) and kind (`dm`, `group`) filter. Newest conversation first, at most 20. Each result has its channel, external id, title, kind, last message time and message count. |
+| `baca_chat` | `read` | Read one chat by its chat id or an exact external id. The newest 30 messages by default (at most 100), returned oldest first. Optional `before` and `since` times and a text search. Each message is clipped at 500 characters. |
+
+Times in and out are in your zone (Settings, default `Asia/Makassar`). Each tool's class decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
+
+## Safety
+
+- Both tools are untrusted. Quoted text, group titles and webhook payloads come from other people, so reading them taints the turn and every `write` tool after it asks you first. See [The taint rule](/docs/concepts/taint-rule).
+- The tools are offered only in a private chat with Palui: a DM or the web chat. In a group they don't exist, so another chat's messages can't be posted where other people read them.
+- Webhook summaries run with zero tools, so they never get these.
+- Scheduled jobs do get them when the job's target chat is a DM or the web chat (a nightly "rangkum grup X" job works). Jobs already never get `destructive` tools and every `write` needs approval, and the result only goes to your own chat.
+
+## Pause and remove
+
+Pausing hides the tools. Nothing is deleted.

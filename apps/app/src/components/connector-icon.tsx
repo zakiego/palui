@@ -8,6 +8,7 @@ import {
   CpuIcon,
   GlobeIcon,
   MessageCircleIcon,
+  MessagesSquareIcon,
   MicIcon,
   MonitorIcon,
   NetworkIcon,
@@ -24,6 +25,7 @@ import {
 const ICONS: Record<string, LucideIcon> = {
   send: SendIcon,
   "message-circle": MessageCircleIcon,
+  "messages-square": MessagesSquareIcon,
   monitor: MonitorIcon,
   cpu: CpuIcon,
   network: NetworkIcon,
