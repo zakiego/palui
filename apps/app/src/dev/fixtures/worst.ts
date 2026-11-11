@@ -132,6 +132,7 @@ export function worst(k: Kit) {
   })
   k.connector("reminders", "reminders", { status: "on" })
   k.connector("jobs", "jobs", { status: "on" })
+  k.connector("chats", "chats", { status: "on" })
   k.connector("webfetch", "webfetch", { status: "on" })
   k.connector("attachments", "attachments", { status: "on" })
   k.connector("voice", "voice", { status: "not_set_up" })
