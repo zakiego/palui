@@ -46,7 +46,7 @@ function HomePage() {
 
   return (
     <>
-      <PageHeader title={t("home.title")} description={t("home.description")} />
+      <PageHeader title={t("home.title")} />
       {!data.runtimeUp && <RuntimeAlert />}
       {showChecklist && <Checklist checklist={c} />}
       {/* Two independent columns, so a long connector list never stretches the cards beside it. */}
@@ -79,7 +79,6 @@ function Checklist({ checklist }: { checklist: HomeData["checklist"] }) {
     <Card>
       <CardHeader>
         <CardTitle>{t("home.checklist")}</CardTitle>
-        <CardDescription>{t("home.checklistDescription")}</CardDescription>
         <CardAction>
           <Badge variant="outline" className="font-mono tabular-nums">
             {done}/4
@@ -317,7 +316,7 @@ const MAP_ROWS: { group?: string; name?: string }[] = [{ group: "w-16" }, { name
 function HomeSkeleton() {
   return (
     <PagePending page="nav.home">
-      <PageHeaderSkeleton title="w-24" description="w-80" />
+      <PageHeaderSkeleton title="w-24" />
       <div className="grid items-start gap-4 @3xl/main:grid-cols-2">
         <Card>
           <CardHeaderSkeleton title="w-28" description="w-20" action="w-14" />

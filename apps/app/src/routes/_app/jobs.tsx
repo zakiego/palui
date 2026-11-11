@@ -68,7 +68,6 @@ function JobsPage() {
     <>
       <PageHeader
         title={t("jobs.title")}
-        description={t("jobs.description")}
         actions={
           <Button onClick={() => setEditing("new")}>
             <PlusIcon data-icon="inline-start" />
@@ -332,7 +331,6 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
       open={open && target !== null}
       onOpenChange={(o) => !o && onClose()}
       title={isNew ? t("jobs.new") : (job?.name ?? "")}
-      description={t("jobs.sheetBody")}
       footer={
         <div className="flex w-full gap-2">
           <Button variant="outline" onClick={onClose}>
@@ -364,7 +362,6 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
         <Field data-invalid={!!errors.rrule}>
           <FieldLabel htmlFor="job-rrule">{t("jobs.field.rrule")}</FieldLabel>
           <Input id="job-rrule" className="font-mono" spellCheck={false} autoCapitalize="characters" value={form.rrule} maxLength={300} aria-invalid={!!errors.rrule} onChange={(e) => set("rrule", e.target.value)} />
-          <FieldDescription>{t("jobs.field.rruleHelp")}</FieldDescription>
           {errors.rrule && <FieldError>{errors.rrule}</FieldError>}
         </Field>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
