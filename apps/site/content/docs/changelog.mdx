@@ -24,9 +24,6 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 ### Changed
 
 - Routines are moving to flows. After this upgrade each routine also gets a flow that runs in shadow: it computes the same times but sends nothing, and differences are logged (the Flows page and `palui flows status` show the count). The routine engine keeps sending until you run `palui flows mode flows`, which hands over with open check-ins and old buttons intact; `palui flows mode legacy` goes back. After the handover the routine tools edit flows, and the Routines page links each routine to its flow and pauses or deletes the flow along with it.
-
-### Changed
-
 - Prompt caching now works between turns, not only inside one. The clock, recall and check-ins moved out of the system prompt to the end of your newest message, so the model can reuse the tools, the system prompt and the earlier conversation it already read. Against CLIProxyAPI, a follow-up turn read 98% of its input from the cache where it read none before.
 - Tokens read from the prompt cache now count at 10% against the global, agent, job and flow daily caps, about what they cost next to fresh input. Fresh input, cache writes and output still count in full, and `/status` shows the weighted number. On 2026-11-11 the old count paused turns at 2.03M tokens when about 0.8M was real cost.
 - A run's page (Activity) shows input read from the cache and input written to it separately, plus what the run counted toward the caps. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
