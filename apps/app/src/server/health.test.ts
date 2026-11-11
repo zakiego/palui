@@ -1,4 +1,5 @@
 import { upsertConnector } from "@palui/core/connectors/store"
+import { PALUI_VERSION } from "@palui/core/version"
 import { memoryDb } from "@palui/db"
 import { describe, expect, it } from "vitest"
 import { health } from "./health"
@@ -12,6 +13,7 @@ describe("/health", () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({
       ok: true,
+      version: PALUI_VERSION,
       schema: expect.any(String),
       runtime: { ok: true, schema: "0000" },
       connectors: [{ id: "telegram", status: "not_set_up" }],

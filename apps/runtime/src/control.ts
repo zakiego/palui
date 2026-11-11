@@ -10,6 +10,7 @@ import { MODEL_OFF_TEXT } from "@palui/core/chat/turn"
 import { WEB_CHAT_EXTERNAL_ID } from "@palui/core/chats"
 import { CONTROL_HEADER, type RuntimeStatus } from "@palui/core/control"
 import type { Logger } from "@palui/core/log"
+import { PALUI_VERSION } from "@palui/core/version"
 import { failoverModel, resolveChain } from "@palui/core/models/failover"
 import { rerouteChannelRows } from "@palui/core/outbox/worker"
 import type { Supervisor } from "@palui/core/connectors/supervisor"
@@ -91,7 +92,7 @@ export function createControlServer(o: ControlServerOptions) {
   lagTimer.unref()
   const streams = new Set<http.ServerResponse>()
 
-  function live(): { status: number; body: { ok: boolean; schema: string } } {
+  function live(): { status: number; body: { ok: boolean; schema: string; version: string } } {
     let schema = "unknown"
     let ok = lag < MAX_LOOP_LAG_MS
     try {
@@ -102,7 +103,7 @@ export function createControlServer(o: ControlServerOptions) {
     } catch {
       ok = false
     }
-    return { status: ok ? 200 : 503, body: { ok, schema } }
+    return { status: ok ? 200 : 503, body: { ok, schema, version: PALUI_VERSION } }
   }
 
   function status(): RuntimeStatus {
