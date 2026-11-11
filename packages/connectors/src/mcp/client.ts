@@ -1,7 +1,7 @@
 // A cached MCP client over Streamable HTTP (PLAN 5.4), shared by the generic MCP
 // connector and recall. One connection per connector instance; any transport
 // failure drops the client so the next call reconnects.
-import { createMCPClient, type ListToolsResult, type MCPClient, type McpToolAnnotations } from "@ai-sdk/mcp"
+import { createMCPClient, type CallToolResult, type ListToolsResult, type MCPClient, type McpToolAnnotations } from "@ai-sdk/mcp"
 import type { Tool } from "ai"
 import type { ToolClass } from "@palui/db"
 
@@ -13,6 +13,9 @@ export type McpEndpoint = {
   // Injected in tests; defaults to global fetch.
   fetch?: typeof fetch
   clientName?: string
+  // Skip the 2026 server/discover handshake and use initialize. For servers
+  // that answer discover with a bare -32022 (T3 Code 0.1.x speaks 2025-06-18).
+  legacyProtocol?: boolean
 }
 
 // Prefill for a tool's class from its MCP annotations. MCP says destructiveHint
@@ -36,6 +39,7 @@ export class McpConnection {
   private connect(): Promise<MCPClient> {
     this.client ??= createMCPClient({
       clientName: this.endpoint.clientName ?? "palui",
+      ...(this.endpoint.legacyProtocol ? { protocolVersionDiscovery: false } : {}),
       transport: {
         type: "http",
         url: this.endpoint.url,
@@ -92,6 +96,12 @@ export class McpConnection {
     })
     this.defs = { at: now, result }
     return result
+  }
+
+  // Call one tool directly. A transport failure retries once on a fresh client,
+  // so a tool that must not run twice needs an idempotency key in its args.
+  async callTool(name: string, args: Record<string, unknown>): Promise<CallToolResult> {
+    return await this.withClient((c) => c.callTool({ name, arguments: args }))
   }
 
   // AI SDK tools for the given definitions. A call that throws (transport
