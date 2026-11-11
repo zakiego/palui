@@ -3,8 +3,9 @@
 import fs from "node:fs"
 import path from "node:path"
 import { chats, events, jobs, messages, pendingApprovals, reminders, runs, schema, toolCalls, type DB, type EventLevel } from "@palui/db"
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, sql, type SQL } from "drizzle-orm"
 import { DateTime } from "luxon"
+import { clip } from "@/lib/format"
 
 export function startOfDay(tz: string, now = Date.now()): number {
   return DateTime.fromMillis(now, { zone: tz }).startOf("day").toMillis()
@@ -33,7 +34,7 @@ export function chatList(db: DB) {
       title: c.title || c.externalId,
       kind: c.kind,
       lastAt: last?.createdAt ?? c.lastMessageAt ?? c.createdAt,
-      preview: last ? last.text.slice(0, 140) : "",
+      preview: last ? clip(last.text, 140) : "",
       previewRole: last?.role ?? null,
     }
   })
@@ -155,7 +156,14 @@ export function reminderLists(db: DB) {
     .limit(100)
     .all()
     .map(view)
-  return { upcoming, recurring, done }
+  // The lists above are capped; these are how many rows there really are.
+  const total = (where: SQL | undefined) => Number(db.select({ n: sql<number>`count(*)` }).from(reminders).where(where).get()?.n ?? 0)
+  const totals = {
+    upcoming: total(and(inArray(reminders.status, ["pending", "firing"]), isNull(reminders.rrule))),
+    recurring: total(and(inArray(reminders.status, ["pending", "firing"]), isNotNull(reminders.rrule))),
+    done: total(inArray(reminders.status, ["done", "cancelled"])),
+  }
+  return { upcoming, recurring, done, totals }
 }
 
 export function nextReminders(db: DB, n = 3, now = Date.now()) {
@@ -200,9 +208,16 @@ export function recentRuns(db: DB, limit = 50) {
       tainted: r.tainted,
       startedAt: r.startedAt,
       ms: r.ms,
-      chat: r.chatId ? (titles.get(r.chatId) || r.chatId) : null,
-      job: r.jobId ? (jobNames.get(r.jobId) || r.jobId) : null,
+      chat: r.chatId ? (titles.get(r.chatId) ?? null) : null,
+      job: r.jobId ? (jobNames.get(r.jobId) ?? null) : null,
+      // The run outlived its chat or job. The page says "Deleted chat", not the id.
+      chatGone: !!r.chatId && !titles.has(r.chatId),
+      jobGone: !!r.jobId && !jobNames.has(r.jobId),
     }))
+}
+
+export function runCount(db: DB): number {
+  return Number(db.select({ n: sql<number>`count(*)` }).from(runs).get()?.n ?? 0)
 }
 
 export function tokensSince(db: DB, since: number) {
@@ -244,19 +259,32 @@ export function usage(db: DB, tz: string, days = 14, now = Date.now()) {
     }
     const total = r.tokensIn + r.tokensOut
     bump(perModel, r.model ?? "unknown", total)
-    if (r.chatId) bump(perChat, titles.get(r.chatId) || r.chatId, total)
-    if (r.jobId) bump(perJob, jobNames.get(r.jobId) || r.jobId, total)
+    // A chat or job deleted since groups under "", which the page shows as "Deleted chat".
+    if (r.chatId) bump(perChat, titles.get(r.chatId) ?? "", total)
+    if (r.jobId) bump(perJob, jobNames.get(r.jobId) ?? "", total)
   }
-  const sorted = (m: Map<string, { key: string; tokens: number; runs: number }>) => [...m.values()].sort((a, b) => b.tokens - a.tokens).slice(0, 20)
+  // The top 20 of each, with how many there were in all so the page can say so.
+  const sorted = (m: Map<string, { key: string; tokens: number; runs: number }>) => ({ rows: [...m.values()].sort((a, b) => b.tokens - a.tokens).slice(0, 20), total: m.size })
   return { days: [...perDay.values()], perModel: sorted(perModel), perChat: sorted(perChat), perJob: sorted(perJob) }
 }
 
 // --- events -----------------------------------------------------------------------
 
-export function eventList(db: DB, opts: { connectorId?: string; levels?: EventLevel[]; limit?: number }) {
+function eventFilter(opts: { connectorId?: string; levels?: EventLevel[] }) {
   const where = []
   if (opts.connectorId) where.push(eq(events.connectorId, opts.connectorId))
   if (opts.levels?.length) where.push(inArray(events.level, opts.levels))
+  return where
+}
+
+// How many events match the same filters `eventList` takes, with no cap.
+export function eventCount(db: DB, opts: { connectorId?: string; levels?: EventLevel[] }): number {
+  const where = eventFilter(opts)
+  return Number(db.select({ n: sql<number>`count(*)` }).from(events).where(where.length ? and(...where) : undefined).get()?.n ?? 0)
+}
+
+export function eventList(db: DB, opts: { connectorId?: string; levels?: EventLevel[]; limit?: number }) {
+  const where = eventFilter(opts)
   return db
     .select()
     .from(events)
@@ -283,7 +311,7 @@ export function jobList(db: DB, tz: string, now = Date.now()) {
         .from(runs)
         .where(and(eq(runs.jobId, j.id), gte(runs.startedAt, today)))
         .get()
-      return { ...j, chatTitle: titles.get(j.chatId) || j.chatId, tokensToday: Number(used?.t ?? 0) }
+      return { ...j, chatTitle: titles.get(j.chatId) ?? null, tokensToday: Number(used?.t ?? 0) }
     })
 }
 

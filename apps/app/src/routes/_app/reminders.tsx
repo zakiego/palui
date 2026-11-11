@@ -3,11 +3,13 @@
 // same echo the bot sends ("Besok, Rabu 11 Nov, 09.00 WITA").
 import * as React from "react"
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
-import { BellIcon, BellPlusIcon, EllipsisIcon, RepeatIcon, SparklesIcon } from "lucide-react"
+import { BellIcon, BellPlusIcon, ClockAlertIcon, EllipsisIcon, RepeatIcon, SparklesIcon } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
 import { AppError } from "@/components/app-error"
+import { ClampText } from "@/components/clamp-text"
+import { ListCapNote } from "@/components/list-cap-note"
 import { PageHeader } from "@/components/page-header"
 import { SimpleSelect } from "@/components/simple-select"
 import {
@@ -34,8 +36,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { cancelReminderFn, createReminderFn, getReminders, parseReminder, snoozeReminderFn } from "@/lib/fns/reminders"
-import { errorMessage, inZone } from "@/lib/format"
-import { useT } from "@/lib/i18n"
+import { clip, errorMessage, inOtherZone, inZone } from "@/lib/format"
+import { useLabel, useT } from "@/lib/i18n"
 
 export const Route = createFileRoute("/_app/reminders")({
   validateSearch: z.object({ new: z.boolean().optional(), tab: z.enum(["upcoming", "recurring", "done"]).optional() }),
@@ -72,21 +74,21 @@ function RemindersPage() {
       <Tabs value={tab} onValueChange={(v) => void navigate({ search: (p) => ({ ...p, tab: v as typeof tab }), replace: true })} className="gap-4">
         <TabsList>
           <TabsTrigger value="upcoming">
-            {t("reminders.upcoming")} <span className="font-mono text-muted-foreground tabular-nums">{data.upcoming.length}</span>
+            {t("reminders.upcoming")} <span className="font-mono text-muted-foreground tabular-nums">{data.totals.upcoming.toLocaleString("en")}</span>
           </TabsTrigger>
           <TabsTrigger value="recurring">
-            {t("reminders.recurring")} <span className="font-mono text-muted-foreground tabular-nums">{data.recurring.length}</span>
+            {t("reminders.recurring")} <span className="font-mono text-muted-foreground tabular-nums">{data.totals.recurring.toLocaleString("en")}</span>
           </TabsTrigger>
           <TabsTrigger value="done">{t("reminders.done")}</TabsTrigger>
         </TabsList>
         <TabsContent value="upcoming">
-          <ReminderTable rows={data.upcoming} onNew={() => setNew(true)} />
+          <ReminderTable rows={data.upcoming} total={data.totals.upcoming} timezone={data.timezone} onNew={() => setNew(true)} />
         </TabsContent>
         <TabsContent value="recurring">
-          <ReminderTable rows={data.recurring} onNew={() => setNew(true)} />
+          <ReminderTable rows={data.recurring} total={data.totals.recurring} timezone={data.timezone} onNew={() => setNew(true)} />
         </TabsContent>
         <TabsContent value="done">
-          <ReminderTable rows={data.done} done />
+          <ReminderTable rows={data.done} total={data.totals.done} timezone={data.timezone} done />
         </TabsContent>
       </Tabs>
       <NewReminderDialog open={!!search.new} onOpenChange={setNew} data={data} />
@@ -94,8 +96,13 @@ function RemindersPage() {
   )
 }
 
-function ReminderTable({ rows, done, onNew }: { rows: Row[]; done?: boolean; onNew?: () => void }) {
+// A pending reminder this far past its time didn't fire when it should have.
+const OVERDUE_AFTER_MS = 2 * 60_000
+
+function ReminderTable({ rows, total, timezone, done, onNew }: { rows: Row[]; total: number; timezone: string; done?: boolean; onNew?: () => void }) {
   const t = useT()
+  const label = useLabel()
+  const now = Date.now()
   if (rows.length === 0) {
     return (
       <Empty className="border border-dashed">
@@ -122,60 +129,89 @@ function ReminderTable({ rows, done, onNew }: { rows: Row[]; done?: boolean; onN
         <TableHeader>
           <TableRow>
             <TableHead>{t("table.reminder")}</TableHead>
-            <TableHead className="w-44 max-sm:hidden">{done ? t("table.status") : t("table.fires")}</TableHead>
-            <TableHead className="w-40 max-md:hidden">{t("table.chat")}</TableHead>
-            {!done && <TableHead className="w-12">
-              <span className="sr-only">Actions</span>
-            </TableHead>}
+            <TableHead className="w-52 max-sm:hidden">{done ? t("table.status") : t("table.fires")}</TableHead>
+            <TableHead className="w-56 max-md:hidden">{t("table.chat")}</TableHead>
+            {!done && (
+              <TableHead className="w-12">
+                <span className="sr-only">{t("table.actions")}</span>
+              </TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r) => (
-            <TableRow key={r.id}>
-              <TableCell className="max-w-0 whitespace-normal">
-                <span className="line-clamp-3 break-words">{r.text}</span>
-                <span className="mt-1 flex flex-wrap items-center gap-1.5 text-caption text-muted-foreground">
-                  <span className="font-mono tabular-nums sm:hidden">{inZone(r.fireAt, r.tz)}</span>
-                  {r.rrule && (
-                    <Badge variant="outline">
-                      <RepeatIcon aria-hidden="true" />
-                      <span className="max-w-48 truncate font-mono">{r.rrule}</span>
-                    </Badge>
-                  )}
-                  {r.smart && (
-                    <Badge variant="soft">
-                      <SparklesIcon aria-hidden="true" />
-                      smart
-                    </Badge>
-                  )}
-                </span>
-              </TableCell>
-              <TableCell className="font-mono text-caption tabular-nums max-sm:hidden">
-                {done ? <Badge variant={r.status === "done" ? "success" : "secondary"}>{r.status}</Badge> : inZone(r.fireAt, r.tz)}
-                {!done && <span className="block text-caption text-muted-foreground">{r.tz}</span>}
-              </TableCell>
-              <TableCell className="max-w-0 truncate max-md:hidden">{r.chat?.title || r.chat?.channel || "Unknown chat"}</TableCell>
-              {!done && (
-                <TableCell>
-                  <RowActions row={r} />
+          {rows.map((r) => {
+            // Every time on this page is in the owner's zone, so the list reads in order.
+            // A reminder set in another zone adds its own clock next to it.
+            const elsewhere = inOtherZone(r.fireAt, r.tz, timezone)
+            const overdue = r.status === "pending" && r.fireAt < now - OVERDUE_AFTER_MS
+            const chat = r.chat?.title || r.chat?.channel || t("runs.deletedChat")
+            return (
+              <TableRow key={r.id}>
+                <TableCell className="max-w-0 whitespace-normal">
+                  <ClampText text={r.text} lines={3} />
+                  <span className="mt-1 flex flex-wrap items-center gap-1.5 text-caption text-muted-foreground">
+                    {!done && (
+                      <span className="font-mono tabular-nums sm:hidden">
+                        {inZone(r.fireAt, timezone)}
+                        {elsewhere ? ` (${elsewhere})` : ""}
+                      </span>
+                    )}
+                    {overdue && (
+                      <Badge variant="warning">
+                        <ClockAlertIcon aria-hidden="true" />
+                        {t("reminders.overdue")}
+                      </Badge>
+                    )}
+                    {r.status === "firing" && <Badge variant="outline">{label("reminder.status", r.status)}</Badge>}
+                    {done && <Badge variant={r.status === "done" ? "success" : "secondary"} className="sm:hidden">{label("reminder.status", r.status)}</Badge>}
+                    {r.rrule && (
+                      <Badge variant="outline" title={r.rrule}>
+                        <RepeatIcon aria-hidden="true" />
+                        <span className="max-w-48 truncate font-mono">{r.rrule}</span>
+                      </Badge>
+                    )}
+                    {r.smart && (
+                      <Badge variant="soft">
+                        <SparklesIcon aria-hidden="true" />
+                        {t("reminders.smart")}
+                      </Badge>
+                    )}
+                    {/* The chat column is gone below md; three reminders called "Standup" still need telling apart. */}
+                    <span dir="auto" className="max-w-full min-w-0 truncate md:hidden" title={chat}>
+                      {chat}
+                    </span>
+                  </span>
                 </TableCell>
-              )}
-            </TableRow>
-          ))}
+                <TableCell className="font-mono text-caption whitespace-normal tabular-nums max-sm:hidden">
+                  {done ? <Badge variant={r.status === "done" ? "success" : "secondary"}>{label("reminder.status", r.status)}</Badge> : inZone(r.fireAt, timezone)}
+                  {!done && elsewhere && <span className="block text-caption break-words text-muted-foreground">{elsewhere}</span>}
+                </TableCell>
+                <TableCell dir="auto" className="max-w-0 truncate text-left max-md:hidden" title={chat}>
+                  {chat}
+                </TableCell>
+                {!done && (
+                  <TableCell>
+                    <RowActions row={r} timezone={timezone} />
+                  </TableCell>
+                )}
+              </TableRow>
+            )
+          })}
         </TableBody>
       </Table>
+      <ListCapNote shown={rows.length} total={total} />
     </Card>
   )
 }
 
-function RowActions({ row }: { row: Row }) {
+function RowActions({ row, timezone }: { row: Row; timezone: string }) {
   const t = useT()
   const router = useRouter()
   const [confirm, setConfirm] = React.useState(false)
   const snooze = async (preset: "10m" | "1h" | "tomorrow") => {
     try {
       const res = await snoozeReminderFn({ data: { id: row.id, preset } })
-      toast.success(`Snoozed to ${inZone(res.fireAt, row.tz)}`)
+      toast.success(t("reminders.snoozed", { time: inZone(res.fireAt, timezone) }))
       void router.invalidate()
     } catch (err) {
       toast.error(errorMessage(err))
@@ -193,15 +229,15 @@ function RowActions({ row }: { row: Row }) {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${row.text.slice(0, 40)}`} />}>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t("reminders.actionsFor", { text: clip(row.text, 40) })} />}>
           <EllipsisIcon aria-hidden="true" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-48">
           <DropdownMenuGroup>
             <DropdownMenuLabel>{t("reminders.snooze")}</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => void snooze("10m")}>10 minutes</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void snooze("1h")}>1 hour</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void snooze("tomorrow")}>Tomorrow 09.00</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void snooze("10m")}>{t("reminders.snooze10m")}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void snooze("1h")}>{t("reminders.snooze1h")}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void snooze("tomorrow")}>{t("reminders.snoozeTomorrow")}</DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
@@ -340,9 +376,9 @@ function NewReminderDialog({ open, onOpenChange, data }: { open: boolean; onOpen
                   {parsed.rrule && <span className="ms-2 font-mono text-caption font-normal text-muted-foreground">{parsed.rrule}</span>}
                 </p>
               ) : parsed && !parsed.ok ? (
-                <p className="text-sm text-destructive-fg">{parsed.error ?? "Couldn't find a time in that. Add one, like \"besok jam 9\"."}</p>
+                <p className="text-sm text-destructive-fg">{parsed.error ?? t("reminders.noTime")}</p>
               ) : (
-                <p className="text-sm text-muted-foreground">Type what and when.</p>
+                <p className="text-sm text-muted-foreground">{t("reminders.typeHint")}</p>
               )}
             </div>
             {error && (
