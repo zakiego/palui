@@ -49,7 +49,7 @@ export type ConnectorManifest<C extends z.ZodType = z.ZodType, S extends Record<
   // by itself and whose error states are final sets false.
   restartOnError?: boolean
   // Presets for multiple-instance connectors (MCP: vorneo, keuangan...).
-  presets?: { id: string; label: string; config: Record<string, unknown>; secretFields?: string[] }[]
+  presets?: { id: string; label: string; config: Record<string, unknown>; secretFields?: string[]; trust?: Trust }[]
   docs?: { commands?: string[]; notes?: string[] }
 }
 

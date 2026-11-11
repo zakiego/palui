@@ -7,6 +7,7 @@ Palui Agent: a self-hosted personal AI assistant (WhatsApp, Telegram, web chat) 
 ```
 apps/app             TanStack Start (Nitro): dashboard under /app, REST under /api, Better Auth, /health, migrations, admin CLI
 apps/runtime         Plain Node process: channel sockets, turns, scheduler, outbox, connector supervisor, control API (:4891)
+apps/host-bridge     Host-side MCP server (launchd, not Docker): an allowlist of CLI commands as tools, reached at host.docker.internal:4893
 apps/site            Next 16 static export + Fumadocs (Cloudflare Pages)
 apps/edge            Cloudflare Worker on palui.zakiego.com: app paths to the tunnel, the rest to Pages
 packages/db          Drizzle schema, migrations (bundled into src/migrations.gen.ts), openDb, crypto (AES-256-GCM), ids

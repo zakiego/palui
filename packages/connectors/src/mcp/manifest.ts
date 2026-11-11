@@ -44,6 +44,15 @@ export default defineManifest({
     },
     { id: "todomap", label: "Todo Map", config: { url: "https://todo.zakiego.com/api/mcp", authMode: "bearer" }, secretFields: ["token"] },
     { id: "linear", label: "Linear", config: { url: "https://mcp.linear.app/mcp", authMode: "bearer" }, secretFields: ["token"] },
+    // apps/host-bridge on the Docker host, installed by ops/install-host-bridge.sh.
+    // Trust is own: the owner writes every command, and the output is their own machine's.
+    {
+      id: "host",
+      label: "Host commands",
+      config: { url: "http://host.docker.internal:4893/mcp", authMode: "bearer" },
+      secretFields: ["token"],
+      trust: "own",
+    },
   ],
   removeWarning: "This removes the server and its token from Palui. The server itself isn't touched.",
   docs: {

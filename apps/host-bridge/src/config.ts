@@ -1,0 +1,242 @@
+// The bridge's config file: the token and the allowlist of commands. Nothing
+// runs that isn't listed here, commands run without a shell, and the model can
+// only fill in declared params, each checked against an enum or a pattern.
+// The one exception is dangerouslyAllowAnyCommand, which the owner turns on by hand.
+import { existsSync, readFileSync } from "node:fs"
+import { homedir } from "node:os"
+import { isAbsolute, join } from "node:path"
+import { z } from "zod"
+
+export const DEFAULT_PORT = 4893
+
+export function defaultConfigPath(): string {
+  return process.env.PALUI_HOST_BRIDGE_CONFIG ?? join(homedir(), ".config", "palui", "host-bridge.json")
+}
+
+function expandHome(path: string): string {
+  return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(1)) : path
+}
+
+const NAME = /^[a-z][a-z0-9_]{0,47}$/
+// `{name}` inside an arg, or an arg that is exactly `{...name}` (a list param).
+const PLACEHOLDER = /\{([a-z][a-z0-9_]*)\}/g
+const SPREAD = /^\{\.\.\.([a-z][a-z0-9_]*)\}$/
+
+// Strict objects: a typo like "timeout" or "allowdash" is an error naming the
+// key, not a setting that silently does nothing. `note` is free text, since JSON
+// has no comments.
+const paramSchema = z
+  .strictObject({
+    description: z.string().optional(),
+    note: z.string().optional(),
+    // Exactly one of enum or pattern. A pattern is anchored: it must match the whole value.
+    enum: z.array(z.string().min(1)).min(1).optional(),
+    // Compiled once here, anchored, and used by both the tool's input schema and buildArgv.
+    pattern: z
+      .string()
+      .min(1)
+      .transform((src, ctx) => {
+        try {
+          return new RegExp(`^(?:${src})$`)
+        } catch {
+          ctx.addIssue({ code: "custom", message: "pattern isn't a valid regular expression" })
+          return z.NEVER
+        }
+      })
+      .optional(),
+    optional: z.boolean().default(false),
+    // A list of values, spread into separate args by `{...name}`.
+    list: z.boolean().default(false),
+    // Values starting with "-" are refused unless this is on, so a value can't
+    // turn into a flag (`--exec=...`) the owner never meant to allow.
+    allowDash: z.boolean().default(false),
+  })
+  .refine((p) => (p.enum ? 1 : 0) + (p.pattern ? 1 : 0) === 1, "a param needs exactly one of enum or pattern")
+
+export type ParamSpec = z.infer<typeof paramSchema>
+
+const commandSchema = z
+  .strictObject({
+    name: z.string().regex(NAME, "lowercase letters, digits and _, starting with a letter"),
+    // Shown in Palui's tool table, chat transcript and approval prompts. Say what
+    // it does and where, e.g. "Restart nginx on the Mac mini". Default: "Host: <name>".
+    title: z.string().min(1).max(80).optional(),
+    description: z.string().min(1),
+    note: z.string().optional(),
+    // read: no side effects. write: changes something, undoable. destructive: anything else.
+    // Palui prefills the tool class from this; the dashboard still has the last word.
+    class: z.enum(["read", "write", "destructive"]),
+    // Absolute path (or ~/...). launchd's PATH is minimal, and a bare name could resolve anywhere.
+    command: z.string().min(1).transform(expandHome).refine(isAbsolute, "command must be an absolute path"),
+    args: z.array(z.string()).default([]),
+    params: z.record(z.string().regex(NAME), paramSchema).default({}),
+    cwd: z.string().transform(expandHome).optional(),
+    env: z.record(z.string(), z.string()).default({}),
+    timeoutMs: z.number().int().min(100).max(600_000).default(30_000),
+    // Per stream. Longer output keeps its start and its end (where errors usually are).
+    maxOutputBytes: z.number().int().min(1024).max(1_048_576).default(16_384),
+    // Exit codes that count as success. grep exits 1 on "no match", for example.
+    okExitCodes: z.array(z.number().int().min(0).max(255)).min(1).default([0]),
+  })
+  .superRefine((c, ctx) => {
+    const used = new Set<string>()
+    for (const arg of c.args) {
+      for (const { name, spread } of argRefs(arg)) {
+        used.add(name)
+        const p = c.params[name]
+        if (!p) ctx.addIssue({ code: "custom", message: `arg "${arg}" uses an undeclared param` })
+        else if (spread && !p.list) ctx.addIssue({ code: "custom", message: `"{...${name}}" needs a list param` })
+        else if (!spread && p.list) ctx.addIssue({ code: "custom", message: `list param "${name}" must be a whole arg: "{...${name}}"` })
+      }
+    }
+    for (const name of Object.keys(c.params)) {
+      if (!used.has(name)) ctx.addIssue({ code: "custom", message: `param "${name}" isn't used in args` })
+    }
+  })
+
+export type CommandSpec = z.infer<typeof commandSchema>
+
+// The params an arg mentions: the whole arg for `{...name}`, else each `{name}`.
+function argRefs(arg: string): { name: string; spread: boolean }[] {
+  const spread = SPREAD.exec(arg)
+  if (spread) return [{ name: spread[1]!, spread: true }]
+  return [...arg.matchAll(PLACEHOLDER)].map((m) => ({ name: m[1]!, spread: false }))
+}
+
+// The tool that dangerouslyAllowAnyCommand adds. Commands can't use this name.
+export const SHELL_TOOL = "shell"
+
+function defaultShell(): string {
+  const shell = process.env.SHELL
+  if (shell && isAbsolute(shell) && existsSync(shell)) return shell
+  return existsSync("/bin/zsh") ? "/bin/zsh" : "/bin/sh"
+}
+
+// Opt-in escape hatch: one `shell` tool that runs any command line through a
+// login shell (`<shell> -lc "<command>"`), so the allowlist no longer limits
+// anything. Its annotations always say destructive, so Palui asks before every call.
+const dangerousSchema = z.strictObject({
+  note: z.string().optional(),
+  // Default: $SHELL, else /bin/zsh, else /bin/sh. A login shell, so PATH comes from your profile.
+  shell: z.string().min(1).transform(expandHome).refine(isAbsolute, "shell must be an absolute path").optional(),
+  cwd: z.string().transform(expandHome).default(homedir()),
+  timeoutMs: z.number().int().min(100).max(600_000).default(120_000),
+  maxOutputBytes: z.number().int().min(1024).max(1_048_576).default(16_384),
+})
+
+export type DangerousSpec = Omit<z.infer<typeof dangerousSchema>, "shell"> & { shell: string }
+
+const configSchema = z
+  .strictObject({
+    note: z.string().optional(),
+    // 127.0.0.1 is enough: Docker Desktop and OrbStack route host.docker.internal
+    // to the Mac's loopback. 0.0.0.0 would expose the bridge to the LAN.
+    host: z.string().default("127.0.0.1"),
+    port: z.number().int().min(1).max(65_535).default(DEFAULT_PORT),
+    token: z.string().min(32, "use a token of at least 32 characters"),
+    commands: z.array(commandSchema).default([]),
+    // true for the defaults, an object to tune them, false or absent for off.
+    dangerouslyAllowAnyCommand: z
+      .preprocess((v) => (v === true ? {} : v === false ? undefined : v), dangerousSchema.optional())
+      .transform((d): DangerousSpec | undefined => (d ? { ...d, shell: d.shell ?? defaultShell() } : undefined)),
+  })
+  .superRefine((c, ctx) => {
+    const seen = new Set<string>()
+    for (const cmd of c.commands) {
+      if (seen.has(cmd.name)) ctx.addIssue({ code: "custom", message: `duplicate command name "${cmd.name}"` })
+      if (cmd.name === SHELL_TOOL && c.dangerouslyAllowAnyCommand) {
+        ctx.addIssue({ code: "custom", message: `"${SHELL_TOOL}" is taken by dangerouslyAllowAnyCommand, rename the command` })
+      }
+      seen.add(cmd.name)
+    }
+  })
+
+export type BridgeConfig = z.infer<typeof configSchema>
+
+export function parseConfig(raw: unknown): BridgeConfig {
+  const r = configSchema.safeParse(raw)
+  if (!r.success) {
+    const lines = r.error.issues.map((i) => `  ${issuePath(raw, i.path)}: ${i.message}`)
+    throw new Error(`invalid host bridge config:\n${lines.join("\n")}`)
+  }
+  return r.data
+}
+
+// "commands.3.params.repo" becomes "git_log.params.repo", so nobody counts entries by hand.
+function issuePath(raw: unknown, path: PropertyKey[]): string {
+  if (path[0] === "commands" && typeof path[1] === "number") {
+    const entry = (raw as { commands?: unknown[] } | null)?.commands?.[path[1]]
+    const name = entry && typeof entry === "object" && "name" in entry && typeof entry.name === "string" ? entry.name : null
+    const head = name ? `command "${name}"` : `commands[${path[1]}]`
+    return [head, ...path.slice(2).map(String)].join(".")
+  }
+  return path.map(String).join(".") || "(root)"
+}
+
+export class MissingConfigError extends Error {}
+
+export function loadConfig(path: string): BridgeConfig {
+  let text: string
+  try {
+    text = readFileSync(path, "utf8")
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") throw new MissingConfigError(`no config at ${path}`)
+    throw new Error(`can't read ${path}: ${(err as Error).message}`)
+  }
+  let json: unknown
+  try {
+    json = JSON.parse(text)
+  } catch (err) {
+    throw new Error(`${path} isn't valid JSON: ${(err as Error).message}`)
+  }
+  return parseConfig(json)
+}
+
+export class ArgError extends Error {}
+
+// Turns the model's input into argv. Throws ArgError on anything that isn't
+// declared, doesn't match, or looks like a flag without allowDash.
+export function buildArgv(spec: CommandSpec, input: Record<string, unknown>): string[] {
+  for (const key of Object.keys(input)) {
+    if (!spec.params[key]) throw new ArgError(`unknown param "${key}"`)
+  }
+  const values = new Map<string, string[]>()
+  for (const [name, p] of Object.entries(spec.params)) {
+    const v = input[name]
+    if (v === undefined || v === null) {
+      if (!p.optional) throw new ArgError(`missing param "${name}"`)
+      continue
+    }
+    const list = p.list ? v : [v]
+    if (!Array.isArray(list)) throw new ArgError(`param "${name}" must be a list of strings`)
+    for (const item of list) checkValue(name, p, item)
+    values.set(name, list as string[])
+  }
+
+  const argv: string[] = []
+  for (const arg of spec.args) {
+    const spread = SPREAD.exec(arg)
+    if (spread) {
+      argv.push(...(values.get(spread[1]!) ?? []))
+      continue
+    }
+    let missing = false
+    const out = arg.replace(PLACEHOLDER, (_, name: string) => {
+      const v = values.get(name)
+      if (!v) missing = true
+      return v?.[0] ?? ""
+    })
+    // An arg that mentions an absent optional param is dropped whole.
+    if (!missing) argv.push(out)
+  }
+  return argv
+}
+
+function checkValue(name: string, p: ParamSpec, v: unknown): asserts v is string {
+  if (typeof v !== "string") throw new ArgError(`param "${name}" must be a string`)
+  // Control characters (NUL, newlines) are never fine in an arg.
+  if (/[\u0000-\u001f\u007f]/.test(v)) throw new ArgError(`param "${name}" has control characters`)
+  if (!p.allowDash && v.startsWith("-")) throw new ArgError(`param "${name}" can't start with "-"`)
+  if (p.enum && !p.enum.includes(v)) throw new ArgError(`param "${name}" must be one of: ${p.enum.join(", ")}`)
+  if (p.pattern && !p.pattern.test(v)) throw new ArgError(`param "${name}" doesn't match ${p.pattern.source}`)
+}

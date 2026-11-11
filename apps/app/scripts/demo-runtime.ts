@@ -7,7 +7,7 @@
 // Refuses to run when NODE_ENV is production.
 import { createServer } from "node:http"
 import { config } from "@palui/core/config"
-import { listConnectors, setConnectorStatus } from "@palui/core/connectors/store"
+import { getConnector, listConnectors, setConnectorStatus } from "@palui/core/connectors/store"
 import { dbPath, migrations, openDb } from "@palui/db"
 
 if (config().mode === "prod") throw new Error("demo-runtime is for dev databases only")
@@ -22,6 +22,27 @@ function settle() {
       if (c.status === "connecting" && c.id !== "recall") setConnectorStatus(db, c.id, "on", null)
     }
   }, 1200)
+}
+
+// A fake MCP tool list for the tool table, shaped like McpToolListing. `saved`
+// follows the connector's stored toolPrefs, so Save tool settings shows up.
+const DEMO_TOOLS = [
+  { name: "disk_free", title: "Free disk space on the host", description: "Show free disk space on the host.", suggestedClass: "read" },
+  { name: "uptime", title: "Host uptime and load", description: "Show how long the host has been up and its load average.", suggestedClass: "read" },
+  { name: "restart_service", title: "Restart a service on the Mac mini", description: "Restart one of the allowlisted launchd services.", suggestedClass: "destructive" },
+  { name: "list_deals", description: "List deals in a stage, with no title from the server.", suggestedClass: "write" },
+]
+
+function listTools(id: string) {
+  const prefs = ((getConnector(db, id)?.config ?? {}) as { toolPrefs?: Record<string, { enabled: boolean; class: string }> }).toolPrefs ?? {}
+  return {
+    tools: DEMO_TOOLS.map((t) => ({
+      ...t,
+      enabled: prefs[t.name]?.enabled ?? true,
+      class: prefs[t.name]?.class ?? t.suggestedClass,
+      saved: Boolean(prefs[t.name]),
+    })),
+  }
 }
 
 const DEMO_MODELS = [
@@ -71,12 +92,15 @@ const server = createServer((req, res) => {
   }
   if (url.startsWith("/control/test/")) return json({ ok: true, detail: "Reachable (demo runtime)" })
   if (url.startsWith("/control/action/")) {
+    const id = decodeURIComponent(url.slice("/control/action/".length))
     let raw = ""
     req.on("data", (chunk: Buffer) => (raw += chunk))
     req.on("end", () => {
       const name = (JSON.parse(raw || "{}") as { name?: string }).name
       // The settings model picker lists these.
       if (name === "listModels") return json({ models: DEMO_MODELS })
+      // The MCP tool table lists these.
+      if (name === "listTools") return json(listTools(id))
       json({})
     })
     return

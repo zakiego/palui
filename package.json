@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "pnpm --filter @palui/app dev",
     "dev:runtime": "pnpm --filter @palui/runtime dev",
+    "host-bridge": "pnpm --filter @palui/host-bridge dev",
     "build": "pnpm -r --workspace-concurrency=2 build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
