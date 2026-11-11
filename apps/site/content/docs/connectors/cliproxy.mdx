@@ -22,7 +22,7 @@ Kind: `model`. CLIProxyAPI exposes the models from your existing subscriptions (
 
 ## Roles
 
-Palui asks for a model by role, and you pick the model for each role in Settings:
+Palui asks for a model by role, and you pick the model for each role in Settings, under Models. The model field lists the models your gateway serves (from its `/v1/models`), and you can still type an id it doesn't list. When the runtime is down or the connector is paused, the list can't load and you type the id instead.
 
 | Role | Used for |
 |---|---|
@@ -33,6 +33,8 @@ Palui asks for a model by role, and you pick the model for each role in Settings
 ## Failover
 
 Each role has a chain of model connectors. On a 5xx, a 429 or a quota error, Palui tries the next connector in the chain. [ai-gateway](/docs/connectors/ai-gateway) is the usual fallback.
+
+Each step in a chain can set its own reasoning effort: Default, Off, Minimal, Low, Medium, High, Extra high or Max. Default leaves it to the provider. The effort applies to that step only, so a fallback can think less than the primary. Claude models get it as effort or a thinking budget, OpenAI-style models as `reasoning_effort`.
 
 ## Tools
 
