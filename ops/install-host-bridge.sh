@@ -37,9 +37,6 @@ if [ ! -f "$config" ]; then
   "$node_bin" "$bundle" init
   echo
 fi
-config_ok=1
-"$node_bin" "$bundle" check >/dev/null || config_ok=0
-
 sed -e "s|__HOME__|$HOME|g" -e "s|__NODE__|$node_bin|g" "$repo/ops/$label.plist" > "$plist"
 plutil -lint "$plist" >/dev/null
 
@@ -60,10 +57,7 @@ if "$node_bin" "$bundle" status; then
   echo "  $node_bin $bundle check && $restart"
 else
   echo
-  if [ "$config_ok" = 0 ]; then
-    echo "The config has problems. See them with:" >&2
-    echo "  $node_bin $bundle check" >&2
-  fi
+  "$node_bin" "$bundle" check >&2 || true
   echo "Fix it, then restart with:" >&2
   echo "  $restart" >&2
   echo "Last log lines:" >&2
