@@ -29,6 +29,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiChatStreamRouteImport } from './routes/api/chat/stream'
 import { Route as ApiEventsStreamRouteImport } from './routes/api/events/stream'
 import { Route as ApiHooksSlugRouteImport } from './routes/api/hooks/$slug'
+import { Route as AppActivityRunsIdRouteImport } from './routes/_app/activity_.runs.$id'
 import { Route as ApiOauthGoogleCallbackRouteImport } from './routes/api/oauth/google/callback'
 
 const AppRoute = AppRouteImport.update({
@@ -130,6 +131,11 @@ const ApiHooksSlugRoute = ApiHooksSlugRouteImport.update({
   path: '/api/hooks/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppActivityRunsIdRoute = AppActivityRunsIdRouteImport.update({
+  id: '/activity_/runs/$id',
+  path: '/activity/runs/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiOauthGoogleCallbackRoute = ApiOauthGoogleCallbackRouteImport.update({
   id: '/api/oauth/google/callback',
   path: '/api/oauth/google/callback',
@@ -156,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/events/stream': typeof ApiEventsStreamRoute
   '/api/hooks/$slug': typeof ApiHooksSlugRoute
+  '/activity/runs/$id': typeof AppActivityRunsIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/events/stream': typeof ApiEventsStreamRoute
   '/api/hooks/$slug': typeof ApiHooksSlugRoute
+  '/activity/runs/$id': typeof AppActivityRunsIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
 }
 export interface FileRoutesById {
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/events/stream': typeof ApiEventsStreamRoute
   '/api/hooks/$slug': typeof ApiHooksSlugRoute
+  '/_app/activity_/runs/$id': typeof AppActivityRunsIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
 }
 export interface FileRouteTypes {
@@ -226,6 +235,7 @@ export interface FileRouteTypes {
     | '/api/chat/stream'
     | '/api/events/stream'
     | '/api/hooks/$slug'
+    | '/activity/runs/$id'
     | '/api/oauth/google/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -248,6 +258,7 @@ export interface FileRouteTypes {
     | '/api/chat/stream'
     | '/api/events/stream'
     | '/api/hooks/$slug'
+    | '/activity/runs/$id'
     | '/api/oauth/google/callback'
   id:
     | '__root__'
@@ -271,6 +282,7 @@ export interface FileRouteTypes {
     | '/api/chat/stream'
     | '/api/events/stream'
     | '/api/hooks/$slug'
+    | '/_app/activity_/runs/$id'
     | '/api/oauth/google/callback'
   fileRoutesById: FileRoutesById
 }
@@ -429,6 +441,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHooksSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/activity_/runs/$id': {
+      id: '/_app/activity_/runs/$id'
+      path: '/activity/runs/$id'
+      fullPath: '/activity/runs/$id'
+      preLoaderRoute: typeof AppActivityRunsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/oauth/google/callback': {
       id: '/api/oauth/google/callback'
       path: '/api/oauth/google/callback'
@@ -451,6 +470,7 @@ interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppConnectorsIdRoute: typeof AppConnectorsIdRoute
   AppConnectorsNewRoute: typeof AppConnectorsNewRoute
+  AppActivityRunsIdRoute: typeof AppActivityRunsIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -465,6 +485,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppConnectorsIdRoute: AppConnectorsIdRoute,
   AppConnectorsNewRoute: AppConnectorsNewRoute,
+  AppActivityRunsIdRoute: AppActivityRunsIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

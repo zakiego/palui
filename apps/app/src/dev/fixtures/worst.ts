@@ -215,8 +215,10 @@ export function worst(k: Kit) {
   let t = now - 3 * H
   const next = (step = MIN) => (t += step)
 
-  k.message(web, "user", "p", next())
-  const bigRun = k.run({ chatId: web.id, trigger: "message", model: within(MODEL_LONG, LIMITS.model), tokensIn: 98_765_432, tokensOut: 1_234_567, steps: 50, status: "ok", startedAt: t, ms: 3 * D })
+  const promptAt = next()
+  const bigRun = k.run({ chatId: web.id, trigger: "message", model: within(MODEL_LONG, LIMITS.model), tokensIn: 98_765_432, tokensOut: 1_234_567, tokensCached: 87_654_321, steps: 50, status: "ok", startedAt: t, ms: 3 * D })
+  // A one-letter prompt, linked to its run so the run page shows it.
+  k.message(web, "user", "p", promptAt, { runId: bigRun })
   const toolStatuses = ["ok", "error", "denied", "pending"] as const
   const toolClasses = ["read", "write", "destructive"] as const
   for (let i = 0; i < 30; i++) {
@@ -300,7 +302,7 @@ export function worst(k: Kit) {
   k.run({ trigger: "hook", model: "o", tokensIn: 0, tokensOut: 0, status: "aborted", error: "", startedAt: now - 7 * MIN, ms: 1000 })
   k.run({ chatId: arabic.id, trigger: "reminder", model: "claude-haiku-4-5-20251001", tokensIn: 999, tokensOut: 1, status: "ok", startedAt: now - 8 * MIN, ms: 9_999 })
   // The job and the chat were deleted later: only their ids are left.
-  k.run({ jobId: "job_0mhremoved0000000000", trigger: "schedule", model: "claude-sonnet-4-6", tokensIn: 21_000, tokensOut: 1400, status: "ok", startedAt: now - 9 * MIN, ms: 15_000 })
+  k.run({ jobId: "job_0mhremoved0000000000", trigger: "schedule", model: "claude-sonnet-4-6", tokensIn: 21_000, tokensOut: 1400, status: "ok", resultPreview: within(fill(PARAGRAPH, LIMITS.jobResult), LIMITS.jobResult), startedAt: now - 9 * MIN, ms: 15_000 })
   k.run({ chatId: "chat_0mhremoved0000000000", trigger: "message", model: "claude-sonnet-4-6", tokensIn: 4000, tokensOut: 300, status: "ok", startedAt: now - 10 * MIN, ms: 60_000 })
   k.run({ chatId: jo.id, jobId: briefing, trigger: "schedule", model: "claude-sonnet-4-6", tokensIn: 1, tokensOut: 0, status: "ok", startedAt: now + 2 * H, ms: 86_400_000 })
   k.run({ chatId: priya.id, trigger: "message", model: "gpt-4-0613", tokensIn: 8000, tokensOut: 2000, status: "ok", startedAt: now - 3 * 365 * D, ms: 4200 })

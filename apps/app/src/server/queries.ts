@@ -216,6 +216,61 @@ export function recentRuns(db: DB, limit = 50) {
     }))
 }
 
+// One run for its page: the run, the messages it read and wrote, and every
+// tool call in order. Null when the id is unknown.
+export function runDetail(db: DB, id: string) {
+  const r = db.select().from(runs).where(eq(runs.id, id)).get()
+  if (!r) return null
+  const chat = r.chatId ? db.select({ title: chats.title, externalId: chats.externalId }).from(chats).where(eq(chats.id, r.chatId)).get() : undefined
+  const job = r.jobId ? db.select({ name: jobs.name }).from(jobs).where(eq(jobs.id, r.jobId)).get() : undefined
+  const msgs = db
+    .select({ id: messages.id, role: messages.role, text: messages.text, createdAt: messages.createdAt })
+    .from(messages)
+    .where(and(eq(messages.runId, id), inArray(messages.role, ["user", "assistant"])))
+    .orderBy(asc(messages.createdAt))
+    .all()
+  const tools: ToolCallView[] = db
+    .select()
+    .from(toolCalls)
+    .where(eq(toolCalls.runId, id))
+    .orderBy(asc(toolCalls.createdAt))
+    .all()
+    .map((c) => ({
+      id: c.id,
+      tool: c.tool,
+      connectorId: c.connectorId,
+      class: c.class,
+      status: c.status,
+      ms: c.ms,
+      args: c.args === null || c.args === undefined ? "" : JSON.stringify(c.args, null, 2).slice(0, 2000),
+      result: c.resultPreview,
+    }))
+  return {
+    id: r.id,
+    trigger: r.trigger,
+    model: r.model,
+    status: r.status,
+    error: r.error,
+    resultPreview: r.resultPreview,
+    tokensIn: r.tokensIn,
+    tokensOut: r.tokensOut,
+    tokensCached: r.tokensCached,
+    steps: r.steps,
+    tainted: r.tainted,
+    startedAt: r.startedAt,
+    ms: r.ms,
+    chatId: chat ? r.chatId : null,
+    jobId: job ? r.jobId : null,
+    chat: chat ? chat.title || chat.externalId : null,
+    job: job?.name ?? null,
+    chatGone: !!r.chatId && !chat,
+    jobGone: !!r.jobId && !job,
+    prompt: msgs.filter((m) => m.role === "user" && m.text.trim()),
+    reply: msgs.filter((m) => m.role === "assistant" && m.text.trim()),
+    tools,
+  }
+}
+
 export function runCount(db: DB): number {
   return Number(db.select({ n: sql<number>`count(*)` }).from(runs).get()?.n ?? 0)
 }
