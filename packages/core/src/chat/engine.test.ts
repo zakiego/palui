@@ -334,6 +334,28 @@ describe("turn", () => {
     expect(seen.at(-1)).toEqual(["alpha__read"])
     expect(outboxTexts(h.db).length).toBe(before)
   })
+
+  it("shows later turns the tool calls earlier turns made, so the model needn't re-check its own work", async () => {
+    const add = fnTool("add", (i) => ({ sum: Number(i.a) + Number(i.b) }))
+    const h = await basic([callTool("alpha__add", { a: 1, b: 2 }, "c1"), say("hasilnya 3"), say("sama-sama"), say("halo lagi")], {
+      registry: { alpha: toolsRuntime("alpha", () => ({ add: { tool: add, class: "read" } })) },
+      rows: { alpha: "tools" },
+    })
+    await h.engine.inbound(tgMessage("1 tambah 2?"))
+    await h.engine.idle()
+    await h.engine.inbound(tgMessage("makasih"))
+    await h.engine.idle()
+    const next = h.m.prompts[2] as { role: string; content: unknown }[]
+    expect(next.map((m) => m.role)).toEqual(["system", "user", "assistant", "tool", "assistant", "user"])
+    expect(JSON.stringify(next[2])).toContain('"toolCallId":"c1"')
+    expect(JSON.stringify(next[3])).toContain("sum")
+    // With no tools on, the calls stay out: some providers reject tool parts without a tool list.
+    pauseConnector(h.db, "alpha")
+    await h.sup.reconcile()
+    await h.engine.inbound(tgMessage("halo"))
+    await h.engine.idle()
+    expect((h.m.prompts[3] as { role: string }[]).map((m) => m.role)).toEqual(["system", "user", "assistant", "user", "assistant", "user"])
+  })
 })
 
 describe("approvals", () => {

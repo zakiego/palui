@@ -1,9 +1,9 @@
 // Turn context (PLAN 8.4): persona, now (in the settings zone), enabled
 // capabilities, recall profile, session summary and the last 30 messages.
-import { and, desc, eq, gt, isNotNull, or } from "drizzle-orm"
+import { and, asc, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm"
 import { DateTime } from "luxon"
-import type { ModelMessage, UserContent } from "ai"
-import { messages, type DB } from "@palui/db"
+import type { ModelMessage, ToolCallPart, ToolResultPart, UserContent } from "ai"
+import { messages, toolCalls, type DB } from "@palui/db"
 
 export const HISTORY_LIMIT = 30
 
@@ -82,21 +82,81 @@ export function loadHistory(db: DB, sessionId: string, summarizedUntil: number |
     .reverse()
 }
 
+export type ToolCallRow = typeof toolCalls.$inferSelect
+
+// The tool calls made by the runs behind these rows, oldest first. Without them
+// the model only sees its own prose ("udah aku set"), can't tell a call that ran
+// from one it merely claimed, and re-checks old work on every later turn.
+export function loadToolCalls(db: DB, rows: HistoryRow[]): ToolCallRow[] {
+  const runIds = [...new Set(rows.map((r) => r.runId).filter((id): id is string => !!id))]
+  if (!runIds.length) return []
+  return db.select().from(toolCalls).where(inArray(toolCalls.runId, runIds)).orderBy(asc(toolCalls.createdAt), sql`rowid`).all()
+}
+
+// What the model is shown as the result of a past call. Only the stored preview
+// survives, so a long result is cut and says so.
+function replayedOutput(c: ToolCallRow): ToolResultPart["output"] {
+  const preview = c.resultPreview ?? ""
+  if (c.status === "pending") return { type: "text", value: "Not run yet: still waiting for the owner's approval." }
+  if (c.status === "denied") return { type: "execution-denied", reason: preview && preview !== "denied" ? preview : "Not run: the owner did not approve it." }
+  if (c.status === "error") return { type: "error-text", value: preview || "The tool failed." }
+  return { type: "text", value: preview.endsWith("…") ? `${preview}\n[result cut short in the history]` : preview }
+}
+
+// One past run's calls as an assistant message plus its tool message.
+function replayedCalls(calls: ToolCallRow[], seen: Set<string>): ModelMessage[] {
+  const callParts: ToolCallPart[] = []
+  const resultParts: ToolResultPart[] = []
+  for (const c of calls) {
+    // Row ids are `<runId>:<toolCallId>`. A resumed run can hold the same call twice.
+    const toolCallId = c.id.slice(c.id.indexOf(":") + 1).replace(/[^a-zA-Z0-9_-]/g, "_")
+    if (seen.has(toolCallId)) continue
+    seen.add(toolCallId)
+    const input = c.args && typeof c.args === "object" && !Array.isArray(c.args) ? c.args : {}
+    callParts.push({ type: "tool-call", toolCallId, toolName: c.tool, input })
+    resultParts.push({ type: "tool-result", toolCallId, toolName: c.tool, output: replayedOutput(c) })
+  }
+  return callParts.length ? [{ role: "assistant", content: callParts }, { role: "tool", content: resultParts }] : []
+}
+
 // Rows to model messages. Images only for `withImages` rows (the current batch);
 // older ones become a short note. Consecutive same-role rows are merged and the
-// list starts with a user message (Anthropic requires it).
-export function toModelMessages(rows: HistoryRow[], withImages: Set<string>): ModelMessage[] {
+// list starts with a user message (Anthropic requires it). `calls` (from
+// loadToolCalls) are replayed as real tool-call and tool-result parts: a run's
+// calls go right before its reply, or before the next owner message when it
+// never replied (it asked for approval and said nothing).
+export function toModelMessages(rows: HistoryRow[], withImages: Set<string>, calls: ToolCallRow[] = []): ModelMessage[] {
   const out: ModelMessage[] = []
+  const byRun = new Map<string, ToolCallRow[]>()
+  for (const c of calls) byRun.set(c.runId, [...(byRun.get(c.runId) ?? []), c])
+  const seen = new Set<string>()
+  // Runs whose messages were passed and whose calls are not in `out` yet, in order.
+  const open: string[] = []
+  const flush = (keep?: string | null) => {
+    for (const runId of open.splice(0)) {
+      if (runId === keep) {
+        open.push(runId)
+        continue
+      }
+      out.push(...replayedCalls(byRun.get(runId) ?? [], seen))
+      byRun.delete(runId)
+    }
+  }
   for (const r of rows) {
     const c = (r.content ?? {}) as StoredContent
     if (r.role === "assistant") {
       const text = r.text || c.text || ""
+      if (r.runId && byRun.has(r.runId) && !open.includes(r.runId)) open.push(r.runId)
+      flush()
       if (!text) continue
       const last = out.at(-1)
       if (last?.role === "assistant" && typeof last.content === "string") last.content = `${last.content}\n\n${text}`
       else out.push({ role: "assistant", content: text })
       continue
     }
+    // An owner message of another run: earlier runs that never replied show their calls first.
+    flush(r.runId)
+    if (r.runId && byRun.has(r.runId) && !open.includes(r.runId)) open.push(r.runId)
     const parts: Exclude<UserContent, string> = []
     const images = (c.media ?? []).filter((m): m is Extract<StoredMedia, { kind: "image" }> => m.kind === "image")
     const text = r.text || c.text || ""

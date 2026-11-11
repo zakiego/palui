@@ -16,7 +16,7 @@ import type { Supervisor } from "../connectors/supervisor"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
-import { buildSystem, hasImages, loadHistory, toModelMessages, type StoredContent } from "./context"
+import { buildSystem, hasImages, loadHistory, loadToolCalls, toModelMessages, type StoredContent } from "./context"
 import type { EngineDeps } from "./deps"
 
 export const MODEL_OFF_TEXT = "Model lagi off. Nyalakan: `/connectors on cliproxy`"
@@ -202,7 +202,9 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         summary: input.trigger === "message" ? session?.summary : null,
         trigger: origin,
       })
-      modelMessages = input.trigger === "message" ? toModelMessages(history, batch) : [{ role: "user", content: input.prompt ?? "" }]
+      // Past tool calls are replayed only next to a tool list: a request with tool parts and no tools is rejected by some providers.
+      const pastCalls = Object.keys(tools.tools).length ? loadToolCalls(db, history) : []
+      modelMessages = input.trigger === "message" ? toModelMessages(history, batch, pastCalls) : [{ role: "user", content: input.prompt ?? "" }]
     }
 
     model = failoverModel(chain, (from, e) => rlog.warn("model failed, trying the next one in the chain", { connector_id: from.connectorId, model: from.model, error: (e as Error)?.message }))
