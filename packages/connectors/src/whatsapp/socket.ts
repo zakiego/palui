@@ -32,6 +32,7 @@ export type WaSocket = {
   requestPairingCode(phoneNumber: string): Promise<string>
   sendPresenceUpdate(type: "composing" | "paused" | "available" | "unavailable", jid?: string): Promise<void>
   presenceSubscribe?(jid: string): Promise<void>
+  groupMetadata?(jid: string): Promise<{ subject?: string }>
   logout(msg?: string): Promise<void>
   end(error: Error | undefined): void
   signalRepository?: { lidMapping?: { getPNForLID(lid: string): Promise<string | null>; getLIDForPN(pn: string): Promise<string | null> } }

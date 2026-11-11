@@ -19,11 +19,28 @@ export function jidDigits(jid: string): string {
 export const isLid = (jid: string) => jid.endsWith("@lid")
 export const isPhoneJid = (jid: string) => jid.endsWith("@s.whatsapp.net")
 
-// v1 is DM only: no groups, status updates, broadcast lists or newsletters.
+// DMs only: no groups, status updates, broadcast lists or newsletters.
 export function isDirectChat(jid: string): boolean {
   if (jid === "status@broadcast") return false
   if (jid.endsWith("@g.us") || jid.endsWith("@broadcast") || jid.endsWith("@newsletter")) return false
   return isPhoneJid(jid) || isLid(jid)
+}
+
+// A group chat (PLAN 19.6). Groups are read so agents can answer mentions.
+export const isGroupChat = (jid: string) => jid.endsWith("@g.us")
+
+// Whether a group message is meant for us: it @mentions this account (by phone
+// JID or LID), or it replies to one of our messages.
+export function isAddressed(content: Content | undefined, selfIds: (string | null | undefined)[]): boolean {
+  if (!content) return false
+  const self = new Set(selfIds.filter((x): x is string => !!x).map(bareJid))
+  for (const value of Object.values(content)) {
+    const ctx = (value as { contextInfo?: { mentionedJid?: string[] | null; participant?: string | null } | null } | null)?.contextInfo
+    if (!ctx) continue
+    if ((ctx.mentionedJid ?? []).some((j) => self.has(bareJid(j)))) return true
+    if (ctx.participant && self.has(bareJid(ctx.participant))) return true
+  }
+  return false
 }
 
 // Unwrap the envelopes WhatsApp puts around real content (disappearing messages,

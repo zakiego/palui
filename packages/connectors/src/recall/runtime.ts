@@ -35,15 +35,15 @@ export function createMemoryHandle(api: RecallApi, config: Config, stats: Recall
   return {
     autoRecall: config.autoRecall,
     autoSave: config.autoSave,
-    async recall(query, { timeoutMs }) {
+    async recall(query, { timeoutMs, container, about }) {
       if (!shouldRecall(query)) {
         stats.skippedShort++
         return null
       }
       stats.calls++
       try {
-        const p = await api.profile(config.container, query, AbortSignal.timeout(timeoutMs))
-        const text = profileText(p)
+        const p = await api.profile(container ?? config.container, query, AbortSignal.timeout(timeoutMs))
+        const text = profileText(p, about)
         if (text) stats.hits++
         else stats.empty++
         return text
@@ -54,9 +54,9 @@ export function createMemoryHandle(api: RecallApi, config: Config, stats: Recall
         return null
       }
     },
-    async save({ sourceId, content, title }) {
+    async save({ sourceId, content, title, container }) {
       if (!content.trim()) return
-      await api.addMemory({ container: config.container, content, title, sourceId })
+      await api.addMemory({ container: container ?? config.container, content, title, sourceId })
     },
   }
 }

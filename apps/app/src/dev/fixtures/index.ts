@@ -48,6 +48,7 @@ const PRODUCT_TABLES = [
   schema.events,
   schema.hooks,
   schema.instructions,
+  schema.agents,
   schema.preferences,
   schema.savedAttachments,
   schema.usage,

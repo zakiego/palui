@@ -15,6 +15,7 @@ import routines from "./routines/runtime"
 import remoteMcp from "./remote-mcp/runtime"
 import t3code from "./t3code/runtime"
 import telegram from "./telegram/runtime"
+import tgbot from "./tgbot/runtime"
 import voice from "./voice/runtime"
 import web from "./web/runtime"
 import webfetch from "./webfetch/runtime"
@@ -22,6 +23,7 @@ import whatsapp from "./whatsapp/runtime"
 
 export const runtimes: Record<string, AnyRuntime> = {
   telegram,
+  tgbot,
   whatsapp,
   web,
   cliproxy,

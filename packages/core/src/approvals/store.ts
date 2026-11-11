@@ -1,7 +1,7 @@
 // Pending tool approvals (PLAN 8.6). A turn that ends with tool-approval-request
 // parts is saved here with everything needed to resume it, so it survives a
 // restart. All requests from one run are answered together in one resume call.
-import { and, asc, eq, inArray, lte } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull, lte, or } from "drizzle-orm"
 import type { ModelMessage } from "ai"
 import { newId, pendingApprovals, runs, toolCalls, type DB, type ToolClass } from "@palui/db"
 
@@ -26,6 +26,19 @@ export type ResumeContext = {
   batchRunId?: string
   // Set by markResumed once the run is claimed for resuming.
   resumedAt?: number
+  // The agent and the turn mode (PLAN 19.4), kept so a resume keeps its policy.
+  agentId?: string
+  mode?: TurnMode
+}
+
+// owner: a private chat. guest: someone other than the owner is in the batch,
+// or the agent gives the owner no powers in shared chats. sharedOwner: the
+// owner in a shared chat with powers on approval.
+export type TurnMode = "owner" | "guest" | "sharedOwner"
+
+// Approvals asked in this chat: its own, and those of shared chats asked here (PLAN 19.4).
+export function askedIn(chatId: string) {
+  return or(eq(pendingApprovals.askChatId, chatId), and(isNull(pendingApprovals.askChatId), eq(pendingApprovals.chatId, chatId)))!
 }
 
 export function createApproval(
@@ -33,6 +46,8 @@ export function createApproval(
   input: {
     runId: string
     chatId: string
+    // Where the prompt goes when that isn't chatId (a shared chat asks in the owner's DM).
+    askChatId?: string | null
     approvalId: string
     toolCallId: string
     tool: string
@@ -50,6 +65,7 @@ export function createApproval(
       id: newId("apr"),
       runId: input.runId,
       chatId: input.chatId,
+      askChatId: input.askChatId ?? null,
       approvalId: input.approvalId,
       toolCallId: input.toolCallId,
       tool: input.tool,
@@ -73,7 +89,7 @@ export function pendingForChat(db: DB, chatId: string): ApprovalRow[] {
   return db
     .select()
     .from(pendingApprovals)
-    .where(and(eq(pendingApprovals.chatId, chatId), eq(pendingApprovals.status, "pending")))
+    .where(and(askedIn(chatId), eq(pendingApprovals.status, "pending")))
     .orderBy(asc(pendingApprovals.createdAt))
     .all()
 }

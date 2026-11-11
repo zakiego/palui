@@ -1,9 +1,9 @@
 ---
 title: Chat commands
-description: Reference for /connectors, /new, /stop and /status, plus the approval and reminder replies Palui understands on every channel.
+description: Reference for /connectors, /new, /stop, /status and /agent, plus the approval and reminder replies Palui understands on every channel.
 ---
 
-Commands start with a slash. The router handles them before anything else, so they never reach the model and work even when every model connector is paused. Only the owner can use them. From anyone else they're dropped like any other message.
+Commands start with a slash. The router handles them before anything else, so they never reach the model and work even when every model connector is paused. Only the owner can use them. From anyone else they're plain text: in a chat with an agent they go to the agent as a normal message, and anywhere else they're dropped.
 
 ## Commands
 
@@ -15,6 +15,9 @@ Commands start with a slash. The router handles them before anything else, so th
 | `/new` | Starts a new session in this chat. recall auto-save runs for the one you just closed. |
 | `/stop` | Aborts the turn that's running in this chat. |
 | `/status` | Shows the model in use, tokens used today and connector states. |
+| `/agent` | Shows which agent answers in this chat and lists the agents. |
+| `/agent <slug>` | Gives this chat that agent, allows it and starts a new session. See [Agents](/docs/concepts/agents). |
+| `/agent off` | Goes back to Palui. Other people in this chat stop getting answers. |
 
 `<id>` is the connector id shown by `/connectors`, for example `telegram`, `cliproxy` or `recall`.
 

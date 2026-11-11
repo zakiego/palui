@@ -91,6 +91,8 @@ export type TurnInfo = {
   // approval resumed the turn in a new run; tools that read the current
   // message (saving an attachment) look it up by this id.
   batchRunId?: string
+  // The agent answering (PLAN 19). Tools with per-agent data (instructions) use it.
+  agentId?: string
 }
 
 // A tool plus its connector metadata. `class` drives approvals (PLAN 10); `untrusted`
@@ -101,6 +103,9 @@ export type PaluiTool = {
   untrusted?: boolean
   // Shown in the transcript and the Activity page.
   title?: string
+  // May run in a turn started by someone other than the owner (PLAN 19.4).
+  // Unmarked means no: guests only get tools that can't reach the owner's data.
+  guestSafe?: boolean
 }
 
 export type InboundMedia = {
@@ -140,6 +145,9 @@ export type InboundMessage = {
   media?: InboundMedia[]
   // A button press (Telegram callback_query data).
   callback?: { data: string; callbackId?: string }
+  // Groups: the message @mentions this account or replies to one of its
+  // messages (PLAN 19.2). Agents in groups answer only these.
+  addressed?: boolean
   fromMe?: boolean
   at: number
 }
@@ -157,9 +165,11 @@ export type ChannelHandle = {
 
 export type MemoryHandle = {
   // Auto-recall: profile text for the prompt, or null when skipped/timed out.
-  recall(query: string, opts: { timeoutMs: number }): Promise<string | null>
+  // `container` overrides the connector's own (an agent's memory, PLAN 19.5);
+  // `about` names who the facts are about ("the owner" by default).
+  recall(query: string, opts: { timeoutMs: number; container?: string; about?: string }): Promise<string | null>
   // Auto-save a transcript slice; sourceId keeps it idempotent.
-  save(input: { sourceId: string; content: string; title?: string }): Promise<void>
+  save(input: { sourceId: string; content: string; title?: string; container?: string }): Promise<void>
   autoRecall: boolean
   autoSave: boolean
 }

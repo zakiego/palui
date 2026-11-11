@@ -9,7 +9,7 @@ import { silentLogger, type Logger } from "../log"
 import { claimOwner, isOwner } from "../owner"
 import type { ConnectorServices, InboundMessage } from "../connectors/define"
 import { turnBus, type TurnBus } from "./bus"
-import { runCommand } from "./commands"
+import { runCommand, switchAgent } from "./commands"
 import { maybeCompact } from "./compaction"
 import type { StoredContent } from "./context"
 import type { EngineDeps } from "./deps"
@@ -81,12 +81,12 @@ export function createEngine(opts: EngineOptions) {
 
   async function inbound(msg: InboundMessage): Promise<{ chatId: string; messageId: string } | null> {
     const now = ctx.clock()
-    const reason = senderCheck(db, msg)
-    if (reason) {
-      logEvent(db, { connectorId: msg.connectorId, kind: "router.ignore", message: reason }, now)
+    const verdict = senderCheck(db, msg, now)
+    if (!verdict.ok) {
+      if (!verdict.quiet) logEvent(db, { connectorId: msg.connectorId, kind: "router.ignore", message: verdict.reason }, now)
       return null
     }
-    const { chat, row } = writeInbound(db, msg, now)
+    const { chat, row } = writeInbound(db, msg, now, { fromOwner: verdict.fromOwner })
     if (chat.channel === "web") ctx.bus.publish({ type: "message", chatId: chat.id, messageId: row.id, role: "user", text: row.text })
     void routeInOrder(chat.id, row.id)
     return { chatId: chat.id, messageId: row.id }
@@ -121,7 +121,17 @@ export function createEngine(opts: EngineOptions) {
     try {
       row = await prepareMedia(db, row, ctx.host.running(), log)
       const content = row.content as StoredContent
-      const r = await route({ db, chat, content, text: row.text, replyToChannelMsgId: row.replyToChannelMsgId ?? undefined, reminderActions: ctx.deps.reminderActions, routineActions: ctx.deps.routineActions, now: ctx.clock() })
+      const r = await route({
+        db,
+        chat,
+        content,
+        text: row.text,
+        replyToChannelMsgId: row.replyToChannelMsgId ?? undefined,
+        reminderActions: ctx.deps.reminderActions,
+        routineActions: ctx.deps.routineActions,
+        fromOwner: row.fromOwner,
+        now: ctx.clock(),
+      })
       // Stop the button spinner whatever the press turned out to be.
       if (content.callback?.callbackId) answerCallback(chat, content.callback.callbackId)
       switch (r.kind) {
@@ -238,7 +248,7 @@ export function createEngine(opts: EngineOptions) {
   // the chat that was asked. The dashboard passes none.
   async function decideApproval(id: string, approved: boolean, by: string, chat?: ChatRow): Promise<boolean> {
     let row = getApproval(db, id)
-    if (row && chat && row.chatId !== chat.id) {
+    if (row && chat && (row.askChatId ?? row.chatId) !== chat.id) {
       log.warn("approval answered from another chat; ignored", { approval_id: id, chat_id: chat.id })
       row = undefined
     }
@@ -273,6 +283,8 @@ export function createEngine(opts: EngineOptions) {
     const rows = approvalsForRun(db, runId)
     if (!rows.length || rows.some((r) => r.status === "pending")) return
     const chatId = rows[0]!.chatId
+    // Where the owner was asked: a shared chat's requests are asked in the owner's DM.
+    const askChatId = rows[0]!.askChatId ?? chatId
     queue.push(chatId, {
       kind: "task",
       run: async () => {
@@ -282,7 +294,7 @@ export function createEngine(opts: EngineOptions) {
         if (blocked) {
           if (!blockedResumes.has(runId)) {
             blockedResumes.add(runId)
-            const chat = getChat(db, chatId)
+            const chat = getChat(db, askChatId)
             if (chat) sendToChat(ctx, chat, `${blocked}\nAksi yang udah kamu jawab belum aku jalanin. Nanti lanjut sendiri begitu bisa.`, "system")
             logEvent(db, { kind: "approval.blocked", level: "warn", message: "Resume after an approval is waiting: turns can't run right now", data: { runId } }, ctx.clock())
           }
@@ -334,6 +346,8 @@ export function createEngine(opts: EngineOptions) {
     dispatch,
     runTurn,
     stopChat,
+    // Dashboard: switch a chat's agent, in the chat's order so it never lands mid-turn.
+    switchAgent: (chatId: string, agentId: string | null) => queue.runInChat(chatId, () => switchAgent(ctx, chatId, agentId)),
     decideApproval,
     expireApprovals,
     replayPending,

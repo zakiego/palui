@@ -7,6 +7,7 @@ import type { TurnBus } from "@palui/core/chat/bus"
 import type { EngineDeps } from "@palui/core/chat/deps"
 import type { Engine } from "@palui/core/chat/engine"
 import { MODEL_OFF_TEXT } from "@palui/core/chat/turn"
+import { AgentError } from "@palui/core/agents"
 import { WEB_CHAT_EXTERNAL_ID } from "@palui/core/chats"
 import { CONTROL_HEADER, type RuntimeStatus } from "@palui/core/control"
 import type { Logger } from "@palui/core/log"
@@ -190,6 +191,16 @@ export function createControlServer(o: ControlServerOptions) {
       return send(res, 200, await o.deps.jobs.runNow(decodeURIComponent(m[1]!)))
     }
     if ((m = /^\/control\/stop\/([^/]+)$/.exec(path))) return send(res, 200, { ok: o.engine.stopChat(decodeURIComponent(m[1]!)) })
+    if ((m = /^\/control\/chats\/([^/]+)\/agent$/.exec(path))) {
+      const agentId = body.agentId === null ? null : typeof body.agentId === "string" && body.agentId ? body.agentId : undefined
+      if (agentId === undefined) throw new HttpError(400, "agentId must be an agent id or null")
+      try {
+        await o.engine.switchAgent(decodeURIComponent(m[1]!), agentId)
+      } catch (e) {
+        throw new HttpError(e instanceof AgentError ? 400 : 404, (e as Error).message)
+      }
+      return send(res, 200, { ok: true })
+    }
     if (path === "/control/reminders/parse") {
       if (!o.deps.parseReminder) throw new HttpError(501, "Reminder parsing isn't wired into this runtime build yet")
       const text = typeof body.text === "string" ? body.text : ""

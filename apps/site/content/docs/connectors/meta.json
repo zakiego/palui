@@ -3,6 +3,7 @@
   "pages": [
     "index",
     "telegram",
+    "agent-bot",
     "whatsapp",
     "web-chat",
     "cliproxy",

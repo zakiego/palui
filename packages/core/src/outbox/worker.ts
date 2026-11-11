@@ -1,7 +1,7 @@
 // The outbox worker (PLAN 8.7, 6, 4.3): claim, send through the channel handle,
 // ack, retry with backoff. Delivery is at least once: a row is only `sent` after
 // the channel acks it.
-import { and, eq, inArray, isNotNull, lt, lte, sql } from "drizzle-orm"
+import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm"
 import { connectors, messages, outbox, pendingApprovals, type Channel, type DB } from "@palui/db"
 import { getChat } from "../chats"
 import { logEvent } from "../events"
@@ -33,12 +33,16 @@ export type ChannelState = "ready" | "paused" | "down" | "removed"
 export type OutboxWorkerOptions = {
   db: DB
   channel(ch: Channel): ChannelHandle | undefined
+  // A specific connector's channel (an agent's Telegram bot, PLAN 19.6), for
+  // rows with outbox.connectorId set.
+  connector?(id: string): ChannelHandle | undefined
   log: Logger
   clock?: () => number
   sendTimeoutMs?: number
 }
 
-export function channelState(db: DB, ch: Channel, handle: ChannelHandle | undefined): ChannelState {
+// `ch` is a connector id: the channel's main connector shares the channel's name.
+export function channelState(db: DB, ch: Channel | string, handle: ChannelHandle | undefined): ChannelState {
   if (ch === "web") return handle ? "ready" : "down"
   const row = db.select().from(connectors).where(eq(connectors.id, ch)).get()
   if (!row) return "removed"
@@ -115,8 +119,8 @@ export function createOutboxWorker(opts: OutboxWorkerOptions) {
   // Set by stop(): send loops hand their remaining rows back instead of sending.
   let stopping = false
   let unsubscribe: (() => void) | undefined
-  // One send loop per channel at a time; a slow channel never holds up the others.
-  const busy = new Map<Channel, Promise<void>>()
+  // One send loop per channel (or agent bot, keyed "bot:<id>") at a time; a slow one never holds up the others.
+  const busy = new Map<string, Promise<void>>()
   // Sends still in flight, so a timed-out one can be settled when it finishes.
   const pendingSends = new Map<string, Promise<SendResult>>()
 
@@ -162,14 +166,25 @@ export function createOutboxWorker(opts: OutboxWorkerOptions) {
   }
 
   function handleRemoved(now: number) {
-    const chans = db.selectDistinct({ channel: outbox.channel }).from(outbox).where(eq(outbox.status, "pending")).all()
+    const chans = db.selectDistinct({ channel: outbox.channel }).from(outbox).where(and(eq(outbox.status, "pending"), isNull(outbox.connectorId))).all()
     for (const { channel } of chans) {
       if (channelState(db, channel, opts.channel(channel)) === "removed") rerouteChannelRows(db, channel, now, opts.channel)
     }
+    // An agent bot that was removed: its rows try the channel's main connector.
+    const bots = db.selectDistinct({ id: outbox.connectorId }).from(outbox).where(and(eq(outbox.status, "pending"), isNotNull(outbox.connectorId))).all()
+    for (const { id } of bots) {
+      if (id && channelState(db, id, opts.connector?.(id)) === "removed") {
+        db.update(outbox).set({ connectorId: null }).where(and(eq(outbox.connectorId, id), eq(outbox.status, "pending"))).run()
+      }
+    }
   }
 
-  function claim(now: number, sendable: Channel[]): OutboxRow[] {
-    if (!sendable.length) return []
+  function claim(now: number, sendable: Channel[], sendableBots: string[] = []): OutboxRow[] {
+    if (!sendable.length && !sendableBots.length) return []
+    const which = or(
+      sendable.length ? and(isNull(outbox.connectorId), inArray(outbox.channel, sendable)) : sql`0`,
+      sendableBots.length ? inArray(outbox.connectorId, sendableBots) : sql`0`,
+    )
     // Idempotent claim: only rows still pending flip to sending.
     return db
       .update(outbox)
@@ -182,7 +197,7 @@ export function createOutboxWorker(opts: OutboxWorkerOptions) {
             db
               .select({ id: outbox.id })
               .from(outbox)
-              .where(and(eq(outbox.status, "pending"), lte(outbox.nextAttemptAt, now), inArray(outbox.channel, sendable)))
+              .where(and(eq(outbox.status, "pending"), lte(outbox.nextAttemptAt, now), which))
               .orderBy(outbox.createdAt)
               .limit(BATCH),
           ),
@@ -194,12 +209,12 @@ export function createOutboxWorker(opts: OutboxWorkerOptions) {
 
   // Resolves "timeout" when the channel didn't answer in time (counted as a failed attempt).
   async function sendOne(row: OutboxRow): Promise<"ok" | "failed" | "timeout"> {
-    const handle = opts.channel(row.channel)
+    const handle = row.connectorId ? opts.connector?.(row.connectorId) : opts.channel(row.channel)
     const chat = getChat(db, row.chatId)
     let timer: NodeJS.Timeout | undefined
     try {
       if (!chat) throw new Error(`chat ${row.chatId} not found`)
-      if (!handle) throw new Error(`channel ${row.channel} isn't running`)
+      if (!handle) throw new Error(`channel ${row.connectorId ?? row.channel} isn't running`)
       const sending = handle.send(chat.externalId, row.payload)
       pendingSends.set(row.id, sending)
       sending.then(
@@ -325,7 +340,7 @@ export function createOutboxWorker(opts: OutboxWorkerOptions) {
       resetStuck(now)
       expire(now)
       handleRemoved(now)
-      const chans = db.selectDistinct({ channel: outbox.channel }).from(outbox).where(eq(outbox.status, "pending")).all()
+      const chans = db.selectDistinct({ channel: outbox.channel }).from(outbox).where(and(eq(outbox.status, "pending"), isNull(outbox.connectorId))).all()
       const sendable = chans
         .map((c) => c.channel)
         .filter((ch) => {
@@ -333,9 +348,20 @@ export function createOutboxWorker(opts: OutboxWorkerOptions) {
           const st = channelState(db, ch, opts.channel(ch))
           return st === "ready" || st === "down"
         })
-      const rows = claim(now, sendable)
-      const byChannel = new Map<Channel, OutboxRow[]>()
-      for (const r of rows) byChannel.set(r.channel, [...(byChannel.get(r.channel) ?? []), r])
+      const bots = db.selectDistinct({ id: outbox.connectorId }).from(outbox).where(and(eq(outbox.status, "pending"), isNotNull(outbox.connectorId))).all()
+      const sendableBots = bots
+        .map((b) => b.id!)
+        .filter((id) => {
+          if (busy.has(`bot:${id}`)) return false
+          const st = channelState(db, id, opts.connector?.(id))
+          return st === "ready" || st === "down"
+        })
+      const rows = claim(now, sendable, sendableBots)
+      const byChannel = new Map<string, OutboxRow[]>()
+      for (const r of rows) {
+        const key = r.connectorId ? `bot:${r.connectorId}` : r.channel
+        byChannel.set(key, [...(byChannel.get(key) ?? []), r])
+      }
       started = [...byChannel].map(([ch, list]) => {
         const loop = sendChannel(list)
           .catch((e) => log.error("outbox send loop failed", { channel: ch, error: e }))

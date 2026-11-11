@@ -7,12 +7,12 @@
 // The different failures are spread across the first rows of each list, the
 // way real data mixes them, instead of stacked into one row.
 import { DEFAULT_PERSONA } from "@palui/core/settings"
-import { D, H, MIN, type Kit } from "./kit"
+import { D, H, MIN, gradientAvatar, type Kit } from "./kit"
 
 // Limits the dashboard enforces (the zod schemas in src/lib/fns). A value that
 // claims to be "at the limit" is checked against it, so the fixture can't
 // drift past what the forms accept.
-const LIMITS = { attachmentTitle: 200, attachmentDescription: 1000, attachmentFilename: 200, connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500, instructionTitle: 80, instructionBody: 1000, preferenceKey: 40, preferenceValue: 300 }
+const LIMITS = { agentName: 40, agentSlug: 24, attachmentTitle: 200, attachmentDescription: 1000, attachmentFilename: 200, connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500, instructionTitle: 80, instructionBody: 1000, preferenceKey: 40, preferenceValue: 300 }
 
 function within(value: string, limit: number): string {
   if (value.length > limit) throw new Error(`fixture value is ${value.length} characters, over the limit of ${limit}: ${value.slice(0, 40)}`)
@@ -171,6 +171,24 @@ export function worst(k: Kit) {
   const family = k.chat("telegram", "-1001234567890", "Keluarga Besar Bani H. Abdurrahman Siddiq 👨‍👩‍👧‍👦 Banjarmasin, Martapura, Banjarbaru, Pelaihari (arisan, haul, dan info acara)", { kind: "group" })
   // Seven characters, then emoji: the list's 140-character preview cut lands in the middle of one.
   say(family, `Wkwkwk ${"😂".repeat(80)}`, now - 50_000)
+
+  // --- agents (PLAN 19): a name and slug at the limit, a cap already hit, guests in a group ---
+  const arisan = k.agent({
+    slug: within("koordinator-arisan-haul-", LIMITS.agentSlug),
+    name: within("Koordinator Arisan & Haul Bani Abdurrahm", LIMITS.agentName),
+    persona: fill("Kamu koordinator arisan keluarga. Catat siapa yang sudah bayar, ingatkan jadwal haul, dan jawab sopan dalam bahasa Banjar kalau ditanya pakai bahasa Banjar. ", LIMITS.persona),
+    ownerPowers: "approve",
+    avatarIcon: "chef-hat",
+    avatarColor: "violet",
+    dailyTokenCap: 250_000,
+    tokensToday: 312_481,
+    recallContainer: "agent-arisan-keluarga-bani-abdurrahman-siddiq-banjarmasin-2026",
+  })
+  // An uploaded photo: a small gradient PNG, the shape a browser-resized photo has.
+  k.agent({ slug: "cs", name: "CS", persona: "Jawab pertanyaan pelanggan Vorneo.", guestTools: "none", avatarImage: gradientAvatar() })
+  k.assign(family, arisan)
+  k.message(family, "user", "@palui_bot siapa yang belum bayar arisan bulan ini?", now - 40_000, { fromOwner: false, senderName: "Muhammad Fadhlurrahman Al-Banjari bin H. Abdurrahman Siddiq", senderId: "1000000099" })
+  k.message(family, "user", "؟", now - 30_000, { fromOwner: false, senderName: null, senderId: "1000000100" })
 
   // No title yet: the list falls back to the raw JID.
   const noTitleGroup = k.chat("whatsapp", "120363041234567890123456@g.us", "", { kind: "group" })

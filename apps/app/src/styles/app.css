@@ -561,3 +561,26 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Agent avatar tones (PLAN 19.7). Identity, not status: a soft tile with a
+   darker glyph, one hue per agent, so agents tell apart at a glance in lists
+   and pickers. zinc (and anything unknown) is the plain muted tile. */
+@layer components {
+    [data-avatar-tone] { --avatar-bg: var(--muted); --avatar-fg: var(--foreground); }
+    [data-avatar-tone="red"] { --avatar-bg: oklch(0.93 0.045 25); --avatar-fg: oklch(0.45 0.15 25); }
+    [data-avatar-tone="orange"] { --avatar-bg: oklch(0.93 0.045 50); --avatar-fg: oklch(0.45 0.15 50); }
+    [data-avatar-tone="amber"] { --avatar-bg: oklch(0.93 0.045 75); --avatar-fg: oklch(0.45 0.15 75); }
+    [data-avatar-tone="green"] { --avatar-bg: oklch(0.93 0.045 150); --avatar-fg: oklch(0.45 0.15 150); }
+    [data-avatar-tone="teal"] { --avatar-bg: oklch(0.93 0.045 185); --avatar-fg: oklch(0.45 0.15 185); }
+    [data-avatar-tone="blue"] { --avatar-bg: oklch(0.93 0.045 255); --avatar-fg: oklch(0.45 0.15 255); }
+    [data-avatar-tone="violet"] { --avatar-bg: oklch(0.93 0.045 295); --avatar-fg: oklch(0.45 0.15 295); }
+    [data-avatar-tone="pink"] { --avatar-bg: oklch(0.93 0.045 350); --avatar-fg: oklch(0.45 0.15 350); }
+    .dark [data-avatar-tone="red"] { --avatar-bg: oklch(0.31 0.07 25); --avatar-fg: oklch(0.86 0.1 25); }
+    .dark [data-avatar-tone="orange"] { --avatar-bg: oklch(0.31 0.07 50); --avatar-fg: oklch(0.86 0.1 50); }
+    .dark [data-avatar-tone="amber"] { --avatar-bg: oklch(0.31 0.07 75); --avatar-fg: oklch(0.86 0.1 75); }
+    .dark [data-avatar-tone="green"] { --avatar-bg: oklch(0.31 0.07 150); --avatar-fg: oklch(0.86 0.1 150); }
+    .dark [data-avatar-tone="teal"] { --avatar-bg: oklch(0.31 0.07 185); --avatar-fg: oklch(0.86 0.1 185); }
+    .dark [data-avatar-tone="blue"] { --avatar-bg: oklch(0.31 0.07 255); --avatar-fg: oklch(0.86 0.1 255); }
+    .dark [data-avatar-tone="violet"] { --avatar-bg: oklch(0.31 0.07 295); --avatar-fg: oklch(0.86 0.1 295); }
+    .dark [data-avatar-tone="pink"] { --avatar-bg: oklch(0.31 0.07 350); --avatar-fg: oklch(0.86 0.1 350); }
+}

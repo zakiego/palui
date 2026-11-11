@@ -358,10 +358,9 @@ describe("whatsapp inbound", () => {
     expect(ctx.inbound[0]).toMatchObject({ senderExternalId: OWNER_LID, senderAltId: OWNER_JID })
   })
 
-  it("drops fromMe, groups, status, newsletters and non-notify batches", async () => {
+  it("drops fromMe, status, newsletters and non-notify batches", async () => {
     const { sock, ctx } = await openRunning()
     sock().message(dm("A", {}, { fromMe: true }))
-    sock().message(dm("B", {}, { remoteJid: "120363@g.us", participant: OWNER_JID }))
     sock().message(dm("C", {}, { remoteJid: "status@broadcast" }))
     sock().message(dm("D", {}, { remoteJid: "1203630@newsletter" }))
     sock().message(dm("E"), "append")
@@ -369,6 +368,25 @@ describe("whatsapp inbound", () => {
     await until(() => ctx.inbound.length === 1)
     await settle()
     expect(ctx.inbound.map((m) => m.channelMsgId)).toEqual(["F"])
+  })
+
+  it("reads groups with the participant as sender and marks mentions and replies to us as addressed", async () => {
+    const { sock, ctx } = await openRunning()
+    const self = sock().user!.id
+    const g = { remoteJid: "120363@g.us", participant: "62811@s.whatsapp.net" }
+    sock().message(dm("G1", { pushName: "Budi", message: { conversation: "ngobrol biasa" } }, g))
+    sock().message(dm("G2", { pushName: "Budi", message: { extendedTextMessage: { text: "@bot halo", contextInfo: { mentionedJid: [self] } } } }, g))
+    sock().message(dm("G3", { message: { extendedTextMessage: { text: "lanjut", contextInfo: { stanzaId: "BOT9", participant: self, quotedMessage: { conversation: "tadi" } } } } }, g))
+    sock().message(dm("G4", {}, { remoteJid: "120363@g.us" }))
+    await until(() => ctx.inbound.length === 3)
+    await settle()
+    expect(ctx.inbound.map((m) => [m.channelMsgId, m.addressed])).toEqual([
+      ["G1", false],
+      ["G2", true],
+      ["G3", true],
+    ])
+    expect(ctx.inbound[1]).toMatchObject({ chatExternalId: "120363@g.us", chatKind: "group", senderExternalId: "62811@s.whatsapp.net", senderName: "Budi" })
+    expect(ctx.inbound[2]!.quoted?.from).toBe("self")
   })
 
   it("reads extended text with the quoted id", async () => {

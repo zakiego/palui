@@ -105,6 +105,8 @@ export function controlClient(baseUrl: string, token: string, fetchImpl: typeof 
     approve: (id: string, approved: boolean) => call<{ ok: boolean }>("POST", `/control/approvals/${encodeURIComponent(id)}`, { approved }),
     runJob: (id: string) => call<{ ok: boolean; runId?: string; detail?: string }>("POST", `/control/jobs/${encodeURIComponent(id)}/run`, {}),
     stop: (chatId: string) => call<{ ok: boolean }>("POST", `/control/stop/${encodeURIComponent(chatId)}`, {}),
+    // Switch a chat's agent (PLAN 19.2): saves the session to the old agent's memory first. null means Palui.
+    setChatAgent: (chatId: string, agentId: string | null) => call<{ ok: true }>("POST", `/control/chats/${encodeURIComponent(chatId)}/agent`, { agentId }, 20_000),
     parseReminder: (text: string, tz?: string) => call<ParsedReminder>("POST", "/control/reminders/parse", { text, tz }, 20_000),
     // Raw SSE stream for the app to proxy to the browser.
     stream: (signal?: AbortSignal) => fetchImpl(`${baseUrl}/control/stream`, { headers: { [CONTROL_HEADER]: token }, signal }),

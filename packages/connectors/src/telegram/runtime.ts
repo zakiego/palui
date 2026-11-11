@@ -124,10 +124,11 @@ function displayName(user: User): string {
 
 const START_RE = /^\/start(?:@\w+)?(?:\s+(\S+))?\s*$/
 
-export function createTelegramRuntime(overrides: Partial<TelegramDeps> = {}) {
+// `m`: the main Telegram manifest, or tgbot for an agent's own bot (PLAN 19.6).
+export function createTelegramRuntime(overrides: Partial<TelegramDeps> = {}, m: typeof manifest = manifest) {
   const deps: TelegramDeps = { ...defaultDeps, ...overrides }
 
-  return defineRuntime(manifest, {
+  return defineRuntime(m, {
     async test(ctx): Promise<TestResult> {
       const token = ctx.secrets.botToken
       if (!token) return { ok: false, detail: ERRORS.missingToken }
@@ -159,6 +160,8 @@ async function startTelegram(ctx: Ctx, deps: TelegramDeps): Promise<RunningConne
 
   const log = ctx.log.child({ connector_id: ctx.id })
   const bot = deps.createBot(token)
+  // The bot's own user id is the token's prefix.
+  const botId = Number(token.split(":")[0])
   let stopping = false
   let username: string | undefined = ctx.config.botUsername
   const typingLoops = new Map<string, { interval: ReturnType<typeof setInterval>; cap: ReturnType<typeof setTimeout> }>()
@@ -209,6 +212,21 @@ async function startTelegram(ctx: Ctx, deps: TelegramDeps): Promise<RunningConne
     return { media: [] }
   }
 
+  // A group message meant for this bot (PLAN 19.2): it @mentions the bot, runs
+  // one of its commands, or replies to one of its messages.
+  function addressed(msg: Message): boolean {
+    if (msg.reply_to_message?.from?.id === botId) return true
+    const text = msg.text ?? msg.caption ?? ""
+    const me = username ? `@${username.toLowerCase()}` : undefined
+    for (const e of msg.entities ?? msg.caption_entities ?? []) {
+      if (e.type === "text_mention" && e.user?.id === botId) return true
+      const part = text.slice(e.offset, e.offset + e.length).toLowerCase()
+      if (me && e.type === "mention" && part === me) return true
+      if (me && e.type === "bot_command" && part.endsWith(me)) return true
+    }
+    return false
+  }
+
   bot.on("message", async (gctx) => {
     const msg = gctx.message
     const from = msg.from
@@ -244,6 +262,7 @@ async function startTelegram(ctx: Ctx, deps: TelegramDeps): Promise<RunningConne
       at: msg.date * 1000,
     }
     if (msg.reply_to_message) inbound.replyToChannelMsgId = String(msg.reply_to_message.message_id)
+    if (inbound.chatKind === "group") inbound.addressed = addressed(msg)
     if (media.length) inbound.media = media
     await ctx.services.inbound(inbound)
   })

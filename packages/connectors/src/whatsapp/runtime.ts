@@ -31,7 +31,9 @@ import manifest from "./manifest"
 import {
   bareJid,
   formatPairingCode,
+  isAddressed,
   isDirectChat,
+  isGroupChat,
   isLid,
   jidDigits,
   mediaOf,
@@ -318,18 +320,39 @@ async function startWhatsApp(ctx: Ctx, deps: WhatsAppDeps): Promise<RunningConne
     if (update.connection === "close") onClose(s, update)
   }
 
+  // Group subjects, so the Chats page shows a name (re-read after an hour).
+  const groupTitles = new Map<string, { title: string; at: number }>()
+  async function groupTitle(s: WaSocket, jid: string): Promise<string | undefined> {
+    const hit = groupTitles.get(jid)
+    if (hit && Date.now() - hit.at < 3600_000) return hit.title
+    try {
+      const meta = await s.groupMetadata?.(jid)
+      const title = meta?.subject?.trim()
+      if (title) groupTitles.set(jid, { title, at: Date.now() })
+      return title ?? hit?.title
+    } catch (err) {
+      log.debug("group metadata lookup failed", { err: String(err) })
+      return hit?.title
+    }
+  }
+
   async function deliver(s: WaSocket, m: WAMessage) {
     const key = m.key
     const jid = key?.remoteJid
     if (!key || !jid || key.fromMe) return
-    if (!isDirectChat(jid)) return
+    const group = isGroupChat(jid)
+    if (!group && !isDirectChat(jid)) return
+    // In a group the chat is the group and the sender is the participant.
+    const sender = group ? key.participant : jid
+    if (!sender) return
 
     const content = unwrap(m.message)
-    let alt = key.remoteJidAlt ? bareJid(key.remoteJidAlt) : undefined
+    const senderAlt = group ? key.participantAlt : key.remoteJidAlt
+    let alt = senderAlt ? bareJid(senderAlt) : undefined
     if (!alt) {
       try {
         const mapping = s.signalRepository?.lidMapping
-        const found = isLid(jid) ? await mapping?.getPNForLID(jid) : await mapping?.getLIDForPN(jid)
+        const found = isLid(sender) ? await mapping?.getPNForLID(sender) : await mapping?.getLIDForPN(sender)
         if (found) alt = bareJid(found)
       } catch (err) {
         log.debug("lid mapping lookup failed", { err: String(err) })
@@ -341,7 +364,7 @@ async function startWhatsApp(ctx: Ctx, deps: WhatsAppDeps): Promise<RunningConne
     const media: InboundMedia[] = []
     let note: string | undefined
     if (info) {
-      const owner = ctx.services.isOwner({ channel: "whatsapp", externalId: bareJid(jid), ...(alt ? { altId: alt } : {}) })
+      const owner = ctx.services.isOwner({ channel: "whatsapp", externalId: bareJid(sender), ...(alt ? { altId: alt } : {}) })
       const max = info.kind === "document" ? DOCUMENT_MAX_BYTES : MEDIA_MAX_BYTES
       if (!owner) {
         // Strangers are dropped by the router; don't download their files.
@@ -374,20 +397,22 @@ async function startWhatsApp(ctx: Ctx, deps: WhatsAppDeps): Promise<RunningConne
       channel: "whatsapp",
       connectorId: ctx.id,
       chatExternalId: jid,
-      chatKind: "dm",
-      senderExternalId: bareJid(jid),
+      chatKind: group ? "group" : "dm",
+      senderExternalId: bareJid(sender),
       text: body,
       at: timestampMs(m.messageTimestamp),
     }
-    if (alt && alt !== bareJid(jid)) msg.senderAltId = alt
-    if (m.pushName) {
-      msg.senderName = m.pushName
-      msg.chatTitle = m.pushName
-    }
+    if (alt && alt !== bareJid(sender)) msg.senderAltId = alt
+    if (m.pushName) msg.senderName = m.pushName
+    if (group) {
+      msg.addressed = isAddressed(content, [s.user?.id, s.user?.lid])
+      const title = await groupTitle(s, jid)
+      if (title) msg.chatTitle = title
+    } else if (m.pushName) msg.chatTitle = m.pushName
     if (key.id) msg.channelMsgId = key.id
     const quote = quoteOf(content)
     if (quote?.id) msg.replyToChannelMsgId = quote.id
-    if (quote) msg.quoted = { from: quoteAuthor(quote.participant, [s.user?.id, s.user?.lid], [jid, alt], true), text: quote.text, ...(quote.media ? { media: quote.media } : {}) }
+    if (quote) msg.quoted = { from: quoteAuthor(quote.participant, [s.user?.id, s.user?.lid], [sender, alt], !group), text: quote.text, ...(quote.media ? { media: quote.media } : {}) }
     if (media.length) msg.media = media
     await ctx.services.inbound(msg)
   }

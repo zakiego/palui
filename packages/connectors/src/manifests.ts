@@ -16,6 +16,7 @@ import routines from "./routines/manifest"
 import remoteMcp from "./remote-mcp/manifest"
 import t3code from "./t3code/manifest"
 import telegram from "./telegram/manifest"
+import tgbot from "./tgbot/manifest"
 import voice from "./voice/manifest"
 import web from "./web/manifest"
 import webfetch from "./webfetch/manifest"
@@ -24,6 +25,7 @@ import whatsapp from "./whatsapp/manifest"
 // Order is the catalog and Connectors page order within each kind.
 export const manifests: Record<string, ConnectorManifest> = {
   telegram,
+  tgbot,
   whatsapp,
   web,
   cliproxy,

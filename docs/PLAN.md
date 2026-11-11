@@ -33,16 +33,16 @@ For now only I can use it. Anyone else who messages the bot gets nothing.
 | Feature | OpenClaw / Hermes | Palui v1 |
 |---|---|---|
 | Owner allowlist / pairing | yes | yes (owner only, claimed with a nonce) |
-| Persona file (SOUL.md) | yes | yes, `settings.persona` |
+| Persona file (SOUL.md) | yes | yes, one per agent (section 19) |
 | Cron | yes | yes, Jobs |
 | Heartbeat | OpenClaw | yes, as a Job every 30 min with a "say nothing if nothing matters" prompt |
 | Model failover | yes | yes, per model role |
 | Approvals for risky tools | yes | yes, saved and resumable (section 8) |
 | Self-written skills | Hermes | deferred |
 | Subagents | both | deferred |
-| Group chats | both | deferred (the code path exists, the UI is hidden) |
+| Group chats | both | yes, with an agent, mention or reply only (section 19) |
 | Voice replies (TTS) | both | deferred. Voice-in only |
-| Multiple profiles or agents | both | deferred |
+| Multiple profiles or agents | both | yes, section 19 |
 | stdio MCP, shell, browser | both | deferred (needs binaries in the container and a sandbox). Host commands work today through `apps/host-bridge`, an allowlist MCP server on the host |
 
 ### Non-goals for v1
@@ -215,9 +215,9 @@ Telegram (the first channel built)
 WhatsApp
 - Connect: the wizard first asks for the owner's phone number. Then it pairs by phone-number code (8 chars, big Geist Mono, `ABCD-EFGH`, copy button), with QR as a fallback tab. Expiry is driven by Baileys `connection.update`: a new `qr` arrives on each rotation, and the pairing code is requested after the socket opens. A text label ("expires in about 2 min") isn't announced on every tick. Session files live in `/data/wa-auth`.
 - Owner match: messages from the stored number are accepted. The LID is learned from the first DM whose `key.remoteJidAlt` (or the LID mapping) matches the number, and both are stored. Anything with `fromMe` is dropped.
-- Number: Palui's own number (D2), not utusan's. Nothing is shared with utusan, so there's no chat split and no utusan check. Every DM from the owner is answered. Groups start outside the allowlist.
+- Number: Palui's own number (D2), not utusan's. Nothing is shared with utusan, so there's no chat split and no utusan check. Every DM from the owner is answered. Groups and other people's DMs start outside the allowlist until they get an agent (section 19).
 - Runtime: a lock on the auth dir, reconnect with exponential backoff, and 440 means "another session took over", so it pauses with that reason instead of fighting. A logout means `error: unlinked`.
-- DM only. An ⏳ reaction while thinking, cleared on reply.
+- DMs, plus groups with an agent (section 19). An ⏳ reaction while thinking, cleared on reply.
 - Risk: Baileys is unofficial. Keep volume low, use one owner, never broadcast. Telegram is the reliable channel.
 
 Web chat
@@ -314,7 +314,7 @@ Generic automations the agent builds from chat (`packages/core/src/routines`, to
 ## 8. The agent turn
 
 1. Inbox: every inbound message is written to `messages` with `status=pending` before the channel handler returns. Pending rows are replayed on start. grammY confirms updates when it fetches the next batch, and Baileys delivers once, so this is what keeps a message sent mid-deploy.
-2. Router: identify the channel and sender. Non-owners are dropped, with the reason logged as a sentence. A message that answers a pending approval ("ya"/"batal", or a button callback) is matched here, before the model sees it. Commands (`/new`, `/stop`, `/status`, `/connectors`) never reach the model.
+2. Router: identify the channel and sender. Non-owners are dropped, with the reason logged as a sentence, unless the chat is allowed and has an agent (section 19). A message that answers a pending approval ("ya"/"batal", or a button callback) is matched here, before the model sees it. Commands (`/new`, `/stop`, `/status`, `/connectors`) never reach the model.
 3. Per-chat queue: one turn at a time per chat. Messages that arrive mid-turn are batched into the next turn.
 4. Context: persona, now (date and WITA), the list of enabled capabilities, recall profile, and the session (summary plus the last 30 messages). The tool calls those turns made are replayed with them as real tool-call and tool-result parts (the result is the stored 500-character preview), so the model can tell what it ran from what it only said. Without that it distrusts its own replies and re-checks old work on every turn. A message that replies to another carries the quoted message in a `[Replying to ...]` block with `> ` lines, taken from the stored row or outbox when there is one, otherwise from the channel (WhatsApp `contextInfo.quotedMessage`). It is context only, never instructions. A quote of someone other than the owner or Palui taints the turn.
 5. Loop: AI SDK with tools from enabled connectors, within the section 5.2 budget.
@@ -332,17 +332,18 @@ Delivery is at least once. Outbox rows stuck in `sending` for more than 5 minute
 | `connectors` | id, type, kind, label, enabled, status, status_detail, trust, config json, secrets (encrypted), config_hash, updated_at |
 | `identities` | id, channel, external_id, alt_id (LID), display_name, role |
 | `claims` | nonce, channel, expires_at, used_at |
-| `chats` | id, channel, external_id, title, kind, session_id |
+| `agents` | id, slug, name, persona, is_default, recall_container, owner_powers, guest_tools, daily_token_cap, telegram_connector_id, avatar_image, avatar_icon, avatar_color |
+| `chats` | id, channel, connector_id, external_id, title, kind, session_id, allowed, agent_id |
 | `sessions` | id, chat_id, summary, saved_to_recall_at |
-| `messages` | id, session_id, role, content json, channel_msg_id, status (pending/handled), created_at |
-| `runs` | id, chat_id, trigger, model, tokens_in, tokens_out, tainted, status, error, started_at, ms |
+| `messages` | id, session_id, role, content json, channel_msg_id, sender_name, from_owner, status (pending/handled), created_at |
+| `runs` | id, chat_id, agent_id, trigger, model, tokens_in, tokens_out, tainted, status, error, started_at, ms |
 | `tool_calls` | id, run_id, connector_id, tool, class, args json, result_preview, status, ms |
-| `pending_approvals` | id, run_id, chat_id, approval_id, messages json, prompt_msg_id, expires_at, status |
+| `pending_approvals` | id, run_id, chat_id, ask_chat_id, approval_id, messages json, prompt_msg_id, expires_at, status |
 | `reminders` | id, chat_id, text, rrule, tz, fire_at, status, last_fired_at, snoozed_until |
 | `jobs` | id, name, rrule, tz, prompt, chat_id, model_role, tool_scope, enabled, next_run_at, daily_token_cap |
 | `routines` | id, chat_id, name, tz, days, source json, action json, recap json, enabled, paused_until, status, next_fire_at, next_occ, cursor, source_state, next_refresh_at, next_recap_at, last_error |
 | `routine_occurrences` | id, routine_id, chat_id, key (unique per routine), label, scheduled_at, status, answer, answers json, follow_ups, next_follow_up_at, deadline_at, fallback |
-| `outbox` | id, chat_id, payload, status, attempts, next_attempt_at, claimed_at, channel_msg_id, source |
+| `outbox` | id, chat_id, connector_id, payload, status, attempts, next_attempt_at, claimed_at, channel_msg_id, source |
 | `events` | id, at, level, connector_id, kind, message |
 | `settings` | key, value |
 
@@ -351,7 +352,7 @@ All writes go through transactions, with no JSON state files. Retention: `tool_c
 ## 10. Security
 
 - Dashboard: passkeys, `disableSignUp: true` from the first boot. The owner comes from `docker compose exec app palui owner invite`, a single-use link valid for 15 minutes, which is also the recovery path for a lost passkey (recall's pattern). App routes are `noindex`.
-- Channel owner: claimed with a Telegram nonce link and a WhatsApp phone number plus learned LID (section 5.1). Everyone else is silently dropped and logged.
+- Channel owner: claimed with a Telegram nonce link and a WhatsApp phone number plus learned LID (section 5.1). Everyone else is silently dropped and logged, except in chats the owner allowed and gave an agent (section 19).
 - Taint rule: a turn becomes tainted once it reads untrusted content (web fetch, a hook payload, results from an `external` MCP server). For the rest of that turn, every `write` tool needs approval too, and auto-save skips it. A label in the prompt isn't counted as a control.
 - recall auto-save stores only my messages and final replies, so tool output can't become a permanent injection through auto-recall.
 - Jobs and hooks: no `destructive` tools, `write` needs approval, and hook summaries run with zero tools.
@@ -393,7 +394,8 @@ shadcn `sidebar-07` (collapses to icons, becomes a Sheet on a phone). The header
 | Jobs | Schedule, next run, last result, Run now, Pause, daily cap. | Table, Switch, Sheet, Badge |
 | Connectors | Connectors grouped as Channels, Models, Memory, Tools, Skills. Each card shows an icon, name, one line, status, a Switch and an "Open" button. The card itself isn't a button. Open shows a Sheet (a Drawer on a phone) with the setup wizard or config, Test, recent events and the danger area. "Add connector" opens a catalog in a Command. The MCP sheet has a tool table with a Switch and class Select per tool, search, and "enable all read tools". | Card, Switch, Button, Badge, Sheet, Drawer, Field, Alert, AlertDialog, Command, Table, Select |
 | Activity | Tabs: Events (filter by connector and level), Runs, Usage (tokens per day, model, chat and job, with no dollar figures, since CLIProxyAPI has no usage stats and subscriptions have no per-token cost). | Tabs, Table, ToggleGroup, Badge, `chart-*` blocks |
-| Settings | Persona, timezone, language, model roles and failover, budgets, passkeys, API keys, backup status. | Field, Textarea, Select, Tabs |
+| Agents | Each agent's persona, instructions, shared-chat rules, daily cap and Telegram bot (section 19.7). | Table, Sheet, Field, Textarea, Select, Switch |
+| Settings | Timezone, language, model roles and failover, budgets, passkeys, API keys, backup status. | Field, Textarea, Select, Tabs |
 
 ### 11.5 Interaction rules
 
@@ -521,8 +523,74 @@ Order:
 |---|---|---|
 | R1 (with M4) | My own DM with the bot | v1 WhatsApp |
 | R2 | My other personal chats (jurnal "15 minutes" group, code-notif) | A Jurnal skill (the 15-min ask, SQLite store, nightly recap that replaces the cloop `jurnal-ringkasan` job), plain notification sends for selfhost and m4-alerts |
-| R3 | Project groups (Vorneo and others) | Groups with mention-only replies, per-chat roles like utusan's IAM (guest/member/admin/owner), per-chat memory (recall container per group), per-chat persona overlays |
+| R3 | Project groups (Vorneo and others) | Agents in groups with mention-only replies and their own memory (section 19). Still open: per-chat roles like utusan's IAM (guest/member/admin/owner) |
 | R4 | `vorneo.id/admin/chat` web bridge | A web channel with HMAC tickets (utusan's `src/lib/ticket.ts` design) |
 | R5 | Switch off utusan | Every item in utusan's skill and tool list has a Palui owner or is dropped on purpose: gws, skill reading, `kirim_file`, voice notes, `/approve` stub flow, dashboard. One week with utusan stopped but restorable (`launchctl bootout`, keep `~/.utusan`) |
 
 After R5: archive the utusan repo, remove its launchd plist, update the `utusan`, `notify-wa`, `jurnal-ringkasan` and `email-watcher` skills to send through Palui (a small `palui send` CLI or REST endpoint, added in R2).
+
+## 19. Agents
+
+Palui stops being one persona for one person. An agent is a named persona with its own standing instructions, its own recall container and its own daily token cap. Agents can be put in groups and in other people's chats, the way @grok answers in any thread it's tagged in. The owner still runs everything from the dashboard.
+
+### 19.1 What an agent is
+
+| Field | Meaning |
+|---|---|
+| `slug` | Lowercase id used in `/agent <slug>` and on the Agents page (`chef`, `vorneo-cs`). Fixed after creation. |
+| `name`, `persona` | Display name and the persona text that opens the system prompt (max 8000 chars). |
+| `recall_container` | Where its memory lives. Palui (the default agent) uses the recall connector's container. Every other agent gets `agent-<slug>`. |
+| `owner_powers` | `off` or `approve`: what the owner's own messages get in this agent's shared chats (19.4). |
+| `guest_tools` | `none` or `safe`: what other people can make it use (19.4). |
+| `daily_token_cap` | Tokens per day across all its chats. 0 means only the global cap applies. |
+| `telegram_connector_id` | Optional: its own Telegram bot (19.6). |
+
+Standing instructions belong to an agent (`instructions.agent_id`, null means Palui). Preferences stay the owner's and only Palui reads them, since they hold personal data (`home_lat`, `default_city`).
+
+The first boot after the migration creates Palui as the default agent from `settings.persona` and the existing instructions. Palui can't be deleted. It's the owner's personal agent, so it never goes into a shared chat: its memory is the owner's memory.
+
+### 19.2 Chats
+
+- Every chat has at most one agent (`chats.agent_id`, null means Palui). One agent can be in many chats.
+- A chat is shared when it's a group, or a DM with someone who isn't the owner. The owner's DMs and the web chat are private.
+- Shared chats need two things before anyone but the owner is answered: the chat is allowed, and it has an agent other than Palui. Both are set from the Chats page or with `/agent <slug>` sent by the owner in that chat.
+- A message from a stranger in a chat that isn't set up is dropped and logged, but the chat row is created (allowed off), so it shows up on the Chats page to be set up.
+- Groups: an agent replies only when it's @mentioned or when someone replies to one of its messages. Everything else in the group is dropped unread and never stored. A group where the owner never set an agent keeps today's rule: owner messages only.
+- `/agent` lists agents. `/agent <slug>` assigns one and allows the chat. `/agent off` goes back to Palui (and stops answering guests). A switch saves the session to the old agent's memory and starts a new one, like `/new`. Only the owner can send commands. From anyone else, text that looks like a command is just text.
+
+### 19.3 Who the model sees
+
+- Every inbound message records `sender_name` and `from_owner`.
+- In a shared chat each user message in the history starts with `[Name]:`, and the owner's start with `[Owner]:`. The system prompt says it's a shared chat, that only `[Owner]` lines come from the owner, and that the owner's private details aren't to be shared.
+- Approval answers, reminder buttons and commands are owner only. A guest's "ya" is a normal message.
+
+### 19.4 Tools and approvals
+
+- Guest turn: any message in the batch is from someone other than the owner. It gets no tools (`guest_tools: none`) or only tools marked `guestSafe` in the connector contract (`guest_tools: safe`). Unmarked tools are never guest safe (fail closed). Today that's web fetch (`ambil_halaman`).
+- Owner turn in a shared chat: with `owner_powers: off` it's treated like a guest turn. With `approve` it gets every tool, and every write or destructive call needs approval.
+- Guest and shared-chat turns are strict: every `write` needs approval, like jobs.
+- Approval prompts from a shared chat never go to that chat. They go to the owner's DM on the same channel (the web chat when there's none), and they name the chat they came from. `pending_approvals.ask_chat_id` is where the prompt went, and only an answer from there counts.
+
+### 19.5 Memory and budget
+
+- Auto-recall and auto-save use the agent's container. Palui keeps the owner's container.
+- Auto-save writes owner lines as `Owner:`, guest lines as `<name> (in <chat>):` and replies as `<agent name>:`. Guest text is saved on purpose, so a group agent remembers people. That also means anyone in an allowed chat can put text into that agent's memory, never into Palui's. Turns tainted by an untrusted tool result are still skipped.
+- A guest message makes the turn strict (19.4), but it doesn't mark the run tainted, so auto-save keeps it.
+- `daily_token_cap` is counted in `usage` under `agent:<id>:<day>`. When it's hit, that agent stops answering until midnight (settings zone). The chat gets one notice per agent per day, and the global cap still applies on top.
+
+### 19.6 Channels
+
+- WhatsApp: one number for every agent. Groups (`@g.us`) are now read. The sender is `key.participant`. A message is addressed when `contextInfo.mentionedJid` holds Palui's number or LID, or when it quotes one of Palui's messages. Media from guests isn't downloaded. The model gets a note instead.
+- Telegram: an agent can have its own bot. The Telegram connector allows several instances (`telegram`, `telegram-<slug>`). Chats are keyed by `(channel, connector_id, external_id)`, because two bots see the same DM and group ids. Replies go out through the bot the chat came in on (`outbox.connector_id`). In groups, a message is addressed when it mentions `@<bot username>` or replies to the bot. Bots in groups need privacy mode left on.
+- The owner claim stays one per channel: claiming one bot makes that Telegram account the owner for every bot.
+
+### 19.7 Dashboard
+
+- Agents page: list with avatar, name, chats, tokens today against the cap. A sheet to create or edit: avatar, name, slug, persona, owner powers, guest tools, daily cap, recall container, Telegram bot, and a link to the agent's instructions on Notes. Palui's sheet hides the shared-chat fields.
+- Avatar: an uploaded photo (cropped square and re-encoded as a 256 px WebP in the browser, stored as a data URL of at most 96 KB), else one of 24 icons on one of 9 colors, else Palui's mark for the default agent and a plain bot for the rest. Columns `avatar_image`, `avatar_icon`, `avatar_color`.
+- Chats page: each chat shows its agent and an Allowed switch, with a Select to change the agent.
+- Settings: the persona field moves to Palui on the Agents page.
+
+### 19.8 Not in this round
+
+Per-person roles (utusan IAM), group messages kept as background context, agents talking to each other, per-chat caps, media from guests.

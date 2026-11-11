@@ -5,8 +5,10 @@ import { ensureChat, ensureWebChat, type ChatRow } from "@palui/core/chats"
 import { masterKey } from "@palui/core/config"
 import { saveAttachment } from "@palui/core/attachments/service"
 import { setConnectorStatus, upsertConnector } from "@palui/core/connectors/store"
-import { type Settings, setSetting } from "@palui/core/settings"
+import { getSetting, type Settings, setSetting } from "@palui/core/settings"
+import { addUsage, usageKeys } from "@palui/core/budget/index"
 import {
+  agents,
   chats,
   events,
   hooks,
@@ -27,6 +29,7 @@ import {
   type Trust,
 } from "@palui/db"
 import { encrypt } from "@palui/db/crypto"
+import { crc32, deflateSync } from "node:zlib"
 import { eq } from "drizzle-orm"
 import { manifestFor } from "@/lib/manifests"
 
@@ -38,6 +41,30 @@ export const D = 24 * H
 export const FIXTURE_PASSKEY_PREFIX = "fx_"
 
 export type Kit = ReturnType<typeof createKit>
+
+// A 48 px gradient PNG as a data URL: the shape a browser-resized avatar photo has.
+export function gradientAvatar(px = 48): string {
+  const rows: Buffer[] = []
+  for (let y = 0; y < px; y++) {
+    const row = Buffer.alloc(1 + px * 3)
+    for (let x = 0; x < px; x++) row.set([Math.round((255 * x) / px), Math.round((255 * y) / px), 180], 1 + x * 3)
+    rows.push(row)
+  }
+  const chunk = (type: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(type), data])
+    const len = Buffer.alloc(4)
+    len.writeUInt32BE(data.length)
+    const crc = Buffer.alloc(4)
+    crc.writeUInt32BE(crc32(body))
+    return Buffer.concat([len, body, crc])
+  }
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(px, 0)
+  ihdr.writeUInt32BE(px, 4)
+  ihdr.set([8, 2, 0, 0, 0], 8)
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(Buffer.concat(rows))), chunk("IEND", Buffer.alloc(0))])
+  return `data:image/png;base64,${png.toString("base64")}`
+}
 
 type ConnectorOpts = {
   label?: string
@@ -77,6 +104,20 @@ export function createKit(db: DB, now = Date.now()) {
       // ensureChat skips an empty title on update and never sets these two.
       if (opts.createdAt !== undefined) db.update(chats).set({ createdAt: opts.createdAt }).where(eq(chats.id, row.id)).run()
       return row
+    },
+
+    // Raw insert, so a fixture can use values at the form limits.
+    agent(values: { slug: string; name: string; persona: string; ownerPowers?: "off" | "approve"; guestTools?: "none" | "safe"; dailyTokenCap?: number; recallContainer?: string | null; telegramConnectorId?: string | null; avatarImage?: string | null; avatarIcon?: string | null; avatarColor?: string | null; tokensToday?: number }) {
+      const id = newId("agt")
+      const { tokensToday, ...row } = values
+      db.insert(agents).values({ id, ...row, createdAt: now, updatedAt: now }).run()
+      if (tokensToday) addUsage(db, usageKeys.agent(id, now, getSetting(db, "timezone")), tokensToday, now)
+      return id
+    },
+
+    // A chat answered by an agent (PLAN 19.2).
+    assign(chat: ChatRow, agentId: string) {
+      db.update(chats).set({ agentId, allowed: true }).where(eq(chats.id, chat.id)).run()
     },
 
     message(chat: ChatRow, role: "user" | "assistant", text: string, at: number, extra: Partial<typeof messages.$inferInsert> = {}) {

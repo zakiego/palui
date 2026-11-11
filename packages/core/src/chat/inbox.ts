@@ -9,6 +9,7 @@ import type { Logger } from "../log"
 import type { InboundMedia, InboundMessage } from "../connectors/define"
 import type { RunningEntry } from "../connectors/supervisor"
 import { QUOTE_MAX_CHARS, type StoredContent, type StoredMedia, type StoredQuote } from "./context"
+import { chatScope, scopeAgentId } from "./router"
 
 export type MessageRow = typeof messages.$inferSelect
 
@@ -16,17 +17,29 @@ export const MAX_INLINE_DOC_BYTES = 64 * 1024
 const TEXT_MIME = /^(text\/|application\/(json|xml|x-yaml|yaml|csv|x-ndjson|javascript|typescript|x-sh|sql))/i
 const TEXT_EXT = /\.(txt|md|markdown|csv|tsv|json|ya?ml|xml|log|ini|toml|ts|js|py|sql|sh|html?)$/i
 
-export function writeInbound(db: DB, msg: InboundMessage, now = Date.now()): { chat: ChatRow; row: MessageRow } {
-  // WhatsApp is DM only (PLAN 5.1): a new group chat starts outside the allowlist.
-  // DMs are always in it, since the router already drops anyone but the owner.
-  const waDm = msg.channel === "whatsapp" && msg.chatKind === "dm"
+// `fromOwner` comes from the sender check (PLAN 19.3). Guests only get here in
+// chats that already exist, are allowed and have an agent.
+export function writeInbound(db: DB, msg: InboundMessage, now = Date.now(), opts: { fromOwner?: boolean } = {}): { chat: ChatRow; row: MessageRow } {
+  const fromOwner = opts.fromOwner ?? true
+  // WhatsApp (PLAN 5.1, 19.2): a new group chat starts outside the allowlist.
+  // The owner's DM is always in it.
+  const ownerWaDm = msg.channel === "whatsapp" && msg.chatKind === "dm" && fromOwner
+  const scope = chatScope(msg)
   let chat = ensureChat(
     db,
-    { channel: msg.channel, externalId: msg.chatExternalId, title: msg.chatTitle, kind: msg.chatKind, allowed: msg.channel === "whatsapp" ? waDm : true },
+    {
+      channel: msg.channel,
+      externalId: msg.chatExternalId,
+      title: msg.chatTitle,
+      kind: msg.chatKind,
+      allowed: msg.channel === "whatsapp" ? ownerWaDm : true,
+      connectorId: scope,
+      agentId: scopeAgentId(db, scope),
+    },
     now,
   )
   // A DM left out by the old utusan chat split opens again on its next message.
-  if (waDm && !chat.allowed) chat = db.update(chats).set({ allowed: true }).where(eq(chats.id, chat.id)).returning().get()
+  if (ownerWaDm && !chat.allowed) chat = db.update(chats).set({ allowed: true }).where(eq(chats.id, chat.id)).returning().get()
   const media: StoredMedia[] | undefined = msg.media?.length
     ? msg.media.map((m) => (m.kind === "image" ? { kind: "image", mimeType: m.mimeType, data: m.data } : { kind: m.kind, mimeType: m.mimeType, data: m.data, filename: m.filename }))
     : undefined
@@ -44,6 +57,8 @@ export function writeInbound(db: DB, msg: InboundMessage, now = Date.now()): { c
       channelMsgId: msg.channelMsgId ?? null,
       replyToChannelMsgId: msg.replyToChannelMsgId ?? null,
       senderId: msg.senderExternalId,
+      senderName: msg.senderName?.replace(/\s+/g, " ").trim().slice(0, 80) || null,
+      fromOwner,
       status: "pending",
       createdAt: msg.at || now,
     })

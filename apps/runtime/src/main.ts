@@ -93,7 +93,7 @@ export async function startRuntime(opts: RuntimeOptions = {}): Promise<Runtime> 
   Object.assign(services, engine.services)
   services.reconcile = () => supervisor.poke()
   services.callTool = connectorToolCaller(() => supervisor.running(), { tz: () => getSetting(db, "timezone") })
-  const worker = createOutboxWorker({ db, channel: (ch) => supervisor.channel(ch), log })
+  const worker = createOutboxWorker({ db, channel: (ch) => supervisor.channel(ch), connector: (id) => supervisor.get(id)?.handle.channel, log })
   const control = createControlServer({ db, token: getControlToken(cfg), engine, supervisor, deps, bus, log, startedAt })
 
   // The control API first, so /live answers while connectors come up.

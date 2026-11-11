@@ -3,14 +3,15 @@
 // reminder actions, then a turn.
 import { and, eq, like } from "drizzle-orm"
 import { outbox, pendingApprovals, type DB } from "@palui/db"
-import { pendingForChat } from "../approvals/store"
-import type { ChatRow } from "../chats"
+import { agentForTelegramConnector } from "../agents"
+import { askedIn, pendingForChat } from "../approvals/store"
+import { ensureChat, findChat, type ChatRow } from "../chats"
 import { isOwner } from "../owner"
 import type { InboundMessage } from "../connectors/define"
 import type { StoredContent } from "./context"
 import type { ReminderActions } from "./deps"
 
-export type CommandName = "new" | "stop" | "status" | "connectors"
+export type CommandName = "new" | "stop" | "status" | "connectors" | "agent"
 
 export type Route =
   | { kind: "ignore"; reason: string }
@@ -23,14 +24,45 @@ export type Route =
   | { kind: "hook"; hook: NonNullable<StoredContent["hook"]>; text: string }
   | { kind: "turn" }
 
-// Checks that need only the inbound message. A non-null result is the reason
-// (a sentence) to drop it; dropped messages are never stored.
-export function senderCheck(db: DB, msg: InboundMessage): string | null {
-  if (msg.fromMe) return `Dropped a ${msg.channel} message sent from the bot's own account (fromMe).`
-  if (!isOwner(db, { channel: msg.channel, externalId: msg.senderExternalId, altId: msg.senderAltId })) {
-    return `Dropped a ${msg.channel} message from ${msg.senderExternalId}${msg.senderAltId ? ` (alt ${msg.senderAltId})` : ""}: not the owner.`
+// Which connector scope a chat lives in: an agent's own Telegram bot keeps its
+// chats apart from the main bot's (PLAN 19.6). "" is the channel's main connector.
+export function chatScope(msg: Pick<InboundMessage, "channel" | "connectorId">): string {
+  return msg.channel === "telegram" && msg.connectorId && msg.connectorId !== "telegram" ? msg.connectorId : ""
+}
+
+// The agent a new chat in this scope starts with: an agent bot's own agent.
+export function scopeAgentId(db: DB, scope: string): string | null {
+  return scope ? (agentForTelegramConnector(db, scope)?.id ?? null) : null
+}
+
+// `quiet`: a group message nobody addressed to us. Normal chatter, so it's
+// dropped without an event (it would flood Activity).
+export type SenderVerdict = { ok: true; fromOwner: boolean } | { ok: false; reason: string; quiet?: boolean }
+
+// Checks that need only the inbound message and the chat row, if any (PLAN 19.2).
+// Dropped messages are never stored. A stranger's message in a chat we've never
+// seen creates the chat row (not allowed), so the owner can set it up.
+export function senderCheck(db: DB, msg: InboundMessage, now = Date.now()): SenderVerdict {
+  if (msg.fromMe) return { ok: false, reason: `Dropped a ${msg.channel} message sent from the bot's own account (fromMe).` }
+  const owner = isOwner(db, { channel: msg.channel, externalId: msg.senderExternalId, altId: msg.senderAltId })
+  const scope = chatScope(msg)
+  let chat = findChat(db, msg.channel, msg.chatExternalId, scope)
+  const agentId = chat ? chat.agentId : scopeAgentId(db, scope)
+  const group = msg.chatKind === "group"
+  if (owner) {
+    // In a group with an agent, the owner addresses it like everyone else. Commands and buttons always go through.
+    if (group && agentId && !msg.addressed && !msg.callback && !msg.text.trim().startsWith("/")) return { ok: false, reason: "Group message not addressed to the agent.", quiet: true }
+    return { ok: true, fromOwner: true }
   }
-  return null
+  if (!chat) {
+    chat = ensureChat(db, { channel: msg.channel, externalId: msg.chatExternalId, title: msg.chatTitle, kind: msg.chatKind, allowed: false, connectorId: scope, agentId }, now)
+  }
+  if (group && !msg.addressed) return { ok: false, reason: "Group message not addressed to the agent.", quiet: true }
+  if (!chat.allowed || !chat.agentId) {
+    const who = `${msg.senderName ? `${msg.senderName} ` : ""}(${msg.senderExternalId}${msg.senderAltId ? `, alt ${msg.senderAltId}` : ""})`
+    return { ok: false, reason: `Dropped a ${msg.channel} message from ${who}: not the owner, and this chat isn't set up for guests (allow it and give it an agent on the Chats page).` }
+  }
+  return { ok: true, fromOwner: false }
 }
 
 // Checks that need the chat row.
@@ -39,7 +71,7 @@ export function chatCheck(chat: ChatRow): string | null {
   return null
 }
 
-const COMMANDS: Record<string, CommandName> = { "/new": "new", "/stop": "stop", "/status": "status", "/connectors": "connectors" }
+const COMMANDS: Record<string, CommandName> = { "/new": "new", "/stop": "stop", "/status": "status", "/connectors": "connectors", "/agent": "agent" }
 
 export function parseCommand(text: string): { name: CommandName; args: string[] } | null {
   const t = text.trim()
@@ -66,7 +98,7 @@ function quotedApproval(db: DB, chatId: string, channelMsgId: string): string | 
   const direct = db
     .select({ id: pendingApprovals.id })
     .from(pendingApprovals)
-    .where(and(eq(pendingApprovals.chatId, chatId), eq(pendingApprovals.promptMsgId, channelMsgId)))
+    .where(and(askedIn(chatId), eq(pendingApprovals.promptMsgId, channelMsgId)))
     .get()
   if (direct) return direct.id
   const sent = db
@@ -85,6 +117,9 @@ export type RouteInput = {
   replyToChannelMsgId?: string
   reminderActions?: ReminderActions
   routineActions?: ReminderActions
+  // false for a guest (PLAN 19.3): approvals, buttons, commands and reminder
+  // actions are the owner's, so a guest's "ya" or "/new" is just a message.
+  fromOwner?: boolean
   now: number
 }
 
@@ -92,6 +127,11 @@ export async function route(i: RouteInput): Promise<Route> {
   const blocked = chatCheck(i.chat)
   if (blocked) return { kind: "ignore", reason: blocked }
   if (i.content.hook) return { kind: "hook", hook: i.content.hook, text: i.text }
+  if (i.fromOwner === false) {
+    if (i.content.callback) return { kind: "ignore", reason: "A guest pressed a button; buttons are the owner's." }
+    if (!i.text.trim()) return { kind: "ignore", reason: "Empty message." }
+    return { kind: "turn" }
+  }
 
   const cb = i.content.callback?.data
   if (cb) {

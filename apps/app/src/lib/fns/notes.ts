@@ -13,6 +13,7 @@ import {
   setPreference,
   updateInstruction,
 } from "@palui/core/notes/service"
+import { getAgent, getDefaultAgent, listAgents } from "@palui/core/agents"
 import { createServerFn } from "@tanstack/react-start"
 import { z } from "zod"
 import { requireUser, requireWriter } from "@/server/session"
@@ -23,15 +24,25 @@ function rethrow(err: unknown): never {
   throw err
 }
 
-export const getNotes = createServerFn({ method: "GET" }).handler(async () => {
-  const { db } = await requireUser()
-  return { instructions: listInstructions(db), preferences: listPreferences(db) }
-})
+// Instructions are per agent (PLAN 19.1); preferences are the owner's.
+export const getNotes = createServerFn({ method: "GET" })
+  .validator(z.object({ agentId: z.string().min(1).max(100).optional() }))
+  .handler(async ({ data }) => {
+    const { db } = await requireUser()
+    const agent = (data.agentId ? getAgent(db, data.agentId) : undefined) ?? getDefaultAgent(db)
+    return {
+      agent: { id: agent.id, name: agent.name, isDefault: agent.isDefault },
+      agents: listAgents(db).map((a) => ({ id: a.id, name: a.name })),
+      instructions: listInstructions(db, { agentId: agent.id }),
+      preferences: listPreferences(db),
+    }
+  })
 
 export const saveInstructionFn = createServerFn({ method: "POST" })
   .validator(
     z.object({
       id: z.string().min(1).max(100).optional(),
+      agentId: z.string().min(1).max(100).optional(),
       title: z.string().trim().min(1).max(MAX_INSTRUCTION_TITLE),
       body: z.string().trim().min(1).max(MAX_INSTRUCTION_BODY),
     }),
@@ -39,7 +50,7 @@ export const saveInstructionFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { db } = await requireWriter()
     try {
-      const row = data.id ? updateInstruction(db, data.id, { title: data.title, body: data.body }) : createInstruction(db, { title: data.title, body: data.body })
+      const row = data.id ? updateInstruction(db, data.id, { title: data.title, body: data.body }) : createInstruction(db, { title: data.title, body: data.body, agentId: data.agentId })
       return { id: row.id }
     } catch (err) {
       rethrow(err)

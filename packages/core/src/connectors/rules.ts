@@ -17,7 +17,7 @@ export function ownerChat(db: DB, channel: Channel): ChatRow | undefined {
   const existing = db
     .select()
     .from(chats)
-    .where(and(eq(chats.channel, channel), inArray(chats.externalId, ids), eq(chats.kind, "dm")))
+    .where(and(eq(chats.channel, channel), eq(chats.connectorId, ""), inArray(chats.externalId, ids), eq(chats.kind, "dm")))
     .orderBy(desc(chats.lastMessageAt))
     .get()
   if (existing) return existing

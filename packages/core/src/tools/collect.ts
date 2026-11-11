@@ -66,6 +66,8 @@ export type CollectOptions = {
   sticky?: string[] | null
   // Called with the names a search just loaded, to keep them for the session.
   onLoad?: (names: string[]) => void
+  // Guest turns only get tools marked guestSafe (PLAN 19.4, fail closed).
+  guestOnly?: boolean
   log: Logger
   // Called after an untrusted tool returns (taints the turn).
   onUntrustedResult: (meta: ToolMeta) => void
@@ -92,6 +94,7 @@ export async function collectTools(running: RunningEntry[], opts: CollectOptions
       if (!pt?.tool) continue
       const cls = normalizeClass(pt.class)
       if (opts.excludeDestructive && cls === "destructive") continue
+      if (opts.guestOnly && !pt.guestSafe) continue
       const name = namespaced(e.id, toolName)
       const meta: ToolMeta = { name, connectorId: e.id, tool: toolName, class: cls, untrusted: !!pt.untrusted || e.row.trust === "external", title: pt.title, label: e.row.label }
       out.tools[name] = wrapTool(pt.tool, meta, opts)

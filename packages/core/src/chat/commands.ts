@@ -1,7 +1,10 @@
 // Chat commands (PLAN 8.2, 4.6). They never reach the model and keep working
 // when every model connector is off.
+import { agentForChat, assignAgent, getAgent, getAgentBySlug, getDefaultAgent, isSharedChat, listAgents } from "../agents"
 import { getSetting } from "../settings"
 import { formatClock, tokensToday, getUsage, usageKeys } from "../budget"
+import { eq } from "drizzle-orm"
+import { chats } from "@palui/db"
 import { rotateSession, type ChatRow } from "../chats"
 import { autoSave, findMemory } from "../memory"
 import { channelName, selfChannelOffUndo } from "../connectors/rules"
@@ -28,7 +31,49 @@ export async function runCommand(ctx: EngineCtx, chat: ChatRow, name: CommandNam
       return { text: statusText(ctx) }
     case "connectors":
       return cmdConnectors(ctx, chat, args)
+    case "agent":
+      return cmdAgent(ctx, chat, args)
   }
+}
+
+// Switch a chat's agent (PLAN 19.2): save the session to the old agent's
+// memory, assign, then start a fresh session so the new persona isn't
+// confused by the old one's replies. Shared by /agent and the dashboard.
+export async function switchAgent(ctx: EngineCtx, chatId: string, agentId: string | null) {
+  const before = ctx.db.select().from(chats).where(eq(chats.id, chatId)).get()
+  if (!before) throw new Error(`No chat ${chatId}`)
+  const target = agentId ? getAgent(ctx.db, agentId) : getDefaultAgent(ctx.db)
+  if (!target) throw new Error(`No agent ${agentId}`)
+  const same = agentForChat(ctx.db, before).id === target.id
+  if (!same && before.sessionId) {
+    try {
+      await autoSave(ctx.db, findMemory(ctx.host.running()), before.sessionId, ctx.log)
+    } catch (e) {
+      ctx.log.warn("auto-save before an agent switch failed", { chat_id: chatId, error: e })
+    }
+  }
+  const r = assignAgent(ctx.db, chatId, target.isDefault ? null : target.id)
+  if (!same) rotateSession(ctx.db, chatId, ctx.clock())
+  return { ...r, changed: !same }
+}
+
+async function cmdAgent(ctx: EngineCtx, chat: ChatRow, args: string[]): Promise<CommandReply> {
+  const { db } = ctx
+  const current = agentForChat(db, chat)
+  const arg = args[0]?.toLowerCase()
+  if (!arg) {
+    const lines = [`Agent di chat ini: ${current.name}`, "", "Agent yang ada:", ...listAgents(db).map((a) => `• ${a.slug}: ${a.name}${a.isDefault ? " (default)" : ""}`), "", "Ganti pakai /agent <slug>. Balik ke Palui: /agent off."]
+    return { text: lines.join("\n") }
+  }
+  if (chat.connectorId) return { text: `Chat ini masuk lewat bot milik ${current.name}, jadi agent-nya tetap.` }
+  const target = arg === "off" ? getDefaultAgent(db) : getAgentBySlug(db, arg)
+  if (!target) return { text: `Gak ada agent \`${arg}\`. Cek daftarnya pakai /agent.` }
+  if (target.id === current.id) return { text: `Udah pakai ${target.name}.` }
+  await switchAgent(ctx, chat.id, target.isDefault ? null : target.id)
+  const shared = isSharedChat(db, chat)
+  if (target.isDefault) return { text: shared ? "Oke, balik ke Palui. Di sini cuma kamu yang aku jawab." : "Oke, balik ke Palui. Mulai sesi baru." }
+  const who = shared ? (chat.kind === "group" ? " Orang lain di grup ini bisa ngobrol sama dia kalau mention atau reply pesannya." : " Orang di chat ini sekarang dijawab sama dia.") : ""
+  return { text: `Oke, sekarang ${target.name} yang jawab di sini. Mulai sesi baru.${who}` }
 }
 
 async function cmdNew(ctx: EngineCtx, chat: ChatRow): Promise<CommandReply> {

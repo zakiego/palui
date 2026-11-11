@@ -1,0 +1,56 @@
+---
+title: Agents
+description: Named personas with their own instructions, memory, daily cap and avatar, which you can put in groups and in other people's chats.
+---
+
+An agent is a persona Palui can answer as. Each one has its own persona text, standing instructions, recall container, daily token cap and avatar. Palui itself is the default agent, and it's the only one you start with.
+
+Agents are how Palui answers people other than you. Put an agent in a group, or in a DM someone else started with Palui's number, and it answers them, the way @grok answers whoever tags it.
+
+## Palui stays yours
+
+Palui is your personal agent. Its memory is your memory and its preferences are your personal data, so it never answers anyone else. A group you never gave an agent keeps the old rule: Palui answers only your own messages there.
+
+## Give a chat an agent
+
+1. Create the agent on the Agents page: a name, a slug like `chef`, and a persona.
+2. Pick it for a chat on the Chats page, or send `/agent chef` in that chat yourself.
+
+That allows the chat and starts a new session. The old one is saved to the old agent's memory first, the same as `/new`. `/agent off` goes back to Palui, and other people stop getting answers.
+
+Someone who messages Palui in a chat you haven't set up gets no reply. The chat still shows up on the Chats page, so you can set it up.
+
+## Groups
+
+In a group, an agent answers only when someone @mentions Palui's number (or the agent's own bot) or replies to one of its messages. Everything else in the group is ignored and never stored. That applies to you too, except for commands.
+
+Every message records who sent it. The model sees other people's messages as `[Name]: ...` and yours as `[Owner]: ...`, and it's told that only `[Owner]` lines come from you.
+
+## What other people can make it do
+
+Each agent has two switches for shared chats:
+
+- Tools for other people: none, or safe tools only. Safe tools are the ones that can't reach your accounts or data. Today that's web fetch.
+- When you write there: treat you like everyone else, or use your tools but ask you first. Approval prompts from a shared chat go to your own DM, never into the group, and only your answer there counts.
+
+In a shared chat every write tool needs approval, the same as a scheduled job. Commands, approval answers and reminder buttons work only for you. If someone else sends `/new` or `ya`, it's just a message to the agent.
+
+Admin details stay out of shared chats. If the model is off or a budget is hit, people there get a short "can't answer right now" reply, and the details go to your DM.
+
+## Memory
+
+Each agent remembers in its own recall container, `agent-<slug>` unless you set another one. Palui keeps the recall connector's container.
+
+Auto-save stores what other people said too, labeled with their name and the chat, so a group agent remembers who's who. That means anyone in a chat you allowed can put text into that agent's memory. It can never reach Palui's memory. Turns that read untrusted tool output are still skipped. See [Memory](/docs/concepts/memory).
+
+## Daily cap
+
+An agent with a daily token cap stops answering when it's used up, until midnight in your timezone. The chat gets one short notice that day. The global cap in Settings still applies on top.
+
+## Its own Telegram bot
+
+On Telegram an agent can have a bot of its own, so people add that bot to a group and @mention it by name. See [Agent bot](/docs/connectors/agent-bot). On WhatsApp every agent shares Palui's one number.
+
+## Avatar
+
+Upload a photo for an agent, or pick an icon and a color. The photo is cropped square and shrunk to 256 px in your browser before it's saved. The avatar shows on the Agents page and in the Chats agent picker.

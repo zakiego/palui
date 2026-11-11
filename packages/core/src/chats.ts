@@ -12,25 +12,29 @@ export function getChat(db: DB, id: string): ChatRow | undefined {
   return db.select().from(chats).where(eq(chats.id, id)).get()
 }
 
-export function findChat(db: DB, channel: Channel, externalId: string): ChatRow | undefined {
+// `connectorId`: the bot the chat came in on when it isn't the channel's main
+// connector (an agent's own Telegram bot, PLAN 19.6). "" means the main one.
+export function findChat(db: DB, channel: Channel, externalId: string, connectorId = ""): ChatRow | undefined {
   return db
     .select()
     .from(chats)
-    .where(and(eq(chats.channel, channel), eq(chats.externalId, externalId)))
+    .where(and(eq(chats.channel, channel), eq(chats.connectorId, connectorId), eq(chats.externalId, externalId)))
     .get()
 }
 
-// Find or create the chat and make sure it has an open session.
+// Find or create the chat and make sure it has an open session. `allowed` and
+// `agentId` only apply to a new chat.
 export function ensureChat(
   db: DB,
-  input: { channel: Channel; externalId: string; title?: string; kind?: "dm" | "group"; allowed?: boolean },
+  input: { channel: Channel; externalId: string; title?: string; kind?: "dm" | "group"; allowed?: boolean; connectorId?: string; agentId?: string | null },
   now = Date.now(),
 ): ChatRow {
+  const connectorId = input.connectorId ?? ""
   return db.transaction((tx) => {
     let chat = tx
       .select()
       .from(chats)
-      .where(and(eq(chats.channel, input.channel), eq(chats.externalId, input.externalId)))
+      .where(and(eq(chats.channel, input.channel), eq(chats.connectorId, connectorId), eq(chats.externalId, input.externalId)))
       .get()
     if (!chat) {
       chat = tx
@@ -38,10 +42,12 @@ export function ensureChat(
         .values({
           id: newId("chat"),
           channel: input.channel,
+          connectorId,
           externalId: input.externalId,
           title: input.title ?? "",
           kind: input.kind ?? "dm",
           allowed: input.allowed ?? true,
+          agentId: input.agentId ?? null,
           createdAt: now,
         })
         .returning()

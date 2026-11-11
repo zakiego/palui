@@ -5,6 +5,7 @@ import { tool } from "ai"
 import { z } from "zod"
 import type { DB } from "@palui/db"
 import { defineRuntime, type PaluiTool } from "@palui/core/connectors/define"
+import { getAgent, getDefaultAgent } from "@palui/core/agents"
 import { logEvent } from "@palui/core/events"
 import {
   createInstruction,
@@ -32,10 +33,17 @@ function view(r: InstructionRow) {
   return { id: r.id, title: r.title, body: r.body, enabled: r.enabled }
 }
 
-export function notesTools(db: DB, clock: () => number = () => Date.now()): Record<string, PaluiTool> {
+// `agentId`: the agent of the turn (PLAN 19.1). Instructions are that agent's;
+// preferences are the owner's, so only the default agent gets those tools.
+export function notesTools(db: DB, clock: () => number = () => Date.now(), agentId?: string): Record<string, PaluiTool> {
   // An audit line in Activity, and the Notes page refreshes on it.
   const note = (kind: string, message: string) => logEvent(db, { connectorId: "notes", kind, message }, clock())
-  return {
+  const agent = agentId ? (getAgent(db, agentId) ?? getDefaultAgent(db)) : getDefaultAgent(db)
+  const mine = (id: string) => {
+    const r = getInstruction(db, id)
+    return r && r.agentId === agent.id ? r : undefined
+  }
+  const tools: Record<string, PaluiTool> = {
     simpan_instruksi: {
       class: "destructive",
       title: "Save a standing instruction",
@@ -49,7 +57,8 @@ export function notesTools(db: DB, clock: () => number = () => Date.now()): Reco
         }),
         execute: async ({ id, title, body }) => {
           try {
-            const r = id ? updateInstruction(db, id, { title, body }, clock()) : createInstruction(db, { title, body }, clock())
+            if (id && !mine(id)) return { ok: false as const, error: `Nggak ada instruksi ${id}. Panggil daftar_instruksi untuk lihat id-nya.` }
+            const r = id ? updateInstruction(db, id, { title, body }, clock()) : createInstruction(db, { title, body, agentId: agent.id }, clock())
             note("notes.instruction", `Instruction "${r.title}" ${id ? "updated" : "saved"} from chat`)
             return { ok: true as const, message: id ? `Instruksi "${r.title}" diperbarui.` : `Instruksi "${r.title}" disimpan.`, instruction: view(r) }
           } catch (e) {
@@ -66,7 +75,7 @@ export function notesTools(db: DB, clock: () => number = () => Date.now()): Reco
         description: "List the owner's saved standing instructions with their ids (including ones turned off in the dashboard).",
         inputSchema: z.object({}),
         execute: async () => {
-          const rows = listInstructions(db)
+          const rows = listInstructions(db, { agentId: agent.id })
           return { ok: true as const, count: rows.length, instructions: rows.map(view), message: rows.length ? undefined : "Belum ada instruksi tersimpan." }
         },
       }),
@@ -79,7 +88,7 @@ export function notesTools(db: DB, clock: () => number = () => Date.now()): Reco
         description: "Delete a saved standing instruction by id.",
         inputSchema: z.object({ id: z.string().describe("Instruction id from daftar_instruksi.") }),
         execute: async ({ id }) => {
-          const r = getInstruction(db, id)
+          const r = mine(id)
           if (!r || !deleteInstruction(db, id)) return { ok: false as const, error: `Nggak ada instruksi ${id}. Panggil daftar_instruksi untuk lihat id-nya.` }
           note("notes.instruction", `Instruction "${r.title}" deleted from chat`)
           return { ok: true as const, message: `Instruksi "${r.title}" dihapus.` }
@@ -140,6 +149,12 @@ export function notesTools(db: DB, clock: () => number = () => Date.now()): Reco
       }),
     },
   }
+  if (!agent.isDefault) {
+    delete tools.simpan_preferensi
+    delete tools.lihat_preferensi
+    delete tools.hapus_preferensi
+  }
+  return tools
 }
 
 export default defineRuntime(manifest, {
@@ -150,6 +165,6 @@ export default defineRuntime(manifest, {
   },
   start: async (ctx) => ({
     stop: async () => {},
-    tools: async () => notesTools(ctx.db),
+    tools: async (turn) => notesTools(ctx.db, undefined, turn.agentId),
   }),
 })

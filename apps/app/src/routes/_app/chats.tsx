@@ -30,6 +30,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { RuntimeAlert } from "@/components/runtime-alert"
 import { CLASS_TONE, ToolTrace } from "@/components/tool-trace"
+import { AgentAvatar } from "@/components/agent-avatar"
+import { SimpleSelect } from "@/components/simple-select"
+import { Switch } from "@/components/ui/switch"
+import { setChatAgentFn, setChatAllowedFn } from "@/lib/fns/agents"
 import { decideApproval, getChats, getTranscript, sendWebMessage, stopTurn } from "@/lib/fns/chats"
 import { ago, errorMessage } from "@/lib/format"
 import { markdownToPlain } from "@/lib/markdown"
@@ -282,6 +286,7 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
         <Badge variant="outline">{transcript.chat.channel}</Badge>
         <CopyMenu transcript={transcript} />
       </header>
+      {transcript.chat.channel !== "web" && <AgentBar transcript={transcript} />}
       {isWeb && down && <RuntimeAlert className="m-3 w-auto" />}
       <MessageScrollerProvider autoScroll defaultScrollPosition="end">
       <MessageScroller className="min-h-0 flex-1">
@@ -300,7 +305,7 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
             {transcript.messages.map((m) => (
               <MessageScrollerItem key={m.id} messageId={m.id}>
                 {m.role === "assistant" && m.tools.length > 0 && <ToolTrace className="mb-2" tools={m.tools.map((x) => ({ id: x.id, tool: x.tool, class: x.class, status: x.status as LiveTool["status"], ms: x.ms ?? undefined, preview: x.result ?? undefined, args: x.args }))} />}
-                <ChatMessage role={m.role} source={m.source} text={m.text} at={m.createdAt} />
+                <ChatMessage role={m.role} source={m.source} sender={m.sender} text={m.text} at={m.createdAt} />
               </MessageScrollerItem>
             ))}
             {optimistic.map((text, i) => (
@@ -361,6 +366,72 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
   )
 }
 
+// Who answers in this chat and whether it's answered at all (PLAN 19.2).
+function AgentBar({ transcript }: { transcript: Transcript }) {
+  const t = useT()
+  const router = useRouter()
+  const chat = transcript.chat
+  const [agentId, setAgentId] = React.useState(transcript.agent.id)
+  const [allowed, setAllowed] = React.useState(chat.allowed)
+  const [busy, setBusy] = React.useState(false)
+  React.useEffect(() => setAgentId(transcript.agent.id), [transcript.agent.id])
+  React.useEffect(() => setAllowed(chat.allowed), [chat.allowed])
+
+  const pick = async (id: string) => {
+    const next = transcript.agents.find((a) => a.id === id)
+    if (!next || id === agentId) return
+    const before = agentId
+    setAgentId(id)
+    setBusy(true)
+    try {
+      const r = await setChatAgentFn({ data: { chatId: chat.id, agentId: next.isDefault ? null : id } })
+      toast.success(t(r.saved ? "chats.agentSaved" : "chats.agentSavedNoMemory", { name: next.name }))
+      void router.invalidate()
+    } catch (err) {
+      setAgentId(before)
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const toggle = async (next: boolean) => {
+    setAllowed(next)
+    try {
+      await setChatAllowedFn({ data: { chatId: chat.id, allowed: next } })
+      void router.invalidate()
+    } catch (err) {
+      setAllowed(!next)
+      toast.error(errorMessage(err))
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 border-b px-4 py-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+        {chat.connectorId ? (
+          <span className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{t("chats.botChat", { name: transcript.agent.name })}</span>
+        ) : (
+          <SimpleSelect
+            size="sm"
+            className="w-full max-w-56 min-w-0"
+            aria-label={t("chats.agentFor", { name: chat.title })}
+            disabled={busy}
+            value={agentId}
+            options={transcript.agents.map((a) => ({ value: a.id, label: a.name, icon: <AgentAvatar agent={a} size="xs" /> }))}
+            onChange={(id) => void pick(id)}
+          />
+        )}
+        <label className="flex items-center gap-2 text-sm">
+          <Switch checked={allowed} onCheckedChange={(v) => void toggle(v)} aria-label={t("chats.allowedFor", { name: chat.title })} />
+          {t("chats.allowed")}
+        </label>
+      </div>
+      {transcript.shared && transcript.agent.isDefault && <p className="text-caption text-muted-foreground">{t("chats.guestsWaiting")}</p>}
+    </div>
+  )
+}
+
 // Copies what's loaded: the transcript query keeps the newest 150 messages.
 function CopyMenu({ transcript }: { transcript: Transcript }) {
   const t = useT()
@@ -394,6 +465,7 @@ function CopyMenu({ transcript }: { transcript: Transcript }) {
 function ChatMessage({
   role,
   source,
+  sender,
   text,
   at,
   pending,
@@ -401,6 +473,8 @@ function ChatMessage({
 }: {
   role: "user" | "assistant"
   source?: "hook" | null
+  // Set for someone other than the owner in a shared chat.
+  sender?: string | null
   text: string
   at?: number
   pending?: boolean
@@ -418,6 +492,29 @@ function ChatMessage({
               <span className="mb-1 flex items-center gap-1.5 text-caption">
                 <WebhookIcon aria-hidden className="size-3.5" />
                 {t("chats.webhookEvent")}
+              </span>
+              {text}
+            </BubbleContent>
+          </Bubble>
+          {at && (
+            <MessageFooter>
+              <time className="tabular-nums" dateTime={new Date(at).toISOString()}>
+                {ago(at)}
+              </time>
+            </MessageFooter>
+          )}
+        </MessageContent>
+      </Message>
+    )
+  }
+  if (sender) {
+    return (
+      <Message align="start">
+        <MessageContent>
+          <Bubble variant="outline" align="start">
+            <BubbleContent className="whitespace-pre-wrap break-words">
+              <span dir="auto" className="mb-1 block text-caption font-medium [overflow-wrap:anywhere]">
+                {sender}
               </span>
               {text}
             </BubbleContent>

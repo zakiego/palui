@@ -2,7 +2,8 @@
 // into every turn's system prompt; Palui can also save them from chat (the
 // notes skill), instructions only after an approval.
 import * as React from "react"
-import { createFileRoute, useRouter } from "@tanstack/react-router"
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
+import { z } from "zod"
 import { NotebookPenIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
 
@@ -11,6 +12,7 @@ import { ClampText } from "@/components/clamp-text"
 import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending } from "@/components/page-pending"
 import { ResponsiveSheet } from "@/components/responsive-sheet"
+import { SimpleSelect } from "@/components/simple-select"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,7 +41,9 @@ import { errorMessage } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 
 export const Route = createFileRoute("/_app/notes")({
-  loader: () => getNotes(),
+  validateSearch: z.object({ agent: z.string().max(100).optional() }),
+  loaderDeps: ({ search }) => ({ agent: search.agent }),
+  loader: ({ deps }) => getNotes({ data: { agentId: deps.agent } }),
   head: () => ({ meta: [{ title: "Notes · Palui" }] }),
   component: NotesPage,
   pendingComponent: NotesSkeleton,
@@ -57,6 +61,7 @@ const KEY_RE = /^[a-z][a-z0-9_]{0,39}$/
 function NotesPage() {
   const data = Route.useLoaderData()
   const router = useRouter()
+  const navigate = useNavigate({ from: Route.fullPath })
   const t = useT()
   // `editing` stays set while the sheet closes, so it keeps its content through the exit animation.
   const [editing, setEditingTarget] = React.useState<Instruction | "new" | null>(null)
@@ -83,7 +88,16 @@ function NotesPage() {
         <Card>
           <CardHeader>
             <CardTitle>{t("notes.instructions")}</CardTitle>
-            <CardDescription>{t("notes.instructionsBody")}</CardDescription>
+            <CardDescription>{data.agents.length > 1 ? t("notes.instructionsFor", { name: data.agent.name }) : t("notes.instructionsBody")}</CardDescription>
+            {data.agents.length > 1 && (
+              <SimpleSelect
+                className="mt-2 w-full max-w-64"
+                aria-label={t("notes.agent")}
+                value={data.agent.id}
+                options={data.agents.map((a) => ({ value: a.id, label: a.name }))}
+                onChange={(id) => void navigate({ search: { agent: id }, replace: true })}
+              />
+            )}
           </CardHeader>
           <CardContent>
             {data.instructions.length === 0 ? (
@@ -107,7 +121,7 @@ function NotesPage() {
         </Card>
         <PreferencesCard data={data} />
       </div>
-      <InstructionSheet key={editing === "new" ? "new" : (editing?.id ?? "none")} open={sheetOpen} target={editing} onClose={() => setSheetOpen(false)} />
+      <InstructionSheet key={editing === "new" ? "new" : (editing?.id ?? "none")} open={sheetOpen} target={editing} agentId={data.agent.id} onClose={() => setSheetOpen(false)} />
     </>
   )
 }
@@ -152,7 +166,7 @@ function InstructionRow({ item, onEdit }: { item: Instruction; onEdit: () => voi
   )
 }
 
-function InstructionSheet({ open, target, onClose }: { open: boolean; target: Instruction | "new" | null; onClose: () => void }) {
+function InstructionSheet({ open, target, agentId, onClose }: { open: boolean; target: Instruction | "new" | null; agentId: string; onClose: () => void }) {
   const t = useT()
   const router = useRouter()
   const item = target && target !== "new" ? target : null
@@ -169,7 +183,7 @@ function InstructionSheet({ open, target, onClose }: { open: boolean; target: In
     if (Object.keys(next).length) return
     setBusy("save")
     try {
-      await saveInstructionFn({ data: { id: item?.id, title: title.trim(), body: body.trim() } })
+      await saveInstructionFn({ data: { id: item?.id, agentId, title: title.trim(), body: body.trim() } })
       toast.success(t("notes.instructionSaved"))
       onClose()
       void router.invalidate()
@@ -295,7 +309,10 @@ function PreferencesCard({ data }: { data: Data }) {
     <Card>
       <CardHeader>
         <CardTitle>{t("notes.preferences")}</CardTitle>
-        <CardDescription>{t("notes.preferencesBody")}</CardDescription>
+        <CardDescription>
+          {t("notes.preferencesBody")}
+          {data.agents.length > 1 && ` ${t("notes.preferencesPalui")}`}
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {data.preferences.length === 0 ? (

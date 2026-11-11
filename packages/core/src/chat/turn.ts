@@ -3,9 +3,11 @@
 import { and, eq, inArray, like } from "drizzle-orm"
 import { isStepCount, streamText, type ModelMessage, type ToolApprovalResponse } from "ai"
 import { events, jobs, messages, newId, pendingApprovals, runs, sessions, toolCalls, type DB, type RunStatus, type RunTrigger } from "@palui/db"
-import { approvalsForRun, createApproval, preview, supersedeSameCall, type ApprovalRow, type ResumeContext } from "../approvals/store"
-import { checkGlobalBudget, jobOverCap, pausedNotice, recordRunStart, recordRunTokens } from "../budget"
+import { agentForChat, getAgent, isSharedChat, type AgentRow } from "../agents"
+import { approvalsForRun, createApproval, preview, supersedeSameCall, type ApprovalRow, type ResumeContext, type TurnMode } from "../approvals/store"
+import { agentOverCap, checkGlobalBudget, firstAgentNoticeToday, jobOverCap, pausedNotice, recordAgentTokens, recordRunStart, recordRunTokens } from "../budget"
 import { getChat, getSession, type ChatRow } from "../chats"
+import { ownerChat } from "../connectors/rules"
 import { logEvent } from "../events"
 import { redact, type Logger } from "../log"
 import { autoRecall, findMemory } from "../memory"
@@ -22,6 +24,8 @@ import { buildSystem, hasImages, loadHistory, loadToolCalls, quotesOutsider, toM
 import type { EngineDeps } from "./deps"
 
 export const MODEL_OFF_TEXT = "Model lagi off. Nyalakan: `/connectors on cliproxy`"
+// What a shared chat hears instead of admin details (budgets, connectors, errors).
+export const SHARED_BUSY_TEXT = "Maaf, lagi gak bisa jawab sekarang. Coba lagi nanti ya."
 export const REPLY_TTL_MS = 24 * 3600_000
 // A run cut short by a shutdown stays `running` with this error, so the next
 // start recovers it the same way as a crash (recoverInterruptedRuns).
@@ -76,7 +80,7 @@ export type ExecInput = TurnOptions & {
 // Enqueue a message to a chat's channel.
 export function sendToChat(ctx: EngineCtx, chat: ChatRow, text: string, source: string, extra: { actions?: { id: string; label: string }[]; format?: "plain" | "markdown" } = {}) {
   const now = ctx.clock()
-  const row = enqueueOutbox(ctx.db, { chatId: chat.id, channel: chat.channel, payload: { text, ...extra }, source, expiresAt: now + REPLY_TTL_MS }, now)
+  const row = enqueueOutbox(ctx.db, { chatId: chat.id, channel: chat.channel, connectorId: chat.connectorId, payload: { text, ...extra }, source, expiresAt: now + REPLY_TTL_MS }, now)
   notifyOutbox()
   return row
 }
@@ -113,6 +117,10 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   const chat = getChat(db, input.chatId)
   if (!chat) throw new Error(`No chat ${input.chatId}`)
   const settings = getAllSettings(db)
+  // The agent and whether this is a shared chat (PLAN 19). The default agent
+  // in a group the owner never gave an agent keeps the old owner-only rules.
+  const agent: AgentRow = (input.resume?.context.agentId ? getAgent(db, input.resume.context.agentId) : undefined) ?? agentForChat(db, chat)
+  const shared = !agent.isDefault && isSharedChat(db, chat)
   const deliver = input.resume ? input.resume.context.deliver : (input.deliver ?? true)
   const origin: ResumeContext["originTrigger"] = input.resume ? input.resume.context.originTrigger : input.trigger === "approval" ? "message" : input.trigger
   const tlog = log.child({ chat_id: chat.id })
@@ -120,8 +128,19 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   // Budgets: a hit cap pauses turns and tells the owner (PLAN 5.2).
   const budget = checkGlobalBudget(db, startedAt)
   if (!budget.ok) {
-    if (budget.fresh || input.trigger === "message") sendToChat(ctx, chat, pausedNotice(db, budget), "system")
+    if (shared) {
+      if (budget.fresh) sendToOwner(ctx, chat, pausedNotice(db, budget))
+      if (input.trigger === "message") sendToChat(ctx, chat, SHARED_BUSY_TEXT, "system")
+    } else if (budget.fresh || input.trigger === "message") sendToChat(ctx, chat, pausedNotice(db, budget), "system")
     if (budget.fresh) logEvent(db, { kind: "budget.pause", level: "warn", message: `Turns paused: ${budget.reason}` }, startedAt)
+    markBatch(db, input.batchIds, null)
+    return { runId: "", text: "", status: "budget" }
+  }
+  if (agentOverCap(db, agent, startedAt)) {
+    if (firstAgentNoticeToday(db, agent.id, startedAt)) {
+      logEvent(db, { kind: "budget.agent", level: "warn", message: `Agent ${agent.name} hit its daily token cap (${agent.dailyTokenCap}); it answers again tomorrow` }, startedAt)
+      if (input.trigger === "message") sendToChat(ctx, chat, `${agent.name} lagi istirahat, jatah hari ini udah habis. Besok lagi ya.`, "system")
+    }
     markBatch(db, input.batchIds, null)
     return { runId: "", text: "", status: "budget" }
   }
@@ -143,10 +162,12 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     history = [...history, ...db.select().from(messages).where(inArray(messages.id, [...batch])).all()]
   }
   const role: ModelRole = input.resume?.context.modelRole ?? input.modelRole ?? (hasImages(history, batch) ? "vision" : "default")
+  const guestInBatch = history.some((h) => batch.has(h.id) && h.role === "user" && !h.fromOwner)
+  const mode: TurnMode = input.resume?.context.mode ?? (!shared ? "owner" : guestInBatch || agent.ownerPowers === "off" ? "guest" : "sharedOwner")
 
   const chain = resolveChain(db, ctx.host, role)
   if (!chain.length) {
-    if (input.trigger === "message") sendToChat(ctx, chat, MODEL_OFF_TEXT, "system")
+    if (input.trigger === "message") sendToChat(ctx, chat, shared ? SHARED_BUSY_TEXT : MODEL_OFF_TEXT, "system")
     markBatch(db, input.batchIds, null)
     tlog.warn("no model connector running", { role })
     return { runId: "", text: "", status: "no_model" }
@@ -154,7 +175,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
 
   const runId = newId("run")
   const rlog = tlog.child({ run_id: runId })
-  db.insert(runs).values({ id: runId, chatId: chat.id, jobId: jobId ?? null, trigger: input.trigger, status: "running", startedAt }).run()
+  db.insert(runs).values({ id: runId, chatId: chat.id, agentId: agent.id, jobId: jobId ?? null, trigger: input.trigger, status: "running", startedAt }).run()
   recordRunStart(db, startedAt)
   markBatch(db, input.batchIds, runId)
 
@@ -163,7 +184,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   ctx.active.set(chat.id, active)
   const state = { tainted: !!(input.untrustedInput || input.resume?.context.tainted || quotesOutsider(history, batch)) }
   const toolStarts = new Map<string, number>()
-  const channel = chat.channel === "web" ? undefined : ctx.host.channel(chat.channel)
+  const channel = chat.channel === "web" ? undefined : chat.connectorId ? ctx.host.get(chat.connectorId)?.handle?.channel : ctx.host.channel(chat.channel)
   const typing = (on: boolean) => channel?.typing?.(chat.externalId, on).catch(() => {})
 
   let status: RunStatus = "ok"
@@ -183,8 +204,9 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
 
   try {
     const batchRunId = input.resume ? (input.resume.context.batchRunId ?? input.resume.previousRunId) : runId
-    const turnInfo: TurnInfo = { runId, chatId: chat.id, channel: chat.channel, trigger: input.trigger, tz: settings.timezone, now: startedAt, jobId, batchRunId }
-    const noTools = input.noTools || origin === "hook"
+    const turnInfo: TurnInfo = { runId, chatId: chat.id, channel: chat.channel, trigger: input.trigger, tz: settings.timezone, now: startedAt, jobId, batchRunId, agentId: agent.id }
+    const guest = mode === "guest"
+    const noTools = input.noTools || origin === "hook" || (guest && agent.guestTools === "none")
     const scope = input.resume ? input.resume.context.toolScope : input.toolScope
     const tools: CollectedTools = noTools
       ? emptyTools()
@@ -197,6 +219,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
           onLoad: (names) => {
             if (chat.sessionId) rememberLoaded(db, chat.sessionId, names)
           },
+          guestOnly: guest,
           log: rlog,
           onUntrustedResult: (m) => {
             if (!state.tainted) rlog.info("turn tainted by an untrusted tool result", { tool: m.name })
@@ -224,28 +247,32 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         .filter((h) => batch.has(h.id))
         .map((h) => h.text)
         .join("\n")
-      const recall = input.trigger === "message" ? await autoRecall(db, findMemory(ctx.host.running()), batchText, rlog, startedAt) : null
+      const recall = input.trigger === "message" ? await autoRecall(db, findMemory(ctx.host.running()), batchText, rlog, startedAt, agent) : null
       system = buildSystem({
-        persona: settings.persona,
+        persona: agent.persona,
         now: startedAt,
         tz: settings.timezone,
         channel: chat.channel,
         chat: { id: chat.id, externalId: chat.externalId, kind: chat.kind, sessionId: chat.sessionId },
         capabilities: capabilityList(ctx, tools),
         toolSearch: tools.deferred.length > 0,
-        notes: notesPrompt(db),
-        checkins: input.trigger === "message" ? checkinsPrompt(db, chat.id, startedAt) : null,
+        notes: notesPrompt(db, agent),
+        // Routine check-ins are the owner's; a shared chat never sees them.
+        checkins: input.trigger === "message" && !shared ? checkinsPrompt(db, chat.id, startedAt) : null,
         recall,
+        recallAbout: agent.isDefault ? "owner" : "chats",
         summary: input.trigger === "message" ? session?.summary : null,
         trigger: origin,
+        shared: shared ? { kind: chat.kind, guest } : null,
       })
       // Past tool calls are replayed only next to a tool list: a request with tool parts and no tools is rejected by some providers.
       const pastCalls = Object.keys(tools.tools).length ? loadToolCalls(db, history) : []
-      modelMessages = input.trigger === "message" ? toModelMessages(history, batch, pastCalls) : [{ role: "user", content: input.prompt ?? "" }]
+      modelMessages = input.trigger === "message" ? toModelMessages(history, batch, pastCalls, { labelSenders: shared }) : [{ role: "user", content: input.prompt ?? "" }]
     }
 
     model = failoverModel(chain, (from, e) => rlog.warn("model failed, trying the next one in the chain", { connector_id: from.connectorId, model: from.model, error: (e as Error)?.message }))
-    const strict = unattended(origin) || origin === "hook"
+    // Shared chats (PLAN 19.4): every write needs approval, like jobs.
+    const strict = unattended(origin) || origin === "hook" || mode !== "owner"
     void typing(true)
     ctx.bus.publish({ type: "turn-start", chatId: chat.id, runId })
 
@@ -375,8 +402,12 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         sessionId: chat.sessionId,
         system,
         batchRunId: turnInfo.batchRunId,
+        agentId: agent.id,
+        mode,
       }
       if (text && deliver && !silent) deliverReply(ctx, chat, runId, text)
+      // A shared chat never sees the prompt: it goes to the owner's DM (PLAN 19.4).
+      const askChat = shared ? (ownerChat(db, chat.channel) ?? ownerChat(db, "web") ?? chat) : chat
       for (const r of approvalRequests) {
         const meta = tools.meta[r.toolName]
         supersede(r.toolName, r.input)
@@ -385,6 +416,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
           {
             runId,
             chatId: chat.id,
+            askChatId: askChat.id === chat.id ? null : askChat.id,
             approvalId: r.approvalId,
             toolCallId: r.toolCallId,
             tool: r.toolName,
@@ -396,13 +428,13 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
           ctx.clock(),
           ctx.approvalTtlMs,
         )
-        sendApprovalPrompt(ctx, chat, row, meta?.title)
+        sendApprovalPrompt(ctx, askChat, row, meta?.title, askChat.id === chat.id ? undefined : chat)
       }
       status = "awaiting_approval"
     } else if (status === "ok") {
       if (text && deliver && !silent) deliverReply(ctx, chat, runId, text)
     } else if (status === "error" && (input.trigger === "message" || input.trigger === "approval")) {
-      sendToChat(ctx, chat, `Waduh, gagal jawab: ${shortError(error)}. Coba lagi bentar ya.`, "system")
+      sendToChat(ctx, chat, shared ? SHARED_BUSY_TEXT : `Waduh, gagal jawab: ${shortError(error)}. Coba lagi bentar ya.`, "system")
     }
   } catch (e) {
     const aborted = controller.signal.aborted || (e as Error)?.name === "AbortError" || (e as Error)?.name === "TimeoutError"
@@ -410,7 +442,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     error = (e as Error)?.message ?? String(e)
     if (aborted && ctx.draining) interrupted = true
     else if (!aborted) rlog.error("turn failed", { error: e })
-    if (!interrupted && status === "error" && (input.trigger === "message" || input.trigger === "approval")) sendToChat(ctx, chat, `Waduh, gagal jawab: ${shortError(error)}. Coba lagi bentar ya.`, "system")
+    if (!interrupted && status === "error" && (input.trigger === "message" || input.trigger === "approval")) sendToChat(ctx, chat, shared ? SHARED_BUSY_TEXT : `Waduh, gagal jawab: ${shortError(error)}. Coba lagi bentar ya.`, "system")
   } finally {
     void typing(false)
     if (ctx.active.get(chat.id) === active) ctx.active.delete(chat.id)
@@ -440,9 +472,11 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     .where(eq(runs.id, runId))
     .run()
   recordRunTokens(db, tokensIn + tokensOut, jobId, ctx.clock())
+  recordAgentTokens(db, agent.id, tokensIn + tokensOut, ctx.clock())
   const after = checkGlobalBudget(db, ctx.clock())
   if (!after.ok && after.fresh) {
-    sendToChat(ctx, chat, pausedNotice(db, after), "system")
+    if (shared) sendToOwner(ctx, chat, pausedNotice(db, after))
+    else sendToChat(ctx, chat, pausedNotice(db, after), "system")
     logEvent(db, { kind: "budget.pause", level: "warn", message: `Turns paused: ${after.reason}` }, ctx.clock())
   }
   ctx.bus.publish({ type: "turn-end", chatId: chat.id, runId, status: interrupted ? "aborted" : status, error })
@@ -490,10 +524,18 @@ export function deliverReply(ctx: EngineCtx, chat: ChatRow, runId: string, text:
   sendToChat(ctx, chat, text, `reply:${runId}`, { format: "markdown" })
 }
 
-export function sendApprovalPrompt(ctx: EngineCtx, chat: ChatRow, row: ApprovalRow, title?: string) {
+// Admin notices from a shared chat go to the owner's DM instead (PLAN 19.4).
+function sendToOwner(ctx: EngineCtx, from: ChatRow, text: string) {
+  const to = ownerChat(ctx.db, from.channel) ?? ownerChat(ctx.db, "web")
+  if (to) sendToChat(ctx, to, text, "system")
+}
+
+// `from`: the shared chat the request came from, when the prompt is asked elsewhere.
+export function sendApprovalPrompt(ctx: EngineCtx, chat: ChatRow, row: ApprovalRow, title?: string, from?: ChatRow) {
   const name = title ?? row.tool.replace("__", " › ")
   const kind = row.toolClass === "destructive" ? "aksi destruktif" : "aksi yang mengubah data"
-  const text = `Boleh aku jalanin ${name}? (${kind})\n${row.argsPreview ?? ""}\n\nBalas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.`
+  const where = from ? ` di ${from.kind === "group" ? "grup" : "chat"} ${from.title.trim() ? `"${from.title.trim().slice(0, 60)}"` : from.externalId}` : ""
+  const text = `Boleh aku jalanin ${name}${where}? (${kind})\n${row.argsPreview ?? ""}\n\nBalas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.`
   sendToChat(ctx, chat, text, `approval:${row.id}`, { actions: [{ id: `approve:${row.id}`, label: "Ya" }, { id: `deny:${row.id}`, label: "Batal" }] })
   ctx.bus.publish({ type: "approval", chatId: chat.id, runId: row.runId, approvalId: row.id, tool: row.tool, class: row.toolClass, argsPreview: row.argsPreview ?? "" })
 }

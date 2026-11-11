@@ -14,6 +14,7 @@ import { Route as HealthRouteImport } from './routes/health'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppActivityRouteImport } from './routes/_app/activity'
+import { Route as AppAgentsRouteImport } from './routes/_app/agents'
 import { Route as AppAttachmentsRouteImport } from './routes/_app/attachments'
 import { Route as AppChatsRouteImport } from './routes/_app/chats'
 import { Route as AppConnectorsRouteImport } from './routes/_app/connectors'
@@ -54,6 +55,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppActivityRoute = AppActivityRouteImport.update({
   id: '/activity',
   path: '/activity',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAgentsRoute = AppAgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAttachmentsRoute = AppAttachmentsRouteImport.update({
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/activity': typeof AppActivityRoute
+  '/agents': typeof AppAgentsRoute
   '/attachments': typeof AppAttachmentsRoute
   '/chats': typeof AppChatsRoute
   '/connectors': typeof AppConnectorsRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/activity': typeof AppActivityRoute
+  '/agents': typeof AppAgentsRoute
   '/attachments': typeof AppAttachmentsRoute
   '/chats': typeof AppChatsRoute
   '/connectors': typeof AppConnectorsRoute
@@ -194,6 +202,7 @@ export interface FileRoutesById {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/_app/activity': typeof AppActivityRoute
+  '/_app/agents': typeof AppAgentsRoute
   '/_app/attachments': typeof AppAttachmentsRoute
   '/_app/chats': typeof AppChatsRoute
   '/_app/connectors': typeof AppConnectorsRoute
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/activity'
+    | '/agents'
     | '/attachments'
     | '/chats'
     | '/connectors'
@@ -242,6 +252,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/activity'
+    | '/agents'
     | '/attachments'
     | '/chats'
     | '/connectors'
@@ -266,6 +277,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/_app/activity'
+    | '/_app/agents'
     | '/_app/attachments'
     | '/_app/chats'
     | '/_app/connectors'
@@ -334,6 +346,13 @@ declare module '@tanstack/react-router' {
       path: '/activity'
       fullPath: '/activity'
       preLoaderRoute: typeof AppActivityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/agents': {
+      id: '/_app/agents'
+      path: '/agents'
+      fullPath: '/agents'
+      preLoaderRoute: typeof AppAgentsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/attachments': {
@@ -460,6 +479,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppActivityRoute: typeof AppActivityRoute
+  AppAgentsRoute: typeof AppAgentsRoute
   AppAttachmentsRoute: typeof AppAttachmentsRoute
   AppChatsRoute: typeof AppChatsRoute
   AppConnectorsRoute: typeof AppConnectorsRoute
@@ -475,6 +495,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppActivityRoute: AppActivityRoute,
+  AppAgentsRoute: AppAgentsRoute,
   AppAttachmentsRoute: AppAttachmentsRoute,
   AppChatsRoute: AppChatsRoute,
   AppConnectorsRoute: AppConnectorsRoute,

@@ -15,7 +15,6 @@ export const getSettingsPage = createServerFn({ method: "GET" }).handler(async (
   const s = getAllSettings(db)
   return {
     settings: {
-      persona: s.persona,
       timezone: s.timezone,
       language: s.language,
       uiLanguage: s.uiLanguage,
@@ -51,7 +50,6 @@ export const listConnectorModels = createServerFn({ method: "GET" })
   })
 
 const patch = z.object({
-  persona: z.string().trim().min(1).max(8000).optional(),
   timezone: z
     .string()
     .min(1)

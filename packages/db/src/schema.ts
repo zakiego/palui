@@ -176,12 +176,18 @@ export const chats = sqliteTable(
     title: text("title").notNull().default(""),
     kind: text("kind").$type<"dm" | "group">().notNull().default("dm"),
     sessionId: text("session_id"),
-    // WhatsApp allowlist (PLAN 5.1): Palui only answers allowed chats.
+    // Which bot the chat came in on, when a channel has several (an agent's own
+    // Telegram bot, PLAN 19.6). "" for the channel's main connector.
+    connectorId: text("connector_id").notNull().default(""),
+    // WhatsApp allowlist (PLAN 5.1): Palui only answers allowed chats. Shared
+    // chats also need an agent before guests are answered (PLAN 19.2).
     allowed: bool("allowed").notNull().default(true),
+    // The agent that answers here; null means the default agent (Palui).
+    agentId: text("agent_id"),
     lastMessageAt: integer("last_message_at"),
     createdAt: integer("created_at").notNull(),
   },
-  (t) => [uniqueIndex("chats_channel_external").on(t.channel, t.externalId)],
+  (t) => [uniqueIndex("chats_channel_connector_external").on(t.channel, t.connectorId, t.externalId)],
 )
 
 export const sessions = sqliteTable(
@@ -220,6 +226,9 @@ export const messages = sqliteTable(
     // Inbound: the message this one quotes (reply-to), for WhatsApp reminder actions.
     replyToChannelMsgId: text("reply_to_channel_msg_id"),
     senderId: text("sender_id"),
+    // Inbound: the sender's display name, and whether it was the owner (PLAN 19.3).
+    senderName: text("sender_name"),
+    fromOwner: bool("from_owner").notNull().default(true),
     status: text("status").$type<MessageStatus>().notNull().default("handled"),
     ignoreReason: text("ignore_reason"),
     runId: text("run_id"),
@@ -242,6 +251,8 @@ export const runs = sqliteTable(
   {
     id: text("id").primaryKey(),
     chatId: text("chat_id"),
+    // The agent that ran it (PLAN 19); null for runs from before agents.
+    agentId: text("agent_id"),
     jobId: text("job_id"),
     trigger: text("trigger").$type<RunTrigger>().notNull(),
     model: text("model"),
@@ -288,6 +299,9 @@ export const pendingApprovals = sqliteTable(
     id: text("id").primaryKey(),
     runId: text("run_id").notNull(),
     chatId: text("chat_id").notNull(),
+    // Where the prompt went when that isn't chatId: a shared chat asks in the
+    // owner's DM (PLAN 19.4). Only an answer from here counts.
+    askChatId: text("ask_chat_id"),
     // AI SDK approvalId from the tool-approval-request part.
     approvalId: text("approval_id").notNull(),
     toolCallId: text("tool_call_id"),
@@ -509,6 +523,9 @@ export const outbox = sqliteTable(
     chatId: text("chat_id").notNull(),
     // Channel connector id at enqueue time; may change on fallback.
     channel: text("channel").$type<Channel>().notNull(),
+    // The exact connector to send through when the channel has several (an
+    // agent's Telegram bot); null means the channel's main connector.
+    connectorId: text("connector_id"),
     payload: json<OutboxPayload>("payload").notNull(),
     status: text("status").$type<OutboxStatus>().notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),
@@ -580,6 +597,8 @@ export const usage = sqliteTable("usage", {
 // dashboard). Every turn's system prompt carries the enabled ones.
 export const instructions = sqliteTable("instructions", {
   id: text("id").primaryKey(),
+  // The agent these belong to; null means the default agent (PLAN 19.1).
+  agentId: text("agent_id"),
   title: text("title").notNull(),
   body: text("body").notNull(),
   enabled: bool("enabled").notNull().default(true),
@@ -591,5 +610,34 @@ export const instructions = sqliteTable("instructions", {
 export const preferences = sqliteTable("preferences", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+})
+
+// --- Agents (PLAN 19) ----------------------------------------------------------------
+
+export type OwnerPowers = "off" | "approve"
+export type GuestTools = "none" | "safe"
+
+// A named persona with its own instructions, memory container and daily cap.
+// Exactly one is the default (Palui, the owner's personal agent).
+export const agents = sqliteTable("agents", {
+  id: text("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  persona: text("persona").notNull(),
+  isDefault: bool("is_default").notNull().default(false),
+  // null: the recall connector's own container (the default agent).
+  recallContainer: text("recall_container"),
+  ownerPowers: text("owner_powers").$type<OwnerPowers>().notNull().default("off"),
+  guestTools: text("guest_tools").$type<GuestTools>().notNull().default("safe"),
+  // Tokens per day across all its chats; 0 means no cap of its own.
+  dailyTokenCap: integer("daily_token_cap").notNull().default(0),
+  telegramConnectorId: text("telegram_connector_id").unique(),
+  // Avatar (PLAN 19.7): an uploaded photo wins, else an icon on a color, else the default.
+  // The photo is a small data URL (resized in the browser, capped in core/agents.ts).
+  avatarImage: text("avatar_image"),
+  avatarIcon: text("avatar_icon"),
+  avatarColor: text("avatar_color"),
+  createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 })

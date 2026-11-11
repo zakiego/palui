@@ -18,6 +18,8 @@ export const usageKeys = {
   tokens: (now: number, tz: string) => `tokens:${dayKey(now, tz)}`,
   runs: (now: number, tz: string) => `runs:${hourKey(now, tz)}`,
   job: (jobId: string, now: number, tz: string) => `job:${jobId}:${dayKey(now, tz)}`,
+  agent: (agentId: string, now: number, tz: string) => `agent:${agentId}:${dayKey(now, tz)}`,
+  agentNotice: (agentId: string, now: number, tz: string) => `agent-notice:${agentId}:${dayKey(now, tz)}`,
 }
 
 export function getUsage(db: DB, key: string): number {
@@ -101,4 +103,23 @@ export function recordRunStart(db: DB, now = Date.now()): void {
 
 export function tokensToday(db: DB, now = Date.now()): number {
   return getUsage(db, usageKeys.tokens(now, getSetting(db, "timezone")))
+}
+
+// Per-agent daily cap (PLAN 19.5), in the settings zone. 0 means no cap of its own.
+export function agentOverCap(db: DB, agent: { id: string; dailyTokenCap: number }, now = Date.now()): boolean {
+  if (!(agent.dailyTokenCap > 0)) return false
+  return getUsage(db, usageKeys.agent(agent.id, now, getSetting(db, "timezone"))) >= agent.dailyTokenCap
+}
+
+export function recordAgentTokens(db: DB, agentId: string, tokens: number, now = Date.now()): void {
+  addUsage(db, usageKeys.agent(agentId, now, getSetting(db, "timezone")), tokens, now)
+}
+
+export function agentTokensToday(db: DB, agentId: string, now = Date.now()): number {
+  return getUsage(db, usageKeys.agent(agentId, now, getSetting(db, "timezone")))
+}
+
+// True the first time it's called for this agent today: the chat gets one notice per day.
+export function firstAgentNoticeToday(db: DB, agentId: string, now = Date.now()): boolean {
+  return addUsage(db, usageKeys.agentNotice(agentId, now, getSetting(db, "timezone")), 1, now) === 1
 }

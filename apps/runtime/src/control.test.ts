@@ -105,6 +105,8 @@ describe("control server", () => {
     expect(await json(await call("POST", "/control/approvals/apr_missing", { approved: true }))).toEqual({ ok: false })
     expect((await call("POST", "/control/approvals/apr_missing", {})).status).toBe(400)
     expect(await json(await call("POST", "/control/stop/chat_x", {}))).toEqual({ ok: false })
+    expect((await call("POST", "/control/chats/chat_x/agent", {})).status).toBe(400)
+    expect((await call("POST", "/control/chats/chat_x/agent", { agentId: null })).status).toBe(404)
     expect((await call("POST", "/control/nope", {})).status).toBe(404)
     expect((await call("POST", "/control/remove/nope", {})).status).toBe(404)
   })

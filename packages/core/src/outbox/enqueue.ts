@@ -5,6 +5,8 @@ import { outbox, newId, type Channel, type DB, type OutboxPayload } from "@palui
 export type EnqueueInput = {
   chatId: string
   channel: Channel
+  // The agent bot to send through (chats.connectorId); omitted means the channel's main connector.
+  connectorId?: string | null
   payload: OutboxPayload
   // "reply:<runId>", "reminder:<id>", "job:<id>", "approval:<id>", "system"
   source: string
@@ -23,6 +25,7 @@ export function enqueueOutbox(db: DB, input: EnqueueInput, now = Date.now()): Ou
       id: newId("out"),
       chatId: input.chatId,
       channel: input.channel,
+      connectorId: input.connectorId || null,
       payload: input.payload,
       status: "pending",
       attempts: 0,

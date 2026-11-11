@@ -121,7 +121,7 @@ export default defineRuntime(manifest, {
     return {
       async stop() {},
       async tools() {
-        return { ambil_halaman: { tool: t, class: "read", untrusted: true, title: "Read a web page" } }
+        return { ambil_halaman: { tool: t, class: "read", untrusted: true, guestSafe: true, title: "Read a web page" } }
       },
     }
   },

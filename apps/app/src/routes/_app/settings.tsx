@@ -40,7 +40,6 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, 
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { authClient, passkeyCancelled } from "@/lib/auth-client"
 import { removePasskey } from "@/lib/fns/session"
 import { createHookFn, getSettingsPage, listConnectorModels, saveSettings } from "@/lib/fns/settings"
@@ -124,7 +123,6 @@ function SettingsPage() {
 
 function GeneralTab({ data }: { data: Data }) {
   const s = data.settings
-  const [persona, setPersona] = React.useState(s.persona)
   const [timezone, setTimezone] = React.useState(s.timezone)
   const [language, setLanguage] = React.useState(s.language)
   const [uiLanguage, setUiLanguage] = React.useState(s.uiLanguage)
@@ -153,7 +151,7 @@ function GeneralTab({ data }: { data: Data }) {
       timezoneRef.current?.focus()
       return
     }
-    void save({ persona, timezone: tz, language, uiLanguage, fallbackChannel: fallback })
+    void save({ timezone: tz, language, uiLanguage, fallbackChannel: fallback })
   }
   return (
     <Card>
@@ -162,14 +160,13 @@ function GeneralTab({ data }: { data: Data }) {
       </CardHeader>
       <CardContent>
         <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="persona">{t("settings.persona")}</FieldLabel>
-            {/* It grows with its text up to half the screen, then scrolls, so Save stays in reach. */}
-            <Textarea id="persona" rows={8} maxLength={8000} className="max-h-[50svh]" value={persona} onChange={(e) => setPersona(e.target.value)} />
-            <FieldDescription>
-              <span className="tabular-nums">{t("settings.persona.count", { n: persona.length.toLocaleString("en") })}</span>
-            </FieldDescription>
-          </Field>
+          {/* Persona moved to each agent (PLAN 19.7). */}
+          <p className="text-sm text-muted-foreground">
+            {t("settings.personaMoved")}{" "}
+            <Link to="/agents" className="underline underline-offset-4">
+              {t("settings.personaMovedLink")}
+            </Link>
+          </p>
           <div className="grid grid-cols-1 gap-4 @2xl/main:grid-cols-2">
             <Field data-invalid={timezoneError ? true : undefined}>
               <FieldLabel htmlFor="timezone">{t("jobs.field.tz")}</FieldLabel>
@@ -803,8 +800,8 @@ function HooksCard({ data }: { data: Data }) {
   )
 }
 
-// The General tab's card, the one most visits land on: a persona box, then
-// four fields in two columns, and Save in the footer. Other tabs get a card
+// The General tab's card, the one most visits land on: a line pointing to the
+// agents' personas, then four fields in two columns, and Save in the footer. Other tabs get a card
 // of plain fields.
 function SettingsSkeleton() {
   const { tab = "general" } = Route.useSearch()
@@ -820,13 +817,7 @@ function SettingsSkeleton() {
           </CardHeader>
           <CardContent>
             <FieldGroup>
-              {tab === "general" && (
-                <Field>
-                  <SkeletonText className="text-sm" width="w-16" />
-                  <Skeleton className="h-24 w-full rounded-lg" />
-                  <SkeletonText className="text-sm" width="w-40" />
-                </Field>
-              )}
+              {tab === "general" && <SkeletonText className="text-sm" width="w-72" />}
               <div className="grid grid-cols-1 gap-4 @2xl/main:grid-cols-2">
                 {[
                   { label: "w-20", help: "w-56" },

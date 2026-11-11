@@ -336,7 +336,7 @@ export function createSupervisor(opts: SupervisorOptions) {
   function otherChannel(exceptId: string): { channel: Channel; chatId: string } | null {
     for (const e of running()) {
       const ch = e.handle.channel
-      if (!ch || e.id === exceptId || ch.channel === "web" || !safeReachable(ch)) continue
+      if (!ch || e.id === exceptId || ch.channel === "web" || e.row.type !== ch.channel || !safeReachable(ch)) continue
       const chat = ownerChat(db, ch.channel)
       if (chat) return { channel: ch.channel, chatId: chat.id }
     }
@@ -380,8 +380,10 @@ export function createSupervisor(opts: SupervisorOptions) {
     return running().find((e) => e.id === id)
   }
 
+  // The channel's main connector. Agent bots (another type with the same
+  // channel, PLAN 19.6) are only reached by id.
   function channel(ch: Channel): ChannelHandle | undefined {
-    return running().find((e) => e.handle.channel?.channel === ch)?.handle.channel
+    return running().find((e) => e.handle.channel?.channel === ch && e.row.type === ch)?.handle.channel
   }
 
   function status(): ConnectorLive[] {

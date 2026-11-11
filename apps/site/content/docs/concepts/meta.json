@@ -4,6 +4,7 @@
     "connectors",
     "channels",
     "chats-and-sessions",
+    "agents",
     "memory",
     "reminders",
     "jobs",

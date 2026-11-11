@@ -176,6 +176,20 @@ describe("telegram inbound", () => {
     await s.running.stop()
   })
 
+  it("marks group messages that mention, command or reply to the bot as addressed", async () => {
+    const s = await claimed()
+    const group = { id: -100777, type: "group", title: "Kebun" }
+    const inGroup = (m: Record<string, unknown>) => messageUpdate({ chat: group, ...m }, STRANGER)
+    await s.feed(inGroup({ text: "ngobrol biasa" }))
+    await s.feed(inGroup({ text: "@palui_test_bot halo", entities: [{ type: "mention", offset: 0, length: 15 }] }))
+    await s.feed(inGroup({ text: "@other_bot halo", entities: [{ type: "mention", offset: 0, length: 10 }] }))
+    await s.feed(inGroup({ text: "lanjut", reply_to_message: { message_id: 5, date: 0, chat: group, from: { id: 123456789, is_bot: true, first_name: "Palui" } } }))
+    await s.feed(inGroup({ text: "/new@palui_test_bot", entities: [{ type: "bot_command", offset: 0, length: 19 }] }))
+    expect(s.ctx.inbound.map((m) => m.addressed)).toEqual([false, true, false, true, true])
+    expect(s.ctx.inbound[1]).toMatchObject({ chatKind: "group", chatTitle: "Kebun", chatExternalId: "-100777", senderExternalId: "77" })
+    await s.running.stop()
+  })
+
   it("downloads the largest photo as base64 jpeg with its caption", async () => {
     const s = await claimed()
     await s.feed(

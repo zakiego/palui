@@ -1,5 +1,6 @@
 // Chats page: the list, a transcript, the web chat input and approvals.
-import { ensureWebChat } from "@palui/core/chats"
+import { agentForChat, isSharedChat, listAgents } from "@palui/core/agents"
+import { ensureWebChat, getChat } from "@palui/core/chats"
 import { getSetting, setSetting } from "@palui/core/settings"
 import { createServerFn } from "@tanstack/react-start"
 import { z } from "zod"
@@ -18,8 +19,16 @@ export const getTranscript = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { db } = await requireUser()
     const t = transcript(db, data.chatId)
-    if (!t) throw new Error("That chat doesn't exist anymore.")
-    return t
+    const row = getChat(db, data.chatId)
+    if (!t || !row) throw new Error("That chat doesn't exist anymore.")
+    const agent = agentForChat(db, row)
+    return {
+      ...t,
+      // Who answers here (PLAN 19.2), and the agents it can switch to.
+      agent: { id: agent.id, name: agent.name, isDefault: agent.isDefault },
+      shared: isSharedChat(db, row),
+      agents: listAgents(db).map((a) => ({ id: a.id, name: a.name, isDefault: a.isDefault, avatarImage: a.avatarImage, avatarIcon: a.avatarIcon, avatarColor: a.avatarColor })),
+    }
   })
 
 export const sendWebMessage = createServerFn({ method: "POST" })

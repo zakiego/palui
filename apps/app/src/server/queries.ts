@@ -95,7 +95,9 @@ export function transcript(db: DB, chatId: string, limit = 150) {
     }
     // Inbound webhook events are stored as user messages; the UI shows them as events, not as mine.
     const source = m.senderId?.startsWith("hook:") ? ("hook" as const) : null
-    return { id: m.id, role: m.role as "user" | "assistant", source, text: m.text, status: m.status, createdAt: m.createdAt, tools }
+    // Someone other than the owner in a shared chat (PLAN 19.3).
+    const sender = m.role === "user" && !m.fromOwner ? (m.senderName ?? m.senderId ?? "?") : null
+    return { id: m.id, role: m.role as "user" | "assistant", source, sender, text: m.text, status: m.status, createdAt: m.createdAt, tools }
   })
   const approvals = db
     .select()
@@ -105,7 +107,7 @@ export function transcript(db: DB, chatId: string, limit = 150) {
     .all()
     .map((a) => ({ id: a.id, tool: a.tool, class: a.toolClass, argsPreview: a.argsPreview, expiresAt: a.expiresAt }))
   return {
-    chat: { id: chat.id, channel: chat.channel, title: chat.title || chat.externalId, kind: chat.kind },
+    chat: { id: chat.id, channel: chat.channel, title: chat.title || chat.externalId, kind: chat.kind, agentId: chat.agentId, allowed: chat.allowed, connectorId: chat.connectorId },
     messages: items,
     approvals,
   }

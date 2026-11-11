@@ -125,12 +125,12 @@ export class RecallApi {
 const MAX_PROFILE_CHARS = 4000
 
 // Profile text for the prompt, or null when recall knows nothing useful.
-export function profileText(p: RecallProfile): string | null {
+export function profileText(p: RecallProfile, about = "the owner"): string | null {
   const parts: string[] = []
   const stat = p.static?.trim()
   const dyn = p.dynamic?.trim()
-  if (stat) parts.push(`About the owner: ${stat}`)
-  else if (p.staticMemories?.length) parts.push(`Facts about the owner:\n${p.staticMemories.slice(0, 10).map((m) => `- ${m.fact}`).join("\n")}`)
+  if (stat) parts.push(`About ${about}: ${stat}`)
+  else if (p.staticMemories?.length) parts.push(`Facts about ${about}:\n${p.staticMemories.slice(0, 10).map((m) => `- ${m.fact}`).join("\n")}`)
   if (dyn) parts.push(`Lately: ${dyn}`)
   else if (p.dynamicMemories?.length) parts.push(`Recent facts:\n${p.dynamicMemories.slice(0, 10).map((m) => `- ${m.fact}`).join("\n")}`)
   const hits = (p.searchResults ?? []).map((r) => r.text?.trim()).filter(Boolean).slice(0, 8)

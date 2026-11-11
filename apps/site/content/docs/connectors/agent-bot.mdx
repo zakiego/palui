@@ -1,0 +1,39 @@
+---
+title: Agent bot (Telegram)
+description: Give an agent its own Telegram bot, so people can add it to a group and @mention it by name.
+---
+
+Kind: `channel`, several allowed. It's the [Telegram](/docs/connectors/telegram) connector under another name: one bot per agent. Every chat that comes in on this bot belongs to its agent. See [Agents](/docs/concepts/agents).
+
+## Connect
+
+<Steps>
+<Step>
+
+### Create the bot
+
+Message @BotFather, send `/newbot` and copy the token. Leave privacy mode on: in groups the bot then sees only commands, mentions and replies to it.
+
+</Step>
+<Step>
+
+### Add it to Palui
+
+On the Connectors page, add "Agent bot (Telegram)" and paste the token. Test shows the bot's `@username`.
+
+</Step>
+<Step>
+
+### Give it to an agent
+
+Open the agent on the Agents page and pick the bot under "Own Telegram bot".
+
+</Step>
+</Steps>
+
+## How it behaves
+
+- You're the owner on every bot. Claiming the main Telegram bot is enough.
+- A chat with this bot is its own chat, separate from the same DM or group on the main bot, and its agent can't be changed.
+- Replies go out through the bot the message came in on.
+- Other people are answered only in chats you allowed on the Chats page.

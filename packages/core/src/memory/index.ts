@@ -1,7 +1,8 @@
 // Memory (PLAN 5.3): auto-recall before a turn and auto-save at compaction and
 // on /new, through the first running memory connector.
 import { and, asc, eq, gt, inArray, isNotNull, or } from "drizzle-orm"
-import { messages, runs, sessions, type DB } from "@palui/db"
+import { chats, messages, runs, sessions, type DB } from "@palui/db"
+import { agentContainer, getAgent, getDefaultAgent, type AgentRow } from "../agents"
 import type { Logger } from "../log"
 import type { MemoryHandle } from "../connectors/define"
 import { getConnector, patchConnectorConfig } from "../connectors/store"
@@ -38,12 +39,15 @@ export function recordRecall(db: DB, connectorId: string, skipped: boolean, now 
   patchConnectorConfig(db, connectorId, { autoRecallStats: stats }, now)
 }
 
-export async function autoRecall(db: DB, entry: MemoryEntry | undefined, text: string, log: Logger, now = Date.now()): Promise<string | null> {
+// `agent`: whose memory to read (PLAN 19.5). The default agent reads the owner's.
+export async function autoRecall(db: DB, entry: MemoryEntry | undefined, text: string, log: Logger, now = Date.now(), agent?: AgentRow): Promise<string | null> {
   if (!entry || !entry.memory.autoRecall || !recallApplies(text)) return null
+  const container = agent ? agentContainer(agent) : undefined
+  const opts = { timeoutMs: RECALL_TIMEOUT_MS, ...(container ? { container } : {}), ...(agent && !agent.isDefault ? { about: "the people in your chats" } : {}) }
   let timer: NodeJS.Timeout | undefined
   try {
     const profile = await Promise.race([
-      entry.memory.recall(text, { timeoutMs: RECALL_TIMEOUT_MS }),
+      entry.memory.recall(text, opts),
       new Promise<null>((resolve) => {
         timer = setTimeout(() => resolve(null), RECALL_TIMEOUT_MS + 50)
       }),
@@ -59,16 +63,29 @@ export async function autoRecall(db: DB, entry: MemoryEntry | undefined, text: s
   }
 }
 
-// Auto-save (PLAN 5.3, 10): only the owner's messages and final replies, never
-// tool output, never tainted runs. sourceId `<sessionId>:<firstMsgId>-<lastMsgId>`
-// keeps it idempotent. Returns the number of messages saved.
+// Auto-save (PLAN 5.3, 10, 19.5): owner messages, guest messages labeled with
+// who said them and where, and final replies. Never tool output, never runs
+// tainted by an untrusted tool result. Each run's agent decides the container
+// (a chat can switch agents mid-session). sourceId
+// `<sessionId>:<firstMsgId>-<lastMsgId>` keeps it idempotent. Returns the number
+// of messages saved.
 export async function autoSave(db: DB, entry: MemoryEntry | undefined, sessionId: string, log: Logger, until?: number): Promise<number> {
   if (!entry || !entry.memory.autoSave) return 0
   const session = db.select().from(sessions).where(eq(sessions.id, sessionId)).get()
   if (!session) return 0
+  const chat = db.select().from(chats).where(eq(chats.id, session.chatId)).get()
   const after = session.savedToRecallAt ?? 0
   const rows = db
-    .select({ id: messages.id, role: messages.role, text: messages.text, runId: messages.runId, createdAt: messages.createdAt })
+    .select({
+      id: messages.id,
+      role: messages.role,
+      text: messages.text,
+      runId: messages.runId,
+      createdAt: messages.createdAt,
+      fromOwner: messages.fromOwner,
+      senderName: messages.senderName,
+      senderId: messages.senderId,
+    })
     .from(messages)
     .where(
       and(
@@ -84,21 +101,36 @@ export async function autoSave(db: DB, entry: MemoryEntry | undefined, sessionId
     .filter((m) => until === undefined || m.createdAt <= until)
   if (!rows.length) return 0
   const runIds = [...new Set(rows.map((r) => r.runId!))]
-  const tainted = new Set(
-    db
-      .select({ id: runs.id })
-      .from(runs)
-      .where(and(inArray(runs.id, runIds), eq(runs.tainted, true)))
-      .all()
-      .map((r) => r.id),
-  )
+  const runRows = db
+    .select({ id: runs.id, tainted: runs.tainted, agentId: runs.agentId })
+    .from(runs)
+    .where(inArray(runs.id, runIds))
+    .all()
+  const tainted = new Set(runRows.filter((r) => r.tainted).map((r) => r.id))
+  const agentOf = new Map(runRows.map((r) => [r.id, r.agentId]))
   const keep = rows.filter((r) => !tainted.has(r.runId!) && r.text.trim())
   const last = rows.at(-1)!
-  if (keep.length) {
-    const content = keep.map((m) => `${m.role === "user" ? "Owner" : "Palui"}: ${m.text}`).join("\n")
-    const sourceId = `${sessionId}:${keep[0]!.id}-${keep.at(-1)!.id}`
+  // Group by agent, in order of first appearance.
+  const groups = new Map<string, typeof keep>()
+  const fallback = getDefaultAgent(db)
+  for (const r of keep) {
+    const id = agentOf.get(r.runId!) ?? fallback.id
+    groups.set(id, [...(groups.get(id) ?? []), r])
+  }
+  const where = chat?.title?.trim() ? chat.title.trim().slice(0, 80) : "a chat"
+  for (const [agentId, group] of groups) {
+    const agent = getAgent(db, agentId) ?? fallback
+    const label = (m: (typeof keep)[number]) => {
+      if (m.role === "assistant") return agent.isDefault ? "Palui" : agent.name
+      if (m.fromOwner) return "Owner"
+      return `${(m.senderName ?? m.senderId ?? "Someone").replace(/\s+/g, " ").slice(0, 60)} (in ${where})`
+    }
+    const content = group.map((m) => `${label(m)}: ${m.text}`).join("\n")
+    const base = `${sessionId}:${group[0]!.id}-${group.at(-1)!.id}`
+    const sourceId = groups.size > 1 ? `${base}:${agent.slug}` : base
+    const container = agentContainer(agent)
     try {
-      await entry.memory.save({ sourceId, content, title: "Palui chat" })
+      await entry.memory.save({ sourceId, content, title: agent.isDefault ? "Palui chat" : `${agent.name} chat`, ...(container ? { container } : {}) })
     } catch (e) {
       log.warn("auto-save failed", { connector_id: entry.id, error: e })
       return 0

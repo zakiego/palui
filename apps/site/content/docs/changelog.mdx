@@ -14,6 +14,9 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 ### Added
 
 - Tool search. When more tools are enabled than Tools per turn (Settings, Limits), Palui loads a core set and lists the rest by name. It finds what it needs with `palui__cari_tool` (keywords in any language or exact names), calls it in the same turn, and keeps it loaded for the rest of the conversation. However many skills and MCP servers you add, none of their tools get dropped. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
+- Agents: named personas with their own instructions, recall memory, daily token cap and avatar (an uploaded photo, or an icon and a color). Give one to a WhatsApp or Telegram group, or to someone else's DM, from the new Agents and Chats pages or with `/agent <slug>`, and it answers the people there. In groups it only answers when it's mentioned or replied to. Other people get safe tools only, and approvals from a shared chat come to your DM. Palui stays your personal agent and never answers anyone else. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
+- An Agent bot (Telegram) connector gives an agent its own Telegram bot, so people can add it to a group and @mention it by name.
+- Palui now reads WhatsApp groups. Nothing changes until you give a group an agent: messages there are ignored unless they mention Palui or reply to it.
 - A Notes page and an Instructions & preferences skill. Palui can save standing instructions (always after your approval) and key-value defaults like `default_city`, and reads both at the start of every turn. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 - A Remote MCP setup skill: ask Palui in chat to add a public MCP server (https, no auth) and it checks the URL, lists the tools and adds it after you approve. It can also list servers and remove the ones it added. See the Jadwal Sholat example in the docs.
 - Palui can keep the important files you send in chat, like an ID card, a receipt or a ticket. Ask it in chat ("simpan KTP ini"), and the new Attachments page lists what it saved, with download and delete. It doesn't save everything you send, only files that matter or that you ask for. Files are encrypted with `MASTER_KEY` inside the database, capped at 10 MB, and limited to images, PDF, text and Office files. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
@@ -26,6 +29,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Changed
 
+- The persona moved from Settings to Palui's entry on the Agents page, and the Notes page edits instructions per agent. Your existing persona and instructions carry over to Palui.
 - Each connector now opens on its own page (`/app/connectors/<id>`) instead of a side sheet, with a back link and the Save, Test and Connect buttons pinned at the bottom. Old `?open=<id>` links redirect there.
 - The T3 Code setup asks for the pairing code first and shows the command to make one in a block with a Copy button. The text on its page is cut down to one short line per field, and the longer explanation lives in the docs.
 - A connector that isn't set up yet opens with just the setup guide and the fields it needs. The optional settings sit behind a "More settings" link and show in full once it's connected. A step with a command now shows the command above the box you paste into.

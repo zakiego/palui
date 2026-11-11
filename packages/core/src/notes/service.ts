@@ -1,8 +1,9 @@
 // Owner notes: standing instructions and key-value preferences. Both live in
 // their own tables and go into every turn's system prompt (see notesPrompt), so
 // limits stay small enough to never crowd out the conversation.
-import { asc, eq } from "drizzle-orm"
+import { and, asc, eq } from "drizzle-orm"
 import { instructions, newId, preferences, type DB } from "@palui/db"
+import { getDefaultAgent, type AgentRow } from "../agents"
 
 export const MAX_INSTRUCTIONS = 20
 export const MAX_INSTRUCTION_TITLE = 80
@@ -38,23 +39,30 @@ function checkInstruction(title: string, body: string) {
 
 // --- Instructions ----------------------------------------------------------------------
 
-export function listInstructions(db: DB, opts: { enabledOnly?: boolean } = {}): InstructionRow[] {
-  const q = db.select().from(instructions)
-  return (opts.enabledOnly ? q.where(eq(instructions.enabled, true)) : q).orderBy(asc(instructions.createdAt), asc(instructions.id)).all()
+// Instructions belong to an agent (PLAN 19.1); no agentId means the default agent.
+function ownerAgent(db: DB, agentId: string | undefined): string {
+  return agentId ?? getDefaultAgent(db).id
+}
+
+export function listInstructions(db: DB, opts: { enabledOnly?: boolean; agentId?: string } = {}): InstructionRow[] {
+  const agentId = ownerAgent(db, opts.agentId)
+  const where = opts.enabledOnly ? and(eq(instructions.agentId, agentId), eq(instructions.enabled, true)) : eq(instructions.agentId, agentId)
+  return db.select().from(instructions).where(where).orderBy(asc(instructions.createdAt), asc(instructions.id)).all()
 }
 
 export function getInstruction(db: DB, id: string): InstructionRow | undefined {
   return db.select().from(instructions).where(eq(instructions.id, id)).get()
 }
 
-export function createInstruction(db: DB, input: { title: string; body: string; enabled?: boolean }, now = Date.now()): InstructionRow {
+export function createInstruction(db: DB, input: { title: string; body: string; enabled?: boolean; agentId?: string }, now = Date.now()): InstructionRow {
   const title = clean(input.title).replace(/\n+/g, " ")
   const body = clean(input.body)
   checkInstruction(title, body)
-  if (listInstructions(db).length >= MAX_INSTRUCTIONS) throw new NotesError(`Udah ada ${MAX_INSTRUCTIONS} instruksi. Hapus atau gabung yang lama dulu.`)
+  const agentId = ownerAgent(db, input.agentId)
+  if (listInstructions(db, { agentId }).length >= MAX_INSTRUCTIONS) throw new NotesError(`Udah ada ${MAX_INSTRUCTIONS} instruksi. Hapus atau gabung yang lama dulu.`)
   return db
     .insert(instructions)
-    .values({ id: newId("ins"), title, body, enabled: input.enabled ?? true, createdAt: now, updatedAt: now })
+    .values({ id: newId("ins"), agentId, title, body, enabled: input.enabled ?? true, createdAt: now, updatedAt: now })
     .returning()
     .get()
 }
@@ -116,10 +124,11 @@ export function deletePreference(db: DB, key: string): boolean {
 
 // --- Prompt ----------------------------------------------------------------------------
 
-// The system prompt block for the owner's notes, or null when there are none.
-export function notesPrompt(db: DB): string | null {
-  const ins = listInstructions(db, { enabledOnly: true })
-  const prefs = listPreferences(db)
+// The system prompt block for an agent's notes, or null when there are none.
+// Preferences are the owner's personal data, so only the default agent gets them.
+export function notesPrompt(db: DB, agent: AgentRow = getDefaultAgent(db)): string | null {
+  const ins = listInstructions(db, { enabledOnly: true, agentId: agent.id })
+  const prefs = agent.isDefault ? listPreferences(db) : []
   if (!ins.length && !prefs.length) return null
   const parts: string[] = []
   if (ins.length) {
