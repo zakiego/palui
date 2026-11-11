@@ -17,7 +17,7 @@ import { notesPrompt } from "../notes/service"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
-import { buildSystem, hasImages, loadHistory, loadToolCalls, toModelMessages, type StoredContent } from "./context"
+import { buildSystem, hasImages, loadHistory, loadToolCalls, quotesOutsider, toModelMessages, type StoredContent } from "./context"
 import type { EngineDeps } from "./deps"
 
 export const MODEL_OFF_TEXT = "Model lagi off. Nyalakan: `/connectors on cliproxy`"
@@ -144,7 +144,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   const controller = new AbortController()
   const active: ActiveTurn = { runId, controller, connectorIds: new Set() }
   ctx.active.set(chat.id, active)
-  const state = { tainted: !!(input.untrustedInput || input.resume?.context.tainted) }
+  const state = { tainted: !!(input.untrustedInput || input.resume?.context.tainted || quotesOutsider(history, batch)) }
   const toolStarts = new Map<string, number>()
   const channel = chat.channel === "web" ? undefined : ctx.host.channel(chat.channel)
   const typing = (on: boolean) => channel?.typing?.(chat.externalId, on).catch(() => {})

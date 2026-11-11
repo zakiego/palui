@@ -8,7 +8,7 @@ import type { RunningConnector } from "@palui/core/connectors/define"
 import { testContext } from "../channel-utils/testing"
 import { AuthLockedError, STALE_AFTER_MS, acquireAuthLock } from "./lock"
 import manifest from "./manifest"
-import { formatPairingCode, pairingDigits } from "./messages"
+import { formatPairingCode, pairingDigits, quoteAuthor, quoteOf } from "./messages"
 import { EXPIRES_HINT, REASONS, THINKING_REACTION, authDirFor, backoffDelay, createWhatsAppRuntime, lockPathFor, type WhatsAppDeps, type WhatsAppLive } from "./runtime"
 import { FakeSocket } from "./test-socket"
 
@@ -378,6 +378,19 @@ describe("whatsapp inbound", () => {
     expect(ctx.inbound[0]).toMatchObject({ text: "yang ini", replyToChannelMsgId: "OLD1" })
   })
 
+  it("passes the quoted text and who wrote it", async () => {
+    const { sock, ctx } = await openRunning()
+    sock().message(
+      dm("IN5", { message: { extendedTextMessage: { text: "Ini?", contextInfo: { stanzaId: "BOT1", participant: "628980001472@s.whatsapp.net", quotedMessage: { conversation: "Jadwal besok jam 9" } } } } }),
+    )
+    sock().message(dm("IN6", { message: { extendedTextMessage: { text: "maksudnya", contextInfo: { stanzaId: "OWN1", participant: OWNER_LID, quotedMessage: { imageMessage: { caption: "struk" } } } } } }))
+    sock().message(dm("IN7", { message: { extendedTextMessage: { text: "hilang?", contextInfo: { stanzaId: "GONE1" } } } }))
+    await until(() => ctx.inbound.length === 3)
+    expect(ctx.inbound[0]).toMatchObject({ text: "Ini?", replyToChannelMsgId: "BOT1", quoted: { from: "self", text: "Jadwal besok jam 9" } })
+    expect(ctx.inbound[1]?.quoted).toEqual({ from: "sender", text: "struk", media: "[image]" })
+    expect(ctx.inbound[2]?.quoted).toEqual({ from: "unknown", text: "" })
+  })
+
   it("downloads owner media and skips stranger media", async () => {
     const { sock, ctx, downloads } = await openRunning()
     sock().message(dm("IMG1", { message: { imageMessage: { caption: "ini apa", mimetype: "image/jpeg" } } }))
@@ -528,5 +541,37 @@ describe("whatsapp unlink", () => {
     expect(ctx.statuses.slice(before)).toEqual([])
     await settle()
     expect(sockets).toHaveLength(1)
+  })
+})
+
+describe("whatsapp quotes", () => {
+  it("reads captions, media labels and ignores a quote inside the quote", () => {
+    expect(quoteOf({ conversation: "plain" })).toBeUndefined()
+    expect(quoteOf({ imageMessage: { caption: "lihat", contextInfo: { stanzaId: "Q1", quotedMessage: { documentMessage: { fileName: "a.pdf" } } } } })).toEqual({
+      id: "Q1",
+      text: "",
+      media: "[document: a.pdf]",
+    })
+    expect(quoteOf({ extendedTextMessage: { text: "x", contextInfo: { stanzaId: "Q2", quotedMessage: { audioMessage: { ptt: true } } } } })?.media).toBe("[voice note]")
+    const nested = quoteOf({
+      extendedTextMessage: {
+        text: "x",
+        contextInfo: { stanzaId: "Q3", quotedMessage: { extendedTextMessage: { text: "lapis dua", contextInfo: { stanzaId: "Q0", quotedMessage: { conversation: "lapis satu" } } } } },
+      },
+    })
+    expect(nested).toEqual({ id: "Q3", text: "lapis dua" })
+    const wrapped = quoteOf({ extendedTextMessage: { text: "x", contextInfo: { stanzaId: "Q4", quotedMessage: { ephemeralMessage: { message: { conversation: "sementara" } } } } } })
+    expect(wrapped?.text).toBe("sementara")
+  })
+
+  it("tells self, sender and others apart across device suffixes and LIDs", () => {
+    const self = ["628980001472:3@s.whatsapp.net", "111222333:3@lid"]
+    const sender = [OWNER_JID, OWNER_LID]
+    expect(quoteAuthor("628980001472@s.whatsapp.net", self, sender)).toBe("self")
+    expect(quoteAuthor("111222333@lid", self, sender)).toBe("self")
+    expect(quoteAuthor("628123456789:7@s.whatsapp.net", self, sender)).toBe("sender")
+    expect(quoteAuthor("620000000@s.whatsapp.net", self, sender)).toBe("other")
+    expect(quoteAuthor("999@lid", self, sender, true)).toBe("sender")
+    expect(quoteAuthor(undefined, self, sender)).toBe("unknown")
   })
 })

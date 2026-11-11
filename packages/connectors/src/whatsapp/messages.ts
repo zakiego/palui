@@ -56,14 +56,67 @@ export function textOf(content: Content | undefined): string {
   )
 }
 
-// The id of the message this one quotes, from whichever part carries contextInfo.
-export function quotedIdOf(content: Content | undefined): string | undefined {
+// A short label for media in a quoted message: "[image]", "[document: a.pdf]".
+// The quote only carries a thumbnail, so nothing is downloaded.
+export function mediaLabel(content: Content | undefined): string | undefined {
+  if (!content) return undefined
+  if (content.imageMessage) return "[image]"
+  if (content.videoMessage) return "[video]"
+  if (content.audioMessage) return content.audioMessage.ptt ? "[voice note]" : "[audio]"
+  if (content.documentMessage) return content.documentMessage.fileName ? `[document: ${content.documentMessage.fileName}]` : "[document]"
+  if (content.stickerMessage) return "[sticker]"
+  if (content.locationMessage || content.liveLocationMessage) return "[location]"
+  if (content.contactMessage) return content.contactMessage.displayName ? `[contact: ${content.contactMessage.displayName}]` : "[contact]"
+  if (content.contactsArrayMessage) return "[contacts]"
+  if (content.pollCreationMessage || content.pollCreationMessageV3) return "[poll]"
+  return undefined
+}
+
+export type QuoteInfo = {
+  // The quoted message's id (stanzaId).
+  id?: string
+  // Who wrote it (contextInfo.participant), when WhatsApp says.
+  participant?: string
+  text: string
+  media?: string
+}
+
+type ContextInfo = { stanzaId?: string | null; participant?: string | null; quotedMessage?: WAMessage["message"] }
+
+// The message this one quotes, from whichever part carries contextInfo. Only one
+// level: a quote inside the quoted message is ignored. Text and media are empty
+// when WhatsApp sent the id without the body (deleted or not synced).
+export function quoteOf(content: Content | undefined): QuoteInfo | undefined {
   if (!content) return undefined
   for (const value of Object.values(content)) {
-    const id = (value as { contextInfo?: { stanzaId?: string | null } } | null)?.contextInfo?.stanzaId
-    if (id) return id
+    const ctx = (value as { contextInfo?: ContextInfo | null } | null)?.contextInfo
+    if (!ctx?.stanzaId && !ctx?.quotedMessage) continue
+    const quoted = unwrap(ctx.quotedMessage)
+    const info: QuoteInfo = { text: textOf(quoted).trim() }
+    if (ctx.stanzaId) info.id = ctx.stanzaId
+    if (ctx.participant) info.participant = ctx.participant
+    const media = mediaLabel(quoted)
+    if (media) info.media = media
+    return info
   }
   return undefined
+}
+
+// Who wrote a quoted message: this account (what Palui sends as), the sender of
+// the new message, someone else, or unknown when WhatsApp left out the participant.
+// In a DM there are only two people, so anyone who isn't us is the sender, even
+// when their LID isn't mapped yet.
+export function quoteAuthor(
+  participant: string | undefined,
+  selfIds: (string | null | undefined)[],
+  senderIds: (string | null | undefined)[],
+  directChat = false,
+): "self" | "sender" | "other" | "unknown" {
+  if (!participant) return "unknown"
+  const p = bareJid(participant)
+  if (selfIds.some((id) => id && bareJid(id) === p)) return "self"
+  if (directChat || senderIds.some((id) => id && bareJid(id) === p)) return "sender"
+  return "other"
 }
 
 export type MediaInfo = {

@@ -112,6 +112,17 @@ export type InboundMedia = {
   durationSec?: number
 }
 
+// The message an inbound one quotes, as the channel saw it. The core prefers its
+// own stored copy when it has one (see writeInbound).
+export type InboundQuote = {
+  // self: the account Palui speaks as. sender: whoever sent the new message.
+  from: "self" | "sender" | "other" | "unknown"
+  // Text or caption; empty when the channel only had the id (deleted, not synced).
+  text: string
+  // A label for any media in it, e.g. "[image]" or "[document: a.pdf]".
+  media?: string
+}
+
 export type InboundMessage = {
   channel: Channel
   connectorId: string
@@ -124,6 +135,7 @@ export type InboundMessage = {
   senderName?: string
   channelMsgId?: string
   replyToChannelMsgId?: string
+  quoted?: InboundQuote
   text: string
   media?: InboundMedia[]
   // A button press (Telegram callback_query data).

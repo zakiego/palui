@@ -2,13 +2,13 @@
 // status `pending` before the channel handler returns. Media is turned into
 // something the model can read later, at dispatch time, so a slow transcription
 // never holds up the channel.
-import { eq } from "drizzle-orm"
-import { chats, messages, newId, type DB } from "@palui/db"
+import { and, desc, eq } from "drizzle-orm"
+import { chats, messages, newId, outbox, type DB } from "@palui/db"
 import { ensureChat, type ChatRow } from "../chats"
 import type { Logger } from "../log"
 import type { InboundMedia, InboundMessage } from "../connectors/define"
 import type { RunningEntry } from "../connectors/supervisor"
-import type { StoredContent, StoredMedia } from "./context"
+import { QUOTE_MAX_CHARS, type StoredContent, type StoredMedia, type StoredQuote } from "./context"
 
 export type MessageRow = typeof messages.$inferSelect
 
@@ -30,7 +30,8 @@ export function writeInbound(db: DB, msg: InboundMessage, now = Date.now()): { c
   const media: StoredMedia[] | undefined = msg.media?.length
     ? msg.media.map((m) => (m.kind === "image" ? { kind: "image", mimeType: m.mimeType, data: m.data } : { kind: m.kind, mimeType: m.mimeType, data: m.data, filename: m.filename }))
     : undefined
-  const content: StoredContent = { text: msg.text ?? "", ...(media ? { media } : {}), ...(msg.callback ? { callback: msg.callback } : {}) }
+  const quoted = resolveQuote(db, chat.id, msg)
+  const content: StoredContent = { text: msg.text ?? "", ...(quoted ? { quoted } : {}), ...(media ? { media } : {}), ...(msg.callback ? { callback: msg.callback } : {}) }
   const row = db
     .insert(messages)
     .values({
@@ -50,6 +51,47 @@ export function writeInbound(db: DB, msg: InboundMessage, now = Date.now()): { c
     .get()
   db.update(chats).set({ lastMessageAt: now }).where(eq(chats.id, chat.id)).run()
   return { chat, row }
+}
+
+const QUOTE_FROM: Record<NonNullable<InboundMessage["quoted"]>["from"], StoredQuote["from"]> = { self: "assistant", sender: "user", other: "other", unknown: "unknown" }
+
+function capQuote(text: string): string {
+  const t = text.trim()
+  return t.length > QUOTE_MAX_CHARS ? `${t.slice(0, QUOTE_MAX_CHARS).trimEnd()}... (truncated)` : t
+}
+
+// What the new message quotes. Our own copy wins: a reply Palui sent (messages
+// or, for reminders and job results, the outbox) or an earlier owner message,
+// whose stored text already has voice notes and files turned into text. When we
+// don't have it, use what the channel sent.
+export function resolveQuote(db: DB, chatId: string, msg: InboundMessage): StoredQuote | undefined {
+  const id = msg.replyToChannelMsgId
+  if (id) {
+    const row = db
+      .select({ role: messages.role, text: messages.text, content: messages.content })
+      .from(messages)
+      .where(and(eq(messages.chatId, chatId), eq(messages.channelMsgId, id)))
+      .orderBy(desc(messages.createdAt))
+      .limit(1)
+      .get()
+    if (row && (row.role === "assistant" || row.role === "user")) {
+      const c = (row.content ?? {}) as StoredContent
+      const text = capQuote(row.text || c.text || "")
+      const media = c.media?.some((m) => m.kind === "image") ? "[image]" : undefined
+      if (text || media) return { from: row.role, text, ...(media ? { media } : {}) }
+    }
+    const sent = db
+      .select({ payload: outbox.payload })
+      .from(outbox)
+      .where(and(eq(outbox.chatId, chatId), eq(outbox.channelMsgId, id)))
+      .orderBy(desc(outbox.createdAt))
+      .limit(1)
+      .get()
+    if (sent?.payload.text) return { from: "assistant", text: capQuote(sent.payload.text) }
+  }
+  const q = msg.quoted
+  if (!q) return undefined
+  return { from: QUOTE_FROM[q.from] ?? "unknown", text: capQuote(q.text), ...(q.media ? { media: q.media } : {}) }
 }
 
 function decodedSize(b64: string): number {

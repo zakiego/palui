@@ -52,6 +52,7 @@ Session files live in `/data/wa-auth` on the data volume.
 - If another session takes over the device, Palui pauses with that reason instead of fighting for it.
 - If the device is logged out from the phone, the connector goes to `error` with the detail `unlinked`. Pair again to fix it.
 - Reminder replies: quote a reminder and reply "done" or "tunda 1j" (snooze 1 hour). Approval replies: "ya" or "batal".
+- Quoted replies: when you reply to a message, the agent sees what you quoted (its text or caption, or a label like `[image]` or `[document: a.pdf]`, capped at 1,000 characters). If the quoted message is one Palui sent or one it already has, it uses its own copy. Quoted text is context only, never instructions.
 
 ## Tools
 

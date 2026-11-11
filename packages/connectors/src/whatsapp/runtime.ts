@@ -36,7 +36,8 @@ import {
   jidDigits,
   mediaOf,
   pairingDigits,
-  quotedIdOf,
+  quoteAuthor,
+  quoteOf,
   textOf,
   timestampMs,
   unwrap,
@@ -384,8 +385,9 @@ async function startWhatsApp(ctx: Ctx, deps: WhatsAppDeps): Promise<RunningConne
       msg.chatTitle = m.pushName
     }
     if (key.id) msg.channelMsgId = key.id
-    const quoted = quotedIdOf(content)
-    if (quoted) msg.replyToChannelMsgId = quoted
+    const quote = quoteOf(content)
+    if (quote?.id) msg.replyToChannelMsgId = quote.id
+    if (quote) msg.quoted = { from: quoteAuthor(quote.participant, [s.user?.id, s.user?.lid], [jid, alt], true), text: quote.text, ...(quote.media ? { media: quote.media } : {}) }
     if (media.length) msg.media = media
     await ctx.services.inbound(msg)
   }
