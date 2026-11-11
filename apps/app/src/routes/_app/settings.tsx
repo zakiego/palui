@@ -741,6 +741,13 @@ function HooksCard({ data }: { data: Data }) {
                   <CopyButton text={created.secret} />
                 </div>
               </Field>
+              <Field>
+                <FieldLabel>{t("settings.hooks.tryIt")}</FieldLabel>
+                <div className="flex min-w-0 items-start gap-2">
+                  <code className="min-w-0 flex-1 rounded-md bg-muted p-2 font-mono text-caption break-all">{curlFor(created.url, created.secret)}</code>
+                  <CopyButton text={curlFor(created.url, created.secret)} />
+                </div>
+              </Field>
             </FieldGroup>
           ) : (
             <form
@@ -843,4 +850,10 @@ function SettingsSkeleton() {
       </div>
     </PagePending>
   )
+}
+
+// A ready-to-run signed request for a new hook, so the secret can be tested
+// right away. Signing is HMAC-SHA256 over "<timestamp>.<raw body>".
+function curlFor(url: string, secret: string): string {
+  return `BODY='Hello from curl'; TS=$(date +%s); curl -X POST '${url}' -H "x-palui-timestamp: $TS" -H "x-palui-signature: sha256=$(printf '%s.%s' "$TS" "$BODY" | openssl dgst -sha256 -hmac '${secret}' -hex | sed 's/^.* //')" -d "$BODY"`
 }

@@ -307,7 +307,7 @@ function PairPhone(props: WizardActionProps) {
             Get code
           </Button>
         </div>
-        <p className="text-caption text-muted-foreground">Leave empty to pair with the QR.</p>
+        <p className="text-caption text-muted-foreground">Palui's own number, not yours. Leave empty for QR.</p>
         {error && <FieldError>{error}</FieldError>}
       </Field>
     </form>
