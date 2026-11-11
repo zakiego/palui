@@ -46,6 +46,7 @@ export function createEngine(opts: EngineOptions) {
     active: new Map(),
     draining: false,
     approvalTtlMs: opts.approvalTtlMs ?? APPROVAL_TTL_MS,
+    resumeRun: (runId) => maybeResume(runId),
   }
   const { db, log } = ctx
   let sweep: NodeJS.Timeout | undefined

@@ -3,7 +3,7 @@
 // restart. All requests from one run are answered together in one resume call.
 import { and, asc, eq, inArray, lte } from "drizzle-orm"
 import type { ModelMessage } from "ai"
-import { newId, pendingApprovals, type DB, type ToolClass } from "@palui/db"
+import { newId, pendingApprovals, runs, toolCalls, type DB, type ToolClass } from "@palui/db"
 
 export const APPROVAL_TTL_MS = 10 * 60_000
 
@@ -102,13 +102,49 @@ export function expireDue(db: DB, now = Date.now()): string[] {
   return [...new Set(rows.map((r) => r.runId))]
 }
 
+export const SUPERSEDED_PREVIEW = "dropped: the same call was made again before the owner answered"
+
+// Sorted-key JSON, so the same arguments compare equal in whatever order the model wrote them.
+function canonical(v: unknown): string {
+  return JSON.stringify(v, (_k, x: unknown) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x)) ?? ""
+}
+
+// The model made a call again (same tool, same arguments) while an older request
+// for it still waits in this chat: the older one is moot. It's marked superseded
+// and its call denied, so the owner gets no late "that didn't run" follow-up
+// about something already asked again. A run left with only superseded requests
+// is closed here. `resume` lists the runs that had another request answered and
+// are now fully decided: they still owe a resume.
+export function supersedeSameCall(db: DB, input: { chatId: string; runId: string; tool: string; args: unknown }, now = Date.now()): { superseded: ApprovalRow[]; resume: string[] } {
+  const superseded: ApprovalRow[] = []
+  for (const r of pendingForChat(db, input.chatId)) {
+    if (r.tool !== input.tool || r.runId === input.runId) continue
+    const callId = `${r.runId}:${r.toolCallId}`
+    const prior = db.select({ args: toolCalls.args }).from(toolCalls).where(eq(toolCalls.id, callId)).get()
+    if (!prior || canonical(prior.args) !== canonical(input.args)) continue
+    db.transaction((tx) => {
+      tx.update(pendingApprovals).set({ status: "superseded", decidedAt: now }).where(eq(pendingApprovals.id, r.id)).run()
+      tx.update(toolCalls).set({ status: "denied", resultPreview: SUPERSEDED_PREVIEW }).where(eq(toolCalls.id, callId)).run()
+    })
+    superseded.push(r)
+  }
+  const resume: string[] = []
+  for (const runId of new Set(superseded.map((r) => r.runId))) {
+    const rows = approvalsForRun(db, runId)
+    if (rows.some((r) => r.status === "pending")) continue
+    if (rows.some((r) => r.status !== "superseded")) resume.push(runId)
+    else if (markResumed(db, runId, now)) db.update(runs).set({ status: "ok" }).where(eq(runs.id, runId)).run()
+  }
+  return { superseded, resume }
+}
+
 // Runs whose requests are all decided but not resumed yet (after a restart).
 // A resumed row keeps its decision status and gets context.resumedAt.
 export function readyToResume(db: DB): string[] {
   const rows = db
     .select()
     .from(pendingApprovals)
-    .where(inArray(pendingApprovals.status, ["approved", "denied", "expired", "pending"]))
+    .where(inArray(pendingApprovals.status, ["approved", "denied", "expired", "superseded", "pending"]))
     .all()
   const byRun = new Map<string, ApprovalRow[]>()
   for (const r of rows) byRun.set(r.runId, [...(byRun.get(r.runId) ?? []), r])

@@ -19,6 +19,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 ### Fixed
 
 - Palui no longer re-checks your reminders, or any earlier work, on every message. Later turns now see the tool calls earlier turns made and their results, so it stops doubting its own replies and stops taking back answers that were right.
+- Asking for the same thing again while an approval prompt still waits now drops the older request. You no longer get a late "that didn't run" message about something that was already answered.
 
 ## 0.3.0 (2026-11-11)
 
