@@ -51,25 +51,37 @@ export function formatClock(ms: number, tz: string): string {
   return DateTime.fromMillis(ms, { zone: tz }).toFormat("HH.mm")
 }
 
-// Whether a new turn may start. A hit cap pauses turns (settings) until the
-// window rolls over; `fresh` is true the first time, so the caller tells the owner once.
-// A daily token cap of 0 (or less) means no cap, the same as agents and jobs.
-export function checkGlobalBudget(db: DB, now = Date.now()): BudgetCheck {
+// The cap that blocks turns right now, from the live counters and the current
+// settings. Pure: a raised cap lifts a pause on the next check, a lowered one
+// starts it, with no stale `turnsPausedUntil` in between. A daily token cap of
+// 0 (or less) means no cap, the same as agents and jobs.
+export function activePause(db: DB, now = Date.now()): { reason: string; until: number } | null {
   const tz = getSetting(db, "timezone")
-  const until = getSetting(db, "turnsPausedUntil")
-  if (until && until > now) return { ok: false, reason: getSetting(db, "turnsPausedReason") ?? "budget", until, fresh: false }
-  if (until && until <= now) {
-    setSetting(db, "turnsPausedUntil", null, now)
-    setSetting(db, "turnsPausedReason", null, now)
-  }
   const b = getSetting(db, "budgets")
   if (getUsage(db, usageKeys.runs(now, tz)) >= b.maxRunsPerHour) {
-    return pauseTurns(db, nextHour(now, tz), `batas ${b.maxRunsPerHour} run per jam kena`, now)
+    return { until: nextHour(now, tz), reason: `batas ${b.maxRunsPerHour} run per jam kena` }
   }
   if (b.dailyTokenCap > 0 && getUsage(db, usageKeys.tokens(now, tz)) >= b.dailyTokenCap) {
-    return pauseTurns(db, nextDay(now, tz), `batas ${b.dailyTokenCap.toLocaleString("id-ID")} token per hari kena`, now)
+    return { until: nextDay(now, tz), reason: `batas ${b.dailyTokenCap.toLocaleString("id-ID")} token per hari kena` }
   }
-  return { ok: true }
+  return null
+}
+
+// Whether a new turn may start. A hit cap pauses turns until the window rolls
+// over; the pause is mirrored in settings so `fresh` is true only the first time
+// and the caller tells the owner once.
+export function checkGlobalBudget(db: DB, now = Date.now()): BudgetCheck {
+  const hit = activePause(db, now)
+  const until = getSetting(db, "turnsPausedUntil")
+  if (!hit) {
+    if (until !== null) {
+      setSetting(db, "turnsPausedUntil", null, now)
+      setSetting(db, "turnsPausedReason", null, now)
+    }
+    return { ok: true }
+  }
+  if (until === hit.until && getSetting(db, "turnsPausedReason") === hit.reason) return { ok: false, ...hit, fresh: false }
+  return pauseTurns(db, hit.until, hit.reason, now)
 }
 
 export function pauseTurns(db: DB, until: number, reason: string, now = Date.now()): BudgetCheck {

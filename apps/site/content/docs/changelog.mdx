@@ -19,6 +19,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 - The global daily token cap (Settings, Limits) can now be set to 0 to turn it off, the same as an agent's or a job's cap, so turns never pause on token use. `/status` shows `tanpa batas` when it's off.
 
+### Fixed
+
+- Raising the daily token cap or runs per hour (or setting the token cap to 0) now lifts a budget pause on the next message instead of at midnight, and `/status` shows the cap that applies now. Before, a pause stayed until midnight even after you raised the cap, and turns could fail once that pause ran out.
+
 ## 0.4.0 (2026-11-11)
 
 ### Added

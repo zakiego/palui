@@ -2,7 +2,7 @@
 // when every model connector is off.
 import { agentForChat, assignAgent, getAgent, getAgentBySlug, getDefaultAgent, isSharedChat, listAgents } from "../agents"
 import { getSetting } from "../settings"
-import { formatClock, tokensToday, getUsage, usageKeys } from "../budget"
+import { activePause, formatClock, tokensToday, getUsage, usageKeys } from "../budget"
 import { eq } from "drizzle-orm"
 import { chats } from "@palui/db"
 import { rotateSession, type ChatRow } from "../chats"
@@ -108,8 +108,8 @@ export function statusText(ctx: EngineCtx): string {
     `Token hari ini: ${tokensToday(db, now).toLocaleString("id-ID")} / ${budgets.dailyTokenCap > 0 ? budgets.dailyTokenCap.toLocaleString("id-ID") : "tanpa batas"}`,
     `Run jam ini: ${getUsage(db, usageKeys.runs(now, tz))} / ${budgets.maxRunsPerHour}`,
   ]
-  const paused = getSetting(db, "turnsPausedUntil")
-  if (paused && paused > now) lines.push(`Turn dijeda sampai ${formatClock(paused, tz)}: ${getSetting(db, "turnsPausedReason") ?? ""}`)
+  const paused = activePause(db, now)
+  if (paused) lines.push(`Turn dijeda sampai ${formatClock(paused.until, tz)}: ${paused.reason}`)
   lines.push("", "Konektor:")
   for (const c of ctx.host.status()) lines.push(`• ${c.id}: ${STATUS_LABEL[c.status] ?? c.status}${c.detail ? ` (${c.detail})` : ""}`)
   return lines.join("\n")

@@ -16,6 +16,7 @@ import { failoverModel, resolveChain } from "@palui/core/models/failover"
 import { rerouteChannelRows } from "@palui/core/outbox/worker"
 import type { Supervisor } from "@palui/core/connectors/supervisor"
 import { getSetting } from "@palui/core/settings"
+import { activePause } from "@palui/core/budget/index"
 
 export const SSE_KEEPALIVE_MS = 15_000
 const MAX_BODY = 1024 * 1024
@@ -114,7 +115,7 @@ export function createControlServer(o: ControlServerOptions) {
       startedAt: o.startedAt,
       schema: st.ok ? st.version : `not ok: ${st.reason}`,
       connectors: o.supervisor.status(),
-      turnsPaused: { until: getSetting(o.db, "turnsPausedUntil"), reason: getSetting(o.db, "turnsPausedReason") },
+      turnsPaused: activePause(o.db) ?? { until: null, reason: null },
       activeTurns: o.engine.activeTurns(),
     }
   }

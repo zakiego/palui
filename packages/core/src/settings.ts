@@ -83,6 +83,12 @@ export function getSetting<K extends keyof Settings>(db: DB, key: K): Settings[K
 }
 
 export function setSetting<K extends keyof Settings>(db: DB, key: K, value: Settings[K], now = Date.now()) {
+  // The value column is NOT NULL, and every nullable key defaults to null, so
+  // null drops the row and getSetting falls back to the default.
+  if (value === null) {
+    db.delete(settings).where(eq(settings.key, key)).run()
+    return
+  }
   db.insert(settings)
     .values({ key, value, updatedAt: now })
     .onConflictDoUpdate({ target: settings.key, set: { value, updatedAt: now } })
