@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import { memoryDb } from "@palui/db"
 import { silentLogger } from "@palui/core/log"
 import { setSetting } from "@palui/core/settings"
+import { failoverModel } from "@palui/core/models/failover"
+import { generateText } from "ai"
 import type { ConnectorContext } from "@palui/core/connectors/define"
 import aiGatewayManifest from "../ai-gateway/manifest"
 import manifest from "./manifest"
@@ -69,5 +71,25 @@ describe("gateway model connectors", () => {
     expect(def.provider).toContain("anthropic")
     expect(vis.provider).toContain("cliproxy")
     expect(h.live!()).toMatchObject({ baseUrl: "http://host.docker.internal:8317" })
+  })
+
+  it("start lists the gateway's models through the listModels action", async () => {
+    const calls: { url: string; headers: Record<string, string>; body?: unknown }[] = []
+    const rt = gatewayRuntime(manifest, { fetch: fakeFetch(calls) })
+    const h = await rt.start(ctx({}, { apiKey: "k" }) as never)
+    expect(await h.action!("listModels", {})).toEqual({ models: ["claude-sonnet-4-6", "gemini-3-flash-preview"] })
+    await expect(h.action!("nope", {})).rejects.toThrow("Unknown action nope")
+  })
+
+  it("a link's effort reaches the gateway as reasoning effort, and only on that link", async () => {
+    const calls: { url: string; headers: Record<string, string>; body?: unknown }[] = []
+    const rt = gatewayRuntime(manifest, { fetch: fakeFetch(calls) })
+    const h = await rt.start(ctx({ protocols: { default: "openai" } }, { apiKey: "k" }) as never)
+    const lm = (id: string) => h.model!(id, "default") as never
+    await generateText({ model: failoverModel([{ connectorId: "cliproxy", model: "gpt-5", effort: "high", lm: lm("gpt-5") }]), prompt: "hi" })
+    await generateText({ model: failoverModel([{ connectorId: "cliproxy", model: "gpt-5", lm: lm("gpt-5") }]), prompt: "hi" })
+    const bodies = calls.filter((c) => c.url.endsWith("/chat/completions")).map((c) => c.body as { reasoning_effort?: string })
+    expect(bodies[0]!.reasoning_effort).toBe("high")
+    expect(bodies[1]!.reasoning_effort).toBeUndefined()
   })
 })

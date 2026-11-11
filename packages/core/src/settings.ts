@@ -1,8 +1,13 @@
 // Typed settings with defaults, stored as JSON in the `settings` table.
 import { eq } from "drizzle-orm"
 import { settings, type DB } from "@palui/db"
+import type { ReasoningEffort } from "./models/effort"
 
 export type ModelRole = "default" | "fast" | "vision"
+
+export { REASONING_EFFORTS, type ReasoningEffort } from "./models/effort"
+
+export type ModelChainLink = { connectorId: string; model: string; effort?: ReasoningEffort }
 
 export type Settings = {
   persona: string
@@ -10,8 +15,8 @@ export type Settings = {
   // Bot language: "auto" = casual Indonesian, English when the owner writes English (D6).
   language: "auto" | "id" | "en"
   uiLanguage: "en" | "id"
-  // Per role, an ordered failover chain of { connectorId, model }.
-  modelRoles: Record<ModelRole, { connectorId: string; model: string }[]>
+  // Per role, an ordered failover chain of { connectorId, model, effort? }.
+  modelRoles: Record<ModelRole, ModelChainLink[]>
   budgets: {
     maxSteps: number
     turnTimeoutMs: number

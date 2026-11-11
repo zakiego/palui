@@ -24,6 +24,21 @@ function settle() {
   }, 1200)
 }
 
+const DEMO_MODELS = [
+  "claude-sonnet-5-5",
+  "claude-opus-5-5",
+  "claude-haiku-5-5",
+  "claude-fable-5-2",
+  "gpt-5.2",
+  "gpt-5.2-codex",
+  "o4-mini",
+  "gemini-3-pro-preview",
+  "gemini-3-flash-preview",
+  "llama-4-maverick",
+  "deepseek-v3.2",
+  "qwen3-coder-480b-a35b-instruct-with-a-long-model-id",
+]
+
 function status() {
   return {
     ok: true,
@@ -55,7 +70,17 @@ const server = createServer((req, res) => {
     return json({ ok: true })
   }
   if (url.startsWith("/control/test/")) return json({ ok: true, detail: "Reachable (demo runtime)" })
-  if (url.startsWith("/control/action/")) return json({})
+  if (url.startsWith("/control/action/")) {
+    let raw = ""
+    req.on("data", (chunk: Buffer) => (raw += chunk))
+    req.on("end", () => {
+      const name = (JSON.parse(raw || "{}") as { name?: string }).name
+      // The settings model picker lists these.
+      if (name === "listModels") return json({ models: DEMO_MODELS })
+      json({})
+    })
+    return
+  }
   if (url.startsWith("/control/remove/")) return json({ ok: false, detail: "The demo runtime doesn't remove connectors." })
   if (url.startsWith("/control/reminders/parse")) return json({ ok: false, text: "", tz: config().defaultTz, error: "The demo runtime doesn't parse reminders." })
   if (url.startsWith("/control/")) return json({ ok: true })

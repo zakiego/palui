@@ -77,8 +77,8 @@ export function worst(k: Kit) {
   k.setting("fallbackChannel", "none")
   k.setting("budgets", { maxSteps: 50, turnTimeoutMs: 600_000, maxTools: 128, dailyTokenCap: 100_000_000, maxRunsPerHour: 1000 })
   const sixSteps = [
-    { connectorId: "cliproxy", model: within(MODEL_LONG, LIMITS.model) },
-    { connectorId: "ai-gateway", model: "claude-sonnet-4-6" },
+    { connectorId: "cliproxy", model: within(MODEL_LONG, LIMITS.model), effort: "xhigh" as const },
+    { connectorId: "ai-gateway", model: "claude-sonnet-4-6", effort: "none" as const },
     // A connector that was removed after the chain was saved.
     { connectorId: "openrouter", model: "anthropic/claude-opus-4.1:thinking" },
     { connectorId: "cliproxy", model: "gemini-2.5-flash-preview-with-a-long-model-id" },
