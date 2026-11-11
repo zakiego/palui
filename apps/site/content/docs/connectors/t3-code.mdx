@@ -35,8 +35,11 @@ The token is full access, so threads Palui starts run like the ones you start yo
 | `daftar_thread` | `read` | Lists recent threads, in one project or all of them. |
 | `mulai_thread` | `write` | Starts a thread with a task, in a new worktree unless you ask for the project's own checkout. |
 | `kirim_ke_thread` | `write` | Sends a follow-up to a thread. An idle thread starts working on it. |
+| `thread_chat_ini` | `read` | Lists the threads started or followed up from the current chat, with their ids and links. |
 | `lihat_thread` | `read` | Shows a thread's status, branch, pull requests and latest messages. |
 | `hentikan_thread` | `destructive` | Interrupts a thread's running turn. Always asks first. |
+
+A thread link looks like `…/threads/<environmentId>/<threadId>`. The first id is your T3 Code install and is the same for every thread. The last part is the thread id.
 
 `write` tools run right away in your own chat. They ask first after [untrusted content](/docs/concepts/taint-rule) in the same turn, and in scheduled jobs and hooks.
 

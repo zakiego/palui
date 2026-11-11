@@ -208,6 +208,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         now: startedAt,
         tz: settings.timezone,
         channel: chat.channel,
+        chat: { id: chat.id, externalId: chat.externalId, kind: chat.kind, sessionId: chat.sessionId },
         capabilities: capabilityList(ctx, tools),
         notes: notesPrompt(db),
         recall,

@@ -7,7 +7,7 @@ import type { PaluiTool, TurnInfo } from "@palui/core/connectors/define"
 import { fakeCtx, startMcpServer, type TestMcpServer } from "../mcp/test-helpers"
 import { codeFingerprint, matchProject, pairWithCode, parseModel, T3Client } from "./client"
 import manifest from "./manifest"
-import runtime, { createWatcher, ensureToken, finishedText, parseConfig, startT3, threadIdOf, WATCH_TTL_MS } from "./runtime"
+import runtime, { createWatcher, ensureToken, environmentIdOf, finishedText, parseConfig, startT3, threadIdOf, WATCH_TTL_MS } from "./runtime"
 
 const TOKEN = "t3.session.token"
 const CODE = "PAIR-CODE-1234"
@@ -245,13 +245,14 @@ describe("t3code tools and watcher", () => {
     return { s, ctx, chat, turn, started, tools }
   }
 
-  it("offers six tools with the right classes", async () => {
+  it("offers seven tools with the right classes", async () => {
     const { tools, started } = await setup()
     expect(Object.fromEntries(Object.entries(tools).map(([k, v]) => [k, v.class]))).toEqual({
       daftar_proyek: "read",
       daftar_thread: "read",
       mulai_thread: "write",
       kirim_ke_thread: "write",
+      thread_chat_ini: "read",
       lihat_thread: "read",
       hentikan_thread: "destructive",
     })
@@ -262,7 +263,7 @@ describe("t3code tools and watcher", () => {
   it("starts a thread in a worktree, then tells the chat when it finishes", async () => {
     const { s, ctx, tools, started } = await setup()
     const out = await exec(tools.mulai_thread, { project: "palui", task: "Fix the bug\nin the router" })
-    expect(out).toMatchObject({ ok: true, threadId: "11111111-aaaa", title: "Fix the bug", project: "palui", workspace: "new worktree from main" })
+    expect(out).toMatchObject({ ok: true, threadId: "11111111-aaaa", environmentId: "env1", title: "Fix the bug", project: "palui", workspace: "new worktree from main" })
     expect(s.launches[0]).toMatchObject({
       projectId: "p1",
       title: "Fix the bug",
@@ -284,6 +285,8 @@ describe("t3code tools and watcher", () => {
     expect(rows[0]!.payload.text).toBe(`T3 Code beres: Fix the bug\n\n${s.reply}\n\nhttps://app.t3.codes/threads/env1/11111111-aaaa`)
     expect(started.watcher.list()).toHaveLength(0)
     expect(ctx.patches.at(-1)).toEqual({ watches: [] })
+    // The thread stays listed for this chat after the watch is gone.
+    expect(await exec(tools.thread_chat_ini, {})).toMatchObject({ ok: true, threads: [{ threadId: "11111111-aaaa", action: "started", environmentId: "env1" }] })
     await started.handle.stop()
   })
 
@@ -325,6 +328,30 @@ describe("t3code tools and watcher", () => {
     expect(s.interrupts).toEqual(["11111111-aaaa"])
     expect(await exec(tools.lihat_thread, { thread: "gone" })).toEqual({ ok: false, error: "Thread gone was not found." })
     await started.handle.stop()
+  })
+
+  it("lists only the threads started or followed from this chat", async () => {
+    const { ctx, tools, turn, started } = await setup()
+    expect(await exec(tools.thread_chat_ini, {})).toEqual({ ok: true, chatId: turn.chatId, threads: [], message: "Belum ada thread T3 Code dari chat ini." })
+    await exec(tools.mulai_thread, { project: "palui", task: "Fix it" })
+    await exec(tools.kirim_ke_thread, { thread: "11111111-aaaa", message: "More" })
+
+    const other = ensureChat(ctx.db, { channel: "whatsapp", externalId: "628@s.whatsapp.net" })
+    const otherTools = await started.handle.tools({ ...turn, chatId: other.id })
+    expect(await exec(otherTools.thread_chat_ini, {})).toMatchObject({ ok: true, chatId: other.id, threads: [] })
+
+    const out = (await exec(tools.thread_chat_ini, {})) as { threads: Record<string, unknown>[] }
+    expect(out.threads).toEqual([
+      { threadId: "11111111-aaaa", title: "Fix the bug", action: "followed", at: new Date(0).toISOString(), link: "https://app.t3.codes/threads/env1/11111111-aaaa", environmentId: "env1" },
+    ])
+    expect(await exec(tools.daftar_thread, {})).toMatchObject({ threads: [{ id: "11111111-aaaa", environmentId: "env1" }] })
+    await started.handle.stop()
+  })
+
+  it("reads the environment id out of a thread link", () => {
+    expect(environmentIdOf("https://app.t3.codes/threads/8b457a52-1111/mcp%3Alaunch%3Aabc")).toBe("8b457a52-1111")
+    expect(environmentIdOf("https://app.t3.codes/projects/x")).toBeUndefined()
+    expect(environmentIdOf(undefined)).toBeUndefined()
   })
 
   it("uses the configured model over T3 Code's first one", async () => {

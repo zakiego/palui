@@ -14,6 +14,7 @@ import manifest, { t3Config } from "./manifest"
 export const POLL_MS = 20_000
 export const WATCH_TTL_MS = 24 * 3600_000
 export const MAX_WATCHES = 20
+export const MAX_HISTORY = 50
 const REPLY_CHARS = 1500
 const NOTICE_TTL_MS = 24 * 3600_000
 
@@ -37,7 +38,23 @@ const learned = z.object({
       }),
     )
     .optional(),
+  // Threads started or followed up from each chat, newest last, so the model can
+  // answer "which threads did I start here" after the watch is gone.
+  history: z
+    .array(
+      z.object({
+        threadId: z.string(),
+        chatId: z.string(),
+        title: z.string(),
+        link: z.string().optional(),
+        action: z.enum(["started", "followed"]),
+        at: z.number(),
+      }),
+    )
+    .optional(),
 })
+
+export type HistoryEntry = NonNullable<z.infer<typeof learned>["history"]>[number]
 
 export type Watch = NonNullable<z.infer<typeof learned>["watches"]>[number]
 
@@ -92,6 +109,18 @@ export function threadIdOf(input: string): string {
   }
 }
 
+// The T3 Code environment in a thread link (…/threads/<environmentId>/<threadId>).
+// It's the same for every thread on the owner's Mac, so it is not a thread id.
+export function environmentIdOf(link: string | undefined): string | undefined {
+  const url = link ? URL.parse(link) : null
+  if (!url) return undefined
+  const parts = url.pathname.split("/").filter(Boolean)
+  const i = parts.indexOf("threads")
+  return i >= 0 && parts.length >= i + 3 ? parts[i + 1] : undefined
+}
+
+const LINK_NOTE = "Links look like …/threads/<environmentId>/<threadId>. environmentId is the T3 Code install on the owner's Mac and is the same for every thread; threadId is the thread."
+
 function shortHash(...parts: string[]): string {
   return createHash("sha256").update(parts.join("\0")).digest("hex").slice(0, 12)
 }
@@ -107,6 +136,7 @@ function threadView(t: T3ThreadSummary) {
     title: t.title,
     status: t.status,
     ...(t.link ? { link: t.link } : {}),
+    ...(environmentIdOf(t.link) ? { environmentId: environmentIdOf(t.link) } : {}),
     ...(t.branch ? { branch: t.branch } : {}),
     ...(t.pendingRequestCount ? { waitingForAnswer: true } : {}),
     ...(t.pullRequests?.length ? { pullRequests: t.pullRequests.map((p) => p.url).filter(Boolean) } : {}),
@@ -143,11 +173,14 @@ function notify(db: DB, chatId: string, text: string, source: string, now: numbe
 export type Watcher = {
   add(w: Omit<Watch, "since">, now?: number): void
   list(): Watch[]
+  remember(e: Omit<HistoryEntry, "at">, now?: number): void
+  history(chatId: string): HistoryEntry[]
   poll(now?: number): Promise<void>
 }
 
 export function createWatcher(ctx: Ctx, client: () => T3Client, onError: (err: unknown) => void): Watcher {
   let watches: Watch[] = learnedOf(ctx.config).watches ?? []
+  let history: HistoryEntry[] = learnedOf(ctx.config).history ?? []
   const save = () => ctx.patchConfig({ watches })
   let polling = false
 
@@ -157,6 +190,11 @@ export function createWatcher(ctx: Ctx, client: () => T3Client, onError: (err: u
       save()
     },
     list: () => watches,
+    remember(e, now = Date.now()) {
+      history = [...history.filter((x) => !(x.threadId === e.threadId && x.chatId === e.chatId)), { ...e, at: now }].slice(-MAX_HISTORY)
+      ctx.patchConfig({ history })
+    },
+    history: (chatId) => history.filter((e) => e.chatId === chatId),
     async poll(now = Date.now()) {
       if (polling || !watches.length) return
       polling = true
@@ -259,7 +297,7 @@ export function t3Tools(input: {
       untrusted,
       title: "List T3 Code threads",
       tool: tool({
-        description: "List recent T3 Code threads, newest first, in one project or across all of them.",
+        description: `List recent T3 Code threads, newest first, in one project or across all of them. For the threads started from this chat, use thread_chat_ini. ${LINK_NOTE}`,
         inputSchema: z.object({
           project: z.string().optional().describe("Project name, id or path. Omit for all projects."),
           activeOnly: z.boolean().optional().describe("Only threads that are running, queued or waiting for an answer"),
@@ -312,9 +350,12 @@ export function t3Tools(input: {
               clientRequestId: `palui-${turn.runId}-${shortHash(m.project.id, task)}`,
             })
             if (launched.runId) watcher.add({ threadId: launched.threadId, runId: launched.runId, chatId: turn.chatId, title: name, ...(launched.link ? { link: launched.link } : {}) })
+            watcher.remember({ threadId: launched.threadId, chatId: turn.chatId, title: name, action: "started", ...(launched.link ? { link: launched.link } : {}) }, turn.now)
+            const environmentId = environmentIdOf(launched.link)
             return {
               ok: true,
               threadId: launched.threadId,
+              ...(environmentId ? { environmentId } : {}),
               title: name,
               project: m.project.title,
               workspace: base ? `new worktree from ${base}` : "project checkout",
@@ -340,8 +381,25 @@ export function t3Tools(input: {
             const { thread: t } = await c.read({ threadId, limit: 1, maxCharsPerItem: 1 })
             const runId = t.activeRunId ?? t.latestRunId ?? null
             watcher.add({ threadId, runId, chatId: turn.chatId, title: t.title, ...(t.link ? { link: t.link } : {}) })
+            watcher.remember({ threadId, chatId: turn.chatId, title: t.title, action: "followed", ...(t.link ? { link: t.link } : {}) }, turn.now)
             return { ok: true, thread: threadView(t), note: "Palui will message this chat when it finishes." }
           }),
+      }),
+    },
+    thread_chat_ini: {
+      class: "read",
+      untrusted,
+      title: "List this chat's T3 Code threads",
+      tool: tool({
+        description: `List the T3 Code threads started or followed up from this chat, newest first, with their thread ids and links. Only this chat's threads. ${LINK_NOTE}`,
+        inputSchema: z.object({}),
+        execute: async () => {
+          const threads = watcher
+            .history(turn.chatId)
+            .toReversed()
+            .map((e) => ({ threadId: e.threadId, title: e.title, action: e.action, at: new Date(e.at).toISOString(), ...(e.link ? { link: e.link, environmentId: environmentIdOf(e.link) } : {}) }))
+          return { ok: true, chatId: turn.chatId, threads, ...(threads.length ? {} : { message: "Belum ada thread T3 Code dari chat ini." }) }
+        },
       }),
     },
     lihat_thread: {

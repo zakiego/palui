@@ -17,6 +17,8 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - A Remote MCP setup skill: ask Palui in chat to add a public MCP server (https, no auth) and it checks the URL, lists the tools and adds it after you approve. It can also list servers and remove the ones it added. See the Jadwal Sholat example in the docs.
 - Palui can keep the important files you send in chat, like an ID card, a receipt or a ticket. Ask it in chat ("simpan KTP ini"), and the new Attachments page lists what it saved, with download and delete. It doesn't save everything you send, only files that matter or that you ask for. Files are encrypted with `MASTER_KEY` inside the database, capped at 10 MB, and limited to images, PDF, text and Office files. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 - The chat header has a Copy menu: copy the whole conversation as Markdown (the newest 150 messages, with tool calls listed under each reply) or just the chat ID.
+- Palui knows which chat it's in. Every turn now tells it the chat ID, the channel's own id (WhatsApp JID or Telegram chat id) and the current conversation ID, so "berapa chat id ini?" gets a real answer.
+- A `thread_chat_ini` tool in the T3 Code connector lists the threads started or followed up from the current chat, with their ids and links. Thread results now also say which part of the link is the environment id (the same for every thread) and which is the thread id.
 
 ### Changed
 
