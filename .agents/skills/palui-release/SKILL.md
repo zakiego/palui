@@ -1,63 +1,65 @@
 ---
 name: palui-release
-description: Cut a Palui Agent release. Picks the semver bump, moves the changelog's Unreleased notes under the new version, bumps the root package.json, opens the release PR and tags main as vX.Y.Z after it merges. Use when asked to "release", "cut a release", "bump the version", "tag v0.x", "ship 0.2.0", or "what version are we on".
+description: Release Palui Agent. The agent picks the semver bump from the changelog, asks the owner once, then cuts, commits, pushes and tags the release on main from the local machine. Use right after a user-visible palui PR merges, before a deploy, or when asked to "release", "cut a release", "bump the version", "ship 0.2.0", "tag it" or "what version are we on".
 ---
 
 # Palui release
 
-The version lives in one place: `"version"` in the root `package.json`. Nothing else holds a copy. `packages/core/src/version.ts` reads it, and `GET /health` reports it (plus the runtime's, under `runtime.version`).
+The owner doesn't think about versions. You pick the bump, ask once, and do everything else locally. No release PR, no CI.
 
-The changelog lives in one place: `apps/site/content/docs/changelog.mdx`, published at https://palui.zakiego.com/docs/changelog. `apps/site/lib/changelog.test.ts` fails `pnpm test` when the two disagree, so a bump by hand without a changelog entry can't merge quietly.
+The version lives only in `"version"` in the root `package.json`. `packages/core/src/version.ts` reads it, and `GET /health` reports it. The changelog is `apps/site/content/docs/changelog.mdx`. `apps/site/lib/changelog.test.ts` fails `pnpm test` when the two disagree. All mechanics go through `pnpm release` (`scripts/release.ts`). Never edit the version or move changelog sections by hand.
 
-All mechanics go through `pnpm release` (`scripts/release.ts`). Don't edit the version or move changelog sections by hand.
+## When to run it
 
-## Pick the bump
+- Right after a PR that added a changelog line merges. If you merged it, or the owner says it merged, offer the release in the same reply.
+- Before a deploy, if `## Unreleased` on origin/main has anything in it.
+- When the owner asks.
 
-Read `## Unreleased` and decide from what's in it, not from how much code changed.
-
-| Version now | Unreleased has | Bump |
-| --- | --- | --- |
-| `0.x` | only fixes | `patch` |
-| `0.x` | any feature, behavior change or breaking change | `minor` |
-| `0.x` | the last piece of the v1 scope, and the owner says v1 is done | `major` (to `1.0.0`) |
-| `>= 1.0` | only fixes | `patch` |
-| `>= 1.0` | features, nothing the self-hoster must act on | `minor` |
-| `>= 1.0` | anything under `### Breaking` | `major` |
-
-"Breaking" means a self-hoster has to do something on upgrade: a new required env var, a compose change, a manual data step, a removed chat command or API route, a rollback that now needs a restore. A new migration alone isn't breaking (the app runs it), but it does make rollback need the pre-deploy snapshot, so say that in the entry.
-
-If `Unreleased` says "Nothing yet.", there's nothing to release. Stop and say so.
+PRs never bump the version themselves, so parallel PRs can't fight over a number.
 
 ## Steps
 
-1. Start from fresh main on a new branch:
+1. Get on a clean, fresh origin/main. In a worktree main is usually checked out elsewhere, so detach:
    ```bash
-   git fetch origin && git switch -c release/vX.Y.Z origin/main
+   git fetch origin && git switch --detach origin/main
    ```
-2. Cut it. The date defaults to today in Asia/Makassar; pass `--date` only to backdate.
+   With uncommitted work in the checkout, use a fresh worktree instead of touching it.
+2. Ask the script what the notes call for:
    ```bash
-   pnpm release prepare minor        # or patch, major, or an exact 0.4.0
+   pnpm release suggest
    ```
-3. Read the new section in `changelog.mdx` and tidy it: group bullets under `### Breaking` (first), `### Added`, `### Changed`, `### Fixed`, or topic headings when the release is big. Each bullet says what changed for the person running Palui, not which file moved. Breaking bullets say exactly what to do on upgrade.
-4. Check:
+   It prints e.g. `minor: 0.1.0 -> 0.2.0 (has Added)` or `nothing to release`. If nothing, stop and say so.
+3. Sanity-check the suggestion against the notes yourself. The rules:
+
+   | Unreleased has | 0.x | >= 1.0 |
+   | --- | --- | --- |
+   | only `### Fixed` | patch | patch |
+   | any `### Added` or `### Changed` | minor | minor |
+   | any `### Breaking` | minor | major |
+
+   `1.0.0` happens only when the owner says v1 is done. Never suggest it on your own; you can mention it when the v1 scope in `docs/PLAN.md` looks finished. If a bullet sits under the wrong heading (a feature filed under Fixed), fix the heading on a branch first rather than overriding the bump.
+4. Ask the owner with AskUserQuestion, one question. Put the suggestion first and marked "(Recommended)", the other sensible bumps as options, and the Unreleased bullets in the question so they see what ships. Keep it short, e.g. "Release 0.2.0? It has 2 Added, 1 Fixed."
+5. On a yes, ship it. This bumps, commits `chore(release): vX.Y.Z`, pushes main, tags and pushes the tag:
    ```bash
-   pnpm release check && (cd apps/site && npx vitest run lib/changelog.test.ts)
+   pnpm release ship minor        # or patch, major, or an exact 0.4.0
    ```
-5. Commit `package.json` and `changelog.mdx` as one commit: `chore(release): vX.Y.Z`. Open the PR with the `palui-pr` skill, title `chore(release): vX.Y.Z`, body = the release notes (`pnpm release notes`).
-6. After the PR merges, tag main from a clean checkout of it:
-   ```bash
-   git switch main && git pull --ff-only && pnpm release tag
-   git push origin vX.Y.Z
-   ```
-   Pushing the tag is part of the release the user asked for. A GitHub Release (`node scripts/release.ts notes > /tmp/palui-notes.md && gh release create vX.Y.Z --notes-file /tmp/palui-notes.md`) is a separate outward post: only do it when the user asks for it.
-7. Deploying is separate (`zaki-selfhost` / `deploy.sh`). After a deploy, confirm the running version:
-   ```bash
-   curl -s https://palui.zakiego.com/health | jq '{version, runtime: .runtime.version}'
-   ```
+   The date defaults to today in Asia/Makassar; pass `--date YYYY-MM-DD` only to backdate.
+6. Report the result in one line: version, short sha, and the changelog link https://palui.zakiego.com/docs/changelog (the site redeploys from main).
+
+The owner's yes on step 4 covers the commit and both pushes for that release. It doesn't cover a GitHub Release or a deploy: those are separate asks.
+
+## When it goes wrong
+
+- `HEAD isn't origin/main`: main moved or you're on a branch. Redo step 1.
+- `pushing main failed`: someone pushed in between. Nothing is tagged. `git reset --hard origin/main` (only the local release commit is lost), then start over at step 1.
+- Main pushed but the tag push failed: from that same commit, `pnpm release tag` then `git push origin vX.Y.Z`.
+- Never reuse, move or delete a tag, and never force-push. A broken release gets a new patch.
 
 ## Rules
 
-- Never reuse or move a tag. A broken release gets a new patch.
 - Never put a release heading above `## Unreleased`, and never edit an old release's notes except to fix a typo.
-- Docs-only or site-only changes still go through Unreleased if a reader would care, but they don't need their own release.
 - Heading shape is exact: `## 0.2.0 (2026-11-20)`. The test rejects `## v0.2.0`, `## 0.2.0 - 2026-11-20` and friends.
+- Check what's running after a deploy:
+  ```bash
+  curl -s https://palui.zakiego.com/health | jq '{version, runtime: .runtime.version}'
+  ```

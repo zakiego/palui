@@ -107,7 +107,7 @@ export function checkChangelog(src: string, version: string): string[] {
   const latest = releases[0]
   if (!latest) problems.push("no release yet: add one, e.g. `## 0.1.0 (YYYY-MM-DD)`")
   else if (latest.version !== version)
-    problems.push(`package.json says ${version} but the newest changelog release is ${latest.version}. Bump with \`pnpm release prepare\`, never by hand.`)
+    problems.push(`package.json says ${version} but the newest changelog release is ${latest.version}. Release with \`pnpm release ship\`, never bump by hand.`)
   return problems
 }
 
@@ -133,4 +133,26 @@ export function cutRelease(src: string, version: string, date: string): string {
     "",
   ]
   return [...lines.slice(0, start), ...next, ...lines.slice(end)].join("\n")
+}
+
+export type Suggestion = { bump: Bump | null; reason: string }
+
+// Picks the bump from the Unreleased notes, the same way a person would:
+// any `### Breaking` is a major (still a minor while on 0.x, since 1.0.0 is
+// reserved for "v1 is done"), any `### Added` or `### Changed` is a minor,
+// and `### Fixed` alone is a patch. Bullets under any other heading count as
+// a minor, so an unsorted entry never ships as a quiet patch.
+export function suggestBump(src: string, version: string): Suggestion {
+  const { unreleased } = parseChangelog(src)
+  if (!unreleased || !/^\s*- \S/m.test(unreleased)) return { bump: null, reason: "`## Unreleased` has nothing in it" }
+  const headings = [...unreleased.matchAll(/^### (.+)$/gm)].map((m) => m[1]!.trim().toLowerCase())
+  const preOne = version.startsWith("0.")
+  if (headings.includes("breaking"))
+    return preOne
+      ? { bump: "minor", reason: "has Breaking, but 0.x stays on minors until v1 is done" }
+      : { bump: "major", reason: "has Breaking" }
+  const featureish = headings.filter((h) => h === "added" || h === "changed")
+  if (featureish.length) return { bump: "minor", reason: `has ${[...new Set(featureish)].map((h) => h[0]!.toUpperCase() + h.slice(1)).join(" and ")}` }
+  if (headings.length && headings.every((h) => h === "fixed")) return { bump: "patch", reason: "only Fixed" }
+  return { bump: "minor", reason: "notes aren't sorted under Added, Changed or Fixed, so playing it safe" }
 }

@@ -5,7 +5,7 @@ description: Add a Palui Agent change to the Unreleased section of the docs chan
 
 # Palui changelog entry
 
-Every PR that changes what Palui does for the person running it adds its line to `## Unreleased` in `apps/site/content/docs/changelog.mdx`, in the same PR. The release skill (`palui-release`) later moves that section under a version. Never write a version heading yourself.
+Every PR that changes what Palui does for the person running it adds its line to `## Unreleased` in `apps/site/content/docs/changelog.mdx`, in the same PR. The release skill (`palui-release`) later moves that section under a version. Never write a version heading yourself, and never bump `package.json`.
 
 ## Does this PR need one?
 
@@ -16,7 +16,7 @@ No: refactors with no visible effect, tests, internal tooling, typo fixes in cod
 ## How to write it
 
 1. Open the file and find `## Unreleased`. If its body is `Nothing yet.`, replace that line.
-2. Put the bullet under one of these subheadings, creating it if needed, in this order: `### Breaking`, `### Added`, `### Changed`, `### Fixed`.
+2. Put the bullet under one of these subheadings, creating it if needed, in this order: `### Breaking`, `### Added`, `### Changed`, `### Fixed`. The heading picks the version bump (`pnpm release suggest` reads it), so file it honestly: a new feature under Fixed would ship as a quiet patch.
 3. One bullet per change, one or two sentences, written for the owner running Palui:
    - Say what they'll notice, not which file changed. "Reminders snoozed to tomorrow now fire at 08.00 in your zone, not 08.00 UTC." beats "fix(reminders): use tz in snooze".
    - Name the surface: chat command, dashboard page, connector, `/health`, CLI.
