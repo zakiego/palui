@@ -499,6 +499,40 @@
       }
   }
 
+  /* RouteProgress: a 2px bar on the header's bottom edge while a page switch
+     waits on the server. While loading it runs to 85% over 4s on the house
+     curve, quick at first and then crawling, so it never claims to be done.
+     On arrival it fills in 200ms and fades as it lands, together with the
+     page. Idle snaps back with no transition, ready for the next one. */
+  .route-progress {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: -1px;
+    block-size: 2px;
+    background-color: var(--foreground);
+    transform: scaleX(0);
+    transform-origin: left;
+    opacity: 0;
+    pointer-events: none;
+    }
+  [dir="rtl"] .route-progress {
+    transform-origin: right;
+    }
+  .route-progress[data-phase="loading"] {
+    opacity: 1;
+    transform: scaleX(0.85);
+    transition:
+      transform 4s var(--ease-emphasized),
+      opacity 150ms var(--ease-emphasized);
+    }
+  .route-progress[data-phase="done"] {
+    opacity: 0;
+    transform: scaleX(1);
+    transition:
+      transform 200ms var(--ease-emphasized),
+      opacity 200ms var(--ease-emphasized) 150ms;
+    }
+
   @keyframes skeleton-shimmer {
     from { background-position: -100vw 0; }
     50%, to { background-position: 100vw 0; }
