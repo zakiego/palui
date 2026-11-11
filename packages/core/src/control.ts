@@ -2,6 +2,7 @@
 // runtime serves it on the compose network only (never published). Every call
 // carries the derived control token in `x-palui-control`.
 import type { TestResult } from "./connectors/define"
+import type { CatalogTool } from "./tools/catalog"
 
 export const CONTROL_HEADER = "x-palui-control"
 
@@ -58,6 +59,7 @@ export type ControlRoutes = {
   "POST /control/jobs/:id/run": { res: { ok: boolean; runId?: string; detail?: string } }
   "POST /control/stop/:chatId": { res: { ok: boolean } }
   "POST /control/reminders/parse": { body: { text: string; tz?: string }; res: ParsedReminder }
+  "POST /control/agents/:id/tools": { res: { tools: CatalogTool[] } }
 }
 
 export class ControlError extends Error {
@@ -107,6 +109,8 @@ export function controlClient(baseUrl: string, token: string, fetchImpl: typeof 
     stop: (chatId: string) => call<{ ok: boolean }>("POST", `/control/stop/${encodeURIComponent(chatId)}`, {}),
     // Switch a chat's agent (PLAN 19.2): saves the session to the old agent's memory first. null means Palui.
     setChatAgent: (chatId: string, agentId: string | null) => call<{ ok: true }>("POST", `/control/chats/${encodeURIComponent(chatId)}/agent`, { agentId }, 20_000),
+    // Every tool the agent can be offered right now, and which ones guests get (PLAN 19.7).
+    agentTools: (agentId: string) => call<{ tools: CatalogTool[] }>("POST", `/control/agents/${encodeURIComponent(agentId)}/tools`, {}, 20_000),
     parseReminder: (text: string, tz?: string) => call<ParsedReminder>("POST", "/control/reminders/parse", { text, tz }, 20_000),
     // Raw SSE stream for the app to proxy to the browser.
     stream: (signal?: AbortSignal) => fetchImpl(`${baseUrl}/control/stream`, { headers: { [CONTROL_HEADER]: token }, signal }),

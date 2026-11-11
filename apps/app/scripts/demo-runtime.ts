@@ -47,6 +47,45 @@ function listTools(id: string) {
   }
 }
 
+// The agent page's Tools tab: built-in tools for the skills that are on, and
+// the fake MCP list for every MCP connector that's on.
+const BUILTIN_TOOLS: Record<string, { tool: string; class: string; title?: string; guestSafe?: boolean; untrusted?: boolean }[]> = {
+  reminders: [
+    { tool: "buat_pengingat", class: "write", title: "Bikin pengingat" },
+    { tool: "daftar_pengingat", class: "read", title: "Lihat pengingat" },
+    { tool: "hapus_pengingat", class: "destructive", title: "Hapus pengingat" },
+  ],
+  webfetch: [{ tool: "ambil_halaman", class: "read", title: "Ambil isi halaman web", guestSafe: true, untrusted: true }],
+  notes: [{ tool: "tambah_instruksi", class: "write", title: "Tambah instruksi tetap" }],
+  chats: [{ tool: "cari_obrolan", class: "read" }],
+}
+
+function agentTools() {
+  const tools = listConnectors(db)
+    .filter((c) => c.status === "on" && (c.kind === "skill" || c.kind === "tools" || c.kind === "memory"))
+    .flatMap((c) => {
+      const list = c.type === "mcp" ? DEMO_TOOLS.map((x) => ({ tool: x.name, class: x.suggestedClass, title: x.title })) : (BUILTIN_TOOLS[c.type] ?? [])
+      return list.map((x) => ({
+        name: `${c.id}__${x.tool}`,
+        tool: x.tool,
+        connectorId: c.id,
+        connectorLabel: c.label,
+        connectorType: c.type,
+        class: x.class,
+        title: x.title ?? null,
+        untrusted: c.trust === "external" || ("untrusted" in x && !!x.untrusted),
+        guestSafe: "guestSafe" in x && !!x.guestSafe,
+      }))
+    })
+  return { tools }
+}
+
+// The Memory tab's counts, shaped like recall's GET /v1/containers.
+const DEMO_CONTAINERS = [
+  { container: "default", memories: 1284, documents: 12, lastActivity: Date.now() - 3 * 60_000 },
+  { container: "agent-arisan-keluarga-bani-abdurrahman-siddiq-banjarmasin-2026", memories: 9_876_543, documents: 0, lastActivity: Date.now() - 400 * 24 * 3_600_000 },
+]
+
 const DEMO_MODELS = [
   "claude-sonnet-5-5",
   "claude-opus-5-5",
@@ -103,10 +142,13 @@ const server = createServer((req, res) => {
       if (name === "listModels") return json({ models: DEMO_MODELS })
       // The MCP tool table lists these.
       if (name === "listTools") return json(listTools(id))
+      // The agent page's Memory tab reads these.
+      if (name === "listContainers") return json({ containers: DEMO_CONTAINERS })
       json({})
     })
     return
   }
+  if (/^\/control\/agents\/[^/]+\/tools$/.test(url)) return json(agentTools())
   if (url.startsWith("/control/remove/")) return json({ ok: false, detail: "The demo runtime doesn't remove connectors." })
   if (url.startsWith("/control/reminders/parse")) return json({ ok: false, text: "", tz: config().defaultTz, error: "The demo runtime doesn't parse reminders." })
   if (url.startsWith("/control/")) return json({ ok: true })

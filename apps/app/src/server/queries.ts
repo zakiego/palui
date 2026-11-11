@@ -36,6 +36,7 @@ export function chatList(db: DB, where?: SQL) {
       title: c.title || c.externalId,
       kind: c.kind,
       allowed: c.allowed,
+      replyMode: c.replyMode,
       lastAt: last?.createdAt ?? c.lastMessageAt ?? c.createdAt,
       preview: last ? clip(last.text, 140) : "",
       previewRole: last?.role ?? null,

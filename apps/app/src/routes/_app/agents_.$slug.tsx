@@ -1,15 +1,24 @@
-// One agent's page (PLAN 19.7): profile, shared-chat rules, limits, its
-// standing instructions and the chats it answers in. The settings save
-// together from the bar at the bottom; instructions and the per-chat switches
-// save on their own, the way they do on Notes and Chats.
+// One agent's page (PLAN 19.7), in tabs: its settings, the chats it lives in,
+// its standing instructions, where its memory is, and the tools it may use.
+// The settings (and the memory container) save together from the bar at the
+// bottom; instructions and the per-chat controls save on their own, the way
+// they do on Notes and Chats. Memory and Tools ask the runtime when opened.
 import * as React from "react"
 import { createFileRoute, Link, useBlocker, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon, CircleDotIcon, MessageCircleIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchXIcon, SendIcon } from "lucide-react"
+import { ArrowLeftIcon, AtSignIcon, BrainIcon, CircleAlertIcon, GlobeIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessageCircleIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, SendIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
+import { z } from "zod"
 import { toast } from "sonner"
 
 import { AgentAvatar } from "@/components/agent-avatar"
 import { AvatarPicker } from "@/components/agents/avatar-picker"
 import { AppError } from "@/components/app-error"
+import { ConnectorStatusBadge } from "@/components/connector-status"
+import { CLASS_TONE } from "@/components/tool-trace"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { InstructionList, InstructionSheet, useInstructionSheet } from "@/components/instructions"
 import { ListCapNote } from "@/components/list-cap-note"
 import { PagePending } from "@/components/page-pending"
@@ -27,7 +36,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldTitle } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
@@ -37,11 +46,15 @@ import { StatusText } from "@/components/ui/status-text"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useLiveRefresh } from "@/hooks/use-live-events"
-import { deleteAgentFn, getAgentPage, saveAgentFn, setChatAllowedFn } from "@/lib/fns/agents"
+import { deleteAgentFn, getAgentMemoryFn, getAgentPage, getAgentToolsFn, saveAgentFn, setChatAllowedFn, setChatReplyModeFn } from "@/lib/fns/agents"
 import { ago, errorMessage } from "@/lib/format"
-import { useT } from "@/lib/i18n"
+import { useLabel, useT } from "@/lib/i18n"
+
+const TABS = ["settings", "chats", "instructions", "memory", "tools"] as const
+type Tab = (typeof TABS)[number]
 
 export const Route = createFileRoute("/_app/agents_/$slug")({
+  validateSearch: z.object({ tab: z.enum(TABS).optional() }),
   loader: ({ params }) => getAgentPage({ data: { slug: params.slug } }),
   head: ({ loaderData }) => ({ meta: [{ title: `${loaderData?.agent?.name ?? "Agent"} · Palui` }] }),
   component: AgentPage,
@@ -129,7 +142,7 @@ function AgentPage() {
 function AgentSettings({ data }: { data: Loaded }) {
   const t = useT()
   const router = useRouter()
-  const navigate = useNavigate()
+  const navigate = useNavigate({ from: Route.fullPath })
   const agent = data.agent
   const saved = formFor(agent)
   const [form, setForm] = React.useState(saved)
@@ -138,6 +151,7 @@ function AgentSettings({ data }: { data: Loaded }) {
   const dirty = !sameForm(form, saved)
   const isDefault = agent.isDefault
   const instructionSheet = useInstructionSheet()
+  const tab: Tab = Route.useSearch().tab ?? "settings"
 
   // Chat can add or change an instruction while the page is open.
   useLiveRefresh(() => void router.invalidate(), (e) => e.connectorId === "notes")
@@ -150,7 +164,8 @@ function AgentSettings({ data }: { data: Loaded }) {
   // Leaving with unsaved settings asks first. A delete navigates away on purpose.
   const leaving = React.useRef(false)
   const blocker = useBlocker({
-    shouldBlockFn: () => dirty && !leaving.current,
+    // A tab switch only changes the search, so it never asks.
+    shouldBlockFn: ({ current, next }) => dirty && !leaving.current && current.pathname !== next.pathname,
     enableBeforeUnload: () => dirty && !leaving.current,
     withResolver: true,
   })
@@ -165,7 +180,9 @@ function AgentSettings({ data }: { data: Loaded }) {
     setErrors(next)
     const first = (["name", "persona", "cap", "container"] as const).find((k) => next[k])
     if (first) {
-      document.getElementById(`agent-${first}`)?.focus()
+      const target: Tab = first === "container" ? "memory" : "settings"
+      if (target !== tab) await navigate({ search: { tab: target }, replace: true })
+      requestAnimationFrame(() => document.getElementById(`agent-${first}`)?.focus())
       return
     }
     setBusy("save")
@@ -211,7 +228,6 @@ function AgentSettings({ data }: { data: Loaded }) {
 
   const name = form.name.trim() || agent.name
   const over = agent.dailyTokenCap > 0 && agent.tokensToday >= agent.dailyTokenCap
-  const container = form.container.trim() || (isDefault ? null : `agent-${agent.slug}`)
   const botOptions = [{ value: "", label: t("agents.botNone") }, ...data.bots.map((b) => ({ value: b.id, label: b.username ? `@${b.username}` : b.label }))]
 
   return (
@@ -233,177 +249,195 @@ function AgentSettings({ data }: { data: Loaded }) {
         </div>
       </div>
 
-      <div className="flex w-full max-w-2xl flex-col gap-6">
-        <Section id="profile" title={t("agents.section.profile")}>
-          <FieldGroup>
-            <AvatarPicker
-              agent={{ isDefault, avatarImage: form.avatarImage, avatarIcon: form.avatarIcon, avatarColor: form.avatarColor }}
-              onImage={(v) => set("avatarImage", v)}
-              onIcon={(v) => set("avatarIcon", v)}
-              onColor={(v) => set("avatarColor", v)}
-            />
-            <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2">
-              <Field data-invalid={!!errors.name}>
-                <FieldLabel htmlFor="agent-name">{t("agents.field.name")}</FieldLabel>
-                <Input id="agent-name" value={form.name} maxLength={NAME_MAX} aria-invalid={!!errors.name} onChange={(e) => set("name", e.target.value)} />
-                {errors.name && <FieldError>{errors.name}</FieldError>}
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="agent-slug">{t("agents.field.slug")}</FieldLabel>
-                <Input id="agent-slug" className="font-mono" readOnly value={agent.slug} aria-describedby="agent-slug-hint" />
-                <FieldDescription id="agent-slug-hint" className="[overflow-wrap:anywhere]">
-                  {t("agents.slugHint", { slug: agent.slug })}
-                </FieldDescription>
-              </Field>
-            </div>
-            <Field data-invalid={!!errors.persona}>
-              <FieldLabel htmlFor="agent-persona">{t("agents.field.persona")}</FieldLabel>
-              {/* It grows with its text up to half the screen, then scrolls. */}
-              <Textarea id="agent-persona" rows={8} maxLength={PERSONA_MAX} className="max-h-[50svh]" value={form.persona} aria-invalid={!!errors.persona} onChange={(e) => set("persona", e.target.value)} />
-              <FieldDescription className="tabular-nums">{t("notes.chars", { n: form.persona.length.toLocaleString(), max: PERSONA_MAX.toLocaleString() })}</FieldDescription>
-              {errors.persona && <FieldError>{errors.persona}</FieldError>}
-            </Field>
-            {isDefault && <p className="text-sm text-pretty text-muted-foreground">{t("agents.defaultNote")}</p>}
-          </FieldGroup>
-        </Section>
+      <SectionPicker
+        value={tab}
+        onChange={(v) => void navigate({ search: { tab: v }, replace: true })}
+        counts={{ chats: data.chatsTotal, instructions: data.instructions.length }}
+      />
 
-        {!isDefault && (
-          <Section id="shared" title={t("agents.shared")} description={t("agents.sharedBody")}>
+      <div className="flex flex-col gap-6">
+        {/* Settings and Memory stay mounted (hidden) so unsaved edits survive a switch. */}
+        <div id="agent-panel-settings" hidden={tab !== "settings"} className="flex w-full max-w-2xl flex-col gap-6">
+          <Section id="profile" first title={t("agents.section.profile")}>
             <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="agent-guests">{t("agents.field.guestTools")}</FieldLabel>
-                <SimpleSelect
-                  id="agent-guests"
-                  value={form.guestTools}
-                  onChange={(v) => set("guestTools", v as Form["guestTools"])}
-                  options={[
-                    { value: "safe", label: t("agents.guestTools.safe") },
-                    { value: "none", label: t("agents.guestTools.none") },
-                  ]}
-                />
+              <AvatarPicker
+                agent={{ isDefault, avatarImage: form.avatarImage, avatarIcon: form.avatarIcon, avatarColor: form.avatarColor }}
+                onImage={(v) => set("avatarImage", v)}
+                onIcon={(v) => set("avatarIcon", v)}
+                onColor={(v) => set("avatarColor", v)}
+              />
+              <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2">
+                <Field data-invalid={!!errors.name}>
+                  <FieldLabel htmlFor="agent-name">{t("agents.field.name")}</FieldLabel>
+                  <Input id="agent-name" value={form.name} maxLength={NAME_MAX} aria-invalid={!!errors.name} onChange={(e) => set("name", e.target.value)} />
+                  {errors.name && <FieldError>{errors.name}</FieldError>}
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="agent-slug">{t("agents.field.slug")}</FieldLabel>
+                  <Input id="agent-slug" className="font-mono" readOnly value={agent.slug} aria-describedby="agent-slug-hint" />
+                  <FieldDescription id="agent-slug-hint" className="[overflow-wrap:anywhere]">
+                    {t("agents.slugHint", { slug: agent.slug })}
+                  </FieldDescription>
+                </Field>
+              </div>
+              <Field data-invalid={!!errors.persona}>
+                <FieldLabel htmlFor="agent-persona">{t("agents.field.persona")}</FieldLabel>
+                {/* It grows with its text up to half the screen, then scrolls. */}
+                <Textarea id="agent-persona" rows={8} maxLength={PERSONA_MAX} className="max-h-[50svh]" value={form.persona} aria-invalid={!!errors.persona} onChange={(e) => set("persona", e.target.value)} />
+                <FieldDescription className="tabular-nums">{t("notes.chars", { n: form.persona.length.toLocaleString(), max: PERSONA_MAX.toLocaleString() })}</FieldDescription>
+                {errors.persona && <FieldError>{errors.persona}</FieldError>}
               </Field>
-              <Field>
-                <FieldLabel htmlFor="agent-owner">{t("agents.field.ownerPowers")}</FieldLabel>
-                <SimpleSelect
-                  id="agent-owner"
-                  value={form.ownerPowers}
-                  onChange={(v) => set("ownerPowers", v as Form["ownerPowers"])}
-                  options={[
-                    { value: "off", label: t("agents.ownerPowers.off") },
-                    { value: "approve", label: t("agents.ownerPowers.approve") },
-                  ]}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="agent-bot">{t("agents.field.bot")}</FieldLabel>
-                <SimpleSelect id="agent-bot" value={form.bot} onChange={(v) => set("bot", v)} options={botOptions} />
-                <FieldDescription>
-                  {t("agents.botHint")}{" "}
-                  <Link to="/connectors/new" className="underline underline-offset-4">
-                    {t("agents.botAdd")}
-                  </Link>
-                </FieldDescription>
-              </Field>
+              {isDefault && <p className="text-sm text-pretty text-muted-foreground">{t("agents.defaultNote")}</p>}
             </FieldGroup>
           </Section>
-        )}
 
-        <Section id="limits" title={t("agents.section.limits")} description={t("agents.limitsBody")}>
-          <FieldGroup>
-            <TokensToday agent={agent} over={over} />
-            <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2">
-              <Field data-invalid={!!errors.cap}>
+          {!isDefault && (
+            <Section id="shared" title={t("agents.shared")} description={t("agents.sharedBody")}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="agent-guests">{t("agents.field.guestTools")}</FieldLabel>
+                  <SimpleSelect
+                    id="agent-guests"
+                    value={form.guestTools}
+                    onChange={(v) => set("guestTools", v as Form["guestTools"])}
+                    options={[
+                      { value: "safe", label: t("agents.guestTools.safe") },
+                      { value: "none", label: t("agents.guestTools.none") },
+                    ]}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="agent-owner">{t("agents.field.ownerPowers")}</FieldLabel>
+                  <SimpleSelect
+                    id="agent-owner"
+                    value={form.ownerPowers}
+                    onChange={(v) => set("ownerPowers", v as Form["ownerPowers"])}
+                    options={[
+                      { value: "off", label: t("agents.ownerPowers.off") },
+                      { value: "approve", label: t("agents.ownerPowers.approve") },
+                    ]}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="agent-bot">{t("agents.field.bot")}</FieldLabel>
+                  <SimpleSelect id="agent-bot" value={form.bot} onChange={(v) => set("bot", v)} options={botOptions} />
+                  <FieldDescription>
+                    {t("agents.botHint")}{" "}
+                    <Link to="/connectors/new" className="underline underline-offset-4">
+                      {t("agents.botAdd")}
+                    </Link>
+                  </FieldDescription>
+                </Field>
+              </FieldGroup>
+            </Section>
+          )}
+
+          <Section id="limits" title={t("agents.section.limits")} description={t("agents.limitsBody")}>
+            <FieldGroup>
+              <TokensToday agent={agent} over={over} />
+              <Field data-invalid={!!errors.cap} className="@xl/main:max-w-[calc(50%-0.5rem)]">
                 <FieldLabel htmlFor="agent-cap">{t("agents.field.cap")}</FieldLabel>
                 <Input id="agent-cap" inputMode="numeric" className="tabular-nums" value={form.cap} aria-invalid={!!errors.cap} onChange={(e) => set("cap", e.target.value)} />
                 {errors.cap ? <FieldError>{errors.cap}</FieldError> : <FieldDescription>{t("agents.capHint")}</FieldDescription>}
               </Field>
-              <Field data-invalid={!!errors.container}>
-                <FieldLabel htmlFor="agent-container">{t("agents.field.container")}</FieldLabel>
-                <Input
-                  id="agent-container"
-                  className="font-mono"
-                  spellCheck={false}
-                  autoCapitalize="none"
-                  autoComplete="off"
-                  maxLength={64}
-                  placeholder={isDefault ? t("agents.containerConnector") : `agent-${agent.slug}`}
-                  value={form.container}
-                  aria-invalid={!!errors.container}
-                  onChange={(e) => set("container", e.target.value)}
-                />
-                {errors.container ? (
-                  <FieldError>{errors.container}</FieldError>
-                ) : (
-                  <FieldDescription className="[overflow-wrap:anywhere]">
-                    {t("agents.containerHint")} {container ? t("agents.containerIs", { name: container }) : t("agents.containerIsConnector")}
-                  </FieldDescription>
-                )}
-              </Field>
-            </div>
-          </FieldGroup>
-        </Section>
-
-        <Section
-          id="instructions"
-          title={t("agents.section.instructions")}
-          description={isDefault ? t("agents.instructionsBodyDefault") : t("agents.instructionsBody")}
-          action={
-            <Button variant="outline" size="sm" onClick={() => instructionSheet.edit("new")}>
-              <PlusIcon data-icon="inline-start" />
-              {t("notes.newInstruction")}
-            </Button>
-          }
-        >
-          <InstructionList items={data.instructions} onEdit={instructionSheet.edit} />
-        </Section>
-
-        <Section id="chats" title={t("agents.section.chats")} description={isDefault ? t("agents.chatsBodyDefault") : t("agents.chatsBody", { slug: agent.slug })}>
-          {data.chats.length === 0 ? (
-            <Empty className="border border-dashed p-6">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <MessagesSquareIcon />
-                </EmptyMedia>
-                <EmptyTitle>{t("agents.chatsEmpty")}</EmptyTitle>
-                <EmptyDescription>{t("agents.chatsEmptyBody", { slug: agent.slug })}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <div>
-              <ul className="flex flex-col divide-y">
-                {data.chats.map((c) => (
-                  <ChatRow key={c.id} chat={c} />
-                ))}
-              </ul>
-              <ListCapNote shown={data.chats.length} total={data.chatsTotal} />
-            </div>
-          )}
-        </Section>
-
-        {!isDefault && (
-          <Section id="delete" title={t("agents.delete")} description={t("agents.deleteBody")}>
-            <AlertDialog>
-              <AlertDialogTrigger render={<Button variant="destructive" className="max-w-full self-start" disabled={busy !== null} />}>
-                {busy === "delete" && <Spinner data-icon="inline-start" />}
-                <span className="truncate">{t("agents.deleteNamed", { name: agent.name })}</span>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="[overflow-wrap:anywhere]">{t("agents.deleteTitle", { name: agent.name })}</AlertDialogTitle>
-                  <AlertDialogDescription>{t("agents.deleteBody")}</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                  <AlertDialogAction variant="danger" onClick={() => void remove()}>
-                    {t("common.delete")}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            </FieldGroup>
           </Section>
+
+          {!isDefault && (
+            <Section id="delete" title={t("agents.delete")} description={t("agents.deleteBody")}>
+              <AlertDialog>
+                <AlertDialogTrigger render={<Button variant="destructive" className="max-w-full self-start" disabled={busy !== null} />}>
+                  {busy === "delete" && <Spinner data-icon="inline-start" />}
+                  <span className="truncate">{t("agents.deleteNamed", { name: agent.name })}</span>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="[overflow-wrap:anywhere]">{t("agents.deleteTitle", { name: agent.name })}</AlertDialogTitle>
+                    <AlertDialogDescription>{t("agents.deleteBody")}</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                    <AlertDialogAction variant="danger" onClick={() => void remove()}>
+                      {t("common.delete")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </Section>
+          )}
+        </div>
+
+        {tab === "chats" && (
+          <div id="agent-panel-chats" className="flex w-full max-w-2xl flex-col gap-4">
+            <p className="text-sm text-pretty text-muted-foreground">{isDefault ? t("agents.chatsBodyDefault") : t("agents.chatsBody", { slug: agent.slug })}</p>
+            {data.chats.length === 0 ? (
+              <Empty className="border border-dashed p-6">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <MessagesSquareIcon />
+                  </EmptyMedia>
+                  <EmptyTitle>{t("agents.chatsEmpty")}</EmptyTitle>
+                  <EmptyDescription>{t("agents.chatsEmptyBody", { slug: agent.slug })}</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <div>
+                <ul className="flex flex-col divide-y">
+                  {data.chats.map((c) => (
+                    <ChatRow key={c.id} chat={c} />
+                  ))}
+                </ul>
+                <ListCapNote shown={data.chats.length} total={data.chatsTotal} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "instructions" && (
+          <div id="agent-panel-instructions" className="flex w-full max-w-2xl flex-col gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+              <p className="max-w-[65ch] min-w-0 flex-1 text-sm text-pretty text-muted-foreground">{isDefault ? t("agents.instructionsBodyDefault") : t("agents.instructionsBody")}</p>
+              <Button variant="outline" size="sm" onClick={() => instructionSheet.edit("new")}>
+                <PlusIcon data-icon="inline-start" />
+                {t("notes.newInstruction")}
+              </Button>
+            </div>
+            <InstructionList items={data.instructions} onEdit={instructionSheet.edit} />
+          </div>
+        )}
+
+        <div id="agent-panel-memory" hidden={tab !== "memory"} className="flex w-full max-w-2xl flex-col gap-6">
+          {tab === "memory" && <MemoryStats agent={agent} />}
+          <Field data-invalid={!!errors.container}>
+            <FieldLabel htmlFor="agent-container">{t("agents.field.container")}</FieldLabel>
+            <Input
+              id="agent-container"
+              className="font-mono"
+              spellCheck={false}
+              autoCapitalize="none"
+              autoComplete="off"
+              maxLength={64}
+              placeholder={isDefault ? t("agents.containerConnector") : `agent-${agent.slug}`}
+              value={form.container}
+              aria-invalid={!!errors.container}
+              onChange={(e) => set("container", e.target.value)}
+            />
+            {errors.container ? (
+              <FieldError>{errors.container}</FieldError>
+            ) : (
+              <FieldDescription>{t("agents.containerHint")}</FieldDescription>
+            )}
+          </Field>
+        </div>
+
+        {tab === "tools" && (
+          <div id="agent-panel-tools" className="flex w-full max-w-3xl flex-col gap-6">
+            <ToolsTab agent={agent} />
+          </div>
         )}
       </div>
 
+      {(tab === "settings" || tab === "memory" || dirty) && (
       <div className="sticky bottom-0 z-10 -mx-4 -mb-10 border-t bg-background/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
         <div className="flex w-full max-w-2xl items-center gap-3">
           {dirty && (
@@ -417,6 +451,7 @@ function AgentSettings({ data }: { data: Loaded }) {
           </Button>
         </div>
       </div>
+      )}
 
       <InstructionSheet key={instructionSheet.key} open={instructionSheet.open} target={instructionSheet.target} agentId={agent.id} onClose={instructionSheet.close} />
 
@@ -438,10 +473,47 @@ function AgentSettings({ data }: { data: Loaded }) {
   )
 }
 
-function Section({ id, title, description, action, children }: { id: string; title: string; description?: string; action?: React.ReactNode; children: React.ReactNode }) {
+// The page's sections as big labelled choice cards (icon, name, a radio), not a
+// small tab strip: picking one changes what the page shows.
+const SECTIONS = [
+  { value: "settings", Icon: SlidersHorizontalIcon, title: "agents.tab.settings" },
+  { value: "chats", Icon: MessagesSquareIcon, title: "agents.tab.chats" },
+  { value: "instructions", Icon: NotebookPenIcon, title: "agents.tab.instructions" },
+  { value: "memory", Icon: BrainIcon, title: "agents.tab.memory" },
+  { value: "tools", Icon: WrenchIcon, title: "agents.tab.tools" },
+] as const
+
+function SectionPicker({ value, onChange, counts }: { value: Tab; onChange: (v: Tab) => void; counts: Partial<Record<Tab, number>> }) {
+  const t = useT()
+  return (
+    <RadioGroup
+      value={value}
+      onValueChange={(v) => onChange(v as Tab)}
+      aria-label={t("agents.sections")}
+      className="grid max-w-5xl grid-cols-2 gap-3 @2xl/main:grid-cols-3 @4xl/main:grid-cols-5"
+    >
+      {SECTIONS.map(({ value: v, Icon, title }) => (
+        <FieldLabel key={v} htmlFor={`agent-section-pick-${v}`} className="min-w-0">
+          <Field orientation="horizontal" className="items-center gap-3">
+            <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+            <FieldContent className="min-w-0">
+              <FieldTitle className="flex-wrap">
+                {t(title)}
+                {counts[v] !== undefined && <span className="font-normal text-muted-foreground tabular-nums">{counts[v]!.toLocaleString()}</span>}
+              </FieldTitle>
+            </FieldContent>
+            <RadioGroupItem value={v} id={`agent-section-pick-${v}`} aria-controls={`agent-panel-${v}`} />
+          </Field>
+        </FieldLabel>
+      ))}
+    </RadioGroup>
+  )
+}
+
+function Section({ id, first, title, description, action, children }: { id: string; first?: boolean; title: string; description?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <>
-      {id !== "profile" && <Separator />}
+      {!first && <Separator />}
       <section aria-labelledby={`agent-section-${id}`} className="flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="flex min-w-0 flex-col gap-1">
@@ -485,8 +557,23 @@ function ChatRow({ chat }: { chat: AgentChat }) {
   const t = useT()
   const router = useRouter()
   const [allowed, setAllowed] = React.useState(chat.allowed)
+  const [replyMode, setReplyMode] = React.useState(chat.replyMode)
   React.useEffect(() => setAllowed(chat.allowed), [chat.allowed])
+  React.useEffect(() => setReplyMode(chat.replyMode), [chat.replyMode])
   const { Icon, label } = CHANNEL[chat.channel]
+
+  const changeMode = async (next: string) => {
+    if (next !== "mention" && next !== "all") return
+    const before = replyMode
+    setReplyMode(next)
+    try {
+      await setChatReplyModeFn({ data: { chatId: chat.id, mode: next } })
+      void router.invalidate()
+    } catch (err) {
+      setReplyMode(before)
+      toast.error(errorMessage(err))
+    }
+  }
 
   const toggle = async (next: boolean) => {
     setAllowed(next)
@@ -500,9 +587,9 @@ function ChatRow({ chat }: { chat: AgentChat }) {
   }
 
   return (
-    <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-3 py-4 first:pt-0 last:pb-0">
       <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex min-w-48 flex-1 flex-col gap-0.5">
         <Link
           to="/chats"
           search={{ chat: chat.id }}
@@ -519,12 +606,256 @@ function ChatRow({ chat }: { chat: AgentChat }) {
         </span>
       </div>
       {chat.channel !== "web" && (
-        <label className="flex shrink-0 items-center gap-2 text-sm">
-          <span className="text-muted-foreground">{t("chats.allowed")}</span>
-          <Switch checked={allowed} onCheckedChange={(v) => void toggle(v)} aria-label={t("chats.allowedFor", { name: chat.title })} />
-        </label>
+        <div className="ms-7 flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 sm:ms-0">
+          {chat.kind === "group" && (
+            <SimpleSelect
+              size="sm"
+              className="w-fit min-w-0"
+              aria-label={t("chats.replyModeFor", { name: chat.title })}
+              value={replyMode}
+              options={[
+                { value: "mention", label: t("chats.replyMention"), icon: <AtSignIcon aria-hidden="true" /> },
+                { value: "all", label: t("chats.replyAll"), icon: <MessagesSquareIcon aria-hidden="true" /> },
+              ]}
+              onChange={(v) => void changeMode(v)}
+            />
+          )}
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">{t("chats.allowed")}</span>
+            <Switch checked={allowed} onCheckedChange={(v) => void toggle(v)} aria-label={t("chats.allowedFor", { name: chat.title })} />
+          </label>
+        </div>
       )}
     </li>
+  )
+}
+
+// Loads a tab's data when the tab opens. Memory and Tools ask the runtime, so
+// they never hold up the page.
+function useTabData<T>(load: () => Promise<T>, key: string) {
+  const [state, setState] = React.useState<{ data?: T; error?: string }>({})
+  React.useEffect(() => {
+    let live = true
+    setState({})
+    load().then(
+      (data) => live && setState({ data }),
+      (err: unknown) => live && setState({ error: errorMessage(err) }),
+    )
+    return () => {
+      live = false
+    }
+    // `load` is a new closure every render; `key` says when it changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  return state
+}
+
+function LoadError({ message }: { message: string }) {
+  const t = useT()
+  return (
+    <Alert variant="destructive">
+      <CircleAlertIcon aria-hidden="true" />
+      <AlertTitle>{t("agents.loadError")}</AlertTitle>
+      <AlertDescription className="[overflow-wrap:anywhere]">{message}</AlertDescription>
+    </Alert>
+  )
+}
+
+// One label and value row, for the memory facts.
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3 first:pt-0 last:pb-0">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 text-right text-sm [overflow-wrap:anywhere]">{children}</dd>
+    </div>
+  )
+}
+
+function MemoryStats({ agent }: { agent: Agent }) {
+  const t = useT()
+  const { data, error } = useTabData(() => getAgentMemoryFn({ data: { id: agent.id } }), `${agent.id}:${agent.recallContainer ?? ""}`)
+  if (error) return <LoadError message={error} />
+  if (!data) {
+    return (
+      <div className="flex flex-col gap-3" aria-busy="true">
+        <Skeleton className="h-5 w-full" />
+        <Skeleton className="h-5 w-full" />
+        <Skeleton className="h-5 w-full" />
+      </div>
+    )
+  }
+  if (!data.connector) {
+    return (
+      <Empty className="border border-dashed p-6">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <BrainIcon />
+          </EmptyMedia>
+          <EmptyTitle>{t("agents.memory.none")}</EmptyTitle>
+          <EmptyDescription>{t("agents.memory.noneBody")}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button variant="outline" size="sm" render={<Link to="/connectors/new" />}>
+            {t("agents.memory.add")}
+          </Button>
+        </EmptyContent>
+      </Empty>
+    )
+  }
+  const s = data.stats
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-pretty text-muted-foreground">{agent.isDefault ? t("agents.memory.ownBody") : t("agents.memory.agentBody")}</p>
+      {data.error && <LoadError message={data.error} />}
+      <dl className="flex flex-col divide-y">
+        <Fact label={t("agents.memory.where")}>
+          <span className="font-mono">{data.container}</span>
+        </Fact>
+        <Fact label={t("agents.memory.memories")}>
+          <span className="tabular-nums">{s ? s.memories.toLocaleString() : "–"}</span>
+        </Fact>
+        <Fact label={t("agents.memory.lastSaved")}>{!s ? "–" : s.lastActivity ? ago(s.lastActivity) : t("agents.memory.never")}</Fact>
+        <Fact label={t("agents.memory.connector")}>
+          <span className="inline-flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1">
+            <Link to="/connectors/$id" params={{ id: data.connector.id }} className="underline-offset-4 hover:underline">
+              {data.connector.label}
+            </Link>
+            <ConnectorStatusBadge status={data.connector.enabled ? data.connector.status : "paused"} />
+          </span>
+        </Fact>
+      </dl>
+    </div>
+  )
+}
+
+type ToolsData = Awaited<ReturnType<typeof getAgentToolsFn>>
+type ToolItem = NonNullable<ToolsData["tools"]>[number]
+
+function ToolsTab({ agent }: { agent: Agent }) {
+  const t = useT()
+  const label = useLabel()
+  const [query, setQuery] = React.useState("")
+  const { data, error } = useTabData(() => getAgentToolsFn({ data: { id: agent.id } }), agent.id)
+  const tools = data?.tools ?? null
+  const guestSafe = tools?.filter((x) => x.guestSafe).length ?? 0
+
+  const groups = React.useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const hits = (tools ?? []).filter((x) => !q || x.tool.toLowerCase().includes(q) || (x.title ?? "").toLowerCase().includes(q) || x.connectorLabel.toLowerCase().includes(q))
+    const by = new Map<string, ToolItem[]>()
+    for (const x of hits) (by.get(x.connectorId) ?? by.set(x.connectorId, []).get(x.connectorId)!).push(x)
+    return [...by.values()]
+  }, [tools, query])
+
+  // The count shows once the runtime said how many there are.
+  const safe = tools ? t("agents.tools.safe", { n: guestSafe.toLocaleString() }) : t("agents.tools.safeOnly")
+  const others = agent.isDefault ? t("agents.tools.paluiOthers") : agent.guestTools === "none" ? t("agents.tools.none") : safe
+  // Palui answers only you in a group, as in your own chats (turn.ts: shared needs a non-default agent).
+  const inGroups = agent.isDefault ? t("agents.tools.youRule") : agent.ownerPowers === "approve" ? t("agents.tools.groupsApprove") : agent.guestTools === "none" ? t("agents.tools.none") : safe
+
+  return (
+    <>
+      <ItemGroup className="gap-1">
+        <Rule icon={<UserIcon />} label={t("agents.tools.you")} value={t("agents.tools.youRule")} />
+        <Rule icon={<UsersIcon />} label={t("agents.tools.groups")} value={inGroups} />
+        <Rule icon={<MessagesSquareIcon />} label={t("agents.tools.others")} value={others} />
+      </ItemGroup>
+
+      {error && <LoadError message={error} />}
+      {data?.error && <LoadError message={data.error} />}
+      {!data && !error && (
+        <div className="flex flex-col gap-3" aria-busy="true">
+          {Array.from({ length: 5 }, (_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </div>
+      )}
+      {tools && tools.length === 0 && (
+        <Empty className="border border-dashed p-6">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <WrenchIcon />
+            </EmptyMedia>
+            <EmptyTitle>{t("agents.tools.empty")}</EmptyTitle>
+            <EmptyDescription>{t("agents.tools.emptyBody")}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button variant="outline" size="sm" render={<Link to="/connectors" />}>
+              {t("nav.connectors")}
+            </Button>
+          </EmptyContent>
+        </Empty>
+      )}
+      {tools && tools.length > 0 && (
+        <div className="flex flex-col gap-6">
+          {tools.length > 12 && (
+            <InputGroup className="max-w-sm">
+              <InputGroupAddon>
+                <SearchIcon aria-hidden="true" />
+              </InputGroupAddon>
+              <InputGroupInput type="search" aria-label={t("agents.tools.search")} placeholder={t("agents.tools.search")} value={query} onChange={(e) => setQuery(e.target.value)} />
+            </InputGroup>
+          )}
+          {groups.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">{t("agents.tools.searchEmpty")}</p>}
+          {groups.map((list) => {
+            const head = list[0]!
+            return (
+              <section key={head.connectorId} aria-labelledby={`tools-${head.connectorId}`} className="flex flex-col gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <Link id={`tools-${head.connectorId}`} to="/connectors/$id" params={{ id: head.connectorId }} dir="auto" className="min-w-0 text-heading [overflow-wrap:anywhere] underline-offset-4 hover:underline">
+                    {head.connectorLabel}
+                  </Link>
+                  {head.connectorType === "mcp" && <Badge variant="outline">MCP</Badge>}
+                  <span className="text-caption text-muted-foreground tabular-nums">{list.length.toLocaleString()}</span>
+                </div>
+                <ul className="flex flex-col divide-y">
+                  {list.map((x) => (
+                    <li key={x.name} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 py-3">
+                      <div className="flex min-w-48 flex-1 flex-col gap-0.5">
+                        <span className="font-mono text-sm [overflow-wrap:anywhere]">{x.tool}</span>
+                        {x.title && (
+                          <span dir="auto" className="text-caption text-pretty text-muted-foreground">
+                            {x.title}
+                          </span>
+                        )}
+                      </div>
+                      <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
+                        {data?.used[x.name] ? <span className="text-caption text-muted-foreground tabular-nums">{t("agents.tools.used", { n: data.used[x.name]!.toLocaleString() })}</span> : null}
+                        {x.untrusted && (
+                          <StatusText tone="secondary" icon={<GlobeIcon aria-hidden="true" />}>
+                            {t("agents.tools.outside")}
+                          </StatusText>
+                        )}
+                        {x.guestSafe && !agent.isDefault && agent.guestTools === "safe" && (
+                          <StatusText tone="secondary" icon={<UsersIcon aria-hidden="true" />}>
+                            {t("agents.tools.guests")}
+                          </StatusText>
+                        )}
+                        <StatusText tone={CLASS_TONE[x.class] ?? "destructive"} icon={null}>
+                          {label("tool.class", x.class)}
+                        </StatusText>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+}
+
+function Rule({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <Item size="sm" className="px-0">
+      <ItemMedia variant="icon">{icon}</ItemMedia>
+      <ItemContent>
+        <ItemTitle>{label}</ItemTitle>
+        <ItemDescription className="line-clamp-none">{value}</ItemDescription>
+      </ItemContent>
+    </Item>
   )
 }
 

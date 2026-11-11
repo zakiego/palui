@@ -13,6 +13,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Added
 
+- Each agent's page is now split into sections you pick with big cards: Settings, Chats, Instructions, Memory and Tools. Chats shows where it answers, with the reply mode and "Answer here" for each. Memory shows its recall container, how many memories are in it and when it last saved. Tools lists every tool it can use by connector, marks MCP servers, says who can use them (you, you in groups, other people) and how often it ran each one this week.
 - Groups have a reply mode: mentions only (the default) or every message. Set it with `/reply all` and `/reply mention` in the group, or with the new select on the Chats page. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 - Setting up a WhatsApp group no longer needs the dashboard. Mention Palui in a new group and it replies with your agents and the `/agent <slug>` to send. Before, every message in a group that wasn't allowed yet was dropped, `/agent` included.
 - The Chats page marks chats whose "Answer here" is off as Off.

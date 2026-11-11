@@ -1,14 +1,14 @@
 // Agents page (PLAN 19.7): each agent's persona, shared-chat rules, daily cap,
 // recall container and Telegram bot. The runtime reads them at the start of
 // every turn, so writes go straight to the table.
-import { AgentError, AGENT_COLORS, AGENT_ICONS, MAX_AVATAR_IMAGE, assignAgent, createAgent, deleteAgent, getAgentBySlug, listAgents, MAX_AGENT_NAME, MAX_PERSONA, updateAgent } from "@palui/core/agents"
+import { AgentError, AGENT_COLORS, AGENT_ICONS, MAX_AVATAR_IMAGE, assignAgent, getAgent, createAgent, deleteAgent, getAgentBySlug, listAgents, MAX_AGENT_NAME, MAX_PERSONA, updateAgent } from "@palui/core/agents"
 import { rotateSession, setReplyMode } from "@palui/core/chats"
 import { listInstructions } from "@palui/core/notes/service"
 import { chats, REPLY_MODES } from "@palui/db"
 import { createServerFn } from "@tanstack/react-start"
 import { eq, isNull } from "drizzle-orm"
 import { z } from "zod"
-import { agentView, telegramBots } from "@/server/agents"
+import { agentMemory, agentTools, agentView, telegramBots } from "@/server/agents"
 import { callRuntime, isRuntimeDown, runtime } from "@/server/runtime"
 import { chatList } from "@/server/queries"
 import { requireUser, requireWriter } from "@/server/session"
@@ -44,9 +44,29 @@ export const getAgentPage = createServerFn({ method: "GET" })
       agent: agentView(db, row, own.length),
       bots: telegramBots(db).filter((b) => !taken.has(b.id)),
       instructions: listInstructions(db, { agentId: row.id }),
-      chats: own.slice(0, AGENT_CHATS_LIMIT).map((c) => ({ id: c.id, title: c.title, channel: c.channel, kind: c.kind, lastAt: c.lastAt, allowed: c.allowed })),
+      chats: own.slice(0, AGENT_CHATS_LIMIT).map((c) => ({ id: c.id, title: c.title, channel: c.channel, kind: c.kind, lastAt: c.lastAt, allowed: c.allowed, replyMode: c.replyMode })),
       chatsTotal: own.length,
     }
+  })
+
+// The Tools and Memory tabs load on their own: both ask the runtime, which can
+// be slow or down, and the settings form shouldn't wait on it.
+export const getAgentToolsFn = createServerFn({ method: "GET" })
+  .validator(z.object({ id: z.string().min(1).max(100) }))
+  .handler(async ({ data }) => {
+    const { db } = await requireUser()
+    const row = getAgent(db, data.id)
+    if (!row) throw new Error("That agent doesn't exist anymore.")
+    return agentTools(db, row)
+  })
+
+export const getAgentMemoryFn = createServerFn({ method: "GET" })
+  .validator(z.object({ id: z.string().min(1).max(100) }))
+  .handler(async ({ data }) => {
+    const { db } = await requireUser()
+    const row = getAgent(db, data.id)
+    if (!row) throw new Error("That agent doesn't exist anymore.")
+    return agentMemory(db, row)
   })
 
 const fields = z.object({

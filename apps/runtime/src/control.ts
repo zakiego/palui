@@ -7,8 +7,9 @@ import type { TurnBus } from "@palui/core/chat/bus"
 import type { EngineDeps } from "@palui/core/chat/deps"
 import type { Engine } from "@palui/core/chat/engine"
 import { MODEL_OFF_TEXT } from "@palui/core/chat/turn"
-import { AgentError } from "@palui/core/agents"
-import { WEB_CHAT_EXTERNAL_ID } from "@palui/core/chats"
+import { AgentError, getAgent } from "@palui/core/agents"
+import { toolCatalog } from "@palui/core/tools/catalog"
+import { ensureWebChat, WEB_CHAT_EXTERNAL_ID } from "@palui/core/chats"
 import { CONTROL_HEADER, type RuntimeStatus } from "@palui/core/control"
 import type { Logger } from "@palui/core/log"
 import { PALUI_VERSION } from "@palui/core/version"
@@ -201,6 +202,14 @@ export function createControlServer(o: ControlServerOptions) {
         throw new HttpError(e instanceof AgentError ? 400 : 404, (e as Error).message)
       }
       return send(res, 200, { ok: true })
+    }
+    if ((m = /^\/control\/agents\/([^/]+)\/tools$/.exec(path))) {
+      const agent = getAgent(o.db, decodeURIComponent(m[1]!))
+      if (!agent) throw new HttpError(404, "No such agent")
+      // As offered in the owner's own chat: DM-only tools (chat history, flows) count.
+      const web = ensureWebChat(o.db, clock())
+      const tools = await toolCatalog(o.supervisor.running(), { agentId: agent.id, chatId: web.id, channel: "web", tz: getSetting(o.db, "timezone"), now: clock(), log: o.log })
+      return send(res, 200, { tools })
     }
     if (path === "/control/reminders/parse") {
       if (!o.deps.parseReminder) throw new HttpError(501, "Reminder parsing isn't wired into this runtime build yet")

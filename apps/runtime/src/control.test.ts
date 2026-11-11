@@ -1,3 +1,4 @@
+import { getDefaultAgent } from "@palui/core/agents"
 import { afterEach, describe, expect, it } from "vitest"
 import { memoryDb, migrations, type DB } from "@palui/db"
 import { createTurnBus } from "@palui/core/chat/bus"
@@ -101,12 +102,16 @@ describe("control server", () => {
   })
 
   it("routes approvals, stop and unknown paths", async () => {
-    const { call } = await boot()
+    const { call, db } = await boot()
     expect(await json(await call("POST", "/control/approvals/apr_missing", { approved: true }))).toEqual({ ok: false })
     expect((await call("POST", "/control/approvals/apr_missing", {})).status).toBe(400)
     expect(await json(await call("POST", "/control/stop/chat_x", {}))).toEqual({ ok: false })
     expect((await call("POST", "/control/chats/chat_x/agent", {})).status).toBe(400)
     expect((await call("POST", "/control/chats/chat_x/agent", { agentId: null })).status).toBe(404)
+    expect((await call("POST", "/control/agents/agt_missing/tools", {})).status).toBe(404)
+    const palui = getDefaultAgent(db)
+    const { tools } = (await json(await call("POST", `/control/agents/${palui.id}/tools`, {}))) as { tools: { name: string; class: string; guestSafe: boolean }[] }
+    expect(tools.find((x) => x.name === "reminders__ingatkan")).toMatchObject({ class: "write", guestSafe: false })
     expect((await call("POST", "/control/nope", {})).status).toBe(404)
     expect((await call("POST", "/control/remove/nope", {})).status).toBe(404)
   })

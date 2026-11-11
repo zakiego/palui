@@ -28,6 +28,8 @@ export type ToolMeta = {
   title?: string
   // Connector label, for search and the capability list.
   label?: string
+  // Offered in guest turns too (PLAN 19.4).
+  guestSafe?: boolean
 }
 
 export type CollectedTools = {
@@ -99,7 +101,7 @@ export async function collectTools(running: RunningEntry[], opts: CollectOptions
       if (opts.guestOnly && !pt.guestSafe) continue
       const name = namespaced(e.id, toolName)
       if (opts.only && !opts.only.includes("*") && !opts.only.includes(name)) continue
-      const meta: ToolMeta = { name, connectorId: e.id, tool: toolName, class: cls, untrusted: !!pt.untrusted || e.row.trust === "external", title: pt.title, label: e.row.label }
+      const meta: ToolMeta = { name, connectorId: e.id, tool: toolName, class: cls, untrusted: !!pt.untrusted || e.row.trust === "external", title: pt.title, label: e.row.label, guestSafe: !!pt.guestSafe }
       out.tools[name] = wrapTool(pt.tool, meta, opts)
       out.meta[name] = meta
       order.push(name)
