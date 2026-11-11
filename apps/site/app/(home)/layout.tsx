@@ -23,7 +23,8 @@ export default function Layout({ children }: LayoutProps<"/">) {
       </header>
       {children}
       <footer className="lp-footer">
-        palui.zakiego.com <span aria-hidden="true">·</span> built by <a href="https://zakiego.com">Zakiego</a>
+        palui.zakiego.com <span aria-hidden="true">·</span> built by <a href="https://zakiego.com">Zakiego</a> <span aria-hidden="true">·</span>{" "}
+        <Link href="/brand">Brand</Link>
       </footer>
     </div>
   )

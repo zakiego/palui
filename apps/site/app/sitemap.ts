@@ -5,5 +5,5 @@ import { siteUrl } from "@/lib/shared"
 export const dynamic = "force-static"
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [{ url: siteUrl }, ...source.getPages().map((page) => ({ url: `${siteUrl}${page.url}` }))]
+  return [{ url: siteUrl }, { url: `${siteUrl}/brand` }, ...source.getPages().map((page) => ({ url: `${siteUrl}${page.url}` }))]
 }
