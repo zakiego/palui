@@ -10,6 +10,7 @@ import { RuntimeAlert } from "@/components/runtime-alert"
 import { ConnectorMap } from "@/components/connectors/connector-map"
 import { StatusAnnouncer } from "@/components/connectors/shared"
 import { Badge } from "@/components/ui/badge"
+import { StatusText } from "@/components/ui/status-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -297,7 +298,7 @@ function RunsCard({ runs, timezone }: { runs: HomeData["runs"]; timezone: string
                   </div>
                 </ItemContent>
                 <ItemActions>
-                  <Badge variant={RUN_TONE[r.status] ?? "outline"}>{label("run.status", r.status)}</Badge>
+                  <StatusText tone={RUN_TONE[r.status] ?? "outline"}>{label("run.status", r.status)}</StatusText>
                 </ItemActions>
               </Item>
             ))}

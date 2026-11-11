@@ -12,6 +12,7 @@ import { ListCapNote } from "@/components/list-cap-note"
 import { PageHeader } from "@/components/page-header"
 import { SimpleSelect } from "@/components/simple-select"
 import { Badge } from "@/components/ui/badge"
+import { StatusText } from "@/components/ui/status-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
@@ -146,7 +147,7 @@ function EventsTab({ data }: { data: Awaited<ReturnType<typeof getEvents>> }) {
                 <TableRow key={e.id}>
                   <TableCell className="font-mono text-caption tabular-nums max-sm:hidden">{when(e.at, data.timezone)}</TableCell>
                   <TableCell>
-                    <Badge variant={LEVEL_TONE[e.level as Level] ?? "outline"}>{e.level}</Badge>
+                    <StatusText tone={LEVEL_TONE[e.level as Level] ?? "outline"}>{e.level}</StatusText>
                   </TableCell>
                   <TableCell className="max-w-0 truncate font-mono text-caption max-md:hidden" title={e.connectorId ?? undefined}>
                     {e.connectorId ?? t("activity.system")}
@@ -221,9 +222,9 @@ function RunsTab({ runs, total, timezone }: { runs: Awaited<ReturnType<typeof ge
                   {runTitle(r, t, label)}
                 </span>
                 <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-                  <Badge variant={RUN_TONE[r.status] ?? "outline"}>{label("run.status", r.status)}</Badge>
+                  <StatusText tone={RUN_TONE[r.status] ?? "outline"}>{label("run.status", r.status)}</StatusText>
                   <Badge variant="outline">{label("run.trigger", r.trigger)}</Badge>
-                  {r.tainted && <Badge variant="warning">{t("run.tainted")}</Badge>}
+                  {r.tainted && <StatusText tone="warning">{t("run.tainted")}</StatusText>}
                 </span>
                 {r.error && <ClampText text={r.error} lines={2} className="mt-1 text-caption text-destructive-fg" />}
                 {/* What the hidden columns hold folds in under the run: the model below a wide page, the start and duration on a phone. */}

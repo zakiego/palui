@@ -22,6 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
+import { StatusText } from "@/components/ui/status-text"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -143,15 +144,14 @@ function JobRow({ job, timezone, onEdit }: { job: Job; timezone: string; onEdit:
   const overdue = job.enabled && job.status !== "running" && job.nextRunAt != null && job.nextRunAt < Date.now() - OVERDUE_AFTER_MS
   const ran = job.lastRunAt != null
   const status = (
-    <Badge variant={STATUS_TONE[job.lastStatus ?? ""] ?? "outline"} className="max-w-full" title={job.lastStatus ?? undefined}>
+    <StatusText tone={STATUS_TONE[job.lastStatus ?? ""] ?? "outline"} className="max-w-full" title={job.lastStatus ?? undefined}>
       <span className="truncate">{label("run.status", job.lastStatus ?? "unknown")}</span>
-    </Badge>
+    </StatusText>
   )
   const overdueBadge = overdue && (
-    <Badge variant="warning">
-      <ClockAlertIcon aria-hidden="true" />
+    <StatusText tone="warning" icon={<ClockAlertIcon aria-hidden="true" />}>
       {t("reminders.overdue")}
-    </Badge>
+    </StatusText>
   )
 
   const runNow = () => {
@@ -186,7 +186,7 @@ function JobRow({ job, timezone, onEdit }: { job: Job; timezone: string; onEdit:
             {job.name}
           </span>
           {job.kind !== "job" && <Badge variant="outline">{label("job.kind", job.kind)}</Badge>}
-          {!job.enabled && <Badge variant="secondary">{t("job.paused")}</Badge>}
+          {!job.enabled && <StatusText tone="secondary">{t("job.paused")}</StatusText>}
           {/* The result column is hidden on a narrow page; a failed job still has to say so. */}
           {ran && <span className="inline-flex max-w-full min-w-0 @3xl/main:hidden">{status}</span>}
         </span>
