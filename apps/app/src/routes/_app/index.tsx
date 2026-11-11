@@ -21,7 +21,7 @@ import { useLiveRefresh } from "@/hooks/use-live-events"
 import { compact, duration, errorMessage, inOtherZone, inZone } from "@/lib/format"
 import { dismissChecklist, getHome } from "@/lib/fns/home"
 import { useCount, useLabel, useT, type Key } from "@/lib/i18n"
-import { runTitle } from "@/lib/runs"
+import { RUN_TONE, runTitle } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_app/")({
@@ -240,15 +240,6 @@ function RemindersCard({ reminders, timezone }: { reminders: HomeData["reminders
   )
 }
 
-const RUN_TONE: Record<string, "success" | "destructive" | "secondary" | "outline" | "warning"> = {
-  ok: "success",
-  error: "destructive",
-  aborted: "secondary",
-  running: "outline",
-  awaiting_approval: "warning",
-  budget: "warning",
-}
-
 function RunsCard({ runs, timezone }: { runs: HomeData["runs"]; timezone: string }) {
   const t = useT()
   const label = useLabel()
@@ -280,7 +271,7 @@ function RunsCard({ runs, timezone }: { runs: HomeData["runs"]; timezone: string
         ) : (
           <ItemGroup className="gap-0">
             {runs.map((r) => (
-              <Item key={r.id} size="sm" className="px-0">
+              <Item key={r.id} size="sm" className="-mx-2 rounded-lg px-2" render={<Link to="/activity/runs/$id" params={{ id: r.id }} />}>
                 <ItemContent className="min-w-0">
                   <ItemTitle className="w-full min-w-0">
                     <span dir="auto" className="truncate text-start" title={runTitle(r, t, label)}>

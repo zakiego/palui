@@ -12,3 +12,13 @@ export function runTitle(r: RunNames, t: ReturnType<typeof useT>, label: ReturnT
   if (r.chatGone) return t("runs.deletedChat")
   return label("run.trigger", r.trigger)
 }
+
+// A run's status as a StatusText tone.
+export const RUN_TONE: Record<string, "success" | "destructive" | "secondary" | "warning" | "outline"> = {
+  ok: "success",
+  error: "destructive",
+  aborted: "secondary",
+  budget: "warning",
+  awaiting_approval: "warning",
+  running: "outline",
+}

@@ -3,7 +3,7 @@ import { getSetting } from "@palui/core/settings"
 import { listConnectors } from "@palui/core/connectors/store"
 import { createServerFn } from "@tanstack/react-start"
 import { z } from "zod"
-import { eventCount, eventList, recentRuns, runCount, usage } from "@/server/queries"
+import { eventCount, eventList, recentRuns, runCount, runDetail, usage } from "@/server/queries"
 import { requireUser } from "@/server/session"
 
 const level = z.enum(["debug", "info", "warn", "error"])
@@ -24,6 +24,13 @@ export const getRuns = createServerFn({ method: "GET" }).handler(async () => {
   const { db } = await requireUser()
   return { runs: recentRuns(db, 100), total: runCount(db), timezone: getSetting(db, "timezone") }
 })
+
+export const getRun = createServerFn({ method: "GET" })
+  .validator(z.object({ id: z.string().max(64) }))
+  .handler(async ({ data }) => {
+    const { db } = await requireUser()
+    return { run: runDetail(db, data.id), timezone: getSetting(db, "timezone") }
+  })
 
 export const getUsage = createServerFn({ method: "GET" }).handler(async () => {
   const { db } = await requireUser()

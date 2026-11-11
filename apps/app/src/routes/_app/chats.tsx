@@ -4,7 +4,7 @@
 // calls sit inline and collapsible; pending approvals show Approve/Deny.
 import * as React from "react"
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
-import { ArrowUpIcon, CircleAlertIcon, CopyIcon, HashIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SearchIcon, SendIcon, ShieldAlertIcon, SquareIcon, MessageCircleIcon, WebhookIcon, WrenchIcon } from "lucide-react"
+import { ArrowUpIcon, CircleAlertIcon, CopyIcon, HashIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SearchIcon, SendIcon, ShieldAlertIcon, SquareIcon, MessageCircleIcon, WebhookIcon } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -28,10 +28,10 @@ import { MessageScroller, MessageScrollerProvider, MessageScrollerButton, Messag
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import { RuntimeAlert } from "@/components/runtime-alert"
+import { CLASS_TONE, ToolTrace } from "@/components/tool-trace"
 import { decideApproval, getChats, getTranscript, sendWebMessage, stopTurn } from "@/lib/fns/chats"
-import { ago, duration, errorMessage } from "@/lib/format"
+import { ago, errorMessage } from "@/lib/format"
 import { markdownToPlain } from "@/lib/markdown"
 import { transcriptToMarkdown } from "@/lib/transcript-text"
 import { useLabel, useT } from "@/lib/i18n"
@@ -299,7 +299,7 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
             )}
             {transcript.messages.map((m) => (
               <MessageScrollerItem key={m.id} messageId={m.id}>
-                {m.role === "assistant" && m.tools.length > 0 && <ToolTrace tools={m.tools.map((x) => ({ id: x.id, tool: x.tool, class: x.class, status: x.status as LiveTool["status"], ms: x.ms ?? undefined, preview: x.result ?? undefined, args: x.args }))} />}
+                {m.role === "assistant" && m.tools.length > 0 && <ToolTrace className="mb-2" tools={m.tools.map((x) => ({ id: x.id, tool: x.tool, class: x.class, status: x.status as LiveTool["status"], ms: x.ms ?? undefined, preview: x.result ?? undefined, args: x.args }))} />}
                 <ChatMessage role={m.role} source={m.source} text={m.text} at={m.createdAt} />
               </MessageScrollerItem>
             ))}
@@ -310,7 +310,7 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
             ))}
             {turn && (
               <MessageScrollerItem messageId={`live-${turn.runId}`}>
-                {turn.tools.length > 0 && <ToolTrace tools={turn.tools} />}
+                {turn.tools.length > 0 && <ToolTrace className="mb-2" tools={turn.tools} />}
                 {turn.text ? (
                   <ChatMessage role="assistant" text={turn.text} streaming />
                 ) : (
@@ -451,53 +451,6 @@ function ChatMessage({
         )}
       </MessageContent>
     </Message>
-  )
-}
-
-const CLASS_TONE: Record<string, "secondary" | "warning" | "destructive"> = { read: "secondary", write: "warning", destructive: "destructive" }
-
-// Tool calls shown before the rest fold behind a button. A turn can make
-// dozens, and thirty lines above a reply bury it.
-const TRACE_LIMIT = 5
-
-function ToolTrace({ tools }: { tools: (LiveTool & { args?: string })[] }) {
-  const t = useT()
-  const label = useLabel()
-  const [showAll, setShowAll] = React.useState(false)
-  const shown = showAll || tools.length <= TRACE_LIMIT + 1 ? tools : tools.slice(0, TRACE_LIMIT)
-  const hidden = tools.length - shown.length
-  const hiddenFailed = tools.slice(shown.length).filter((x) => x.status === "error").length
-  return (
-    <Trace className="mb-2">
-      {shown.map((x) => (
-        <TraceCollapsible key={x.id}>
-          <TraceCollapsibleTrigger>
-            <TraceLine status={x.status === "running" ? "running" : x.status === "error" ? "error" : undefined}>
-              <TraceIcon>{x.status === "running" ? <Spinner /> : <WrenchIcon />}</TraceIcon>
-              <TraceTitle className="font-mono text-caption" title={x.tool}>
-                {x.tool}
-              </TraceTitle>
-              <StatusText tone={CLASS_TONE[x.class] ?? "destructive"} icon={null}>{label("tool.class", x.class)}</StatusText>
-              {/* A word next to the color, so a failed call doesn't rely on red alone. */}
-              {x.status === "error" && <StatusText tone="destructive">{t("tool.failed")}</StatusText>}
-              {x.status === "denied" && <StatusText tone="outline">{t("tool.denied")}</StatusText>}
-              {x.ms != null && <TraceDescription>{duration(x.ms)}</TraceDescription>}
-            </TraceLine>
-          </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent className="flex flex-col gap-2">
-            {/* The trigger truncates the name; here it's whole. */}
-            <span className="font-mono text-caption break-all">{x.tool}</span>
-            {x.args && <pre className="max-h-48 overflow-auto rounded-md bg-code p-2 font-mono text-xs break-all whitespace-pre-wrap">{x.args}</pre>}
-            {x.preview ? <pre className="max-h-48 overflow-auto rounded-md bg-code p-2 font-mono text-xs break-all whitespace-pre-wrap">{x.preview}</pre> : <span className="text-caption">{t("chats.noResult")}</span>}
-          </TraceCollapsibleContent>
-        </TraceCollapsible>
-      ))}
-      {hidden > 0 && (
-        <Button variant="ghost" size="sm" className="self-start" onClick={() => setShowAll(true)}>
-          {hiddenFailed > 0 ? t("chats.moreToolsFailed", { n: hidden, failed: hiddenFailed }) : t("chats.moreTools", { n: hidden })}
-        </Button>
-      )}
-    </Trace>
   )
 }
 

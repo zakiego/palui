@@ -27,7 +27,7 @@ import { useLiveRefresh } from "@/hooks/use-live-events"
 import { getEvents, getRuns, getUsage } from "@/lib/fns/activity"
 import { compact, duration, inZone } from "@/lib/format"
 import { useCount, useLabel, useT } from "@/lib/i18n"
-import { runTitle } from "@/lib/runs"
+import { RUN_TONE, runTitle } from "@/lib/runs"
 
 const LEVELS = ["debug", "info", "warn", "error"] as const
 type Level = (typeof LEVELS)[number]
@@ -172,15 +172,6 @@ function EventsTab({ data }: { data: Awaited<ReturnType<typeof getEvents>> }) {
   )
 }
 
-const RUN_TONE: Record<string, "success" | "destructive" | "secondary" | "warning" | "outline"> = {
-  ok: "success",
-  error: "destructive",
-  aborted: "secondary",
-  budget: "warning",
-  awaiting_approval: "warning",
-  running: "outline",
-}
-
 function RunsTab({ runs, total, timezone }: { runs: Awaited<ReturnType<typeof getRuns>>["runs"]; total: number; timezone: string }) {
   const t = useT()
   const label = useLabel()
@@ -216,20 +207,31 @@ function RunsTab({ runs, total, timezone }: { runs: Awaited<ReturnType<typeof ge
         </TableHeader>
         <TableBody>
           {runs.map((r) => (
-            <TableRow key={r.id}>
+            // The title links to the run; its ::after stretches over the row, so the whole row opens it.
+            <TableRow key={r.id} className="relative">
               <TableCell className="font-mono text-caption tabular-nums max-sm:hidden">{inZone(r.startedAt, timezone)}</TableCell>
               <TableCell className="max-w-0 whitespace-normal">
-                <span className="block truncate text-left" dir="auto" title={runTitle(r, t, label)}>
+                <Link
+                  to="/activity/runs/$id"
+                  params={{ id: r.id }}
+                  className="block truncate text-left outline-none after:absolute after:inset-0 focus-visible:after:rounded-md focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+                  dir="auto"
+                >
                   {runTitle(r, t, label)}
-                </span>
+                </Link>
                 <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                   <StatusText tone={RUN_TONE[r.status] ?? "outline"}>{label("run.status", r.status)}</StatusText>
                   <Badge variant="outline">{label("run.trigger", r.trigger)}</Badge>
                   {r.tainted && <StatusText tone="warning">{t("run.tainted")}</StatusText>}
                 </span>
-                {r.error && <ClampText text={r.error} lines={2} className="mt-1 text-caption text-destructive-fg" />}
+                {/* Two lines here; the run page shows the whole error. */}
+                {r.error && (
+                  <span dir="auto" className="mt-1 line-clamp-2 text-caption break-words whitespace-pre-line text-destructive-fg">
+                    {r.error}
+                  </span>
+                )}
                 {/* What the hidden columns hold folds in under the run: the model below a wide page, the start and duration on a phone. */}
-                <span className="mt-1 block truncate font-mono text-caption text-muted-foreground @5xl/main:hidden" title={r.model ?? undefined}>
+                <span className="mt-1 block truncate font-mono text-caption text-muted-foreground @5xl/main:hidden">
                   {r.model ?? t("runs.noModel")}
                 </span>
                 <span className="mt-1 block font-mono text-caption text-muted-foreground tabular-nums sm:hidden">
@@ -237,7 +239,7 @@ function RunsTab({ runs, total, timezone }: { runs: Awaited<ReturnType<typeof ge
                   {r.ms != null ? ` · ${duration(r.ms)}` : ""}
                 </span>
               </TableCell>
-              <TableCell className="hidden max-w-0 truncate font-mono text-caption @5xl/main:table-cell" title={r.model ?? undefined}>
+              <TableCell className="hidden max-w-0 truncate font-mono text-caption @5xl/main:table-cell">
                 {r.model ?? t("runs.noModel")}
               </TableCell>
               <TableCell className="text-end font-mono text-caption tabular-nums">
