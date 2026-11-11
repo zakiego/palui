@@ -17,7 +17,6 @@ import type { TurnInfo } from "../connectors/define"
 import type { Supervisor } from "../connectors/supervisor"
 import { notesPrompt } from "../notes/service"
 import { flowCheckinsPrompt } from "../flows/checkin"
-import { checkinsPrompt } from "../routines/service"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, emptyTools, SEARCH_TOOL, STICKY_MAX, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
@@ -297,8 +296,8 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
       const turnContext = buildTurnContext({
         now: startedAt,
         tz: settings.timezone,
-        // Routine check-ins are the owner's; a shared chat never sees them.
-        checkins: input.trigger === "message" && !shared ? [checkinsPrompt(db, chat.id, startedAt), flowCheckinsPrompt(db, chat.id, startedAt)].filter(Boolean).join("\n\n") || null : null,
+        // Flow check-ins are the owner's; a shared chat never sees them.
+        checkins: input.trigger === "message" && !shared ? flowCheckinsPrompt(db, chat.id, startedAt) : null,
         recall,
         recallAbout: agent.isDefault ? "owner" : "chats",
       })

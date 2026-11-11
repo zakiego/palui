@@ -12,7 +12,7 @@ import { parseYesNo } from "../chat/router"
 import { answerFlowCheckin, checkinWaitOf } from "./checkin"
 import { matchChatTrigger } from "./entry"
 import { definitionOf, decideVersion, FlowError, getFlow, getRun, getVersion, VERSION_APPROVAL_SOURCE } from "./service"
-import { matchAnswer } from "../routines/service"
+import { matchAnswer } from "./source-config"
 
 const ANSWER_RE = /^fl:([A-Za-z0-9_-]+):([a-z0-9_]{1,20})$/
 const VERSION_RE = /^flowver:(approve|deny):([A-Za-z0-9_-]+)$/

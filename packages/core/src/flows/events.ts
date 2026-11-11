@@ -29,7 +29,7 @@ export function emitFlowEvent(db: DB, name: FlowEventName, src: RunRow, data: Fl
   let n = 0
   for (const row of listeners) {
     const flow = db.select().from(flows).where(eq(flows.id, row.flowId)).get()
-    if (!flow || flow.shadow || flow.chatId !== source.chatId) continue
+    if (!flow || flow.chatId !== source.chatId) continue
     let version
     try {
       version = currentVersion(db, flow)

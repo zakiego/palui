@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest"
 import { NOW, WITA } from "../reminders/test-helpers"
 import { utcToLocal } from "../reminders/time"
-import { sourceSchema, type RoutineSource, type ToolSource } from "./config"
+import { sourceSchema, type ScheduleSource, type ToolSource } from "./source-config"
 import { extractItems, extractList, localDate, nextLocalTime, parseTimeValue, refreshToolSource, renderArgs, safeLabel, toolData, upcoming, type SourceInput } from "./sources"
-import { fakePrayerTool, PRAYER_ROUTINE, prayerPayload } from "./test-helpers"
+import { fakePrayerTool, PRAYER_SOURCE, prayerPayload } from "./test-helpers"
 
 const start = { at: NOW, key: "" }
 const local = (ms: number) => utcToLocal(ms, WITA).slice(0, 16)
 
 function input(source: unknown, extra: Partial<SourceInput> = {}): SourceInput {
-  return { source: sourceSchema.parse(source) as RoutineSource, tz: WITA, days: null, state: {}, ...extra }
+  return { source: sourceSchema.parse(source) as ScheduleSource, tz: WITA, days: null, state: {}, ...extra }
 }
 
 describe("times source", () => {
@@ -79,7 +79,7 @@ describe("tool results", () => {
   })
 
   it("maps item fields with offsets and reports missing ones", () => {
-    const src = sourceSchema.parse({ ...PRAYER_ROUTINE.source, items: [{ field: "times.fajr", label: "Subuh", offsetMin: -10 }, { field: "times.nope" }] }) as ToolSource
+    const src = sourceSchema.parse({ ...PRAYER_SOURCE, items: [{ field: "times.fajr", label: "Subuh", offsetMin: -10 }, { field: "times.nope" }] }) as ToolSource
     const got = extractItems(src, prayerPayload("2026-11-11"), "2026-11-11", WITA)
     expect(got.entries.map((e) => `${local(e.at)} ${e.label} ${e.key}`)).toEqual(["2026-11-11T04:25 Subuh times.fajr"])
     expect(got.problems).toEqual(["times.nope: missing"])
@@ -100,7 +100,7 @@ describe("tool results", () => {
 })
 
 describe("refreshing a tool source", () => {
-  const src = sourceSchema.parse(PRAYER_ROUTINE.source) as ToolSource
+  const src = sourceSchema.parse(PRAYER_SOURCE) as ToolSource
 
   it("reads today and tomorrow and computes the day's occurrences", async () => {
     const call = fakePrayerTool()

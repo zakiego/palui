@@ -141,7 +141,7 @@ export function systemBlocks(stable: string, summary?: string | null): SystemMod
 export type TurnContextInput = {
   now: number
   tz: string
-  // Open routine check-ins in this chat (routines/service checkinsPrompt).
+  // Open flow check-ins in this chat (flows/checkin flowCheckinsPrompt).
   checkins?: string | null
   recall?: string | null
   // Heading for `recall`; the default agent's memory is about the owner.
@@ -355,7 +355,7 @@ export const STALE_READ_NOTE = "[Taken before the owner approved the other call 
 // The AI SDK runs every call of a step that needs no approval right away, and
 // the approved ones only when the owner answers. On resume, the results of the
 // calls made next to an approved one are older than what it changed (a list
-// still showing the routine that was just deleted), so they say so.
+// still showing the flow that was just deleted), so they say so.
 export function markStaleReads(msgs: ModelMessage[], approvedCallIds: Set<string>): ModelMessage[] {
   if (!approvedCallIds.size) return msgs
   const at = msgs.findLastIndex((m) => m.role === "assistant" && Array.isArray(m.content) && m.content.some((p) => p.type === "tool-call" && approvedCallIds.has(p.toolCallId)))

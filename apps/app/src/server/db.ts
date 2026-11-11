@@ -2,19 +2,19 @@
 // runs migrations (PLAN 3.1), so it opens with migrate on.
 import { config } from "@palui/core/config"
 import { dbPath, openDb, type DB } from "@palui/db"
-import { syncRoutineFlows } from "@palui/core/flows/migrate"
+import { removeRetiredConnectors } from "@palui/core/connectors/store"
 
 let instance: DB | undefined
 
 export function getDb(): DB {
   if (!instance) {
     instance = openDb(dbPath(config().dataDir), { migrate: true })
-    // The data migration after the SQL ones (RFC flows 3.6): routines get their
-    // flows (shadow ones until the owner hands over). Idempotent, never fatal.
+    // Cleanup after the SQL migrations: drop rows of connector types that no
+    // longer exist (the routines builtin). Idempotent, never fatal.
     try {
-      syncRoutineFlows(instance)
+      removeRetiredConnectors(instance)
     } catch (e) {
-      console.error("routine to flow migration failed", e)
+      console.error("removing retired connectors failed", e)
     }
   }
   return instance

@@ -9,7 +9,6 @@ import { getSetting, type Settings, setSetting } from "@palui/core/settings"
 import { addUsage, usageKeys } from "@palui/core/budget/index"
 import { createFlow, updateFlow } from "@palui/core/flows/service"
 import { localToUtc, utcToLocal } from "@palui/core/reminders/time"
-import { createRoutine, setPaused, type RoutineInput } from "@palui/core/routines/service"
 import {
   agents,
   chats,
@@ -26,8 +25,6 @@ import {
   pendingApprovals,
   preferences,
   reminders,
-  routineOccurrences,
-  routines,
   runs,
   schema,
   toolCalls,
@@ -35,8 +32,7 @@ import {
   type ConnectorStatus,
   type DB,
   type EventLevel,
-  type RoutineOccurrenceStatus,
-  type RoutineSourceState,
+  type SourceState,
   type Trust,
 } from "@palui/db"
 import { encrypt } from "@palui/db/crypto"
@@ -228,8 +224,8 @@ export function createKit(db: DB, now = Date.now()) {
     },
 
     // A flow through the real store (validated, triggers derived), then the
-    // columns a fixture needs to force: paused, failing, a shadow routine, an
-    // unapproved version with write calls, flow variables.
+    // columns a fixture needs to force: paused, failing, an unapproved version
+    // with write calls, flow variables.
     flow(
       chat: ChatRow,
       definition: Record<string, unknown>,
@@ -238,8 +234,6 @@ export function createKit(db: DB, now = Date.now()) {
         pausedUntil?: number | null
         failures?: number
         lastError?: string | null
-        shadow?: boolean
-        routine?: boolean
         unapprovedWrites?: { stepId: string; kind: "tool"; connectorId: string; tool: string; class: "write"; args: Record<string, unknown> }[]
         versions?: { definition: Record<string, unknown>; note?: string; createdBy?: string }[]
         state?: Record<string, unknown>
@@ -247,7 +241,7 @@ export function createKit(db: DB, now = Date.now()) {
       } = {},
     ) {
       const at = opts.createdAt ?? now - D
-      const saved = createFlow(db, { chatId: chat.id, definition, createdBy: opts.routine ? "migration" : "agent:run_fixture" }, at)
+      const saved = createFlow(db, { chatId: chat.id, definition, createdBy: "agent:run_fixture" }, at)
       let versionId = saved.version.id
       for (const [i, v] of (opts.versions ?? []).entries()) versionId = updateFlow(db, saved.flow.id, { definition: v.definition, note: v.note ?? null, createdBy: v.createdBy ?? "agent:run_fixture" }, at + (i + 1) * MIN).version.id
       if (opts.unapprovedWrites) db.update(flowVersions).set({ writeCalls: opts.unapprovedWrites, approvedAt: null, approvedVia: null }).where(eq(flowVersions.id, versionId)).run()
@@ -257,8 +251,6 @@ export function createKit(db: DB, now = Date.now()) {
           pausedUntil: opts.pausedUntil ?? null,
           consecutiveFailures: opts.failures ?? 0,
           lastError: opts.lastError ?? null,
-          shadow: !!opts.shadow,
-          legacyRoutineId: opts.routine ? newId("rtn") : null,
           approvedVersionId: opts.unapprovedWrites ? null : versionId,
           state: { values: opts.state ?? {}, tainted: [] },
         })
@@ -273,7 +265,7 @@ export function createKit(db: DB, now = Date.now()) {
       values: {
         status: "queued" | "running" | "waiting" | "awaiting_approval" | "done" | "failed" | "skipped" | "cancelled"
         startedAt: number
-        skipReason?: "late" | "duplicate" | "paused" | "rate_limited" | "budget" | "not_approved" | "chain_depth" | "shadow" | null
+        skipReason?: "late" | "duplicate" | "paused" | "rate_limited" | "budget" | "not_approved" | "chain_depth" | null
         triggerKind?: string
         triggerId?: string | null
         scheduledAt?: number | null
@@ -326,48 +318,13 @@ export function createKit(db: DB, now = Date.now()) {
       return id
     },
 
-    // Through the service, so the stored config and schedule are what the agent
-    // would have made. `paused`: true for open-ended, a time to pause until.
-    routine(chatId: string, input: RoutineInput, opts: { state?: RoutineSourceState; paused?: true | number; lastError?: string; createdAt?: number } = {}) {
-      const at = opts.createdAt ?? now
-      const r = createRoutine(db, chatId, input, at, opts.state ? { state: opts.state, nextRefreshAt: now + 12 * H } : undefined)
-      if (opts.paused) setPaused(db, r.id, true, opts.paused === true ? null : opts.paused, now)
-      // Raw: a fixture may store a config the service would refuse today.
-      if (opts.lastError) db.update(routines).set({ lastError: opts.lastError }).where(eq(routines.id, r.id)).run()
-      return r.id
-    },
-
     // A tool source's cached times for today and tomorrow, as a read would leave them.
-    toolState(tz: string, times: { key: string; label: string; time: string }[], days = 2): RoutineSourceState {
+    toolState(tz: string, times: { key: string; label: string; time: string }[], days = 2): SourceState {
       const today = utcToLocal(now, tz).slice(0, 10)
       const dates = Array.from({ length: days }, (_, i) => utcToLocal(localToUtc(`${today}T12:00`, tz) + i * D, tz).slice(0, 10))
       return { entries: dates.flatMap((date) => times.map((t) => ({ date, key: t.key, label: t.label, at: localToUtc(`${date}T${t.time}`, tz) }))), fetched: dates, failures: 0, lastOkAt: now }
     },
 
-    routineOccurrence(routineId: string, chatId: string, values: { label: string; at: number; status: RoutineOccurrenceStatus; answer?: string; note?: string; followUps?: number; nextFollowUpAt?: number | null; deadlineAt?: number | null; fallback?: boolean }) {
-      const answeredAt = values.answer ? values.at + 7 * MIN : null
-      db.insert(routineOccurrences)
-        .values({
-          id: newId("rocc"),
-          routineId,
-          chatId,
-          key: `${values.at}:${values.label}`,
-          label: values.label,
-          scheduledAt: values.at,
-          firedAt: values.at,
-          status: values.status,
-          answer: values.answer ?? null,
-          answeredAt,
-          answers: values.answer ? [{ answer: values.answer, ...(values.note ? { text: values.note } : {}), at: answeredAt! }] : [],
-          followUps: values.followUps ?? 0,
-          nextFollowUpAt: values.nextFollowUpAt ?? null,
-          deadlineAt: values.deadlineAt ?? null,
-          fallback: values.fallback ?? false,
-          createdAt: values.at,
-          updatedAt: answeredAt ?? values.at,
-        })
-        .run()
-    },
 
     setting<K extends keyof Settings>(settingKey: K, value: Settings[K]) {
       setSetting(db, settingKey, value, now)

@@ -1,5 +1,6 @@
 // Fixtures for flow tests (not imported by production code): the worked
 // examples from RFC flows section 9, and a tool list they resolve against.
+import type { ToolCaller } from "./sources"
 import type { ToolInfo } from "./validate"
 
 export const EXAMPLE_TOOLS: ToolInfo[] = [
@@ -150,3 +151,46 @@ export const SHOLAT = {
 }
 
 export const EXAMPLES = { BRIEFING, PR_MERGED, BILLS, RECAP, SHOLAT }
+
+// A schedule server like the one at sholat.zakiego.com: one day of times per call,
+// as an MCP text result holding JSON. Times move a minute per day, like the real
+// ones do through the year.
+export function prayerPayload(date: string) {
+  const day = Number(date.slice(8, 10))
+  const m = (base: number) => String(base + (day % 5)).padStart(2, "0")
+  return {
+    date,
+    location: { slug: "banjarmasin", timezone: "Asia/Makassar" },
+    times: { imsak: `04:${m(24)}`, fajr: `04:${m(34)}`, sunrise: `05:${m(50)}`, dhuhr: `12:0${day % 5}`, asr: `15:${m(25)}`, maghrib: `18:${m(11)}`, isha: `19:${m(23)}` },
+  }
+}
+
+export type FakeCalls = { calls: { connectorId: string; tool: string; args: Record<string, unknown> }[]; fail: boolean }
+
+export function fakePrayerTool(): ToolCaller & FakeCalls {
+  const state: FakeCalls = { calls: [], fail: false }
+  const fn = (async (connectorId, tool, args) => {
+    state.calls.push({ connectorId, tool, args })
+    if (state.fail) throw new Error("fetch failed: ECONNRESET")
+    return { content: [{ type: "text", text: JSON.stringify(prayerPayload(String(args.date))) }] }
+  }) as ToolCaller & FakeCalls
+  Object.defineProperty(fn, "calls", { get: () => state.calls })
+  Object.defineProperty(fn, "fail", { get: () => state.fail, set: (v: boolean) => (state.fail = v) })
+  return fn
+}
+
+// A tool source for the prayer server above, as the agent would write it.
+export const PRAYER_SOURCE = {
+  kind: "tool" as const,
+  connectorId: "mcp-jadwal-sholat",
+  tool: "get_prayer_times",
+  args: { city: "banjarmasin", date: "{{date}}" },
+  refreshAt: "00:05",
+  items: [
+    { field: "times.fajr", label: "Subuh" },
+    { field: "times.dhuhr", label: "Dzuhur" },
+    { field: "times.asr", label: "Ashar" },
+    { field: "times.maghrib", label: "Maghrib" },
+    { field: "times.isha", label: "Isya" },
+  ],
+}

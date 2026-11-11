@@ -31,10 +31,6 @@ export type Settings = {
   turnsPausedUntil: number | null
   turnsPausedReason: string | null
   firstRun: { saidHi: boolean; dismissed: boolean }
-  // Who runs routines (RFC flows 12.6): "legacy" the routine engine alone;
-  // "shadow" the routine engine sends while flows compute and compare; "flows"
-  // the flow engine sends (set after a clean shadow week).
-  routineMode: "legacy" | "shadow" | "flows"
 }
 
 export const DEFAULT_PERSONA = `Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.
@@ -73,7 +69,6 @@ export const DEFAULT_SETTINGS: Settings = {
   turnsPausedUntil: null,
   turnsPausedReason: null,
   firstRun: { saidHi: false, dismissed: false },
-  routineMode: "shadow",
 }
 
 export function getSetting<K extends keyof Settings>(db: DB, key: K): Settings[K] {

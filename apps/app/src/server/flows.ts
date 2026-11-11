@@ -5,7 +5,6 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm"
 import { chats, flowRuns, flows, flowStepRuns, type DB } from "@palui/db"
 import { edgesOf } from "@palui/core/flows/graph"
 import { approvalState, checkinOf } from "@palui/core/flows/history"
-import { routineMode, shadowReport } from "@palui/core/flows/migrate"
 import type { FlowDefinition, FlowStep } from "@palui/core/flows/schema"
 import { currentVersion, definitionOf, describeTrigger, diffDefinitions, getFlow, getRun, listVersions, triggersOf, type FlowRow } from "@palui/core/flows/service"
 import { describeWriteCall, type WriteCall } from "@palui/core/flows/validate"
@@ -41,7 +40,7 @@ export function flowList(db: DB, now = Date.now()) {
     db
       .select({ flowId: flowRuns.flowId, n: sql<number>`count(*)` })
       .from(flowRuns)
-      .where(and(sql`${flowRuns.startedAt} >= ${now - 7 * DAY}`, eq(flowRuns.dryRun, false), isNull(flowRuns.parentRunId), sql`coalesce(${flowRuns.skipReason}, '') != 'shadow'`))
+      .where(and(sql`${flowRuns.startedAt} >= ${now - 7 * DAY}`, eq(flowRuns.dryRun, false), isNull(flowRuns.parentRunId)))
       .groupBy(flowRuns.flowId)
       .all()
       .map((r) => [r.flowId, Number(r.n)]),
@@ -56,7 +55,7 @@ export function flowList(db: DB, now = Date.now()) {
     const last = db
       .select({ id: flowRuns.id, status: flowRuns.status, skipReason: flowRuns.skipReason, startedAt: flowRuns.startedAt, error: flowRuns.error })
       .from(flowRuns)
-      .where(and(eq(flowRuns.flowId, f.id), eq(flowRuns.dryRun, false), isNull(flowRuns.parentRunId), sql`coalesce(${flowRuns.skipReason}, '') != 'shadow'`))
+      .where(and(eq(flowRuns.flowId, f.id), eq(flowRuns.dryRun, false), isNull(flowRuns.parentRunId)))
       .orderBy(desc(flowRuns.startedAt))
       .limit(1)
       .get()
@@ -66,25 +65,18 @@ export function flowList(db: DB, now = Date.now()) {
       description: def?.description ?? null,
       enabled: f.enabled,
       pausedUntil: f.pausedUntil,
-      shadow: f.shadow,
-      routine: !!f.legacyRoutineId,
       failures: f.consecutiveFailures,
       lastError: f.lastError,
       approval: approvalState(db, f),
       chatTitle: chatTitle(db, f.chatId),
       tz: f.tz,
-      triggers: (def?.triggers ?? []).map((t) => ({ id: t.id, kind: t.kind, summary: describeTrigger(t, f.tz) })),
+      triggers: (def?.triggers ?? []).map((t) => ({ id: t.id, kind: t.kind, summary: describeTrigger(t) })),
       steps: def?.steps.length ?? 0,
-      nextAt: f.enabled && !f.shadow ? (next ?? null) : null,
+      nextAt: f.enabled ? (next ?? null) : null,
       lastRun: last ?? null,
       runs7d: counts.get(f.id) ?? 0,
     }
   })
-}
-
-export function routinesStatus(db: DB, now = Date.now()) {
-  const report = shadowReport(db, now - 7 * DAY)
-  return { mode: routineMode(db), shadowFlows: report.flows, compared: report.compared, matches: report.matches, diffs: report.diffs.length }
 }
 
 // One line per step for the vertical list: what it does, in plain words.
@@ -130,7 +122,7 @@ export function flowDetail(db: DB, id: string) {
   const recent = db
     .select()
     .from(flowRuns)
-    .where(and(eq(flowRuns.flowId, f.id), eq(flowRuns.dryRun, false), sql`coalesce(${flowRuns.skipReason}, '') != 'shadow'`))
+    .where(and(eq(flowRuns.flowId, f.id), eq(flowRuns.dryRun, false)))
     .orderBy(desc(flowRuns.startedAt))
     .limit(30)
     .all()
@@ -140,8 +132,6 @@ export function flowDetail(db: DB, id: string) {
     description: def?.description ?? null,
     enabled: f.enabled,
     pausedUntil: f.pausedUntil,
-    shadow: f.shadow,
-    routine: !!f.legacyRoutineId,
     failures: f.consecutiveFailures,
     lastError: f.lastError,
     approval: approvalState(db, f),
@@ -154,7 +144,7 @@ export function flowDetail(db: DB, id: string) {
     state: Object.keys(f.state?.values ?? {}).length ? json(f.state.values) : null,
     triggers: (def?.triggers ?? []).map((t) => {
       const row = triggerRows.find((r) => r.triggerId === t.id)
-      return { id: t.id, kind: t.kind, start: t.start, summary: describeTrigger(t, f.tz), nextAt: f.enabled && !f.shadow ? (row?.nextFireAt ?? null) : null, lastError: row?.lastError ?? null }
+      return { id: t.id, kind: t.kind, start: t.start, summary: describeTrigger(t), nextAt: f.enabled ? (row?.nextFireAt ?? null) : null, lastError: row?.lastError ?? null }
     }),
     steps: (def?.steps ?? []).map((s) => ({
       id: s.id,

@@ -2,12 +2,12 @@
 import { getSetting } from "@palui/core/settings"
 import { createServerFn } from "@tanstack/react-start"
 import { z } from "zod"
-import { flowDetail, flowList, routinesStatus } from "@/server/flows"
+import { flowDetail, flowList } from "@/server/flows"
 import { requireUser } from "@/server/session"
 
 export const getFlows = createServerFn({ method: "GET" }).handler(async () => {
   const { db } = await requireUser()
-  return { flows: flowList(db), routines: routinesStatus(db), timezone: getSetting(db, "timezone") }
+  return { flows: flowList(db), timezone: getSetting(db, "timezone") }
 })
 
 export const getFlowFn = createServerFn({ method: "GET" })

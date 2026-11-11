@@ -1,10 +1,10 @@
 // The flow definition (RFC flows section 4): a small JSON document with
 // triggers[] and steps[]. Validated by zod here and by the graph and data checks
 // in validate.ts. Step and trigger kinds are discriminated unions on `kind`, so a
-// new kind needs no migration (the routines rule). `schema` versions the format:
+// new kind needs no migration. `schema` versions the format:
 // upgradeDefinition() turns an older stored definition into the current shape.
 import { z } from "zod"
-import { answerSchema, daysSchema, DEFAULT_ANSWERS, sourceSchema } from "../routines/config"
+import { answerSchema, daysSchema, DEFAULT_ANSWERS, sourceSchema } from "./source-config"
 
 export const DEFINITION_SCHEMA = 1
 

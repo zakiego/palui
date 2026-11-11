@@ -14,7 +14,6 @@ import settings from "./settings/manifest"
 import recall from "./recall/manifest"
 import reminders from "./reminders/manifest"
 import flows from "./flows/manifest"
-import routines from "./routines/manifest"
 import remoteMcp from "./remote-mcp/manifest"
 import t3code from "./t3code/manifest"
 import telegram from "./telegram/manifest"
@@ -38,7 +37,6 @@ export const manifests: Record<string, ConnectorManifest> = {
   t3code,
   reminders,
   flows,
-  routines,
   jobs,
   chats: chatHistory,
   notes,

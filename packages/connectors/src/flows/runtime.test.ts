@@ -3,7 +3,7 @@ import { memoryDb, outbox } from "@palui/db"
 import { ensureChat, ensureWebChat } from "@palui/core/chats"
 import type { PaluiTool, TurnInfo } from "@palui/core/connectors/define"
 import { connectorFlowCaller } from "@palui/core/flows/call"
-import { createFlow, getFlow, listFlows, listVersions } from "@palui/core/flows/service"
+import { getFlow, listFlows, listVersions } from "@palui/core/flows/service"
 import { fakeEntries } from "@palui/core/flows/test-entries"
 import { exampleConnectors } from "@palui/core/flows/test-harness"
 import { BRIEFING } from "@palui/core/flows/test-helpers"
@@ -162,25 +162,6 @@ describe("flow tools", () => {
     expect(await call(tools.jalankan_flow, { id: made.id })).toMatchObject({ ok: false, error: 'Flow "Briefing pagi" lagi dijeda.' })
     expect(await call(tools.hapus_flow, { id: made.id })).toMatchObject({ ok: true })
     expect(listFlows(db)).toEqual([])
-  })
-
-  it("hide a routine's shadow flow everywhere, and its name doesn't block a new flow", async () => {
-    const { db, chat, tools } = setup()
-    const shadow = createFlow(db, { chatId: chat.id, definition: { ...BRIEFING, name: "Sholat 5 waktu" }, createdBy: "migration", legacyRoutineId: "rtn_1", shadow: true }, NOW).flow
-    expect(await call(tools.daftar_flow, {})).toMatchObject({ count: 0 })
-    for (const ref of [shadow.id, "Sholat 5 waktu"]) {
-      const shown = await call(tools.lihat_flow, { id: ref })
-      expect(shown).toMatchObject({ ok: false })
-      expect(shown.error).toContain("routines__jadikan_flow")
-    }
-    expect(await call(tools.cek_flow, { id: shadow.id })).toMatchObject({ ok: false })
-    expect(await call(tools.hapus_flow, { id: shadow.id })).toMatchObject({ ok: false })
-
-    const made = await call(tools.buat_flow, { definition: { ...BRIEFING, name: "Sholat 5 waktu" } })
-    expect(made).toMatchObject({ ok: true })
-    expect(getFlow(db, shadow.id)).toMatchObject({ name: "Sholat 5 waktu (rutinitas)", shadow: true })
-    expect((await call(tools.lihat_flow, { id: "Sholat 5 waktu" })).flow).toMatchObject({ id: made.id })
-    expect(await call(tools.daftar_flow, {})).toMatchObject({ count: 1, flows: [{ name: "Sholat 5 waktu" }] })
   })
 })
 

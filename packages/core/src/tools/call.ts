@@ -1,9 +1,9 @@
-// Calls a connector tool server-side, outside any turn: routine tool sources read
+// Calls a connector tool server-side, outside any turn: flow schedule sources and polls read
 // their data on a timer, so they must not depend on which tools a turn happened
 // to collect. Only `read` tools are allowed: nobody approves these calls.
 import type { RunningEntry } from "../connectors/supervisor"
-import { normalizeClass } from "../tools/collect"
-import type { ToolCaller } from "./sources"
+import { normalizeClass } from "./collect"
+import type { ToolCaller } from "../flows/sources"
 
 export class ToolCallError extends Error {}
 
@@ -25,7 +25,7 @@ export function connectorToolCaller(running: () => RunningEntry[], opts: { tz: (
     const what = `${connectorId}.${toolName}`
     const timeout = opts.timeoutMs ?? TOOL_CALL_TIMEOUT_MS
     const ensureRead = (cls: unknown) => {
-      if (normalizeClass(cls) !== "read") throw new ToolCallError(`${what} is classified ${normalizeClass(cls)}; only read tools can feed a routine. Mark it read on the Connectors page if it only reads.`)
+      if (normalizeClass(cls) !== "read") throw new ToolCallError(`${what} is classified ${normalizeClass(cls)}; only read tools can feed a flow source. Mark it read on the Connectors page if it only reads.`)
     }
     if (entry.handle.callTool) {
       return await withTimeout(
@@ -39,11 +39,11 @@ export function connectorToolCaller(running: () => RunningEntry[], opts: { tz: (
     }
     if (!entry.handle.tools) throw new ToolCallError(`Connector ${connectorId} has no tools.`)
     const now = Date.now()
-    const tools = await entry.handle.tools({ runId: `routine_${now}`, chatId: "", channel: null, trigger: "schedule", tz: opts.tz(), now })
+    const tools = await entry.handle.tools({ runId: `source_${now}`, chatId: "", channel: null, trigger: "schedule", tz: opts.tz(), now })
     const pt = tools[toolName]
     if (!pt?.tool.execute) throw new ToolCallError(`${what} doesn't exist or is turned off.`)
     ensureRead(pt.class)
     const exec = pt.tool.execute as unknown as (input: unknown, o: { toolCallId: string; messages: [] }) => Promise<unknown>
-    return await withTimeout(Promise.resolve(exec(args, { toolCallId: `routine_${now}`, messages: [] })), timeout, what)
+    return await withTimeout(Promise.resolve(exec(args, { toolCallId: `source_${now}`, messages: [] })), timeout, what)
   }
 }

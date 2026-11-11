@@ -135,7 +135,7 @@ export default defineRuntime(manifest, {
         }
         return out
       },
-      // Direct call for routines: the tool must exist and not be turned off. The
+      // Direct call for flow sources and polls: the tool must exist and not be turned off. The
       // class is the saved one, else the server's own hint (readOnlyHint -> read).
       async callTool(name, args) {
         const def = (await conn.listTools()).tools.find((d) => d.name === name) ?? (await conn.listTools({ fresh: true })).tools.find((d) => d.name === name)

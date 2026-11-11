@@ -10,6 +10,7 @@ import {
   getSecrets,
   maskedSecrets,
   patchConnectorSecrets,
+  removeRetiredConnectors,
   pauseConnector,
   resumeConnector,
   setConnectorStatus,
@@ -84,6 +85,16 @@ describe("settings", () => {
 })
 
 describe("redact", () => {
+  it("removes rows of retired connector types and leaves the rest", () => {
+    const db = memoryDb()
+    upsertConnector(db, { id: "telegram", manifest }, KEY)
+    upsertConnector(db, { id: "routines", manifest: { id: "routines", kind: "skill" as const, name: "Routines" } }, KEY)
+    expect(removeRetiredConnectors(db)).toBe(1)
+    expect(getConnector(db, "routines")).toBeUndefined()
+    expect(getConnector(db, "telegram")).toBeDefined()
+    expect(removeRetiredConnectors(db)).toBe(0)
+  })
+
   it("hides known secret shapes", () => {
     const s = redact("key rcl_abcdefgh123 and zkg_abcdefgh and sk-abcdefghijk and 123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0 Bearer abcdefghijklmnop")
     expect(s).not.toMatch(/abcdefgh123|AAHdqTcv|abcdefghijklmnop/)

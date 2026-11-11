@@ -7,9 +7,7 @@
 // The different failures are spread across the first rows of each list, the
 // way real data mixes them, instead of stacked into one row.
 import { DEFAULT_PERSONA } from "@palui/core/settings"
-import { syncRoutineFlows } from "@palui/core/flows/migrate"
 import { D, H, MIN, gradientAvatar, type Kit } from "./kit"
-import { worstRoutines } from "./routines"
 
 // Limits the dashboard enforces (the zod schemas in src/lib/fns). A value that
 // claims to be "at the limit" is checked against it, so the fixture can't
@@ -134,7 +132,7 @@ export function worst(k: Kit) {
   })
   k.connector("reminders", "reminders", { status: "on" })
   k.connector("jobs", "jobs", { status: "on" })
-  k.connector("flows", "flows", { status: "error", detail: "5 flows failing, 1 waiting for approval, 1 routine in its shadow week: the longest status a skill can report" })
+  k.connector("flows", "flows", { status: "error", detail: "5 flows failing, 1 waiting for approval, 3 sources that couldn't be read today: the longest status a skill can report" })
   k.connector("chats", "chats", { status: "on" })
   k.connector("webfetch", "webfetch", { status: "on" })
   k.connector("attachments", "attachments", { status: "on" })
@@ -142,10 +140,6 @@ export function worst(k: Kit) {
   k.connector("hooks", "hooks", { status: "on" })
   k.connector("notes", "notes", { status: "on" })
   k.connector("settings", "settings", { status: "on" })
-  k.connector("routines", "routines", {
-    status: "error",
-    detail: within("Routine \"Sholat lima waktu, cek tiap waktu sampai waktu berikutnya\" couldn't read mcp-jadwal-sholat.get_prayer_times (try 14): 2026-11-12: fetch failed: getaddrinfo ENOTFOUND sholat.zakiego.com | 2026-11-13: fetch failed: getaddrinfo ENOTFOUND sholat.zakiego.com", LIMITS.statusDetail),
-  })
   k.connector("remote-mcp", "remote-mcp", { status: "paused" })
 
   // --- owner notes: at the limits, a URL that never breaks, mixed scripts -------
@@ -332,7 +326,7 @@ export function worst(k: Kit) {
   job({ name: "Đặng Thị Ngọc Hân nhắc việc", rrule: "FREQ=DAILY", tz: "Asia/Ho_Chi_Minh", prompt: "x", chatId: vietnamese.id, nextRunAt: now + H, lastRunAt: 0, lastStatus: "ok", lastResult: "ok" })
   job({ name: "Benachrichtigungseinstellungen-Synchronisierung", kind: "heartbeat", rrule: "FREQ=MINUTELY;INTERVAL=30", tz: "Europe/Berlin", prompt: "x", chatId: web.id, nextRunAt: now + 30 * MIN, lastRunAt: now - 30 * MIN, lastStatus: "running" })
 
-  // --- flows (RFC flows): the step and trigger caps, every run status, RTL, a shadow routine ---
+  // --- flows (RFC flows): the step and trigger caps, every run status, RTL ---
   {
     const flowChat = family
     const longName = within("Rekap-penjualan-harian-Vorneo-untuk-Banjarbaru-Martapura-dan-Hulu-Sungai-Selatan", LIMITS.flowName)
@@ -515,8 +509,4 @@ export function worst(k: Kit) {
   k.attachment({ chatId: arabic.id, title: "بطاقة الهوية", description: "", kind: "jpeg", size: 1, createdAt: now - 3 * 365 * D })
   k.attachment({ chatId: "chat_0mhremoved0000000000", title: "J", kind: "jpeg", filename: null, size: 999_999, createdAt: now + 2 * H })
   k.attachment({ chatId: cjk.id, title: "身份证 王秀英 正反面", description: "身份证正反面照片，有效期至2036年。", kind: "jpeg", filename: "身份证_王秀英.jpg", size: 1536, createdAt: now - 12 * D })
-
-  worstRoutines(k, { family: family.id, vietnamese: vietnamese.id, gone: "chat_0mhremoved0000000000" })
-  // The shadow week (RFC flows 12.6): each routine also has its shadow flow.
-  syncRoutineFlows(k.db, now)
 }

@@ -5,7 +5,7 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm"
 import { events, flowRuns, hooks, messages, pendingApprovals, type DB } from "@palui/db"
 import { formatWhen } from "../reminders/time"
-import { upcoming } from "../routines/sources"
+import { upcoming } from "./sources"
 import { explainTrace } from "./expr"
 import { currentVersion, definitionOf, scheduleInput, stepRunsOf, triggersOf, type FlowRow, type RunRow } from "./service"
 
@@ -28,7 +28,6 @@ function nearestRun(db: DB, flow: FlowRow, at: number): RunRow | undefined {
     .where(and(eq(flowRuns.flowId, flow.id), eq(flowRuns.dryRun, false), gte(flowRuns.startedAt, at - WINDOW_BEFORE_MS - 24 * 3600_000), lte(flowRuns.startedAt, at + WINDOW_AFTER_MS)))
     .orderBy(desc(flowRuns.startedAt))
     .all()
-    .filter((r) => r.skipReason !== "shadow")
   const t = (r: RunRow) => r.scheduledAt ?? r.startedAt
   return rows.filter((r) => t(r) >= at - WINDOW_BEFORE_MS && t(r) <= at + WINDOW_AFTER_MS).sort((a, b) => Math.abs(t(a) - at) - Math.abs(t(b) - at))[0]
 }
@@ -53,7 +52,6 @@ export function diagnoseFlow(db: DB, flow: FlowRow, at: number, now: number): Di
       facts: flow.consecutiveFailures >= 5 ? [`It paused itself after ${flow.consecutiveFailures} failed runs in a row.`] : [],
     }
   }
-  if (flow.shadow) return { verdict: `Flow "${flow.name}" is a migrated routine in its shadow week: it only computes runs; the routine still sends.`, facts }
   const def = definitionOf(currentVersion(db, flow))
   const run = nearestRun(db, flow, at)
   if (run) {

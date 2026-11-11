@@ -18,8 +18,6 @@ export type FlowActions = ReminderActions & {
 
 export type EngineDeps = {
   reminderActions?: ReminderActions
-  // Same shape: Telegram "rt:" buttons and quoted replies to routine check-ins.
-  routineActions?: ReminderActions
   flowActions?: FlowActions
   parseReminder?: (text: string, tz: string, now: number, model: LanguageModel) => Promise<ParsedReminder>
   scheduler?: { start(): void | Promise<void>; stop(): Promise<void>; poke(): void }

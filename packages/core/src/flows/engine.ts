@@ -3,7 +3,7 @@
 // a restart in the middle of one) never act twice:
 //
 //   resume   flows whose pause ended
-//   refresh  schedule tool sources (async, lease + backoff, like routines)
+//   refresh  schedule tool sources (async, lease + backoff)
 //   fire     due schedule triggers: the run row (keyed by occurrence) is inserted
 //            in the same transaction as the trigger's cursor advance
 //   wake     queued and waiting runs whose wake_at passed, claimed with a lease
@@ -23,8 +23,7 @@ import type { Logger } from "../log"
 import { enqueueOutbox, notifyOutbox } from "../outbox/enqueue"
 import { notifyScheduleChanged } from "../reminders/signal"
 import { formatClock, formatDate } from "../reminders/time"
-import { REFRESH_BACKOFF_MS, REFRESH_LEASE_MS, NOTICE_AFTER_FAILURES } from "../routines/engine"
-import { localDate, nextLocalTime, refreshToolSource, upcoming, type Occurrence, type ToolCaller } from "../routines/sources"
+import { localDate, nextLocalTime, refreshToolSource, upcoming, type Occurrence, type ToolCaller } from "./sources"
 import { stepData, STEP_TIMEOUT_MS, type FlowToolCaller } from "./call"
 import { evalCondition, evaluate, parseExpr, parsePath, explainTrace } from "./expr"
 import { defaultNext } from "./graph"
@@ -32,7 +31,6 @@ import { createApproval, getApproval, preview } from "../approvals/store"
 import { checkinButtons, type CheckinWait } from "./checkin"
 import { engineClock } from "./diagnose"
 import { pruneFlows } from "./history"
-import { handover, routineMode, shadowCompare, syncRoutineFlows } from "./migrate"
 import { emitFlowEvent } from "./events"
 import { MAX_EACH, MAX_WAIT_MIN, type CheckinDeadline, type EachStep, type CheckinStep, type FlowDefinition, type FlowEventName, type FlowStep, type PromptStep, type ScheduleTrigger, type ToolStep, type WaitStep } from "./schema"
 import {
@@ -71,6 +69,10 @@ export const LATE_NOTE_MS = 2 * 60_000
 export const OUTBOX_TTL_MS = 24 * 3600_000
 export const READ_RETRY_BACKOFF_SEC = [30, 120]
 export const SILENT_TOKEN = "NOTHING"
+export const REFRESH_LEASE_MS = 5 * 60_000
+export const REFRESH_BACKOFF_MS = [60_000, 5 * 60_000, 15 * 60_000, 30 * 60_000, 60 * 60_000]
+// Tell the owner once a day after this many failed reads in a row.
+export const NOTICE_AFTER_FAILURES = 3
 
 // --- Types --------------------------------------------------------------------------------
 
@@ -98,7 +100,7 @@ export type FlowEngineOptions = {
   now?: () => number
   // Tool steps: resolve the class first, then call (call.ts).
   tools?: FlowToolCaller
-  // Schedule tool sources and polls: the routine read-only caller.
+  // Schedule tool sources and polls: a read-only tool caller (tools/call.ts).
   readSource?: ToolCaller
   // Whether a source's connector returns outside text (taints the run).
   sourceUntrusted?: (connectorId: string) => boolean
@@ -126,7 +128,7 @@ type Transition = {
 
 export type RunContext = {
   run: RunRow
-  flow: Pick<FlowRow, "id" | "name" | "tz" | "chatId" | "state" | "agentId" | "enabled" | "shadow">
+  flow: Pick<FlowRow, "id" | "name" | "tz" | "chatId" | "state" | "agentId" | "enabled">
   version: Pick<VersionRow, "id" | "writeCalls" | "approvedAt">
   def: FlowDefinition
   vars: RunVars
@@ -302,7 +304,7 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
       log.warn("flow source read failed", { flow_id: flow.id, failures, error: res.error })
       logEvent(db, { level: "warn", kind: "flow.source_failed", connectorId: src.connectorId, message: `Flow "${flow.name}" couldn't read ${src.connectorId}.${src.tool} (try ${failures}): ${res.error}`, data: { flowId: flow.id } }, now)
       const today = localDate(now, flow.tz)
-      if (failures >= NOTICE_AFTER_FAILURES && state.noticeFor !== today && freshFlow.enabled && !freshFlow.shadow) {
+      if (failures >= NOTICE_AFTER_FAILURES && state.noticeFor !== today && freshFlow.enabled) {
         const hasData = (state.fetched ?? []).length > 0
         send(freshFlow.chatId, { text: `⚠️ Flow "${flow.name}" gagal ambil data dari ${src.connectorId}.${src.tool}. ${hasData ? "Sementara pakai jadwal dari data terakhir yang berhasil." : "Belum ada data, jadi belum bisa jalan."} Aku coba lagi otomatis.` }, `flow-notice:${flow.id}`, now)
         state.noticeFor = today
@@ -380,7 +382,7 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
   }
 
   // The deadline a check-in starting the run would get: a run started after it
-  // is skipped as late, like a routine check-in after downtime.
+  // is skipped as late (a check-in after downtime, say).
   function startDeadline(def: FlowDefinition, start: string, occ: Occurrence, following: Occurrence | null): number | null {
     const s = def.steps.find((x) => x.id === start)
     if (s?.kind !== "checkin") return null
@@ -418,13 +420,9 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
     const payload = schedulePayload(flow, spec, occ, following, now)
     const sourceTaint = spec.source.kind === "tool" && opts.sourceUntrusted?.(spec.source.connectorId) ? ["trigger"] : []
     db.transaction(() => {
-      if (flow.shadow) {
-        insertRun({ flowId: flow.id, flow, version, triggerId: spec.id, triggerKind: "schedule", runKey: `shadow:${occ.key}`, payload, scheduledAt: occ.at, now, status: "skipped", skipReason: "shadow" })
-      } else {
-        const reason: FlowSkipReason | null = late ? "late" : limitReason(flow, def, now)
-        const run = insertRun({ flowId: flow.id, flow, version, triggerId: spec.id, triggerKind: "schedule", runKey: occ.key, payload, taint: sourceTaint, scheduledAt: occ.at, now, ...(reason ? { status: "skipped" as const, skipReason: reason } : {}) })
-        if (!run) log.info("flow occurrence already handled, not running again", { flow_id: flow.id, key: occ.key })
-      }
+      const reason: FlowSkipReason | null = late ? "late" : limitReason(flow, def, now)
+      const run = insertRun({ flowId: flow.id, flow, version, triggerId: spec.id, triggerKind: "schedule", runKey: occ.key, payload, taint: sourceTaint, scheduledAt: occ.at, now, ...(reason ? { status: "skipped" as const, skipReason: reason } : {}) })
+      if (!run) log.info("flow occurrence already handled, not running again", { flow_id: flow.id, key: occ.key })
       const next = nextScheduled(spec, flow.tz, { ...row, cursor }, now)
       db.update(flowTriggers)
         .set({ status: "idle", cursor, nextFireAt: next?.at ?? null, nextOcc: next, updatedAt: now })
@@ -472,7 +470,7 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
   // A read tool on a timer, server-side with the flow's chat in context. The first
   // poll only remembers the value; later ones start a run when the selected value
   // changed (or became a new non-empty value). After downtime it polls once, it
-  // doesn't catch up. Failures back off like a routine source and tell the owner
+  // doesn't catch up. Failures back off like a schedule source and tell the owner
   // once a day after three in a row.
 
   async function poll(rowId: string, now: number) {
@@ -554,7 +552,7 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
     let n = 0
     for (const d of due) {
       const flow = getFlow(db, d.flowId)
-      if (!flow?.enabled || flow.shadow) continue
+      if (!flow?.enabled) continue
       // The lease: a crash mid-call leaves it to expire and poll again.
       const changed = db
         .update(flowTriggers)
@@ -1353,19 +1351,6 @@ Balas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.`
 
   // --- wiring -----------------------------------------------------------------------------
 
-  // Routines to flows (migrate.ts): keep shadow flows in sync and compare them,
-  // or hand over once the mode says flows. Throttled; cheap either way.
-  let lastRoutineSync = 0
-  function routinesStep(now: number): number {
-    const mode = routineMode(db)
-    if (mode === "flows") return handover(db, now)
-    if (mode !== "shadow" || now - lastRoutineSync < 60_000) return 0
-    lastRoutineSync = now
-    const s = syncRoutineFlows(db, now)
-    const c = shadowCompare(db, now)
-    return s.created + s.updated + s.removed + c.compared
-  }
-
   // Retention, once a day.
   let lastPrune = 0
   function prune(now: number): number {
@@ -1376,7 +1361,6 @@ Balas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.`
   }
 
   const steps: [string, (now: number) => number][] = [
-    ["routines", routinesStep],
     ["prune", prune],
     ["resume", resume],
     ["refresh", refreshes],

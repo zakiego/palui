@@ -11,6 +11,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
+### Breaking
+
+- Routines are gone; flows do everything they did. The routine engine, the routine tools (`buat_rutinitas` and the rest), the Routines page, the `palui flows status` and `palui flows mode` commands and the old routine answer buttons are removed, and the app deletes the Routines connector on start. Routines that weren't handed over to flows stop firing, so if `palui flows status` on 0.6.0 still shows routines, run `palui flows mode flows` there and wait a minute before you upgrade. The routine tables stay for one more release, so rolling back to 0.6.0 still works.
+
 ### Added
 
 - A flow check-in's deadline can now be computed. `{kind:"at", at:"{{steps.nextp.data.next.timestamp}}", plusMin:-10}` stops it 10 minutes before a time a tool returned, `{kind:"next", plusMin:-10}` stops it 10 minutes before the schedule's next occurrence, and `after` takes a template like `"{{vars.left}}"`. A deadline that has already passed skips the ask and takes `onMissed`, so a reminder chain like "last reminder 10 minutes before the next prayer" works whatever the gap between prayers is.

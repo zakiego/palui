@@ -39,7 +39,7 @@ export type SchedulerOptions = {
   // Runs a claimed job (createJobRunner().run). The scheduler sets the job back to
   // idle once this settles.
   onJobDue?: (job: JobRow) => Promise<void>
-  // More things to sweep on the same timer (routines). Each claims its own rows.
+  // More things to sweep on the same timer (flows). Each claims its own rows.
   extensions?: SchedulerExtension[]
 }
 

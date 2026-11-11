@@ -4,7 +4,7 @@
 // notifyScheduleChanged() so the scheduler re-arms at once.
 import { createHash } from "node:crypto"
 import { and, asc, desc, eq, inArray } from "drizzle-orm"
-import { chats, flowRuns, flows, flowStepRuns, flowTriggers, flowVersions, newId, pendingApprovals, type DB, type RoutineCursor } from "@palui/db"
+import { chats, flowRuns, flows, flowStepRuns, flowTriggers, flowVersions, newId, pendingApprovals, type DB, type SourceCursor } from "@palui/db"
 import { getChat } from "../chats"
 import { ownerChat } from "../connectors/rules"
 import { logEvent } from "../events"
@@ -13,8 +13,8 @@ import { claimHooksForFlow } from "./entry"
 import { enqueueOutbox, notifyOutbox } from "../outbox/enqueue"
 import { notifyScheduleChanged } from "../reminders/signal"
 import { formatWhen, isValidZone } from "../reminders/time"
-import { describeSchedule as describeRoutineSchedule } from "../routines/service"
-import { upcoming, type Occurrence, type SourceInput } from "../routines/sources"
+import { describeSource } from "./source-config"
+import { upcoming, type Occurrence, type SourceInput } from "./sources"
 import { getSetting } from "../settings"
 import { canonicalJson, type FlowDefinition, type FlowTrigger, type ScheduleTrigger } from "./schema"
 import { describeWriteCall, parseDefinition, sameWriteCalls, validateDefinition, type Problem, type ValidateContext, type WriteCall } from "./validate"
@@ -150,7 +150,7 @@ export function scheduleInput(t: ScheduleTrigger, tz: string, row: Pick<TriggerR
 export function nextScheduled(t: ScheduleTrigger, tz: string, row: Pick<TriggerRow, "sourceState" | "cursor">, now: number): Occurrence | null {
   const cursor = row.cursor ?? { at: now, key: "" }
   const floor = now - 24 * 3600_000
-  const from: RoutineCursor = cursor.at < floor ? { at: floor, key: "" } : cursor
+  const from: SourceCursor = cursor.at < floor ? { at: floor, key: "" } : cursor
   return upcoming(scheduleInput(t, tz, row), from, 1)[0] ?? null
 }
 
@@ -216,8 +216,6 @@ export type SaveInput = {
   note?: string | null
   agentId?: string | null
   validate?: ValidateContext
-  legacyRoutineId?: string | null
-  shadow?: boolean
 }
 
 export type SaveResult = {
@@ -245,10 +243,9 @@ export function createFlow(db: DB, input: SaveInput, now = Date.now()): SaveResu
   const r = check(db, input.chatId, input.definition, input.validate)
   const def = r.definition!
   if (!getChat(db, input.chatId)) throw new FlowError(`No chat ${input.chatId}.`)
-  if (listFlows(db, input.chatId).filter((f) => !f.shadow).length >= MAX_FLOWS_PER_CHAT) throw new FlowError(`This chat already has ${MAX_FLOWS_PER_CHAT} flows. Delete one first.`)
+  if (listFlows(db, input.chatId).length >= MAX_FLOWS_PER_CHAT) throw new FlowError(`This chat already has ${MAX_FLOWS_PER_CHAT} flows. Delete one first.`)
   const tz = def.tz ?? getSetting(db, "timezone")
   if (!isValidZone(tz)) throw new FlowError(`Unknown time zone "${tz}".`)
-  if (!input.shadow) moveShadowAside(db, input.chatId, def.name, now)
   if (findFlowByName(db, input.chatId, def.name)) throw new FlowError(`A flow named "${def.name}" already exists in this chat. Pick another name or change that one with ubah_flow.`)
   const flowId = newId("flw")
   const versionId = newId("flv")
@@ -265,8 +262,8 @@ export function createFlow(db: DB, input: SaveInput, now = Date.now()): SaveResu
     state: { values: {}, tainted: [] },
     consecutiveFailures: 0,
     agentId: input.agentId ?? null,
-    legacyRoutineId: input.legacyRoutineId ?? null,
-    shadow: !!input.shadow,
+    legacyRoutineId: null,
+    shadow: false,
     lastError: null,
     noticeFor: null,
     createdAt: now,
@@ -295,20 +292,6 @@ export function createFlow(db: DB, input: SaveInput, now = Date.now()): SaveResu
   logEvent(db, { kind: "flow.created", message: `Flow "${flow.name}" created (version 1${needsApproval ? ", waiting for approval" : ""}).`, data: { flowId, versionId } }, now)
   notifyScheduleChanged()
   return { flow, version, changed: true, needsApproval, writeCalls: r.writeCalls, diff: [] }
-}
-
-// A shadow flow (a routine's flow in its shadow week) is hidden from the agent's
-// flow tools, so its name mustn't block a flow the owner makes: it moves aside to
-// "<name> (rutinitas)". The routine sync keeps whatever name the flow has.
-function moveShadowAside(db: DB, chatId: string, name: string, now: number) {
-  const f = findFlowByName(db, chatId, name)
-  if (!f?.shadow) return
-  let next = ""
-  for (let i = 1; i < 50 && !next; i++) {
-    const n = `${f.name} (rutinitas${i > 1 ? ` ${i}` : ""})`.slice(0, 80)
-    if (!findFlowByName(db, chatId, n)) next = n
-  }
-  updateFlow(db, f.id, { patch: { name: next || `${f.name.slice(0, 60)} ${newId("r").slice(-6)}` }, createdBy: "migration", note: "renamed for a flow the owner made with the same name" }, now)
 }
 
 function webhookIds(def: FlowDefinition): string[] {
@@ -532,13 +515,10 @@ export function deleteFlow(db: DB, id: string): void {
 
 // --- Views --------------------------------------------------------------------------------
 
-export function describeTrigger(t: FlowTrigger, tz: string): string {
+export function describeTrigger(t: FlowTrigger): string {
   switch (t.kind) {
     case "schedule":
-      return describeRoutineSchedule(
-        { tz } as never,
-        { name: "", tz, days: (t.days ?? null) as never, source: t.source, action: { kind: "message", text: "x" }, recap: { kind: "off" }, lateGraceMin: t.lateGraceMin ?? 60 },
-      )
+      return describeSource(t.source, t.days ?? null)
     case "webhook":
       return `Webhook ${t.hookId}`
     case "chat":

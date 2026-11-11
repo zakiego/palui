@@ -6,7 +6,7 @@
 import { and, asc, desc, eq, gte, inArray, like, notInArray, or } from "drizzle-orm"
 import { join } from "node:path"
 import { DateTime } from "luxon"
-import { events, flows, flowTriggers, messages, newId, outbox, pendingApprovals, reminders, reports, routines, runs, toolCalls, type DB } from "@palui/db"
+import { events, flows, flowTriggers, messages, newId, outbox, pendingApprovals, reminders, reports, runs, toolCalls, type DB } from "@palui/db"
 import { agentForChat } from "../agents"
 import type { ChatRow } from "../chats"
 import { config } from "../config"
@@ -20,7 +20,7 @@ const RUNS = 5
 const TOOLS_PER_RUN = 15
 const EVENTS = 12
 // Info events that change state. Warn and error events always count.
-const STATE_KINDS = ["flow", "routine", "approval", "reminder", "settings"]
+const STATE_KINDS = ["flow", "approval", "reminder", "settings"]
 // Connector heartbeats: they flood the events table and never explain a bug.
 const NOISE_KINDS = ["status", "connect"]
 // A row id from newId(): an event naming one belongs to that row's chat.
@@ -251,9 +251,8 @@ export function reportText(db: DB, chat: ChatRow, id: string, note: string, now:
   const outboxLines: Line[] = stuck.length ? [{ text: "Outbox not sent:" }] : []
   stuck.forEach((o, i) => outboxLines.push({ rank: tier(TIER.extraRow, 1000 - i), text: `• ${o.id} ${o.status} ${at(o.createdAt)} attempts=${o.attempts} source=${o.source}${o.error ? ` error="${clip(o.error, 120)}"` : ""}` }))
 
-  // What the chat has scheduled right now, so a reply's claim ("the routine is
+  // What the chat has scheduled right now, so a reply's claim ("the flow is
   // gone", "I'll remind you at 9") can be checked against the rows.
-  const routineRows = db.select().from(routines).where(eq(routines.chatId, chat.id)).orderBy(asc(routines.createdAt)).all()
   const flowRows = db.select().from(flows).where(eq(flows.chatId, chat.id)).orderBy(asc(flows.createdAt)).all()
   const triggerRows = flowRows.length ? db.select().from(flowTriggers).where(inArray(flowTriggers.flowId, flowRows.map((f) => f.id))).all() : []
   const reminderRows = db.select().from(reminders).where(and(eq(reminders.chatId, chat.id), inArray(reminders.status, ["pending", "firing"]))).orderBy(asc(reminders.fireAt)).all()
@@ -266,7 +265,7 @@ export function reportText(db: DB, chat: ChatRow, id: string, note: string, now:
   const name = (s: string) => `"${clip(s, 40).replace(/"/g, "'")}"`
   const onOff = (enabled: boolean, pausedUntil: number | null) => (pausedUntil ? `paused until ${at(pausedUntil)}` : enabled ? "on" : "off")
   const next = (ms: number | null | undefined) => `next=${ms ? at(ms) : "none"}`
-  const stateLines: Line[] = [{ text: `Current state (routine mode: ${getSetting(db, "routineMode")}):` }]
+  const stateLines: Line[] = [{ text: "Current state:" }]
   const stateCut = new Map<string, number>()
   const group = (key: string, label: string, rows: string[]) => {
     stateLines.push({ group: key, text: rows.length ? `${label} (${rows.length}):` : `${label}: none` })
@@ -274,18 +273,11 @@ export function reportText(db: DB, chat: ChatRow, id: string, note: string, now:
     rows.slice(0, STATE_ROWS).forEach((text, j) => stateLines.push({ group: key, rank: j ? tier(TIER.extraRow, 1000 - j) : tier(TIER.firstRow, 0), text }))
   }
   group(
-    "routines",
-    "routines",
-    routineRows.map((r) => `• ${r.id} ${name(r.name)} ${onOff(r.enabled, r.pausedUntil)} ${next(r.nextFireAt)}${r.nextOcc?.label ? ` (${clip(r.nextOcc.label, 30)})` : ""}${r.lastError ? ` error="${clip(r.lastError, 80)}"` : ""}`),
-  )
-  group(
     "flows",
     "flows",
     flowRows.map((f) => {
       const due = triggerRows.filter((t) => t.flowId === f.id && t.nextFireAt).map((t) => t.nextFireAt!)
-      const shadow = f.shadow ? " SHADOW (computed, never sent)" : ""
-      const legacy = f.legacyRoutineId ? ` from ${f.legacyRoutineId}` : ""
-      return `• ${f.id} ${name(f.name)}${shadow}${legacy} ${onOff(f.enabled, f.pausedUntil)} ${next(due.length ? Math.min(...due) : null)}${f.lastError ? ` error="${clip(f.lastError, 80)}"` : ""}`
+      return `• ${f.id} ${name(f.name)} ${onOff(f.enabled, f.pausedUntil)} ${next(due.length ? Math.min(...due) : null)}${f.lastError ? ` error="${clip(f.lastError, 80)}"` : ""}`
     }),
   )
   group(
@@ -300,17 +292,16 @@ export function reportText(db: DB, chat: ChatRow, id: string, note: string, now:
   )
 
   // Events have no chat column. They name runs, outbox rows, messages and the
-  // chat's routines, flows, reminders and approvals, so match on those ids.
+  // chat's flows, reminders and approvals, so match on those ids.
   // Info events count when they change state (a flow removed by a migration, an
   // approval decided); connector status and connect lines are noise. An event
-  // that names no row at all (a migration over every routine) is kept too.
+  // that names no row at all (a migration over every flow) is kept too.
   const ids = [
     chat.id,
     ...shownRuns.map((r) => r.id),
     ...stuck.map((o) => o.id),
     ...recent.map((m) => m.id),
     ...approvals.map((a) => a.id),
-    ...routineRows.map((r) => r.id),
     ...flowRows.map((f) => f.id),
     ...reminderRows.map((r) => r.id),
     ...openApprovals.map((a) => a.id),

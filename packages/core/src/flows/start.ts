@@ -93,8 +93,7 @@ export function insertFlowRun(db: DB, input: InsertRunInput): RunRow | null {
     messagesSent: 0,
     scheduledAt: input.scheduledAt ?? null,
     startedAt: input.now,
-    // A shadow observation stays open until shadowCompare settles it.
-    endedAt: status === "queued" || input.skipReason === "shadow" ? null : input.now,
+    endedAt: status === "queued" ? null : input.now,
     error: input.error ?? null,
     legacyOccurrenceId: null,
     dryRun: !!input.dryRun,
@@ -105,14 +104,13 @@ export function insertFlowRun(db: DB, input: InsertRunInput): RunRow | null {
 }
 
 // A run of a flow, now: queued (the scheduler picks it up at once), or a skipped
-// row saying why (paused, rate limited, a shadow flow), or null on a duplicate key.
+// row saying why (paused, rate limited), or null on a duplicate key.
 export function startFlowRun(db: DB, input: StartInput): { run: RunRow | null; skipped?: FlowSkipReason } {
   const flow = getFlow(db, input.flowId)
   if (!flow) return { run: null }
   const version = currentVersion(db, flow)
   const def = definitionOf(version)
-  // A shadow flow only observes (its routine still runs).
-  const reason: FlowSkipReason | null = flow.shadow ? "shadow" : !flow.enabled ? "paused" : runLimitReason(db, flow, def, input.now)
+  const reason: FlowSkipReason | null = !flow.enabled ? "paused" : runLimitReason(db, flow, def, input.now)
   const run = insertFlowRun(db, { ...input, flow, version, ...(reason ? { status: "skipped" as const, skipReason: reason } : {}) })
   if (run && !reason) notifyScheduleChanged()
   return { run, skipped: reason ?? (run ? undefined : "duplicate") }

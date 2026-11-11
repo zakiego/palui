@@ -1,4 +1,4 @@
-// Time sources: when a routine fires. Each kind answers one question, "which
+// Time sources: when a flow schedule fires. Each kind answers one question, "which
 // occurrences come after this cursor", from its config plus the cached state.
 // Only the tool kind has a refresh step (it reads a connector tool); the others
 // are pure functions of the config.
@@ -10,18 +10,18 @@
 // Tool results are data, never instructions: only values that parse as times are
 // used, and labels from a result are cut to one short plain line.
 import { DateTime } from "luxon"
-import type { RoutineCursor, RoutineSourceState } from "@palui/db"
+import type { SourceCursor, SourceState } from "@palui/db"
 import { localToUtc, occurrencesAfter, utcToLocal } from "../reminders/time"
-import { DAY_CODES, type DayCode, type RoutineSource, type ToolSource } from "./config"
+import { DAY_CODES, type DayCode, type ScheduleSource, type ToolSource } from "./source-config"
 
 export type Occurrence = { at: number; key: string; label: string; fallback?: boolean }
 
-export type SourceInput = { source: RoutineSource; tz: string; days: string[] | null; state: RoutineSourceState }
+export type SourceInput = { source: ScheduleSource; tz: string; days: string[] | null; state: SourceState }
 
 export class SourceError extends Error {}
 
 const HORIZON_DAYS = 8
-type Entry = NonNullable<RoutineSourceState["entries"]>[number]
+type Entry = NonNullable<SourceState["entries"]>[number]
 
 // --- Local dates -----------------------------------------------------------------------
 
@@ -48,7 +48,7 @@ export function nextLocalTime(hhmm: string, tz: string, after: number): number {
   return after + 24 * 3600_000
 }
 
-function isAfter(o: Occurrence, c: RoutineCursor): boolean {
+function isAfter(o: Occurrence, c: SourceCursor): boolean {
   return o.at > c.at || (o.at === c.at && o.key > c.key)
 }
 
@@ -58,7 +58,7 @@ function byTime(a: Occurrence, b: Occurrence): number {
 
 // Day-based sources: every occurrence of each local date from the cursor's date
 // (minus one, for negative offsets) over the horizon.
-function dayBased(cursor: RoutineCursor, tz: string, perDate: (date: string) => Occurrence[]): Occurrence[] {
+function dayBased(cursor: SourceCursor, tz: string, perDate: (date: string) => Occurrence[]): Occurrence[] {
   const start = addDays(localDate(cursor.at, tz), -1)
   const out: Occurrence[] = []
   for (let i = 0; i <= HORIZON_DAYS; i++) out.push(...perDate(addDays(start, i)).filter((o) => isAfter(o, cursor)))
@@ -69,13 +69,13 @@ const clockLabel = (hhmm: string) => hhmm.replace(":", ".")
 
 // --- Kinds -----------------------------------------------------------------------------
 
-function timesAfter(i: SourceInput & { source: Extract<RoutineSource, { kind: "times" }> }, cursor: RoutineCursor): Occurrence[] {
+function timesAfter(i: SourceInput & { source: Extract<ScheduleSource, { kind: "times" }> }, cursor: SourceCursor): Occurrence[] {
   return dayBased(cursor, i.tz, (date) =>
     i.source.times.map((t) => ({ at: localToUtc(`${date}T${t.time}`, i.tz), key: `${date}:${t.time}`, label: t.label ?? clockLabel(t.time) })),
   )
 }
 
-function rruleAfter(i: SourceInput & { source: Extract<RoutineSource, { kind: "rrule" }> }, cursor: RoutineCursor, limit: number): Occurrence[] {
+function rruleAfter(i: SourceInput & { source: Extract<ScheduleSource, { kind: "rrule" }> }, cursor: SourceCursor, limit: number): Occurrence[] {
   const at = occurrencesAfter({ rrule: i.source.rrule, tz: i.tz, localStart: i.source.start }, cursor.at - 1, limit + 1)
   return at
     .map((ms) => {
@@ -99,7 +99,7 @@ function toolEntriesFor(i: SourceInput, date: string): Occurrence[] {
     .map((e) => ({ at: localToUtc(`${date}T${utcToLocal(e.at, i.tz).slice(11, 16)}`, i.tz), key: `${date}:${e.key}`, label: e.label, fallback: true }))
 }
 
-function toolAfter(i: SourceInput & { source: ToolSource }, cursor: RoutineCursor): Occurrence[] {
+function toolAfter(i: SourceInput & { source: ToolSource }, cursor: SourceCursor): Occurrence[] {
   if (i.source.items) return dayBased(cursor, i.tz, (date) => toolEntriesFor(i, date))
   return (i.state.entries ?? [])
     .map((e) => ({ at: e.at, key: `${e.date}:${e.key}`, label: e.label }))
@@ -107,7 +107,7 @@ function toolAfter(i: SourceInput & { source: ToolSource }, cursor: RoutineCurso
     .sort(byTime)
 }
 
-function rawAfter(i: SourceInput, cursor: RoutineCursor, limit: number): Occurrence[] {
+function rawAfter(i: SourceInput, cursor: SourceCursor, limit: number): Occurrence[] {
   switch (i.source.kind) {
     case "times":
       return timesAfter(i as SourceInput & { source: typeof i.source }, cursor)
@@ -119,7 +119,7 @@ function rawAfter(i: SourceInput, cursor: RoutineCursor, limit: number): Occurre
 }
 
 // The next `n` occurrences strictly after the cursor that fall on an active day.
-export function upcoming(i: SourceInput, cursor: RoutineCursor, n: number): Occurrence[] {
+export function upcoming(i: SourceInput, cursor: SourceCursor, n: number): Occurrence[] {
   const out: Occurrence[] = []
   let c = cursor
   for (let round = 0; round < 60 && out.length < n; round++) {
@@ -135,7 +135,7 @@ export function upcoming(i: SourceInput, cursor: RoutineCursor, n: number): Occu
   return out
 }
 
-export function nextOccurrenceAfter(i: SourceInput, cursor: RoutineCursor): Occurrence | null {
+export function nextOccurrenceAfter(i: SourceInput, cursor: SourceCursor): Occurrence | null {
   return upcoming(i, cursor, 1)[0] ?? null
 }
 
@@ -153,7 +153,7 @@ export function toolData(output: unknown): unknown {
           .join("\n")
       : null
     // The error text is the server's, so it isn't repeated (it could carry instructions).
-    if (o.isError) throw new SourceError("The tool returned an error result. Check the args with pratinjau_rutinitas.")
+    if (o.isError) throw new SourceError("The tool returned an error result. Check the args with uji_flow.")
     if (o.structuredContent && typeof o.structuredContent === "object") return o.structuredContent
     if (texts !== null) {
       try {
@@ -290,11 +290,11 @@ export function renderArgs(args: Record<string, unknown>, date: string, tz: stri
 
 export type ToolCaller = (connectorId: string, tool: string, args: Record<string, unknown>) => Promise<unknown>
 
-export type RefreshResult = { state: RoutineSourceState; error: string | null }
+export type RefreshResult = { state: SourceState; error: string | null }
 
 // Reads a tool source: today and tomorrow for per-day items, one call for a list.
 // Whatever succeeded is merged into the state even when another call failed.
-export async function refreshToolSource(src: ToolSource, tz: string, prev: RoutineSourceState, call: ToolCaller, now: number): Promise<RefreshResult> {
+export async function refreshToolSource(src: ToolSource, tz: string, prev: SourceState, call: ToolCaller, now: number): Promise<RefreshResult> {
   const today = localDate(now, tz)
   const keepFrom = addDays(today, -3)
   let entries = [...(prev.entries ?? [])]

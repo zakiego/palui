@@ -125,6 +125,17 @@ export function deleteConnector(db: DB, id: string, now = Date.now()) {
   logEvent(db, { connectorId: id, kind: "remove", message: "Removed, credentials deleted", level: "warn" }, now)
 }
 
+// Connector types that no longer exist (routines went to flows). Their rows are
+// removed when the app opens the database, so no page lists a connector it can't
+// render and the supervisor never looks for a runtime that isn't there.
+export const RETIRED_CONNECTOR_TYPES: readonly string[] = ["routines"]
+
+export function removeRetiredConnectors(db: DB, now = Date.now()): number {
+  const rows = listConnectors(db).filter((c) => RETIRED_CONNECTOR_TYPES.includes(c.type))
+  for (const r of rows) deleteConnector(db, r.id, now)
+  return rows.length
+}
+
 export function setConnectorStatus(db: DB, id: string, status: ConnectorStatus, rawDetail: string | null = null, now = Date.now()) {
   // Connector errors can echo a token back (a bot URL, an auth header): redact before storing.
   const detail = rawDetail === null ? null : redact(rawDetail)

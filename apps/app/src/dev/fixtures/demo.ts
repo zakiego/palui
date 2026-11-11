@@ -1,10 +1,8 @@
 // Dev only: the data the dashboard was designed against. Every connector
 // state, a few long names, a Markdown reply, a pending approval. It reads well
 // on purpose; `worst.ts` is the one that goes looking for trouble.
-import { handover, setRoutineMode, syncRoutineFlows } from "@palui/core/flows/migrate"
-import { BRIEFING, RECAP } from "@palui/core/flows/test-helpers"
+import { BRIEFING, RECAP, SHOLAT } from "@palui/core/flows/test-helpers"
 import { D, H, MIN, type Kit } from "./kit"
-import { demoRoutines } from "./routines"
 
 export function demo(k: Kit) {
   const { now } = k
@@ -18,7 +16,6 @@ export function demo(k: Kit) {
   k.connector("mcp-vorneo", "mcp", { label: "Vorneo pipeline and property listings for every kabupaten in Kalimantan Selatan", status: "on", config: { url: "https://vorneo.id/mcp" } })
   k.connector("mcp-linear", "mcp", { label: "Linear 🚀", status: "on", trust: "external", config: { url: "https://mcp.linear.app/mcp" } })
   k.connector("reminders", "reminders", { status: "on" })
-  k.connector("routines", "routines", { status: "on" })
   k.connector("jobs", "jobs", { status: "paused" })
   k.connector("flows", "flows", { status: "on" })
   k.connector("chats", "chats", { status: "on" })
@@ -64,8 +61,9 @@ export function demo(k: Kit) {
   k.job({ name: "Heartbeat with a name long enough to wrap onto a second line on a phone", kind: "heartbeat", rrule: "FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9,10,11,12,13,14,15,16,17,18,19,20,21,22", tz: "Asia/Makassar", prompt: "NOTHING unless it matters.", chatId: tg.id, enabled: false, dailyTokenCap: 30_000 })
   k.run({ chatId: tg.id, jobId, trigger: "schedule", model: "claude-sonnet-4-6", tokensIn: 21000, tokensOut: 1400, status: "ok", startedAt: now - H, ms: 15000 })
 
-  // Flows (RFC flows): a morning briefing, a weekly recap and a migrated routine.
+  // Flows (RFC flows): a morning briefing, a prayer check-in and a weekly recap.
   const briefing = k.flow(tg, BRIEFING)
+  k.flow(tg, SHOLAT)
   k.flowRun(briefing, {
     status: "done",
     triggerId: "main",
@@ -129,10 +127,4 @@ export function demo(k: Kit) {
   k.attachment({ chatId: wa.id, title: "Tiket pesawat BDJ-CGK 12 Des", description: "Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.", kind: "pdf", filename: "e-ticket-XKQ9PL.pdf", size: 184_320, createdAt: now - 3 * H })
   k.attachment({ chatId: tg.id, title: "KTP Zaki", description: "Foto KTP, berlaku seumur hidup.", kind: "jpeg", size: 412_000, createdAt: now - 26 * H })
   k.attachment({ chatId: tg.id, title: "Struk servis motor", description: "Bengkel resmi Banjarbaru, ganti oli dan kampas rem, Rp 385.000.", kind: "pdf", filename: "struk_servis_2026-11-01.pdf", size: 96_000, createdAt: now - 9 * D })
-
-  demoRoutines(k, { tg: tg.id, wa: wa.id, web: web.id })
-  // After the handover: the routines run as flows (RFC flows 3.6).
-  setRoutineMode(k.db, "flows", now)
-  syncRoutineFlows(k.db, now)
-  handover(k.db, now)
 }

@@ -2,7 +2,7 @@
 // zone, truthiness. Everything here is pure and never throws on odd data: a value
 // that doesn't fit is null.
 import { DateTime } from "luxon"
-import { DAY_CODES, type DayCode } from "../routines/config"
+import { DAY_CODES, type DayCode } from "./source-config"
 import { localToUtc, utcToLocal } from "../reminders/time"
 
 export type Scope = Record<string, unknown>

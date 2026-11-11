@@ -133,7 +133,6 @@ export function createEngine(opts: EngineOptions) {
         replyToChannelMsgId: row.replyToChannelMsgId ?? undefined,
         messageId: row.id,
         reminderActions: ctx.deps.reminderActions,
-        routineActions: ctx.deps.routineActions,
         flowActions: ctx.deps.flowActions,
         fromOwner: row.fromOwner,
         now: ctx.clock(),

@@ -8,7 +8,7 @@
 import { asc, eq } from "drizzle-orm"
 import { flowRuns, flowStepRuns, newId, type DB } from "@palui/db"
 import { formatClock, formatDate } from "../reminders/time"
-import { upcoming } from "../routines/sources"
+import { upcoming } from "./sources"
 import type { FlowEngine, RunVars } from "./engine"
 import { startOf } from "./graph"
 import type { FlowDefinition } from "./schema"

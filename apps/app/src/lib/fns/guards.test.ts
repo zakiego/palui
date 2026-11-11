@@ -1,6 +1,6 @@
 // Static guards over the dashboard server functions: every one checks the
 // session (except the ones the login and invite pages need), every POST checks
-// the origin, and reminder, job and routine writes go through the bridges that
+// the origin, and reminder and job writes go through the bridges that
 // poke the runtime's scheduler.
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -38,9 +38,9 @@ describe("dashboard server functions", () => {
     expect(missing).toEqual([])
   })
 
-  it("write reminders, jobs and routines only through the bridges", () => {
+  it("write reminders and jobs only through the bridges", () => {
     for (const { file, text } of sources) {
-      expect(text, file).not.toMatch(/@palui\/core\/(reminders|jobs|routines)\/service/)
+      expect(text, file).not.toMatch(/@palui\/core\/(reminders|jobs)\/service/)
     }
   })
 })

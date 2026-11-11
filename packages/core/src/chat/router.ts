@@ -20,7 +20,7 @@ export type Route =
   // `batch`: a bare "ya"/"batal" with several requests waiting answers every
   // pending request of the newest run (the reply says so).
   | { kind: "approval"; approvalId: string; approved: boolean; batch?: string[] }
-  // A reminder or routine check-in action, answered without the model.
+  // A reminder or flow check-in action, answered without the model.
   | { kind: "reminder"; reply: string }
   | { kind: "hook"; hook: NonNullable<StoredContent["hook"]>; text: string }
   // A flow's chat trigger took it: no reply, the flow answers (RFC flows 4.1).
@@ -119,7 +119,6 @@ export type RouteInput = {
   // The stored message id (chat triggers key their run on it).
   messageId?: string
   reminderActions?: ReminderActions
-  routineActions?: ReminderActions
   // Flow check-in answers ("fl:") and version approvals ("flowver:"), and chat triggers.
   flowActions?: FlowActions
   // false for a guest (PLAN 19.3): approvals, buttons, commands and reminder
@@ -146,10 +145,6 @@ export async function route(i: RouteInput): Promise<Route> {
     if (s) return { kind: "command", name: "connectors", args: [s[1]!, s[2]!] }
     if (cb.startsWith("rem:") && i.reminderActions) {
       const reply = await i.reminderActions.fromCallback(i.db, cb, i.chat.id, i.now)
-      if (reply !== null) return { kind: "reminder", reply }
-    }
-    if (cb.startsWith("rt:") && i.routineActions) {
-      const reply = await i.routineActions.fromCallback(i.db, cb, i.chat.id, i.now)
       if (reply !== null) return { kind: "reminder", reply }
     }
     if ((cb.startsWith("fl:") || cb.startsWith("flowver:")) && i.flowActions) {
@@ -183,10 +178,6 @@ export async function route(i: RouteInput): Promise<Route> {
 
   if (i.reminderActions && i.text.trim()) {
     const reply = await i.reminderActions.fromText(i.db, i.text, i.replyToChannelMsgId, i.chat.id, i.now)
-    if (reply !== null) return { kind: "reminder", reply }
-  }
-  if (i.routineActions && i.text.trim()) {
-    const reply = await i.routineActions.fromText(i.db, i.text, i.replyToChannelMsgId, i.chat.id, i.now)
     if (reply !== null) return { kind: "reminder", reply }
   }
   if (i.flowActions && i.text.trim()) {

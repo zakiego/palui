@@ -16,7 +16,7 @@ import type { AnyRuntime, ConnectorManifest, ConnectorServices } from "@palui/co
 import type { ConnectorRow } from "@palui/core/connectors/store"
 import { createSupervisor, type Supervisor } from "@palui/core/connectors/supervisor"
 import { connectorFlowCaller } from "@palui/core/flows/call"
-import { connectorToolCaller } from "@palui/core/routines/call"
+import { connectorToolCaller } from "@palui/core/tools/call"
 import { getSetting } from "@palui/core/settings"
 import { createControlServer } from "./control"
 

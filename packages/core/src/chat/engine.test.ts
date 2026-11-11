@@ -25,10 +25,6 @@ import {
 } from "./testing"
 import { MODEL_OFF_TEXT } from "./turn"
 import { STALE_READ_NOTE } from "./context"
-import { silentLogger } from "../log"
-import { routineActions } from "../routines/actions"
-import { createRoutineEngine } from "../routines/engine"
-import { createRoutine, openCheckins } from "../routines/service"
 import { turnCandidates } from "../attachments/service"
 import type { TurnInfo } from "../connectors/define"
 
@@ -769,44 +765,6 @@ describe("hooks and reminders", () => {
     await h.engine.inbound(tgMessage("done"))
     await h.engine.idle()
     expect(outboxTexts(db)).toEqual(["Sip, ditandai selesai.", "Sip, selesai.", "model jawab"])
-  })
-})
-
-describe("routine check-ins", () => {
-  it("answers buttons and exact quoted replies without the model, and shows open check-ins to it otherwise", async () => {
-    const db = memoryDb()
-    ownTelegram(db)
-    modelChain(db, ["cliproxy"])
-    const m = scriptedModel([say("dicatat")])
-    const h = await harness({
-      db,
-      registry: { cliproxy: modelRuntime("cliproxy", () => m.model), telegram: channelRuntime("telegram", fakeChannel("telegram")) },
-      rows: { cliproxy: "model", telegram: "channel" },
-      deps: { routineActions },
-    })
-    await h.engine.inbound(tgMessage("halo"))
-    await h.engine.idle()
-    const chatId = db.select().from(messages).get()!.chatId
-    const now = Date.now()
-    const hm = new Date(now + 60_000).toISOString().slice(11, 16)
-    createRoutine(db, chatId, { name: "Vitamin", tz: "UTC", source: { kind: "times", times: [{ time: hm, label: "pagi" }] }, action: { kind: "checkin", text: "Vitamin {{label}}?" } }, now)
-    const routines = createRoutineEngine({ db, log: silentLogger })
-    routines.sweep(now + 2 * 60_000)
-    const occ = openCheckins(db, chatId)[0]!
-    db.update(outbox).set({ channelMsgId: "tg-77" }).where(eq(outbox.source, `routine:${occ.id}`)).run()
-
-    await h.engine.inbound(tgMessage("belum", { replyToChannelMsgId: "tg-77" }))
-    await h.engine.inbound(tgMessage("", { callback: { data: `rt:${occ.id}:done` } }))
-    await h.engine.idle()
-    expect(outboxTexts(db).slice(-2)).toEqual([expect.stringMatching(/^Oke, dicatat: Belum\./), "Sip, dicatat: Sudah (pagi)."])
-    expect(openCheckins(db, chatId)).toEqual([])
-
-    routines.sweep(now + 2 * 60_000 + 24 * 3600_000)
-    await h.engine.inbound(tgMessage("udah kok tadi"))
-    await h.engine.idle()
-    const prompt = JSON.stringify(m.prompts.at(-1))
-    expect(prompt).toContain("Open check-ins in this chat")
-    expect(prompt).toContain('routine \\"Vitamin\\"')
   })
 })
 

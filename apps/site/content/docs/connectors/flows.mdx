@@ -5,8 +5,6 @@ description: The built-in Flows skill lets Palui build automations from chat out
 
 Kind: `skill`. Built in. A flow is a small automation: one or more triggers, and a list of steps that read tools, decide, ask, wait and send. Palui builds flows from chat, dry-runs them before saving, and logs every run with what each step saw and did. Nothing calls the model unless a step asks for it.
 
-Routines are flows now. A routine is a flow with one schedule trigger and one step (see [Routines become flows](#routines-become-flows)).
-
 ## Connect
 
 Nothing to set up. Flows is a built-in skill and is created on first boot. Ask in chat:
@@ -22,7 +20,7 @@ Palui finds the tools it needs, checks the draft, runs it once with your real da
 
 | Kind | Starts a run when | `trigger.*` |
 |---|---|---|
-| `schedule` | A time comes up: fixed times, a repeat rule, or times read daily from a tool (the routine time sources) | `at`, `time`, `date`, `label`, `key` |
+| `schedule` | A time comes up: fixed times, a repeat rule, or times read daily from a tool | `at`, `time`, `date`, `label`, `key` |
 | `webhook` | A signed request reaches a [webhook](/docs/connectors/webhooks) in mode `flow` | `payload`, `headers`, `receivedAt` |
 | `chat` | You send a command (`/beres`) or an exact phrase in the flow's chat | `text`, `args` |
 | `poll` | A read tool's value changes (or becomes non-empty), checked every 5 to 1440 minutes | `value`, `previous` |
@@ -80,16 +78,6 @@ These are only offered in your own DMs and the web chat, never in a group or som
 - Telegram: the answer buttons.
 - WhatsApp: quote the question and reply with an answer.
 - Anywhere: just say it. Open check-ins are in the model's context, so "udah" answers the newest one.
-
-## Routines become flows
-
-Your routines move to flows in two steps, and nothing fires twice or gets skipped:
-
-1. After the upgrade, each routine gets a flow that runs in shadow: it reads the same sources and computes the same times, but sends nothing. The routine engine keeps sending, and differences are logged. The Flows page shows the count.
-   While in shadow, the agent's flow tools don't show these flows. A flow you make with the same name as one moves it aside to `<name> (rutinitas)`. To move one routine early, ask the agent to turn it into a flow (`jadikan_flow`): the flow keeps its schedule, open check-ins and log, and the routine goes.
-2. After a clean week, hand over with `docker compose exec app palui flows mode flows`. The flows take over where the routines were, open check-ins included, and old routine buttons keep working. `palui flows status` shows the shadow comparison, and `palui flows mode legacy` goes back to the routine engine alone.
-
-The routine tools keep working for one more release as wrappers around flows. The Routines page links each routine to its flow; after the handover, pausing or deleting a routine there acts on its flow, and its next times and open check-ins come from the flow.
 
 ## Dashboard
 

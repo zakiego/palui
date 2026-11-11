@@ -6,7 +6,6 @@ import { ClockAlertIcon, WorkflowIcon } from "lucide-react"
 import { AppError } from "@/components/app-error"
 import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending, TableSkeleton } from "@/components/page-pending"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Card } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { StatusText } from "@/components/ui/status-text"
@@ -36,16 +35,10 @@ function FlowsPage() {
   const router = useRouter()
   const t = useT()
   useLiveRefresh(() => void router.invalidate(), (e) => e.kind.startsWith("flow") || e.connectorId === "flows")
-  const shadow = data.routines.mode === "shadow" && data.routines.shadowFlows > 0
 
   return (
     <>
       <PageHeader title={t("flows.title")} description={t("flows.description")} />
-      {shadow && (
-        <Alert role="note">
-          <AlertDescription className="tabular-nums">{t("flows.shadowWeek", { compared: data.routines.compared.toLocaleString("en"), diffs: data.routines.diffs.toLocaleString("en") })}</AlertDescription>
-        </Alert>
-      )}
       {data.flows.length === 0 ? (
         <Empty className="border border-dashed">
           <EmptyHeader>

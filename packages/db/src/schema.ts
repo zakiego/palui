@@ -416,27 +416,13 @@ export const jobs = sqliteTable(
   (t) => [index("jobs_next").on(t.enabled, t.nextRunAt)],
 )
 
-// --- Routines ---------------------------------------------------------------------
-// A routine is a chat-owned automation: a time source (when) plus an action (what).
-// Both are JSON configs with a `kind` that core/routines validates, so a new kind
-// needs no migration. Occurrences are the per-fire log (and the check-in state).
+// --- Routines (retired) -------------------------------------------------------------
+// Routines were replaced by flows. No code reads or writes these two tables any
+// more; they stay in the schema for one release so a rollback still finds them,
+// and a later migration drops them (with flows.legacy_routine_id, flows.shadow
+// and flow_runs.legacy_occurrence_id).
 
 export type RoutineConfigJson = { kind: string } & Record<string, unknown>
-
-// What a time source remembers between refreshes (tool sources cache fetched times).
-export type RoutineSourceState = {
-  // Fetched occurrences, UTC ms, with the local date they were fetched for.
-  entries?: { date: string; key: string; label: string; at: number }[]
-  // Local dates a per-day fetch succeeded for.
-  fetched?: string[]
-  failures?: number
-  lastError?: string | null
-  lastOkAt?: number | null
-  // The local date the owner was last told about a failing source.
-  noticeFor?: string | null
-}
-
-export type RoutineCursor = { at: number; key: string }
 
 export const routines = sqliteTable(
   "routines",
@@ -460,8 +446,8 @@ export const routines = sqliteTable(
     nextFireAt: integer("next_fire_at"),
     nextOcc: json<{ at: number; key: string; label: string; fallback?: boolean } | null>("next_occ"),
     // The last occurrence handled; the next one is computed after it.
-    cursor: json<RoutineCursor | null>("cursor"),
-    sourceState: json<RoutineSourceState>("source_state").notNull().default({}),
+    cursor: json<SourceCursor | null>("cursor"),
+    sourceState: json<SourceState>("source_state").notNull().default({}),
     nextRefreshAt: integer("next_refresh_at"),
     nextRecapAt: integer("next_recap_at"),
     lastError: text("last_error"),
@@ -514,6 +500,21 @@ export const routineOccurrences = sqliteTable(
 // log record every firing, skips included. JSON columns are validated by zod in
 // core/flows, so a new step or trigger kind needs no migration.
 
+// What a time source remembers between refreshes (tool sources cache fetched times).
+export type SourceState = {
+  // Fetched occurrences, UTC ms, with the local date they were fetched for.
+  entries?: { date: string; key: string; label: string; at: number }[]
+  // Local dates a per-day fetch succeeded for.
+  fetched?: string[]
+  failures?: number
+  lastError?: string | null
+  lastOkAt?: number | null
+  // The local date the owner was last told about a failing source.
+  noticeFor?: string | null
+}
+
+export type SourceCursor = { at: number; key: string }
+
 export type FlowState = { values: Record<string, unknown>; tainted: string[] }
 
 export const flows = sqliteTable(
@@ -532,8 +533,8 @@ export const flows = sqliteTable(
     consecutiveFailures: integer("consecutive_failures").notNull().default(0),
     // The agent whose persona and model prompt steps use; null is the default agent.
     agentId: text("agent_id"),
+    // Retired with routines (unused, dropped in a later migration).
     legacyRoutineId: text("legacy_routine_id").unique(),
-    // A migrated routine during the shadow week: computed, never sent.
     shadow: bool("shadow").notNull().default(false),
     lastError: text("last_error"),
     // The local date the owner was last told about a failing run.
@@ -579,8 +580,8 @@ export const flowTriggers = sqliteTable(
     status: text("status").$type<"idle" | "firing">().notNull().default("idle"),
     nextFireAt: integer("next_fire_at"),
     nextOcc: json<{ at: number; key: string; label: string; fallback?: boolean } | null>("next_occ"),
-    cursor: json<RoutineCursor | null>("cursor"),
-    sourceState: json<RoutineSourceState>("source_state").notNull().default({}),
+    cursor: json<SourceCursor | null>("cursor"),
+    sourceState: json<SourceState>("source_state").notNull().default({}),
     nextRefreshAt: integer("next_refresh_at"),
     pollState: json<FlowPollState>("poll_state").notNull().default({}),
     lastError: text("last_error"),
@@ -590,7 +591,7 @@ export const flowTriggers = sqliteTable(
 )
 
 export type FlowRunStatus = "queued" | "running" | "waiting" | "awaiting_approval" | "done" | "failed" | "skipped" | "cancelled"
-export type FlowSkipReason = "late" | "duplicate" | "paused" | "rate_limited" | "budget" | "not_approved" | "chain_depth" | "shadow"
+export type FlowSkipReason = "late" | "duplicate" | "paused" | "rate_limited" | "budget" | "not_approved" | "chain_depth"
 
 export const flowRuns = sqliteTable(
   "flow_runs",
@@ -620,6 +621,7 @@ export const flowRuns = sqliteTable(
     startedAt: integer("started_at").notNull(),
     endedAt: integer("ended_at"),
     error: text("error"),
+    // Retired with routines (unused, dropped in a later migration).
     legacyOccurrenceId: text("legacy_occurrence_id").unique(),
     dryRun: bool("dry_run").notNull().default(false),
     updatedAt: integer("updated_at").notNull(),

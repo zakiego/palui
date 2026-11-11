@@ -13,7 +13,6 @@ import settings from "./settings/runtime"
 import recall from "./recall/runtime"
 import reminders from "./reminders/runtime"
 import flows from "./flows/runtime"
-import routines from "./routines/runtime"
 import remoteMcp from "./remote-mcp/runtime"
 import t3code from "./t3code/runtime"
 import telegram from "./telegram/runtime"
@@ -36,7 +35,6 @@ export const runtimes: Record<string, AnyRuntime> = {
   t3code,
   reminders,
   flows,
-  routines,
   jobs,
   chats: chatHistory,
   notes,

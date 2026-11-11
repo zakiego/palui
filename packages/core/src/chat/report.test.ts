@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { flows, flowTriggers, memoryDb, messages, outbox, pendingApprovals, reminders, reports, routines, runs, toolCalls, type DB } from "@palui/db"
+import { flows, flowTriggers, memoryDb, messages, outbox, pendingApprovals, reminders, reports, runs, toolCalls, type DB } from "@palui/db"
 import { ensureChat } from "../chats"
 import { logEvent } from "../events"
 import { createReport, getReport, reportText } from "./report"
@@ -54,7 +54,7 @@ describe("reportText", () => {
     expect(text).toContain("Messages (oldest first, 0):\n• none")
     expect(text).not.toContain("Outbox not sent")
     expect(text).not.toContain("Events for this chat")
-    expect(section(text, "Current state")).toBe(["Current state (routine mode: shadow):", "routines: none", "flows: none", "pending reminders: none", "open approvals: none"].join("\n"))
+    expect(section(text, "Current state")).toBe(["Current state:", "flows: none", "pending reminders: none", "open approvals: none"].join("\n"))
   })
 
   it("keeps the run behind a shown message when newer scheduled runs fill the list", () => {
@@ -113,18 +113,13 @@ describe("reportText", () => {
     expect(leftOut).toBeGreaterThan(5)
   })
 
-  it("shows the chat's routines, flows with shadow ones labeled, pending reminders and open approvals", () => {
+  it("shows the chat's flows, pending reminders and open approvals", () => {
     const db = memoryDb()
     const chat = chatOf(db)
     const other = ensureChat(db, { channel: "telegram", externalId: "99" }, NOW - DAY)
-    const cfg = { kind: "message", text: "x" } as never
-    const routine = (id: string, chatId: string, v: Partial<typeof routines.$inferInsert> = {}) =>
-      db.insert(routines).values({ id, chatId, name: "Sholat 5 waktu", tz: "Asia/Makassar", source: cfg, action: cfg, recap: cfg, createdAt: NOW - DAY, updatedAt: NOW - DAY, ...v }).run()
-    routine("rtn_on", chat.id, { nextFireAt: NOW + 30 * MIN, nextOcc: { at: NOW + 30 * MIN, key: "k", label: "Ashar" } })
-    routine("rtn_paused", chat.id, { name: 'Kata "mutiara"', enabled: false, pausedUntil: NOW + DAY })
-    routine("rtn_other", other.id)
     const flow = (id: string, v: Partial<typeof flows.$inferInsert> = {}) => db.insert(flows).values({ id, chatId: chat.id, name: id, tz: "Asia/Makassar", createdAt: NOW - DAY, updatedAt: NOW - DAY, ...v }).run()
-    flow("flw_shadow", { shadow: true, legacyRoutineId: "rtn_on" })
+    flow("flw_paused", { name: 'Kata "mutiara"', enabled: false, pausedUntil: NOW + DAY })
+    flow("flw_other", { chatId: other.id })
     flow("flw_live", { lastError: "source down" })
     db.insert(flowTriggers).values([
       { id: "flt_1", flowId: "flw_live", triggerId: "a", kind: "schedule", nextFireAt: NOW + 2 * 60 * MIN, updatedAt: NOW },
@@ -143,11 +138,9 @@ describe("reportText", () => {
     approval("apr_elsewhere", { chatId: other.id })
     const part = section(reportText(db, chat, "rpt_x", "", NOW), "Current state")
     const row = (id: string) => part.split("\n").find((l) => l.startsWith(`• ${id} `)) ?? ""
-    expect(part).toContain("\nroutines (2):\n")
-    expect(row("rtn_on")).toBe('• rtn_on "Sholat 5 waktu" on next=12:30:00 (Ashar)')
-    expect(row("rtn_paused")).toBe(`• rtn_paused "Kata 'mutiara'" paused until 2026-11-13 12:00:00 next=none`)
-    expect(part).not.toContain("rtn_other")
-    expect(row("flw_shadow")).toBe('• flw_shadow "flw_shadow" SHADOW (computed, never sent) from rtn_on on next=none')
+    expect(part).toContain("\nflows (2):\n")
+    expect(row("flw_paused")).toBe(`• flw_paused "Kata 'mutiara'" paused until 2026-11-13 12:00:00 next=none`)
+    expect(part).not.toContain("flw_other")
     expect(row("flw_live")).toBe('• flw_live "flw_live" on next=13:00:00 error="source down"')
     expect(part).toContain("\npending reminders (1):\n• rem_next pending next=13:00:00 rrule=FREQ=DAILY: balas chat fahmi")
     expect(part).not.toContain("rem_done")
@@ -269,14 +262,13 @@ describe("reportText", () => {
     const chat = chatOf(db)
     const other = ensureChat(db, { channel: "telegram", externalId: "99" }, NOW - DAY)
     const r = run(db, chat.id)
-    msg(db, chat.id, { text: "hapus rutinitas", runId: r })
-    const cfg = { kind: "message", text: "x" } as never
-    db.insert(routines).values({ id: "rtn_mine", chatId: chat.id, name: "Sholat", tz: "UTC", source: cfg, action: cfg, recap: cfg, createdAt: NOW - DAY, updatedAt: NOW - DAY }).run()
+    msg(db, chat.id, { text: "jeda flow", runId: r })
+    db.insert(flows).values({ id: "flw_mine", chatId: chat.id, name: "Sholat", tz: "UTC", createdAt: NOW - DAY, updatedAt: NOW - DAY }).run()
     const ev = (kind: string, message: string, data?: Record<string, unknown>, level: "info" | "warn" | "error" = "info", connectorId?: string) =>
       logEvent(db, { level, kind, message, ...(data ? { data } : {}), ...(connectorId ? { connectorId } : {}) }, NOW - MIN)
     ev("approval.decided", "routines__hapus_rutinitas approved from whatsapp", { approvalId: "apr_1", runId: r })
     ev("flow.migration", "Routines to flows: 0 created, 0 updated, 1 removed.", { created: 0, updated: 0, removed: 1 })
-    ev("routine.resumed", "Routine resumed.", { routineId: "rtn_mine" })
+    ev("flow.resumed", "Flow resumed.", { flowId: "flw_mine" })
     ev("flow.created", "Someone else's flow.", { flowId: "flw_other", chatId: other.id })
     ev("status", `whatsapp on for ${chat.id}`, undefined, "info", "whatsapp")
     ev("connect", "connected", undefined, "info", "whatsapp")
@@ -285,7 +277,7 @@ describe("reportText", () => {
     ev("budget.pause", "Turns paused for the day", undefined, "warn")
     const part = section(reportText(db, chat, "rpt_x", "", NOW), "Events for this chat")
     const kinds = part.split("\n").slice(1).map((l) => l.split(" ")[3]!.replace(/:$/, ""))
-    expect(kinds).toEqual(["budget.pause", "routine.resumed", "flow.migration", "approval.decided"])
+    expect(kinds).toEqual(["budget.pause", "flow.resumed", "flow.migration", "approval.decided"])
     expect(part).toContain("info flow.migration: Routines to flows: 0 created, 0 updated, 1 removed.")
   })
 
@@ -303,7 +295,7 @@ describe("reportText", () => {
     const db = memoryDb()
     const chat = chatOf(db)
     for (let i = 1; i <= 3; i++) msg(db, chat.id, { role: "assistant", text: `balasan ${i} ${"b".repeat(1000)}`, createdAt: NOW - (20 - i) * MIN })
-    for (let i = 4; i <= 10; i++) msg(db, chat.id, { text: `pesan ${i} ${"x".repeat(300)}`, createdAt: NOW - (20 - i) * MIN })
+    for (let i = 4; i <= 11; i++) msg(db, chat.id, { text: `pesan ${i} ${"x".repeat(300)}`, createdAt: NOW - (20 - i) * MIN })
     const rows = section(reportText(db, chat, "rpt_x", "", NOW), "Messages").split("\n")
     const reply = (n: number) => rows.find((l) => l.includes(`bot: balasan ${n} `))
     expect(reply(1)).toBeUndefined()

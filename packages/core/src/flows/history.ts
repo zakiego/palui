@@ -61,11 +61,10 @@ export type RunSummary = {
   missedLabels: string[]
 }
 
-// Counts per status, skip reason and check-in answer. Shadow observations aren't runs.
+// Counts per status, skip reason and check-in answer.
 export function summarizeRuns(rows: RunRow[]): RunSummary {
   const s: RunSummary = { total: 0, byStatus: {}, bySkipReason: {}, byAnswer: {}, missed: 0, open: 0, missedLabels: [] }
   for (const r of rows) {
-    if (r.skipReason === "shadow") continue
     s.total++
     s.byStatus[r.status] = (s.byStatus[r.status] ?? 0) + 1
     if (r.skipReason) s.bySkipReason[r.skipReason] = (s.bySkipReason[r.skipReason] ?? 0) + 1
@@ -80,7 +79,7 @@ export function summarizeRuns(rows: RunRow[]): RunSummary {
   return s
 }
 
-// The routine recap text, byte for byte (routines/service recapText), from flow runs.
+// The recap text for a flow's runs (counts per answer, missed labels).
 export function recapText(name: string, def: FlowDefinition, rows: RunRow[], days: number): string {
   const s = summarizeRuns(rows)
   const head = `📊 Rekap ${name}, ${days === 1 ? "24 jam terakhir" : days === 7 ? "7 hari terakhir" : `${days} hari terakhir`}:`
@@ -124,13 +123,12 @@ export function flowSummaryView(db: DB, flow: FlowRow, now: number) {
     triggers: [
       ...def.triggers.map((t) => {
         const row = rows.find((r) => r.triggerId === t.id)
-        return { id: t.id, kind: t.kind, summary: describeTrigger(t, flow.tz), next: flow.enabled && row?.nextFireAt ? formatWhen(row.nextFireAt, flow.tz, now) : null, lastError: row?.lastError ?? null }
+        return { id: t.id, kind: t.kind, summary: describeTrigger(t), next: flow.enabled && row?.nextFireAt ? formatWhen(row.nextFireAt, flow.tz, now) : null, lastError: row?.lastError ?? null }
       }),
       { id: "manual", kind: "manual", summary: "jalankan_flow", next: null, lastError: null },
     ],
     lastRun: last ? { id: last.id, status: last.status, skipReason: last.skipReason, at: formatWhen(last.startedAt, flow.tz, now), error: last.error } : null,
     lastError: flow.lastError,
-    ...(flow.shadow ? { shadow: true } : {}),
   }
 }
 
@@ -179,11 +177,11 @@ export function stepRowsCount(db: DB, runId: string): number {
   return db.select({ id: flowStepRuns.id }).from(flowStepRuns).where(eq(flowStepRuns.runId, runId)).all().length
 }
 
-// flows__ringkasan (RFC 8): counts by answer, missed labels and the routine-style
-// recap text for a flow over the last `days`, so a recap is a plain tool step.
+// flows__ringkasan (RFC 8): counts by answer, missed labels and the recap
+// text for a flow over the last `days`, so a recap is a plain tool step.
 export function flowRecap(db: DB, flow: FlowRow, input: { days: number; triggerId?: string | null }, now: number) {
   const def = definitionOf(currentVersion(db, flow))
-  const rows = listRuns(db, { flowId: flow.id, since: now - input.days * 24 * 3600_000, triggerId: input.triggerId ?? undefined, limit: 5000 }).filter((r) => r.skipReason !== "shadow")
+  const rows = listRuns(db, { flowId: flow.id, since: now - input.days * 24 * 3600_000, triggerId: input.triggerId ?? undefined, limit: 5000 })
   const s = summarizeRuns(rows)
   return {
     flow: flow.name,
