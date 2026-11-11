@@ -34,7 +34,7 @@ describe("toModelMessages with past tool calls", () => {
 
   it("shows a run that asked for approval and never replied before the next owner message", () => {
     const rows = [row("user", "cek disk", "run_1"), row("user", "cek disk", null)]
-    const out = toModelMessages(rows, none, [call("run_1", "toolu_1", { tool: "host__disk_free", args: {}, status: "pending", resultPreview: null })])
+    const out = toModelMessages(rows, none, [call("run_1", "toolu_1", { tool: "host__disk_free", args: {}, status: "pending", resultPreview: null, awaitingApproval: true })])
     expect(out.map((m) => m.role)).toEqual(["user", "assistant", "tool", "user"])
     expect(out[2]).toEqual({ role: "tool", content: [{ type: "tool-result", toolCallId: "toolu_1", toolName: "host__disk_free", output: { type: "text", value: "Not run yet: still waiting for the owner's approval." } }] })
   })
@@ -62,6 +62,13 @@ describe("toModelMessages with past tool calls", () => {
       { type: "error-text", value: "boom" },
       { type: "text", value: `${"x".repeat(499)}…\n[result cut short in the history]` },
     ])
+  })
+
+  it("tells a call cut off mid-turn from one waiting for approval, and leaves huge arguments out", () => {
+    const rows = [row("user", "tulis dokumen", "run_1"), row("user", "halo?", null)]
+    const out = toModelMessages(rows, none, [call("run_1", "toolu_1", { args: { body: "x".repeat(3000) }, status: "pending", resultPreview: null })])
+    expect(out[1]).toEqual({ role: "assistant", content: [{ type: "tool-call", toolCallId: "toolu_1", toolName: "reminders__ingatkan", input: { note: "arguments left out of the history (3011 characters)" } }] })
+    expect(JSON.stringify(out[2])).toContain("No result: the turn stopped before this call finished.")
   })
 
   it("replays a call once when a resumed run recorded it twice, with an id every provider accepts", () => {

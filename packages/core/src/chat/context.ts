@@ -3,7 +3,7 @@
 import { and, asc, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm"
 import { DateTime } from "luxon"
 import type { ModelMessage, ToolCallPart, ToolResultPart, UserContent } from "ai"
-import { messages, toolCalls, type DB } from "@palui/db"
+import { messages, pendingApprovals, toolCalls, type DB } from "@palui/db"
 
 export const HISTORY_LIMIT = 30
 
@@ -82,7 +82,11 @@ export function loadHistory(db: DB, sessionId: string, summarizedUntil: number |
     .reverse()
 }
 
-export type ToolCallRow = typeof toolCalls.$inferSelect
+// `awaitingApproval`: the call has a request the owner hasn't settled yet.
+export type ToolCallRow = typeof toolCalls.$inferSelect & { awaitingApproval?: boolean }
+
+// Arguments past this size (a long document body, say) are not repeated on every later turn.
+const MAX_REPLAYED_ARGS = 2000
 
 // The tool calls made by the runs behind these rows, oldest first. Without them
 // the model only sees its own prose ("udah aku set"), can't tell a call that ran
@@ -90,14 +94,28 @@ export type ToolCallRow = typeof toolCalls.$inferSelect
 export function loadToolCalls(db: DB, rows: HistoryRow[]): ToolCallRow[] {
   const runIds = [...new Set(rows.map((r) => r.runId).filter((id): id is string => !!id))]
   if (!runIds.length) return []
-  return db.select().from(toolCalls).where(inArray(toolCalls.runId, runIds)).orderBy(asc(toolCalls.createdAt), sql`rowid`).all()
+  const waiting = new Set(
+    db
+      .select({ runId: pendingApprovals.runId, toolCallId: pendingApprovals.toolCallId })
+      .from(pendingApprovals)
+      .where(and(inArray(pendingApprovals.runId, runIds), inArray(pendingApprovals.status, ["pending", "approved"])))
+      .all()
+      .map((a) => `${a.runId}:${a.toolCallId}`),
+  )
+  return db
+    .select()
+    .from(toolCalls)
+    .where(inArray(toolCalls.runId, runIds))
+    .orderBy(asc(toolCalls.createdAt), sql`rowid`)
+    .all()
+    .map((c) => ({ ...c, awaitingApproval: waiting.has(c.id) }))
 }
 
 // What the model is shown as the result of a past call. Only the stored preview
 // survives, so a long result is cut and says so.
 function replayedOutput(c: ToolCallRow): ToolResultPart["output"] {
   const preview = c.resultPreview ?? ""
-  if (c.status === "pending") return { type: "text", value: "Not run yet: still waiting for the owner's approval." }
+  if (c.status === "pending") return { type: "text", value: c.awaitingApproval ? "Not run yet: still waiting for the owner's approval." : "No result: the turn stopped before this call finished." }
   if (c.status === "denied") return { type: "execution-denied", reason: preview && preview !== "denied" ? preview : "Not run: the owner did not approve it." }
   if (c.status === "error") return { type: "error-text", value: preview || "The tool failed." }
   return { type: "text", value: preview.endsWith("…") ? `${preview}\n[result cut short in the history]` : preview }
@@ -112,7 +130,8 @@ function replayedCalls(calls: ToolCallRow[], seen: Set<string>): ModelMessage[] 
     const toolCallId = c.id.slice(c.id.indexOf(":") + 1).replace(/[^a-zA-Z0-9_-]/g, "_")
     if (seen.has(toolCallId)) continue
     seen.add(toolCallId)
-    const input = c.args && typeof c.args === "object" && !Array.isArray(c.args) ? c.args : {}
+    const size = JSON.stringify(c.args ?? {}).length
+    const input = size > MAX_REPLAYED_ARGS ? { note: `arguments left out of the history (${size} characters)` } : c.args && typeof c.args === "object" && !Array.isArray(c.args) ? c.args : {}
     callParts.push({ type: "tool-call", toolCallId, toolName: c.tool, input })
     resultParts.push({ type: "tool-result", toolCallId, toolName: c.tool, output: replayedOutput(c) })
   }
