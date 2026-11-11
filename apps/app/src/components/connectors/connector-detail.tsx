@@ -1,13 +1,13 @@
-// The connector sheet (PLAN 11.4 Connectors): the setup wizard generated from the
+// The connector page (PLAN 11.4 Connectors): the setup wizard generated from the
 // manifest's `setup` steps and zod schemas, Test, Connect, recent events, and
-// the danger area. A Drawer under 768px. Closing it keeps progress as a draft.
+// the danger area. Leaving the page with unsaved edits keeps them as a draft.
 import * as React from "react"
-import { useRouter } from "@tanstack/react-router"
+import { Link, useNavigate, useRouter } from "@tanstack/react-router"
+import { ArrowLeftIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { ConnectorManifest, SetupStep } from "@palui/core/connectors/define"
 
 import { ConnectorStatusBadge } from "@/components/connector-status"
-import { ResponsiveSheet } from "@/components/responsive-sheet"
 import { SimpleSelect } from "@/components/simple-select"
 import { CircleAlertIcon } from "lucide-react"
 import { RuntimeAlert } from "@/components/runtime-alert"
@@ -30,69 +30,21 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet, 
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import type { ConnectorTarget } from "@/components/connectors/targets"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { usePoll } from "@/hooks/use-poll"
 import { connectConnectorFn, getConnectorDetail, removeConnectorFn, saveConnectorDraft, testConnectorFn } from "@/lib/fns/connectors"
 import { errorMessage, inZone } from "@/lib/format"
 import { useT } from "@/lib/i18n"
-import type { JsonObject } from "@/lib/json"
 import { type FieldStep, type WizardField, wizardFieldInfo as fieldInfo, wizardInitialValues, wizardPayload } from "@/lib/zod-fields"
-
-export type SheetTarget = {
-  id: string
-  type: string
-  label: string
-  isNew: boolean
-  status: string
-  statusDetail: string | null
-  config: JsonObject
-  secrets: Record<string, string>
-  secretsError: string | null
-  trust: "own" | "external"
-}
 
 type ActionStep = Extract<SetupStep, { action: string }>
 
-export function ConnectorSheet({
-  open,
-  onOpenChange,
-  target,
-  manifest,
-  appUrl,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  target: SheetTarget | null
-  manifest: ConnectorManifest | undefined
-  appUrl: string
-}) {
-  const t = useT()
-  if (!target || !manifest) {
-    return (
-      <ResponsiveSheet open={open} onOpenChange={onOpenChange} title={t("common.loading")}>
-        <Skeleton className="h-40" />
-      </ResponsiveSheet>
-    )
-  }
-  return <SheetBody key={target.id} open={open} onOpenChange={onOpenChange} target={target} manifest={manifest} appUrl={appUrl} />
-}
-
-function SheetBody({
-  open,
-  onOpenChange,
-  target,
-  manifest: m,
-  appUrl,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  target: SheetTarget
-  manifest: ConnectorManifest
-  appUrl: string
-}) {
+export function ConnectorDetail({ target, manifest: m, appUrl }: { target: ConnectorTarget; manifest: ConnectorManifest; appUrl: string }) {
   const t = useT()
   const router = useRouter()
+  const navigate = useNavigate()
   const [values, setValues] = React.useState(() => wizardInitialValues(m, target.config))
   const [label, setLabel] = React.useState(target.label)
   const [trust, setTrust] = React.useState(target.trust)
@@ -101,7 +53,7 @@ function SheetBody({
   const [busy, setBusy] = React.useState<null | "save" | "test" | "connect" | "remove">(null)
   const [saved, setSaved] = React.useState(!target.isNew)
 
-  const detail = usePoll(open ? () => getConnectorDetail({ data: { id: target.id } }) : null, { intervalMs: 3000, deps: [target.id] })
+  const detail = usePoll(() => getConnectorDetail({ data: { id: target.id } }), { intervalMs: 3000, deps: [target.id] })
   const status = target.status
 
   const set = (k: string, v: string | boolean) => {
@@ -207,8 +159,8 @@ function SheetBody({
     try {
       const res = await removeConnectorFn({ data: { id: target.id } })
       toast.success(`${label || m.name} removed`, { description: res.detail })
-      onOpenChange(false)
-      void router.invalidate()
+      removed.current = true
+      void navigate({ to: "/connectors" })
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {
@@ -216,52 +168,41 @@ function SheetBody({
     }
   }
 
-  // Wizard progress survives closing the sheet (PLAN 11.5): save a draft.
-  const close = (next: boolean) => {
-    if (!next && dirty && busy === null) {
+  // Wizard progress survives leaving the page (PLAN 11.5): save a draft.
+  const removed = React.useRef(false)
+  const latest = React.useRef({ dirty, busy, save, t })
+  latest.current = { dirty, busy, save, t }
+  React.useEffect(
+    () => () => {
+      const { dirty, busy, save, t } = latest.current
+      if (!dirty || busy !== null || removed.current) return
       void save(true).then((ok) => {
         if (!ok) toast.warning(t("connectors.partialSave"), { description: t("connectors.partialSaveFix") })
       })
-    }
-    onOpenChange(next)
-  }
+    },
+    [],
+  )
 
   const fieldSteps = m.setup.filter((s): s is FieldStep => "field" in s)
   const actionSteps = m.setup.filter((s): s is ActionStep => "action" in s)
   const live = detail.data?.live ?? {}
 
   return (
-    <ResponsiveSheet
-      open={open}
-      onOpenChange={close}
-      title={
-        <span className="flex min-w-0 flex-wrap items-center gap-2">
-          <span className="min-w-0 break-words">{label || m.name}</span>
-          <ConnectorStatusBadge status={status} />
-        </span>
-      }
-      description={m.summary}
-      footer={
-        <div className="flex w-full flex-wrap gap-2">
-          {fieldSteps.length > 0 && (
-            <Button variant="outline" disabled={busy !== null || !dirty} onClick={() => void onSave()}>
-              {busy === "save" && <Spinner data-icon="inline-start" />}
-              {t("connectors.saveDraft")}
-            </Button>
-          )}
-          {!target.isNew || saved ? (
-            <Button variant="outline" disabled={busy !== null} onClick={() => void onTest()}>
-              {busy === "test" && <Spinner data-icon="inline-start" />}
-              {t("connectors.test")}
-            </Button>
-          ) : null}
-          <Button className="ms-auto" disabled={busy !== null} onClick={() => void onConnect()}>
-            {busy === "connect" && <Spinner data-icon="inline-start" />}
-            {status === "on" || status === "connecting" ? t("connectors.saveReconnect") : t("connectors.connect")}
-          </Button>
+    <>
+      <div className="flex flex-col gap-3">
+        <Button variant="ghost" size="sm" className="-ms-2.5 self-start text-muted-foreground" render={<Link to="/connectors" />}>
+          <ArrowLeftIcon data-icon="inline-start" />
+          {t("nav.connectors")}
+        </Button>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h1 className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 font-heading text-title">
+            <span className="min-w-0 break-words">{label || m.name}</span>
+            <ConnectorStatusBadge status={status} />
+          </h1>
+          <p className="max-w-[65ch] text-sm text-pretty text-muted-foreground">{m.summary}</p>
         </div>
-      }
-    >
+      </div>
+      <div className="flex w-full max-w-2xl flex-col gap-6">
       {detail.data && !detail.data.runtimeUp && <RuntimeAlert />}
       {target.statusDetail && status === "error" && (
         <Alert variant="destructive">
@@ -340,9 +281,9 @@ function SheetBody({
         <>
           <Separator />
           <section aria-labelledby={`${target.id}-events`} className="flex flex-col gap-2">
-            <h3 id={`${target.id}-events`} className="text-heading">
+            <h2 id={`${target.id}-events`} className="text-heading">
               {t("connectors.events")}
-            </h3>
+            </h2>
             {!detail.data && !detail.error ? (
               <div className="flex flex-col gap-2">
                 <Skeleton className="h-4 w-3/4" />
@@ -369,9 +310,9 @@ function SheetBody({
 
           <Separator />
           <section aria-labelledby={`${target.id}-danger`} className="flex flex-col gap-3">
-            <h3 id={`${target.id}-danger`} className="text-heading">
+            <h2 id={`${target.id}-danger`} className="text-heading">
               {t("connectors.danger")}
-            </h3>
+            </h2>
             <p className="text-sm text-pretty text-muted-foreground">{m.removeWarning ?? t("connectors.removeDefault")}</p>
             <AlertDialog>
               <AlertDialogTrigger render={<Button variant="destructive" className="self-start" disabled={busy !== null} />}>
@@ -394,7 +335,28 @@ function SheetBody({
           </section>
         </>
       )}
-    </ResponsiveSheet>
+      </div>
+      <div className="sticky bottom-0 z-10 -mx-4 -mb-10 border-t bg-background/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+        <div className="flex w-full max-w-2xl flex-wrap gap-2">
+          {fieldSteps.length > 0 && (
+            <Button variant="outline" disabled={busy !== null || !dirty} onClick={() => void onSave()}>
+              {busy === "save" && <Spinner data-icon="inline-start" />}
+              {t("connectors.saveDraft")}
+            </Button>
+          )}
+          {!target.isNew || saved ? (
+            <Button variant="outline" disabled={busy !== null} onClick={() => void onTest()}>
+              {busy === "test" && <Spinner data-icon="inline-start" />}
+              {t("connectors.test")}
+            </Button>
+          ) : null}
+          <Button className="ms-auto" disabled={busy !== null} onClick={() => void onConnect()}>
+            {busy === "connect" && <Spinner data-icon="inline-start" />}
+            {status === "on" || status === "connecting" ? t("connectors.saveReconnect") : t("connectors.connect")}
+          </Button>
+        </div>
+      </div>
+    </>
   )
 }
 

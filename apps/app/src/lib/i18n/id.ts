@@ -167,6 +167,7 @@ export const id: Record<Key, string> = {
   "connectors.catalog": "Cari konektor",
   "connectors.external": "eksternal",
   "connectors.added": "sudah ada",
+  "connectors.notFound": "Konektor ini tidak ada. Mungkin sudah dihapus.",
   "connectors.custom": "{name} custom",
   "connectors.customHint": "Atur sendiri, isi URL dan token kamu",
   "connectors.customGroup": "Custom",
