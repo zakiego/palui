@@ -34,7 +34,7 @@ import { engineClock } from "./diagnose"
 import { pruneFlows } from "./history"
 import { handover, routineMode, shadowCompare, syncRoutineFlows } from "./migrate"
 import { emitFlowEvent } from "./events"
-import { MAX_EACH, MAX_WAIT_MIN, type EachStep, type CheckinStep, type FlowDefinition, type FlowEventName, type FlowStep, type PromptStep, type ScheduleTrigger, type ToolStep, type WaitStep } from "./schema"
+import { MAX_EACH, MAX_WAIT_MIN, type CheckinDeadline, type EachStep, type CheckinStep, type FlowDefinition, type FlowEventName, type FlowStep, type PromptStep, type ScheduleTrigger, type ToolStep, type WaitStep } from "./schema"
 import {
   currentVersion,
   definitionOf,
@@ -184,6 +184,26 @@ function errorText(e: unknown): string {
 }
 
 // Where a failed step goes (RFC 5): "fail", "continue", or an error branch.
+// When a check-in stops waiting (schema.ts deadlineSchema). `base` is when its
+// clock starts: the occurrence for a check-in that starts a schedule run, else now.
+export function checkinDeadlineAt(d: CheckinDeadline, o: { base: number; nextAt: number | null; now: number; tz: string; render: (s: string) => unknown }): { at: number } | { error: string } {
+  if (d.kind === "next") return { at: o.nextAt !== null ? o.nextAt + (d.plusMin ?? 0) * 60_000 : o.base + 24 * 3600_000 }
+  if (d.kind === "after") {
+    const v = typeof d.minutes === "number" ? d.minutes : o.render(d.minutes)
+    const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN
+    if (!Number.isFinite(n)) return { error: `deadline.minutes (${String(JSON.stringify(v)).slice(0, 60)}) isn't a number.` }
+    const minutes = Math.round(n)
+    if (minutes > MAX_WAIT_MIN) return { error: "A check-in deadline can't be more than 7 days away." }
+    return { at: o.base + minutes * 60_000 }
+  }
+  const v = o.render(d.at)
+  const ms = toMs(v, o.tz, o.now)
+  if (ms === null) return { error: `deadline.at (${String(JSON.stringify(v)).slice(0, 60)}) isn't a date or time.` }
+  const at = ms + (d.plusMin ?? 0) * 60_000
+  if (at - o.now > MAX_WAIT_MIN * 60_000) return { error: "A check-in deadline can't be more than 7 days away." }
+  return { at }
+}
+
 function onError(c: RunContext, step: FlowStep, error: string, row: Transition["row"], tainted = false): Transition {
   const how = step.onError ?? "fail"
   const output = { ok: false, error }
@@ -364,8 +384,11 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
   function startDeadline(def: FlowDefinition, start: string, occ: Occurrence, following: Occurrence | null): number | null {
     const s = def.steps.find((x) => x.id === start)
     if (s?.kind !== "checkin") return null
-    if (s.deadline.kind === "after") return occ.at + s.deadline.minutes * 60_000
-    return following?.at ?? occ.at + 24 * 3600_000
+    const d = s.deadline
+    if (d.kind === "next") return following ? following.at + (d.plusMin ?? 0) * 60_000 : occ.at + 24 * 3600_000
+    if (d.kind === "after" && typeof d.minutes === "number") return occ.at + d.minutes * 60_000
+    // A computed deadline needs the run; lateGraceMin decides for those.
+    return null
   }
 
   function fireOne(row: TriggerRow, now: number) {
@@ -919,7 +942,19 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
     // A check-in that starts a schedule run counts its deadline from the occurrence.
     const base = c.run.triggerKind === "schedule" && c.run.scheduledAt && c.run.stepsDone === 0 ? c.run.scheduledAt : c.now
     const nextAt = (c.run.trigger as { nextAt?: number | null }).nextAt ?? null
-    const deadlineAt = step.deadline.kind === "after" ? base + step.deadline.minutes * 60_000 : (nextAt ?? base + 24 * 3600_000)
+    const dl = checkinDeadlineAt(step.deadline, { base, nextAt, now: c.now, tz: c.flow.tz, render: (s) => renderString(s, env) })
+    if ("error" in dl) return onError(c, step, dl.error, { status: "error", input: { deadline: step.deadline } })
+    const deadlineAt = dl.at
+    // Its window already closed: nobody is asked, the run goes the missed way.
+    if (deadlineAt <= c.now) {
+      const output = { answer: null, label: null, text: null, answeredAt: null, answers: [], followUps: 0, missed: true, skipped: true }
+      return {
+        row: { status: c.dry ? "stubbed" : "ok", input: { deadlineAt }, output, branch: step.onMissed !== undefined ? "onMissed" : "missed" },
+        output,
+        events: [{ name: "checkin.missed", data: { step: step.id, skipped: true } }],
+        then: { t: "goto", to: step.onMissed !== undefined ? step.onMissed : defaultNext(c.def, step.id) },
+      }
+    }
     let nextFollowUpAt: number | null = step.followUp.max > 0 ? c.now + step.followUp.everyMin * 60_000 : null
     if (nextFollowUpAt !== null && nextFollowUpAt >= deadlineAt) nextFollowUpAt = null
     const tainted = valueTainted(c.run.taint ?? [], step.text)

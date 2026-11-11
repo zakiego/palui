@@ -54,7 +54,7 @@ const localDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$
 
 export const FLOW_HELP = `A flow definition is JSON: { name, description?, tz?, triggers: [...], steps: [...], limits?: { runsPerHour?, dailyTokens? } }.
 Triggers (each has id, kind, start = first step id):
-- schedule: { source: <routine time source: {kind:"times", times:[{time:"06:00", label}]} | {kind:"rrule", rrule, start:"YYYY-MM-DDTHH:mm"} | {kind:"tool", connectorId, tool, args, refreshAt, items|list}>, days?: ["MO".."SU"], lateGraceMin? }. trigger.* = at, time, date, label, key.
+- schedule: { source: <routine time source: {kind:"times", times:[{time:"06:00", label}]} | {kind:"rrule", rrule, start:"YYYY-MM-DDTHH:mm"} | {kind:"tool", connectorId, tool, args, refreshAt, items|list}>, days?: ["MO".."SU"], lateGraceMin? }. trigger.* = at, time, date, label, key, nextAt (the next occurrence, epoch ms).
 - webhook: { hookId } (an existing hook; its mode becomes flow). trigger.payload is untrusted.
 - chat: { command: "/beres" } or { phrases: ["udah bayar"] }, the owner's messages in this chat. trigger.text, trigger.args.
 - poll: { tool, connectorId?, args, everyMin: 5..1440, select: "path.in.result", fire: "change"|"truthy" }. trigger.value, trigger.previous.
@@ -64,12 +64,13 @@ Steps (each has id, kind, optional next (step id or null to end; default the nex
 - tool: { tool: "<connectorId>__<tool>" (as palui__cari_tool shows), args, parse?: {field:"text", as:"json"}, retry?: {max, backoffSec} }. Output steps.<id>.data (or .error with onError).
 - if: { when: "<expression>", then: <id|null>, else: <id|null> }.
 - message: { text, to?: <another chat id the owner allowed> }.
-- checkin: { text, answers: [{id, label, words?, closes}], followUp: {everyMin, max, text?}, deadline: {kind:"next"}|{kind:"after", minutes}, missedText?, on?: {<answer id>: <step id>}, onMissed? }. Output answer, label, missed.
+- checkin: { text, answers: [{id, label, words?, closes}], followUp: {everyMin, max, text?}, deadline, missedText?, on?: {<answer id>: <step id>}, onMissed? }. Output answer, label, missed (skipped too when the deadline had already passed).
+  deadline (default next, max 7 days): {kind:"next", plusMin?} the schedule's next occurrence (plusMin:-10 = 10 min before it) | {kind:"after", minutes: N or "{{template}}"} | {kind:"at", at: "<template or ISO>", plusMin?} a computed time, e.g. {kind:"at", at:"{{steps.nextp.data.next.timestamp}}", plusMin:-10}. A deadline already past skips the ask silently and goes onMissed. Re-asks stop at the deadline.
 - wait: { minutes } or { until: "<template>", plusMin? } (max 7 days).
 - prompt: { prompt: "<literal instruction, no templates>", input: { name: "{{...}}" }, tools: [], send: false, model: "main"|"fast" }. Output text, silent.
 - set: { scope: "run"|"flow", values: { name: "<expression or template>" } } -> vars.<name> or flow.<name> (flow ones persist).
 - each: { items: "<path to a list>", where?: "<expression on item>", key?: "{{item.id}}", max: 20, body: <step id> } runs body once per item, deduped by key across runs.
-Templates "{{path | filter}}" go only in tool args, message/check-in text, prompt input, set values, wait.until, each.key. Paths start with trigger, steps, vars, flow, item, index, now (now.date, now.time, now.weekday), run (run.followUps: the re-ask number, for check-in followUp.text). Filters: time, date, json, default("x"), join(", "), lines("field"), upper, lower, round(n), truncate(n).
+Templates "{{path | filter}}" go only in tool args, message/check-in text, prompt input, set values, wait.until, checkin deadline.at and deadline.minutes, each.key. Paths start with trigger, steps, vars, flow, item, index, now (now.date, now.time, now.weekday), run (run.followUps: the re-ask number, for check-in followUp.text). Filters: time, date, json, default("x"), join(", "), lines("field"), upper, lower, round(n), truncate(n).
 Expressions (if.when, set, each.where): and or not, == != < <= > >=, + - * /, functions exists empty contains startsWith len lower any count number round min max date daysUntil hoursUntil minutesSince weekday today.
 Destructive tools are never allowed. Write tools need the owner's approval once per version.`
 

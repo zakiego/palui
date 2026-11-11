@@ -21,6 +21,7 @@ import { checkinsPrompt } from "../routines/service"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, emptyTools, SEARCH_TOOL, STICKY_MAX, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
+import { limitNotice, shouldWrapUp, stepClock, WRAP_UP_NOTE, type RanTool, type WrapUpReason } from "./turn-limits"
 import { buildSystem, buildTurnContext, hasImages, loadHistory, loadToolCalls, markStaleReads, quotesOutsider, systemBlocks, toModelMessages, withTurnContext, type StoredContent } from "./context"
 import type { EngineDeps } from "./deps"
 
@@ -54,6 +55,8 @@ export type EngineCtx = {
   active: Map<string, ActiveTurn>
   draining: boolean
   approvalTtlMs: number
+  // Tests only: overrides settings.budgets.turnTimeoutMs.
+  turnTimeoutMs?: number
   // Queue the resume of a run whose approval requests are all decided.
   resumeRun: (runId: string) => void
 }
@@ -210,6 +213,18 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   const approvalRequests: { approvalId: string; toolCallId: string; toolName: string; input: unknown }[] = []
   let model: ReturnType<typeof failoverModel> | undefined
   let interrupted = false
+  const timeoutMs = ctx.turnTimeoutMs ?? settings.budgets.turnTimeoutMs
+  // Tools that finished this turn, for the limit notice.
+  const ran: RanTool[] = []
+  // Set once a step was told to answer with no tools (turn-limits.ts).
+  let wrapUp: WrapUpReason | null = null
+  // That step called a tool anyway, which the SDK turns into an error.
+  let toolChoiceViolated = false
+  const failNotice = () => {
+    if (shared) return sendToChat(ctx, chat, SHARED_BUSY_TEXT, "system")
+    if (toolChoiceViolated) return deliverReply(ctx, chat, runId, limitNotice(wrapUp === "steps" ? { maxSteps: settings.budgets.maxSteps } : { timeoutMs }, ran))
+    sendToChat(ctx, chat, `Waduh, gagal jawab: ${shortError(error)}. Coba lagi bentar ya.`, "system")
+  }
 
   try {
     const batchRunId = input.resume ? (input.resume.context.batchRunId ?? input.resume.previousRunId) : runId
@@ -299,6 +314,8 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     const strict = unattended(origin) || origin === "hook" || mode !== "owner"
     void typing(true)
     ctx.bus.publish({ type: "turn-start", chatId: chat.id, runId })
+    const clock = stepClock(performance.now())
+    const hasTools = Object.keys(tools.tools).length > 0
 
     const result = streamText({
       model,
@@ -307,10 +324,20 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
       tools: tools.tools,
       // With tool search on, only the active names reach the model; a search
       // appends to tools.active, and the next step offers the loaded tools.
-      ...(tools.deferred.length ? { activeTools: [...tools.active], prepareStep: () => ({ activeTools: [...tools.active] }) } : {}),
+      ...(tools.deferred.length ? { activeTools: [...tools.active] } : {}),
+      // Near the step or time limit, the step answers with no tools, so the
+      // turn ends with a reply instead of a tool call nobody reads (turn-limits.ts).
+      prepareStep: ({ stepNumber, messages: stepMessages }) => {
+        const active = tools.deferred.length ? { activeTools: [...tools.active] } : {}
+        const reason = hasTools ? shouldWrapUp(clock, { stepNumber, maxSteps: settings.budgets.maxSteps, timeoutMs, now: performance.now() }) : null
+        if (!reason) return active
+        wrapUp = reason
+        rlog.info("turn near its limit, asking for the reply now", { reason, step: stepNumber, elapsed_ms: Math.round(performance.now() - clock.startedAt) })
+        return { ...active, toolChoice: "none" as const, messages: [...stepMessages, { role: "user" as const, content: WRAP_UP_NOTE }] }
+      },
       maxRetries: 1,
       stopWhen: [isStepCount(settings.budgets.maxSteps), () => ctx.draining],
-      abortSignal: AbortSignal.any([controller.signal, AbortSignal.timeout(settings.budgets.turnTimeoutMs)]),
+      abortSignal: AbortSignal.any([controller.signal, AbortSignal.timeout(timeoutMs)]),
       toolApproval: ({ toolCall }) => {
         const meta = tools.meta[toolCall.toolName]
         // Taint at call time, not only when the result comes back: the SDK decides
@@ -335,6 +362,10 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
       for (const id of r.resume) ctx.resumeRun(id)
     }
 
+    const noteRan = (toolName: string, ok: boolean) => {
+      const meta = tools.meta[toolName]
+      ran.push({ name: meta?.tool ?? toolName.split("__").pop() ?? toolName, write: (meta?.class ?? "destructive") !== "read", ok })
+    }
     let stepText = ""
     for await (const p of result.fullStream) {
       switch (p.type) {
@@ -378,10 +409,12 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         case "tool-result":
           if ((p as { preliminary?: boolean }).preliminary) break
           supersede(p.toolName, p.input)
+          noteRan(p.toolName, true)
           finishToolCall(ctx, chat.id, runId, input.resume?.previousRunId, p.toolCallId, p.toolName, "ok", redact(preview(p.output, 500)), toolStarts)
           break
         case "tool-error":
           supersede(p.toolName, p.input)
+          noteRan(p.toolName, false)
           finishToolCall(ctx, chat.id, runId, input.resume?.previousRunId, p.toolCallId, p.toolName, "error", redact(preview((p.error as Error)?.message ?? p.error, 500)), toolStarts)
           break
         case "tool-output-denied":
@@ -390,6 +423,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         case "error":
           status = "error"
           error = (p.error as Error)?.message ?? String(p.error)
+          if (isToolChoiceViolation(p.error)) toolChoiceViolated = true
           break
         case "abort":
           status = "aborted"
@@ -461,15 +495,16 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     } else if (status === "ok") {
       if (text && deliver && !silent) deliverReply(ctx, chat, runId, text)
     } else if (status === "error" && (input.trigger === "message" || input.trigger === "approval")) {
-      sendToChat(ctx, chat, shared ? SHARED_BUSY_TEXT : `Waduh, gagal jawab: ${shortError(error)}. Coba lagi bentar ya.`, "system")
+      failNotice()
     }
   } catch (e) {
     const aborted = controller.signal.aborted || (e as Error)?.name === "AbortError" || (e as Error)?.name === "TimeoutError"
     status = aborted ? "aborted" : "error"
     error = (e as Error)?.message ?? String(e)
+    if (isToolChoiceViolation(e)) toolChoiceViolated = true
     if (aborted && ctx.draining) interrupted = true
     else if (!aborted) rlog.error("turn failed", { error: e })
-    if (!interrupted && status === "error" && (input.trigger === "message" || input.trigger === "approval")) sendToChat(ctx, chat, shared ? SHARED_BUSY_TEXT : `Waduh, gagal jawab: ${shortError(error)}. Coba lagi bentar ya.`, "system")
+    if (!interrupted && status === "error" && (input.trigger === "message" || input.trigger === "approval")) failNotice()
   } finally {
     void typing(false)
     if (ctx.active.get(chat.id) === active) ctx.active.delete(chat.id)
@@ -479,7 +514,18 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   if (interrupted) {
     status = "running"
     error = INTERRUPTED_ERROR
-  } else if (status === "aborted" && !error) error = controller.signal.aborted ? "stopped by the owner" : "turn timed out"
+  } else if (status === "aborted") {
+    if (controller.signal.aborted) error ??= "stopped by the owner"
+    else {
+      error = "turn timed out"
+      // A timeout used to end the turn in silence; the owner gets told, and the
+      // notice is saved as the reply so the next turn knows why it stopped.
+      if (input.trigger === "message" || input.trigger === "approval") {
+        if (shared) sendToChat(ctx, chat, SHARED_BUSY_TEXT, "system")
+        else deliverReply(ctx, chat, runId, limitNotice({ timeoutMs }, ran))
+      }
+    }
+  }
   const ms = ctx.clock() - startedAt
   const served = model?.served()
   db.update(runs)
@@ -512,6 +558,10 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   ctx.bus.publish({ type: "turn-end", chatId: chat.id, runId, status: interrupted ? "aborted" : status, error })
   rlog.info("turn finished", { status: interrupted ? "interrupted" : status, steps, tokens_in: tokensIn, tokens_out: tokensOut, tokens_cached: tokensCached, tokens_cache_write: tokensCacheWrite, ms, tainted: state.tainted, connector_id: served?.connectorId })
   return { runId, text: interrupted ? "" : text, status: interrupted ? "interrupted" : status, tainted: state.tainted }
+}
+
+function isToolChoiceViolation(e: unknown): boolean {
+  return (e as Error | undefined)?.name === "AI_ToolChoiceViolationError"
 }
 
 // Jobs, smart reminders and flow prompt steps run with nobody watching (PLAN 7):

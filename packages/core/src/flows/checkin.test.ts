@@ -126,6 +126,83 @@ describe("check-in steps", () => {
     const wait = run!.wait as { deadlineAt: number }
     expect(wait.deadlineAt).toBe(at("2026-11-10T15:25"))
   })
+
+  it("deadline next with plusMin stops 10 minutes before the next prayer", async () => {
+    const prayer = fakePrayerTool()
+    const h = flowHarness({ engine: { readSource: prayer } })
+    const def = { ...SHOLAT, steps: SHOLAT.steps.map((s) => (s.id === "ask" ? { ...s, deadline: { kind: "next", plusMin: -10 } } : s)) }
+    const { flow } = h.create(def)
+    await h.run(at("2026-11-10T10:00"))
+    await h.run(at("2026-11-10T12:00"))
+    const [run] = runsOf(h.db, flow.id)
+    expect((run!.wait as { deadlineAt: number }).deadlineAt).toBe(at("2026-11-10T15:15"))
+  })
+})
+
+// The owner's rule from rpt_0mwcdzchvhscqv9o16o: the last reminder lands 10
+// minutes before the next prayer, whatever the gap between the two prayers is.
+describe("computed check-in deadlines", () => {
+  const ask = (deadline: Record<string, unknown>) => ({
+    id: "ask",
+    kind: "checkin",
+    text: "Udah sholat?",
+    answers: [{ id: "done", label: "Sudah", closes: true }],
+    followUp: { everyMin: 30, max: 5 },
+    deadline,
+    missedText: "Kelewat.",
+    onMissed: "last",
+    next: null,
+  })
+  const last = { id: "last", kind: "message", text: "Pengingat terakhir", next: null }
+
+  it("at: a template time with plusMin, and re-asks stop before it", async () => {
+    const h = flowHarness()
+    const { flow } = h.create({ name: "Sholat", tz: "Asia/Makassar", steps: [ask({ kind: "at", at: "{{trigger.args.next}}", plusMin: -10 }), last] })
+    const t0 = at("2026-11-10T18:16")
+    h.engine.startRun({ flowId: flow.id, triggerKind: "manual", runKey: "a", payload: { args: { next: "2026-11-10T19:29" } }, now: t0 })
+    await h.run(t0)
+    const [run] = runsOf(h.db, flow.id)
+    expect((run!.wait as { deadlineAt: number }).deadlineAt).toBe(at("2026-11-10T19:19"))
+    await h.run(at("2026-11-10T18:46"))
+    await h.run(at("2026-11-10T19:16"))
+    // The next re-ask (19.46) would be past the deadline, so none is planned.
+    expect(sentTexts(h.db).map((x) => x.text)).toEqual(["Udah sholat?", "🔁 Udah sholat?", "🔁 Udah sholat?"])
+    expect(runsOf(h.db, flow.id)[0]!.wakeAt).toBe(at("2026-11-10T19:19"))
+    await h.run(at("2026-11-10T19:19"))
+    expect(sentTexts(h.db).map((x) => x.text).slice(3)).toEqual(["Kelewat.", "Pengingat terakhir"])
+  })
+
+  it("at: a time already past skips the ask silently and goes onMissed", async () => {
+    const h = flowHarness()
+    const { flow } = h.create({ name: "Sholat", tz: "Asia/Makassar", steps: [ask({ kind: "at", at: "{{trigger.args.next}}", plusMin: -10 }), last] })
+    const t0 = at("2026-11-10T19:25")
+    h.engine.startRun({ flowId: flow.id, triggerKind: "manual", runKey: "a", payload: { args: { next: "2026-11-10T19:29" } }, now: t0 })
+    await h.run(t0)
+    const [run] = runsOf(h.db, flow.id)
+    expect(run!.status).toBe("done")
+    expect((run!.vars as { steps: Record<string, unknown> }).steps.ask).toMatchObject({ missed: true, skipped: true })
+    expect(sentTexts(h.db).map((x) => x.text)).toEqual(["Pengingat terakhir"])
+  })
+
+  it("after: minutes from a template", async () => {
+    const h = flowHarness()
+    const { flow } = h.create({ name: "Sholat", steps: [ask({ kind: "after", minutes: "{{trigger.args.left}}" }), last] })
+    const t0 = h.now()
+    h.engine.startRun({ flowId: flow.id, triggerKind: "manual", runKey: "a", payload: { args: { left: 63 } }, now: t0 })
+    await h.run(t0)
+    expect((runsOf(h.db, flow.id)[0]!.wait as { deadlineAt: number }).deadlineAt).toBe(t0 + 63 * MIN)
+  })
+
+  it("a value that isn't a time fails the step through onError", async () => {
+    const h = flowHarness()
+    const { flow } = h.create({ name: "Sholat", steps: [ask({ kind: "at", at: "{{trigger.args.next}}" }), last] })
+    h.engine.startRun({ flowId: flow.id, triggerKind: "manual", runKey: "a", payload: { args: { next: "besok" } }, now: h.now() })
+    await h.run(h.now())
+    const [run] = runsOf(h.db, flow.id)
+    expect(run!.status).toBe("failed")
+    expect(run!.error).toContain("deadline.at")
+    expect(sentTexts(h.db).map((x) => x.text)).toEqual(['⚠️ Flow "Sholat" gagal: Step ask: deadline.at ("besok") isn\'t a date or time.'])
+  })
 })
 
 describe("wait steps (RFC 9b, entered directly)", () => {

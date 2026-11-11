@@ -117,11 +117,14 @@ export function scriptedModel(steps: Step[], fallback: Step = say("ok"), opts: {
   const prompts: unknown[] = []
   // Tool names offered on each model call, in call order.
   const offered: string[][] = []
+  // The tool choice of each model call ("auto", "none", ...).
+  const choices: (string | undefined)[] = []
   const model = new MockLanguageModelV4({
     ...(opts.provider ? { provider: opts.provider } : {}),
     doStream: async (options) => {
       prompts.push(options.prompt)
       offered.push((options.tools ?? []).map((t) => t.name))
+      choices.push(options.toolChoice?.type)
       const s = steps.length ? steps.shift()! : fallback
       if (s instanceof Error) throw s
       const chunks = typeof s === "function" ? await s() : s
@@ -136,7 +139,7 @@ export function scriptedModel(steps: Step[], fallback: Step = say("ok"), opts: {
       return { content: text ? [{ type: "text", text }] : [], finishReason: { unified: "stop", raw: undefined }, usage: usage(), warnings: [] } as never
     },
   })
-  return { model, prompts, steps, offered }
+  return { model, prompts, steps, offered, choices }
 }
 
 export function promptText(prompt: unknown): string {
@@ -174,6 +177,7 @@ export type HarnessOptions = {
   rows?: Record<string, ConnectorKind>
   deps?: EngineDeps
   approvalTtlMs?: number
+  turnTimeoutMs?: number
   clock?: { now: number }
 }
 
@@ -185,7 +189,7 @@ export async function harness(o: HarnessOptions) {
   let engineRef: ReturnType<typeof createEngine> | undefined
   const sup = createSupervisor({ db, registry: o.registry, services, log: silentLogger, masterKey: TEST_KEY, dataDir: "/tmp/palui-test", clock: () => clock.now, inUse: (id) => engineRef?.inUse(id) ?? false })
   const bus = createTurnBus()
-  const engine = createEngine({ db, host: sup, log: silentLogger, clock: () => clock.now, bus, deps: o.deps, approvalTtlMs: o.approvalTtlMs, sendWaitMs: 20 })
+  const engine = createEngine({ db, host: sup, log: silentLogger, clock: () => clock.now, bus, deps: o.deps, approvalTtlMs: o.approvalTtlMs, turnTimeoutMs: o.turnTimeoutMs, sendWaitMs: 20 })
   engineRef = engine
   Object.assign(services, engine.services)
   await sup.reconcile()

@@ -32,6 +32,8 @@ export type EngineOptions = {
   approvalTtlMs?: number
   // How long a command waits for its reply to go out before applying (self-channel off).
   sendWaitMs?: number
+  // Tests only: overrides settings.budgets.turnTimeoutMs.
+  turnTimeoutMs?: number
 }
 
 export type Engine = ReturnType<typeof createEngine>
@@ -47,6 +49,7 @@ export function createEngine(opts: EngineOptions) {
     active: new Map(),
     draining: false,
     approvalTtlMs: opts.approvalTtlMs ?? APPROVAL_TTL_MS,
+    turnTimeoutMs: opts.turnTimeoutMs,
     resumeRun: (runId) => maybeResume(runId),
   }
   const { db, log } = ctx

@@ -111,8 +111,20 @@ export const messageStepSchema = z.object({
   to: text(80).optional(),
 })
 
-// Until the trigger's next occurrence (schedule paths only), or N minutes, up to a week.
-export const deadlineSchema = z.discriminatedUnion("kind", [z.object({ kind: z.literal("next") }), z.object({ kind: z.literal("after"), minutes: z.number().int().min(1).max(MAX_WAIT_MIN) })])
+// When a check-in stops waiting, up to a week out:
+// - next: the trigger's next occurrence (schedule paths only), shifted by plusMin
+//   ({kind:"next", plusMin:-10} is 10 minutes before it).
+// - after: N minutes, a number or a template that renders to one ("{{vars.left}}").
+// - at: a time from a template or an ISO date/datetime, like wait.until, shifted by
+//   plusMin ({kind:"at", at:"{{steps.nextp.data.next.timestamp}}", plusMin:-10}).
+// A deadline already past when the check-in is reached skips the ask and goes the
+// missed way without sending anything.
+export const deadlineSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("next"), plusMin: z.number().int().min(-1440).max(1440).optional() }),
+  z.object({ kind: z.literal("after"), minutes: z.union([z.number().int().min(1).max(MAX_WAIT_MIN), text(300)]) }),
+  z.object({ kind: z.literal("at"), at: text(300), plusMin: z.number().int().min(-MAX_WAIT_MIN).max(MAX_WAIT_MIN).optional() }),
+])
+export type CheckinDeadline = z.infer<typeof deadlineSchema>
 
 export const checkinStepSchema = z.object({
   ...stepBase,

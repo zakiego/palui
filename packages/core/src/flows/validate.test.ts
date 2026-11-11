@@ -96,6 +96,16 @@ describe("expressions and templates", () => {
     const manualNext = base([{ id: "a", kind: "checkin", text: "?" }])
     expect(problems(manualNext)[0]).toMatch(/deadline "next"/)
   })
+
+  it("checks computed check-in deadlines", () => {
+    const ck = (deadline: unknown) => base([{ id: "a", kind: "checkin", text: "?", deadline }])
+    expect(problems(ck({ kind: "at", at: "{{trigger.args.next}}", plusMin: -10 }))).toEqual([])
+    expect(problems(ck({ kind: "at", at: "2026-11-12T19:29" }))).toEqual([])
+    expect(problems(ck({ kind: "after", minutes: "{{trigger.args.left}}" }))).toEqual([])
+    expect(problems(ck({ kind: "at", at: "besok" }))[0]).toMatch(/deadline.at is a template or an ISO/)
+    expect(problems(ck({ kind: "after", minutes: "sejam" }))[0]).toMatch(/deadline.minutes is a number or a template/)
+    expect(problems(ck({ kind: "at", at: "{{vars.}}" })).some((x) => x.startsWith("steps[0].deadline.at:"))).toBe(true)
+  })
 })
 
 describe("tools and write calls", () => {

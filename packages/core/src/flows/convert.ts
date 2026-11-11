@@ -97,7 +97,10 @@ export function flowToRoutine(def: FlowDefinition): ParsedConfig | null {
   let action: ParsedConfig["action"]
   if (first.kind === "message") action = { kind: "message", text: back(first.text) }
   else if (first.kind === "checkin") {
-    if (first.deadline.kind === "after" && first.deadline.minutes > 2880) return null
+    // A routine only knows "next" and a fixed "after" up to two days.
+    const d = first.deadline
+    if (d.kind === "at" || (d.kind === "next" && d.plusMin) || (d.kind === "after" && (typeof d.minutes !== "number" || d.minutes > 2880))) return null
+    const deadline = d.kind === "after" ? { kind: "after" as const, minutes: d.minutes as number } : { kind: "next" as const }
     const labels = first.answers.map((a) => a.label).join(" / ")
     const backC = (t: string) => back(t).replaceAll(labels, "{{answers}}")
     action = {
@@ -105,7 +108,7 @@ export function flowToRoutine(def: FlowDefinition): ParsedConfig | null {
       text: backC(first.text),
       answers: first.answers.map((a) => ({ ...a, ...(a.reply ? { reply: back(a.reply) } : {}) })),
       followUp: { everyMin: first.followUp.everyMin, max: first.followUp.max, ...(first.followUp.text ? { text: backC(first.followUp.text) } : {}) },
-      deadline: first.deadline,
+      deadline,
       ...(first.missedText ? { missedText: backC(first.missedText) } : {}),
     }
   } else if (first.kind === "prompt") action = { kind: "prompt", prompt: first.prompt.replace(/\[(name|label|time|date|answers|n)\]/g, "{{$1}}") }

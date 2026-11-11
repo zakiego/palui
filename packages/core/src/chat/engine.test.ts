@@ -46,7 +46,10 @@ function modelChain(db: DB, ids: string[]) {
   setSetting(db, "modelRoles", { default: links, fast: links, vision: links })
 }
 
-async function basic(steps: Parameters<typeof scriptedModel>[0] = [], extra: { registry?: Record<string, import("../connectors/define").AnyRuntime>; rows?: Record<string, "tools" | "skill" | "memory" | "model" | "channel"> } = {}) {
+async function basic(
+  steps: Parameters<typeof scriptedModel>[0] = [],
+  extra: { registry?: Record<string, import("../connectors/define").AnyRuntime>; rows?: Record<string, "tools" | "skill" | "memory" | "model" | "channel">; turnTimeoutMs?: number } = {},
+) {
   const db = memoryDb()
   ownTelegram(db)
   modelChain(db, ["cliproxy"])
@@ -56,6 +59,7 @@ async function basic(steps: Parameters<typeof scriptedModel>[0] = [], extra: { r
     db,
     registry: { cliproxy: modelRuntime("cliproxy", () => m.model), telegram: channelRuntime("telegram", tg), ...(extra.registry ?? {}) },
     rows: { cliproxy: "model", telegram: "channel", ...(extra.rows ?? {}) },
+    turnTimeoutMs: extra.turnTimeoutMs,
   })
   return { ...h, tg, m }
 }
@@ -297,15 +301,73 @@ describe("turn", () => {
     setSetting(h.db, "budgets", { ...getSetting(h.db, "budgets"), maxSteps: 2 })
     await h.engine.inbound(tgMessage("hitung dong"))
     await h.engine.idle()
-    expect(calls).toBe(2)
+    // The last allowed step is told to answer with no tools. This model calls
+    // one anyway: it doesn't run, and the owner gets the limit notice.
+    expect(calls).toBe(1)
+    expect(h.m.choices).toEqual(["auto", "none"])
+    expect(promptText(h.m.prompts[1])).toContain("almost out of time or steps")
+    expect(promptText(h.m.prompts[0])).not.toContain("almost out of time or steps")
     const run = h.db.select().from(runs).get()!
-    expect(run).toMatchObject({ status: "ok", steps: 2, tokensIn: 20, tokensOut: 10, modelConnectorId: "cliproxy" })
+    expect(run).toMatchObject({ status: "error", steps: 2, tokensIn: 20, tokensOut: 10, modelConnectorId: "cliproxy" })
     const tc = h.db.select().from(toolCalls).all()
-    expect(tc.map((t) => [t.tool, t.connectorId, t.status])).toEqual([
-      ["alpha__add", "alpha", "ok"],
-      ["alpha__add", "alpha", "ok"],
-    ])
+    expect(tc.map((t) => [t.tool, t.connectorId, t.status])).toEqual([["alpha__add", "alpha", "ok"]])
     expect(tc[0]!.resultPreview).toBe('{"sum":3}')
+    const notice = outboxTexts(h.db).at(-1)!
+    expect(notice).toContain("kena batas 2 langkah")
+    expect(notice).toContain("Yang sempat jalan: add.")
+  })
+
+  it("the last allowed step answers with text", async () => {
+    const add = fnTool("add", (i) => ({ sum: Number(i.a) + Number(i.b) }))
+    const h = await basic([callTool("alpha__add", { a: 1, b: 2 }, "c1"), say("hasilnya 3")], {
+      registry: { alpha: toolsRuntime("alpha", () => ({ add: { tool: add, class: "read" } })) },
+      rows: { alpha: "tools" },
+    })
+    setSetting(h.db, "budgets", { ...getSetting(h.db, "budgets"), maxSteps: 2 })
+    await h.engine.inbound(tgMessage("hitung dong"))
+    await h.engine.idle()
+    expect(h.db.select().from(runs).get()).toMatchObject({ status: "ok", steps: 2 })
+    expect(outboxTexts(h.db)).toEqual(["hasilnya 3"])
+  })
+
+  it("asks for the reply early when the next step probably won't fit in the time left", async () => {
+    const look = fnTool("look", () => ({ ok: true }))
+    const slowCall = async () => {
+      await new Promise((r) => setTimeout(r, 450))
+      return callTool("alpha__look", {}, "c1")
+    }
+    const h = await basic([slowCall, say("ini yang udah aku cek")], {
+      registry: { alpha: toolsRuntime("alpha", () => ({ look: { tool: look, class: "read" } })) },
+      rows: { alpha: "tools" },
+      turnTimeoutMs: 1000,
+    })
+    await h.engine.inbound(tgMessage("cek dong"))
+    await h.engine.idle()
+    expect(h.m.choices).toEqual(["auto", "none"])
+    expect(h.db.select().from(runs).get()).toMatchObject({ status: "ok" })
+    expect(outboxTexts(h.db)).toEqual(["ini yang udah aku cek"])
+  })
+
+  it("tells the owner when a turn times out, and saves the notice for the next turn", async () => {
+    const look = fnTool("look", () => ({ ok: true }))
+    const hang = async () => {
+      await new Promise((r) => setTimeout(r, 600))
+      return say("telat")
+    }
+    const h = await basic([callTool("alpha__look", {}, "c1"), hang], {
+      registry: { alpha: toolsRuntime("alpha", () => ({ look: { tool: look, class: "read" } })) },
+      rows: { alpha: "tools" },
+      turnTimeoutMs: 300,
+    })
+    await h.engine.inbound(tgMessage("cek dong"))
+    await h.engine.idle()
+    expect(h.db.select().from(runs).get()).toMatchObject({ status: "aborted", error: "turn timed out" })
+    const notice = outboxTexts(h.db).at(-1)!
+    expect(notice).toContain("kepotong")
+    expect(notice).toContain("Yang sempat jalan: look.")
+    expect(notice).toContain("Belum ada yang diubah.")
+    const saved = h.db.select().from(messages).where(eq(messages.role, "assistant")).all()
+    expect(saved.map((m) => m.text)).toEqual([notice])
   })
 
   it("fails over to the next connector on 429 and on 5xx", async () => {

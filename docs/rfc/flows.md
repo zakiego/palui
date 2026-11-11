@@ -333,7 +333,10 @@ Same config as today's check-in action, plus branches:
 
 - The run goes to `waiting` with `wait = { kind: "checkin", stepId, followUps, nextFollowUpAt, deadlineAt, answers: [] }` and `wake_at` = the earlier of the next re-ask and the deadline.
 - Answers come in exactly as today: buttons `fl:<runId>:<answerId>`, a quoted reply that matches an answer, or the model calling `jawab_checkin` (open check-ins stay in the system prompt).
-- `deadline: next` means the next occurrence of the trigger that started the run. Only valid on a `schedule` trigger path, checked at save.
+- `deadline: next` means the next occurrence of the trigger that started the run. Only valid on a `schedule` trigger path, checked at save. `plusMin` shifts it (`{ "kind": "next", "plusMin": -10 }` is 10 minutes before).
+- `deadline: after` takes `minutes` as a number or a template that renders to one (`"{{vars.left}}"`).
+- `deadline: at` takes a computed time like `wait.until` (a template or an ISO date/datetime) plus an optional `plusMin`: `{ "kind": "at", "at": "{{steps.nextp.data.next.timestamp}}", "plusMin": -10 }`. A value that isn't a time goes through `onError`.
+- A deadline already past when the step is reached skips the ask: nothing is sent, the output has `missed: true, skipped: true`, and the run takes `onMissed` (or `next`).
 - Output: `{ answer, label, text, answeredAt, answers, followUps, missed }`. Then the `on.<answer>` branch, `onMissed`, or `next`.
 - A non-closing answer keeps the run waiting, as today.
 - Emits `checkin.answered` and `checkin.missed` events.

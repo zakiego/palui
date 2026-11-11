@@ -172,6 +172,14 @@ export function validateDefinition(raw: unknown, ctx: ValidateContext = {}): Val
         tpl(["followUp", "text"], s.followUp.text)
         tpl(["missedText"], s.missedText)
         s.answers.forEach((a, j) => tpl(["answers", j, "reply"], a.reply))
+        if (s.deadline.kind === "after" && typeof s.deadline.minutes === "string") {
+          if (!hasTemplate(s.deadline.minutes)) p(["steps", i, "deadline", "minutes"], 'deadline.minutes is a number or a template like "{{vars.left}}".')
+          tpl(["deadline", "minutes"], s.deadline.minutes)
+        }
+        if (s.deadline.kind === "at") {
+          if (!hasTemplate(s.deadline.at) && !/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}.*)?$/.test(s.deadline.at)) p(["steps", i, "deadline", "at"], "deadline.at is a template or an ISO date/datetime.")
+          tpl(["deadline", "at"], s.deadline.at)
+        }
         break
       case "wait":
         if ((s.minutes === undefined) === (s.until === undefined)) p(["steps", i], `Wait "${s.id}" needs exactly one of minutes or until.`)
@@ -241,7 +249,7 @@ export function validateDefinition(raw: unknown, ctx: ValidateContext = {}): Val
     if (s.kind !== "checkin" || s.deadline.kind !== "next") return
     const from = def.triggers.filter((t) => reachable(def, [t.start]).has(s.id))
     if (!from.length || from.some((t) => t.kind !== "schedule")) {
-      p(["steps", i, "deadline"], `Check-in "${s.id}" uses deadline "next", which only works when every trigger reaching it is a schedule. Use {kind:"after", minutes:N}.`)
+      p(["steps", i, "deadline"], `Check-in "${s.id}" uses deadline "next", which only works when every trigger reaching it is a schedule. Use {kind:"after", minutes:N} or {kind:"at", at:"<template>", plusMin?}.`)
     }
   })
 
