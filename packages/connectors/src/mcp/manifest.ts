@@ -29,9 +29,9 @@ export default defineManifest({
   secrets: { token: z.string().min(1).optional() },
   setup: [
     { field: "url", label: "Server URL", placeholder: "https://example.com/api/mcp", help: "Streamable HTTP endpoint. SSE-only servers aren't supported." },
-    { field: "authMode", label: "Auth", help: "none, bearer (Authorization: Bearer <token>) or header (a custom header)" },
-    { field: "headerName", label: "Header name", optional: true, placeholder: "x-api-key", help: "Only for the custom header mode" },
-    { field: "token", label: "Token", secret: true, optional: true },
+    { field: "authMode", label: "Auth", askFirst: true, help: "bearer sends Authorization: Bearer <token>. header sends the token in a header you name." },
+    { field: "headerName", label: "Header name", askFirst: true, placeholder: "x-api-key", showIf: { field: "authMode", in: ["header"] } },
+    { field: "token", label: "Token", secret: true, optional: true, askFirst: true, showIf: { field: "authMode", in: ["bearer", "header"] } },
     { action: "listTools", label: "Pick which tools Palui may use", help: "Read-only tools are prefilled as read, the rest as write or destructive from the server's hints." },
   ],
   presets: [

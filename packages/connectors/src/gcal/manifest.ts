@@ -20,9 +20,15 @@ export default defineManifest({
     refreshToken: z.string().min(10).optional(),
   },
   setup: [
-    { field: "clientId", label: "OAuth client ID", placeholder: "1234-abc.apps.googleusercontent.com", help: "Google Cloud Console, APIs and Services, Credentials. Type: Web application." },
+    {
+      field: "clientId",
+      label: "OAuth client ID",
+      placeholder: "1234-abc.apps.googleusercontent.com",
+      help: "In Google Cloud Console, Credentials, make a Web application client with this redirect URI, then paste its ID.",
+      command: "{appUrl}/api/oauth/google/callback",
+    },
     { field: "clientSecret", label: "OAuth client secret", secret: true },
-    { action: "oauth", label: "Connect with Google", help: "Redirect URI to register: <APP_URL>/api/oauth/google/callback" },
+    { action: "oauth", label: "Connect with Google" },
   ],
   trust: "own",
   removeWarning: "This deletes the Google tokens from Palui. To revoke access fully, also remove Palui at myaccount.google.com/permissions.",

@@ -17,7 +17,7 @@ export default defineManifest({
   }),
   secrets: { botToken: z.string().regex(/^\d+:[\w-]{30,}$/, "That doesn't look like a bot token from @BotFather (123456789:AA...).") },
   setup: [
-    { field: "botToken", label: "Bot token", help: "From @BotFather, /newbot", secret: true, placeholder: "123456789:AA..." },
+    { field: "botToken", label: "Bot token", help: "Send this to @BotFather in Telegram, then paste the token it gives you.", command: "/newbot", secret: true, placeholder: "123456789:AA..." },
     { action: "claimOwner", label: "Open the link and press Start" },
   ],
   removeWarning: "This deletes the bot token from Palui. The bot stops answering until you connect it again. The bot itself stays in @BotFather.",
