@@ -39,7 +39,7 @@ import { authClient, passkeyCancelled } from "@/lib/auth-client"
 import { removePasskey } from "@/lib/fns/session"
 import { createHookFn, getSettingsPage, saveSettings } from "@/lib/fns/settings"
 import { ago, errorMessage, fullDate } from "@/lib/format"
-import { useT } from "@/lib/i18n"
+import { useLabel, useT } from "@/lib/i18n"
 
 const TABS = ["general", "models", "limits", "security", "hooks"] as const
 
@@ -57,12 +57,13 @@ type SaveInput = Parameters<typeof saveSettings>[0]["data"]
 
 function useSave() {
   const router = useRouter()
+  const t = useT()
   const [busy, setBusy] = React.useState(false)
-  const save = async (patch: SaveInput, okText = "Saved") => {
+  const save = async (patch: SaveInput) => {
     setBusy(true)
     try {
       await saveSettings({ data: patch })
-      toast.success(okText)
+      toast.success(t("common.saved"))
       await router.invalidate()
       return true
     } catch (err) {
@@ -87,11 +88,11 @@ function SettingsPage() {
       <Tabs value={tab} onValueChange={(v) => void navigate({ search: { tab: v as (typeof TABS)[number] }, replace: true })} className="gap-4">
         <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
           <TabsList>
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="models">Models</TabsTrigger>
-            <TabsTrigger value="limits">Limits</TabsTrigger>
-            <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="hooks">Hooks</TabsTrigger>
+            <TabsTrigger value="general">{t("settings.tab.general")}</TabsTrigger>
+            <TabsTrigger value="models">{t("settings.tab.models")}</TabsTrigger>
+            <TabsTrigger value="limits">{t("settings.tab.limits")}</TabsTrigger>
+            <TabsTrigger value="security">{t("settings.tab.security")}</TabsTrigger>
+            <TabsTrigger value="hooks">{t("settings.tab.hooks")}</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="general" keepMounted>
@@ -126,6 +127,7 @@ function GeneralTab({ data }: { data: Data }) {
   // Filled after mount so the server and client markup match during hydration.
   const [zones, setZones] = React.useState<string[]>([])
   const timezoneRef = React.useRef<HTMLInputElement>(null)
+  const t = useT()
   const { busy, save } = useSave()
   React.useEffect(() => {
     try {
@@ -141,7 +143,7 @@ function GeneralTab({ data }: { data: Data }) {
       if (!tz) throw new RangeError("empty time zone")
       new Intl.DateTimeFormat("en", { timeZone: tz })
     } catch {
-      setTimezoneError("Use an IANA zone like Asia/Makassar.")
+      setTimezoneError(t("settings.tz.invalid"))
       timezoneRef.current?.focus()
       return
     }
@@ -150,21 +152,22 @@ function GeneralTab({ data }: { data: Data }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>How Palui talks</CardTitle>
-        <CardDescription>The persona goes at the top of every turn.</CardDescription>
+        <CardTitle>{t("settings.general.title")}</CardTitle>
+        <CardDescription>{t("settings.general.body")}</CardDescription>
       </CardHeader>
       <CardContent>
         <FieldGroup>
           <Field>
-            <FieldLabel htmlFor="persona">Persona</FieldLabel>
-            <Textarea id="persona" rows={8} maxLength={8000} value={persona} onChange={(e) => setPersona(e.target.value)} />
+            <FieldLabel htmlFor="persona">{t("settings.persona")}</FieldLabel>
+            {/* It grows with its text up to half the screen, then scrolls, so Save stays in reach. */}
+            <Textarea id="persona" rows={8} maxLength={8000} className="max-h-[50svh]" value={persona} onChange={(e) => setPersona(e.target.value)} />
             <FieldDescription>
-              <span className="tabular-nums">{persona.length.toLocaleString()}</span> of 8,000 characters.
+              <span className="tabular-nums">{t("settings.persona.count", { n: persona.length.toLocaleString("en") })}</span>
             </FieldDescription>
           </Field>
           <div className="grid grid-cols-1 gap-4 @2xl/main:grid-cols-2">
             <Field data-invalid={timezoneError ? true : undefined}>
-              <FieldLabel htmlFor="timezone">Time zone</FieldLabel>
+              <FieldLabel htmlFor="timezone">{t("jobs.field.tz")}</FieldLabel>
               <Input
                 ref={timezoneRef}
                 id="timezone"
@@ -188,24 +191,24 @@ function GeneralTab({ data }: { data: Data }) {
                 ))}
               </datalist>
               {timezoneError && <FieldError id="timezone-error" role={undefined}>{timezoneError}</FieldError>}
-              <FieldDescription id="timezone-help">IANA name. New reminders and "today" use it.</FieldDescription>
+              <FieldDescription id="timezone-help">{t("settings.tz.help")}</FieldDescription>
             </Field>
             <Field>
-              <FieldLabel htmlFor="language">Bot language</FieldLabel>
+              <FieldLabel htmlFor="language">{t("settings.language")}</FieldLabel>
               <SimpleSelect
                 id="language"
                 className="w-full"
                 value={language}
                 options={[
-                  { value: "auto", label: "Casual Indonesian, English when I write English" },
-                  { value: "id", label: "Always Indonesian" },
-                  { value: "en", label: "Always English" },
+                  { value: "auto", label: t("settings.language.auto") },
+                  { value: "id", label: t("settings.language.id") },
+                  { value: "en", label: t("settings.language.en") },
                 ]}
                 onChange={(v) => setLanguage(v as typeof language)}
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="ui-language">Dashboard language</FieldLabel>
+              <FieldLabel htmlFor="ui-language">{t("settings.uiLanguage")}</FieldLabel>
               <SimpleSelect
                 id="ui-language"
                 className="w-full"
@@ -218,7 +221,7 @@ function GeneralTab({ data }: { data: Data }) {
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="fallback">Fallback channel</FieldLabel>
+              <FieldLabel htmlFor="fallback">{t("settings.fallback")}</FieldLabel>
               <SimpleSelect
                 id="fallback"
                 className="w-full"
@@ -226,11 +229,11 @@ function GeneralTab({ data }: { data: Data }) {
                 options={[
                   { value: "telegram", label: "Telegram" },
                   { value: "whatsapp", label: "WhatsApp" },
-                  { value: "none", label: "None" },
+                  { value: "none", label: t("settings.fallback.none") },
                 ]}
                 onChange={(v) => setFallback(v as typeof fallback)}
               />
-              <FieldDescription>Where a reminder goes after two failed sends.</FieldDescription>
+              <FieldDescription>{t("settings.fallback.help")}</FieldDescription>
             </Field>
           </div>
         </FieldGroup>
@@ -238,7 +241,7 @@ function GeneralTab({ data }: { data: Data }) {
       <CardFooter className="justify-end border-t">
         <Button disabled={busy} onClick={submit}>
           {busy && <Spinner data-icon="inline-start" />}
-          Save
+          {t("common.save")}
         </Button>
       </CardFooter>
     </Card>
@@ -247,11 +250,7 @@ function GeneralTab({ data }: { data: Data }) {
 
 type Role = "default" | "fast" | "vision"
 const ROLES: Role[] = ["default", "fast", "vision"]
-const ROLE_HELP: Record<Role, string> = {
-  default: "Every normal turn.",
-  fast: "Titles, summaries, reminder parsing.",
-  vision: "Messages with photos.",
-}
+const ROLE_HELP = { default: "settings.role.default", fast: "settings.role.fast", vision: "settings.role.vision" } as const
 
 type ChainLink = { connectorId: string; model: string }
 // `key` is client only: it lets a row's DOM node, and focus, follow its item on reorder.
@@ -266,6 +265,7 @@ function ModelsTab({ data }: { data: Data }) {
     const r = data.settings.modelRoles
     return { default: withKeys(r.default), fast: withKeys(r.fast), vision: withKeys(r.vision) }
   })
+  const t = useT()
   const { busy, save } = useSave()
   const options = data.models.map((m) => ({ value: m.id, label: m.label }))
   const known = new Set(options.map((o) => o.value))
@@ -283,14 +283,14 @@ function ModelsTab({ data }: { data: Data }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Model roles</CardTitle>
-        <CardDescription>Each role tries its chain top to bottom. On a 5xx, a 429 or a quota error, the next one takes over.</CardDescription>
+        <CardTitle>{t("settings.models.title")}</CardTitle>
+        <CardDescription>{t("settings.models.body")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         {options.length === 0 && (
           <Alert>
-            <AlertTitle>No model connectors yet</AlertTitle>
-            <AlertDescription>Add CLIProxyAPI or ai-gateway on the Connectors page. Chains below keep their ids until then.</AlertDescription>
+            <AlertTitle>{t("settings.models.none")}</AlertTitle>
+            <AlertDescription>{t("settings.models.noneBody")}</AlertDescription>
           </Alert>
         )}
         {ROLES.map((role) => {
@@ -300,7 +300,7 @@ function ModelsTab({ data }: { data: Data }) {
               <FieldLegend variant="label" className="font-mono">
                 {role}
               </FieldLegend>
-              <FieldDescription>{ROLE_HELP[role]}</FieldDescription>
+              <FieldDescription>{t(ROLE_HELP[role])}</FieldDescription>
               <ol className="flex flex-col gap-2">
                 {chain.map((link, i) => {
                   const missing = !known.has(link.connectorId)
@@ -311,17 +311,19 @@ function ModelsTab({ data }: { data: Data }) {
                     <li key={link.key} className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-2 @2xl/main:grid-cols-[1.25rem_11rem_minmax(0,1fr)_auto]">
                       <span className="font-mono text-caption text-muted-foreground tabular-nums">{i + 1}.</span>
                       <SimpleSelect
-                        aria-label={`${role} step ${i + 1} connector`}
+                        aria-label={t("settings.models.stepConnector", { role, n: i + 1 })}
                         aria-invalid={missing}
                         aria-describedby={showMissing ? missingId : undefined}
                         className="col-span-2 w-full @2xl/main:col-span-1"
                         value={link.connectorId}
-                        options={missing ? [{ value: link.connectorId, label: `${link.connectorId} (missing)` }, ...options] : options}
+                        options={missing ? [{ value: link.connectorId, label: t("settings.models.missing", { id: link.connectorId }) }, ...options] : options}
                         onChange={(v) => setChain(role, chain.map((x, j) => (j === i ? { ...x, connectorId: v } : x)))}
                       />
                       <Input
-                        aria-label={`${role} step ${i + 1} model`}
+                        aria-label={t("settings.models.stepModel", { role, n: i + 1 })}
                         className="col-start-2 font-mono @2xl/main:col-start-auto"
+                        maxLength={120}
+                        title={link.model}
                         spellCheck={false}
                         autoCapitalize="none"
                         autoCorrect="off"
@@ -330,17 +332,17 @@ function ModelsTab({ data }: { data: Data }) {
                         onChange={(e) => setChain(role, chain.map((x, j) => (j === i ? { ...x, model: e.target.value } : x)))}
                       />
                       <DropdownMenu>
-                        <DropdownMenuTrigger data-chain-actions={link.key} render={<Button variant="ghost" size="icon" aria-label={`Actions for ${role} step ${i + 1}`} />}>
+                        <DropdownMenuTrigger data-chain-actions={link.key} render={<Button variant="ghost" size="icon" aria-label={t("settings.models.stepActions", { role, n: i + 1 })} />}>
                           <EllipsisIcon aria-hidden="true" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-auto min-w-40">
                           <DropdownMenuItem className="pointer-coarse:py-2.5" disabled={i === 0} onClick={() => setChain(role, swap(chain, i, i - 1))}>
                             <ArrowUpIcon aria-hidden="true" />
-                            Move up
+                            {t("settings.models.up")}
                           </DropdownMenuItem>
                           <DropdownMenuItem className="pointer-coarse:py-2.5" disabled={i === chain.length - 1} onClick={() => setChain(role, swap(chain, i, i + 1))}>
                             <ArrowDownIcon aria-hidden="true" />
-                            Move down
+                            {t("settings.models.down")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -353,7 +355,7 @@ function ModelsTab({ data }: { data: Data }) {
                             }}
                           >
                             <TrashIcon aria-hidden="true" />
-                            Remove
+                            {t("connectors.remove")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -361,9 +363,9 @@ function ModelsTab({ data }: { data: Data }) {
                         <p id={missingId} className="col-span-2 col-start-2 flex items-start gap-1.5 text-caption text-destructive-fg @2xl/main:col-span-3">
                           <CircleAlertIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
                           <span className="min-w-0 break-words">
-                            {link.connectorId} isn't set up. Pick another connector, or add it in{" "}
+                            {t("settings.models.notSetUp", { id: link.connectorId })}{" "}
                             <Link to="/connectors" className="underline underline-offset-2">
-                              Connectors
+                              {t("nav.connectors")}
                             </Link>
                             .
                           </span>
@@ -381,7 +383,7 @@ function ModelsTab({ data }: { data: Data }) {
                 onClick={() => setChain(role, [...chain, { key: newKey(), connectorId: options[0]?.value ?? "ai-gateway", model: chain.at(-1)?.model ?? "" }])}
               >
                 <PlusIcon data-icon="inline-start" />
-                Add fallback
+                {t("settings.models.add")}
               </Button>
             </FieldSet>
           )
@@ -392,12 +394,12 @@ function ModelsTab({ data }: { data: Data }) {
           disabled={busy}
           onClick={() => {
             const bad = ROLES.find((r) => roles[r].some((x) => !x.model.trim()))
-            if (bad) return toast.error(`Fill in every model id in the ${bad} chain.`)
+            if (bad) return toast.error(t("settings.models.fillIn", { role: bad }))
             void save({ modelRoles: { default: stripKeys(roles.default), fast: stripKeys(roles.fast), vision: stripKeys(roles.vision) } })
           }}
         >
           {busy && <Spinner data-icon="inline-start" />}
-          Save
+          {t("common.save")}
         </Button>
       </CardFooter>
     </Card>
@@ -419,6 +421,7 @@ function LimitsTab({ data }: { data: Data }) {
     dailyTokenCap: String(b.dailyTokenCap),
     maxRunsPerHour: String(b.maxRunsPerHour),
   })
+  const t = useT()
   const { busy, save } = useSave()
   const field = (key: keyof typeof form, label: string, help: string, min: number, max: number) => (
     <Field>
@@ -430,16 +433,16 @@ function LimitsTab({ data }: { data: Data }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Budgets</CardTitle>
-        <CardDescription>Hitting a cap pauses turns and tells you on the channel. Plain reminders and commands keep working.</CardDescription>
+        <CardTitle>{t("settings.limits.title")}</CardTitle>
+        <CardDescription>{t("settings.limits.body")}</CardDescription>
       </CardHeader>
       <CardContent>
         <FieldGroup className="grid grid-cols-1 gap-4 @2xl/main:grid-cols-2">
-          {field("maxSteps", "Steps per turn", "Tool calls and replies in one turn. 1 to 50.", 1, 50)}
-          {field("turnTimeoutS", "Turn time limit (seconds)", "10 to 600.", 10, 600)}
-          {field("maxTools", "Tools per turn", "The most relevant connectors go first. 1 to 128.", 1, 128)}
-          {field("dailyTokenCap", "Daily token cap", "Across every chat and job.", 10_000, 100_000_000)}
-          {field("maxRunsPerHour", "Runs per hour", "1 to 1,000.", 1, 1000)}
+          {field("maxSteps", t("settings.limits.maxSteps"), t("settings.limits.maxStepsHelp"), 1, 50)}
+          {field("turnTimeoutS", t("settings.limits.turnTimeoutS"), t("settings.limits.turnTimeoutSHelp"), 10, 600)}
+          {field("maxTools", t("settings.limits.maxTools"), t("settings.limits.maxToolsHelp"), 1, 128)}
+          {field("dailyTokenCap", t("settings.limits.dailyTokenCap"), t("settings.limits.dailyTokenCapHelp"), 10_000, 100_000_000)}
+          {field("maxRunsPerHour", t("settings.limits.maxRunsPerHour"), t("settings.limits.maxRunsPerHourHelp"), 1, 1000)}
         </FieldGroup>
       </CardContent>
       <CardFooter className="justify-end border-t">
@@ -458,7 +461,7 @@ function LimitsTab({ data }: { data: Data }) {
           }
         >
           {busy && <Spinner data-icon="inline-start" />}
-          Save
+          {t("common.save")}
         </Button>
       </CardFooter>
     </Card>
@@ -467,16 +470,17 @@ function LimitsTab({ data }: { data: Data }) {
 
 function PasskeysCard({ passkeys }: { passkeys: Data["passkeys"] }) {
   const router = useRouter()
+  const t = useT()
   const [adding, setAdding] = React.useState(false)
   const add = async () => {
     setAdding(true)
     try {
       const res = await authClient.passkey.addPasskey({ name: `Added ${new Date().toISOString().slice(0, 10)}` })
       if (res?.error) {
-        if (!passkeyCancelled(res.error)) toast.error(res.error.message ?? "That passkey couldn't be saved.")
+        if (!passkeyCancelled(res.error)) toast.error(res.error.message ?? t("settings.passkeys.failed"))
         return
       }
-      toast.success("Passkey added")
+      toast.success(t("invite.passkeyAdded"))
       void router.invalidate()
     } catch (err) {
       if (!passkeyCancelled({ message: errorMessage(err) })) toast.error(errorMessage(err))
@@ -487,7 +491,7 @@ function PasskeysCard({ passkeys }: { passkeys: Data["passkeys"] }) {
   const remove = async (id: string) => {
     try {
       await removePasskey({ data: { id } })
-      toast.success("Passkey removed")
+      toast.success(t("settings.passkeys.removed"))
       void router.invalidate()
     } catch (err) {
       toast.error(errorMessage(err))
@@ -496,12 +500,12 @@ function PasskeysCard({ passkeys }: { passkeys: Data["passkeys"] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Passkeys</CardTitle>
-        <CardDescription>The only way into this dashboard. Lost them all? Run palui owner invite on the server.</CardDescription>
+        <CardTitle>{t("settings.passkeys.title")}</CardTitle>
+        <CardDescription>{t("settings.passkeys.body")}</CardDescription>
         <CardAction>
           <Button variant="outline" size="sm" disabled={adding} onClick={() => void add()}>
             {adding ? <Spinner data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}
-            Add passkey
+            {t("invite.passkeyAdd")}
           </Button>
         </CardAction>
       </CardHeader>
@@ -512,50 +516,57 @@ function PasskeysCard({ passkeys }: { passkeys: Data["passkeys"] }) {
               <EmptyMedia variant="icon">
                 <FingerprintIcon />
               </EmptyMedia>
-              <EmptyTitle>No passkey yet</EmptyTitle>
-              <EmptyDescription>Add one now, or you'll need a new owner link to get back in.</EmptyDescription>
+              <EmptyTitle>{t("settings.passkeys.empty")}</EmptyTitle>
+              <EmptyDescription>{t("settings.passkeys.emptyBody")}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : (
           <ItemGroup className="gap-0">
-            {passkeys.map((p) => (
+            {passkeys.map((p) => {
+              // A name of only spaces is no name: it would leave a blank row.
+              const name = p.name?.trim() || t("settings.passkeys.unnamed")
+              return (
               <Item key={p.id} size="sm" className="px-0">
                 <ItemMedia variant="icon">
                   <FingerprintIcon aria-hidden="true" />
                 </ItemMedia>
                 <ItemContent className="min-w-0">
-                  <ItemTitle className="w-full min-w-0">
-                    <span className="truncate">{p.name || "Passkey"}</span>
+                  {/* Wraps instead of truncating: two keys that share a long prefix differ at the end. */}
+                  <ItemTitle className="line-clamp-none w-full min-w-0">
+                    <span dir="auto" className="min-w-0 text-left [overflow-wrap:anywhere]">
+                      {name}
+                    </span>
                   </ItemTitle>
                   <ItemDescription>
-                    {p.deviceType === "multiDevice" ? "Synced" : "This device only"}
-                    {p.createdAt ? ` · added ${ago(p.createdAt)}` : ""}
+                    {p.deviceType === "multiDevice" ? t("settings.passkeys.synced") : t("settings.passkeys.deviceOnly")}
+                    {p.createdAt ? ` · ${t("settings.passkeys.added", { time: ago(p.createdAt) })}` : ""}
                   </ItemDescription>
                 </ItemContent>
                 <ItemActions>
                   <AlertDialog>
-                    <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Remove ${p.name || "passkey"}`} disabled={passkeys.length <= 1} />}>
+                    <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t("settings.passkeys.remove", { name })} disabled={passkeys.length <= 1} />}>
                       <TrashIcon aria-hidden="true" />
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Remove this passkey?</AlertDialogTitle>
-                        <AlertDialogDescription>That device can't sign in to Palui anymore.</AlertDialogDescription>
+                        <AlertDialogTitle>{t("settings.passkeys.removeTitle")}</AlertDialogTitle>
+                        <AlertDialogDescription>{t("settings.passkeys.removeBody")}</AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Keep it</AlertDialogCancel>
+                        <AlertDialogCancel>{t("common.keep")}</AlertDialogCancel>
                         <AlertDialogAction variant="danger" onClick={() => void remove(p.id)}>
-                          Remove
+                          {t("connectors.remove")}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
                 </ItemActions>
               </Item>
-            ))}
+              )
+            })}
           </ItemGroup>
         )}
-        {passkeys.length === 1 && <p className="mt-3 text-caption text-muted-foreground">Add a second passkey before you can remove this one.</p>}
+        {passkeys.length === 1 && <p className="mt-3 text-caption text-muted-foreground">{t("settings.passkeys.lastOne")}</p>}
       </CardContent>
     </Card>
   )
@@ -563,11 +574,12 @@ function PasskeysCard({ passkeys }: { passkeys: Data["passkeys"] }) {
 
 function BackupCard({ backup }: { backup: Data["backup"] }) {
   const stale = backup ? Date.now() - backup.at > 7 * 86_400_000 : true
+  const t = useT()
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Backups</CardTitle>
-        <CardDescription>deploy.sh snapshots the database before each deploy and keeps 3.</CardDescription>
+        <CardTitle>{t("settings.backups.title")}</CardTitle>
+        <CardDescription>{t("settings.backups.body")}</CardDescription>
       </CardHeader>
       <CardContent>
         {backup ? (
@@ -577,19 +589,21 @@ function BackupCard({ backup }: { backup: Data["backup"] }) {
             </ItemMedia>
             <ItemContent className="min-w-0">
               <ItemTitle className="w-full min-w-0">
-                <span className="truncate font-mono text-caption">{backup.file}</span>
+                <span className="truncate font-mono text-caption" title={backup.file}>
+                  {backup.file}
+                </span>
               </ItemTitle>
               <ItemDescription>
                 {fullDate(backup.at)} · {(backup.bytes / 1_048_576).toFixed(1)} MB
               </ItemDescription>
             </ItemContent>
-            <ItemActions>{stale ? <Badge variant="warning">over a week old</Badge> : <Badge variant="success">recent</Badge>}</ItemActions>
+            <ItemActions>{stale ? <Badge variant="warning">{t("settings.backups.stale")}</Badge> : <Badge variant="success">{t("settings.backups.recent")}</Badge>}</ItemActions>
           </Item>
         ) : (
           <Alert>
-            <AlertTitle>No backup found</AlertTitle>
+            <AlertTitle>{t("settings.backups.none")}</AlertTitle>
             <AlertDescription>
-              Nothing in <code>/data/backups</code> yet. Make one with <code>docker compose exec app palui backup /data/backups/palui.db.gz</code>.
+              {t("settings.backups.noneIn")} <code>/data/backups</code>. {t("settings.backups.noneMake")} <code className="break-all">docker compose exec app palui backup /data/backups/palui.db.gz</code>.
             </AlertDescription>
           </Alert>
         )}
@@ -606,7 +620,10 @@ function HooksCard({ data }: { data: Data }) {
   const [mode, setMode] = React.useState<"forward" | "summarize">("forward")
   const [busy, setBusy] = React.useState(false)
   const [created, setCreated] = React.useState<{ url: string; secret: string } | null>(null)
-  const chatTitle = (id: string) => data.chats.find((c) => c.id === id)?.title ?? id
+  const t = useT()
+  const label = useLabel()
+  // A hook can outlive its chat: say so instead of showing the chat's id.
+  const chatTitle = (id: string) => data.chats.find((c) => c.id === id)?.title ?? t("runs.deletedChat")
 
   const create = async () => {
     setBusy(true)
@@ -624,12 +641,12 @@ function HooksCard({ data }: { data: Data }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Inbound hooks</CardTitle>
-        <CardDescription>Other services POST to a hook; Palui forwards it to a chat. Hook text is untrusted: summaries run with zero tools.</CardDescription>
+        <CardTitle>{t("settings.hooks.title")}</CardTitle>
+        <CardDescription>{t("settings.hooks.body")}</CardDescription>
         <CardAction>
           <Button variant="outline" size="sm" onClick={() => (setCreated(null), setName(""), setOpen(true))} disabled={!data.chats.length}>
             <PlusIcon data-icon="inline-start" />
-            New hook
+            {t("settings.hooks.new")}
           </Button>
         </CardAction>
       </CardHeader>
@@ -640,8 +657,8 @@ function HooksCard({ data }: { data: Data }) {
               <EmptyMedia variant="icon">
                 <WebhookIcon />
               </EmptyMedia>
-              <EmptyTitle>No hooks yet</EmptyTitle>
-              <EmptyDescription>{data.chats.length ? "Make one for deploy notices, form submissions or alerts." : "Open a chat first: a hook needs somewhere to post."}</EmptyDescription>
+              <EmptyTitle>{t("settings.hooks.empty")}</EmptyTitle>
+              <EmptyDescription>{data.chats.length ? t("settings.hooks.emptyBody") : t("settings.hooks.emptyNoChat")}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : (
@@ -649,17 +666,21 @@ function HooksCard({ data }: { data: Data }) {
             {data.hooks.map((h) => (
               <Item key={h.id} size="sm" className="px-0">
                 <ItemContent className="min-w-0">
-                  <ItemTitle className="w-full min-w-0">
-                    <span className="truncate">{h.name}</span>
-                    <Badge variant="outline">{h.mode}</Badge>
+                  {/* The name wraps (60 characters at most), so it reads in full beside a narrow Copy button. */}
+                  <ItemTitle className="line-clamp-none w-full min-w-0 flex-wrap">
+                    <span dir="auto" className="min-w-0 text-left [overflow-wrap:anywhere]">
+                      {h.name}
+                    </span>
+                    <Badge variant="outline">{label("hook.mode", h.mode)}</Badge>
+                    {!h.enabled && <Badge variant="secondary">{t("settings.hooks.off")}</Badge>}
                   </ItemTitle>
                   <ItemDescription className="font-mono break-all">{`${data.appUrl}/api/hooks/${h.slug}`}</ItemDescription>
-                  <ItemDescription>
-                    To {chatTitle(h.chatId)} · {h.lastAt ? `last ${ago(h.lastAt)}` : "never called"}
+                  <ItemDescription dir="auto" className="text-left break-words" title={chatTitle(h.chatId)}>
+                    {t("settings.hooks.to", { chat: chatTitle(h.chatId) })} · {h.lastAt ? t("settings.hooks.last", { time: ago(h.lastAt) }) : t("settings.hooks.never")}
                   </ItemDescription>
                 </ItemContent>
                 <ItemActions>
-                  <CopyButton text={`${data.appUrl}/api/hooks/${h.slug}`} label="Copy URL" size="sm" variant="ghost" />
+                  <CopyButton text={`${data.appUrl}/api/hooks/${h.slug}`} label={t("settings.hooks.copyUrl")} size="sm" variant="ghost" />
                 </ItemActions>
               </Item>
             ))}
@@ -670,8 +691,8 @@ function HooksCard({ data }: { data: Data }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{created ? "Hook created" : "New hook"}</DialogTitle>
-            <DialogDescription>{created ? "Copy the secret now. You won't see it again." : "Requests carry x-palui-timestamp and an HMAC-SHA256 signature over the timestamp and raw body, made with the hook's secret."}</DialogDescription>
+            <DialogTitle>{created ? t("settings.hooks.created") : t("settings.hooks.new")}</DialogTitle>
+            <DialogDescription>{created ? t("settings.hooks.createdBody") : t("settings.hooks.newBody")}</DialogDescription>
           </DialogHeader>
           {created ? (
             <FieldGroup>
@@ -700,22 +721,22 @@ function HooksCard({ data }: { data: Data }) {
             >
               <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="hook-name">Name</FieldLabel>
+                  <FieldLabel htmlFor="hook-name">{t("connectors.field.name")}</FieldLabel>
                   <Input id="hook-name" autoFocus maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="GitHub deploys" />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="hook-chat">Post to</FieldLabel>
+                  <FieldLabel htmlFor="hook-chat">{t("settings.hooks.postTo")}</FieldLabel>
                   <SimpleSelect id="hook-chat" className="w-full" value={chatId} options={data.chats.map((c) => ({ value: c.id, label: `${c.title} (${c.channel})` }))} onChange={setChatId} />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="hook-mode">Mode</FieldLabel>
+                  <FieldLabel htmlFor="hook-mode">{t("settings.hooks.mode")}</FieldLabel>
                   <SimpleSelect
                     id="hook-mode"
                     className="w-full"
                     value={mode}
                     options={[
-                      { value: "forward", label: "Forward the text as is (no model)" },
-                      { value: "summarize", label: "Summarize it (a turn with zero tools)" },
+                      { value: "forward", label: t("settings.hooks.modeForward") },
+                      { value: "summarize", label: t("settings.hooks.modeSummarize") },
                     ]}
                     onChange={(v) => setMode(v as typeof mode)}
                   />
@@ -725,15 +746,15 @@ function HooksCard({ data }: { data: Data }) {
           )}
           <DialogFooter>
             {created ? (
-              <Button onClick={() => setOpen(false)}>Done</Button>
+              <Button onClick={() => setOpen(false)}>{t("settings.hooks.done")}</Button>
             ) : (
               <>
                 <Button variant="outline" onClick={() => setOpen(false)}>
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button type="submit" form="new-hook" disabled={busy || !name.trim() || !chatId}>
                   {busy && <Spinner data-icon="inline-start" />}
-                  Create hook
+                  {t("settings.hooks.create")}
                 </Button>
               </>
             )}
