@@ -103,7 +103,19 @@ export function jobOverCap(db: DB, jobId: string, cap: number, now = Date.now(),
   return getUsage(db, usageKeys.job(jobId, now, tz)) >= cap
 }
 
-// After a run: add tokens to the global daily counter. The job runner adds the
+// Tokens read from the prompt cache cost about a tenth of fresh input, so they
+// count for a tenth against the daily caps.
+export const CACHE_READ_WEIGHT = 0.1
+
+// What a model call adds to the daily counters (global, agent and job). Fresh
+// input, input written to the cache and output count in full; input read from
+// the cache counts at CACHE_READ_WEIGHT. `tokensIn` is all input, cached or not.
+export function budgetTokens(u: { tokensIn: number; tokensOut: number; tokensCached?: number | null }): number {
+  const cached = Math.min(Math.max(u.tokensCached ?? 0, 0), Math.max(u.tokensIn, 0))
+  return u.tokensIn - cached + Math.round(cached * CACHE_READ_WEIGHT) + u.tokensOut
+}
+
+// After a run: add tokens (weighted, see budgetTokens) to the global daily counter. The job runner adds the
 // same tokens to the per-job counter, so this never writes it (no double count).
 export function recordRunTokens(db: DB, tokens: number, _jobId: string | undefined, now = Date.now()): void {
   const tz = getSetting(db, "timezone")

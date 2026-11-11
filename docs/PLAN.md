@@ -234,6 +234,7 @@ CLIProxyAPI
 - Roles: `default` (turns), `fast` (titles, summaries, reminder parsing), `vision`.
 - Failover per role: on 5xx, 429 or a quota error, try the next connector in the chain.
 - Caching: with `routing.strategy: round-robin` across 4 Claude accounts, prompt caching mostly misses. D8 decides whether to change CLIProxyAPI's strategy (it's shared with other tools on the mini). M0 measures tokens per turn under both.
+- Prompt cache layout: a provider reuses a prompt only up to its first changed byte, so a turn is built stable first. The system prompt holds no clock, recall or check-ins and repeats byte for byte between turns; the session summary is a second system block; the history window drops its oldest messages ten at a time. What changes every turn (now, open check-ins, recall) rides in a `[Palui context]` block at the end of the newest user message and is not stored. On the anthropic protocol three breakpoints are set: the stable system block and the newest user message (1 hour, since chat messages are often more than 5 minutes apart and a read restarts the clock), and the last tool result from a turn's second step on (5 minutes, it is only read seconds later). The openai protocol gets the same layout and no breakpoints. CLIProxyAPI moves the caller's system prompt behind the first user message, so the second turn of a new session misses once.
 
 ai-gateway
 - Same shape, `zkg_` key. The fallback in every chain.
@@ -241,6 +242,7 @@ ai-gateway
 Budget
 - Per turn: 12 steps, 120 s wall clock, about 64 tools loaded up front. Past that, tool search takes over: tools loaded earlier in the session go first, then skills, memory and the rest, one slot goes to `palui__cari_tool`, and every other enabled tool is named in the capability list and loaded on demand by keyword or exact name. Loaded tools join the active set from the next step and stay for the session (`sessions.loaded_tools`, 20 most recent).
 - Global: a daily token cap, a per-job daily cap, and a max of 60 runs per hour. Hitting a cap pauses turns and tells me on the channel.
+- Tokens read from the prompt cache count at 10% against the global, agent, job and flow caps, about their price next to fresh input. Fresh input, cache writes and output count in full.
 - `/stop` aborts the running turn (`abortSignal`). `/status` shows the model, tokens today and connector states.
 
 ### 5.3 Memory: recall
@@ -355,7 +357,7 @@ Delivery is at least once. Outbox rows stuck in `sending` for more than 5 minute
 | `chats` | id, channel, connector_id, external_id, title, kind, session_id, allowed, agent_id |
 | `sessions` | id, chat_id, summary, saved_to_recall_at |
 | `messages` | id, session_id, role, content json, channel_msg_id, sender_name, from_owner, status (pending/handled), created_at |
-| `runs` | id, chat_id, agent_id, trigger, model, tokens_in, tokens_out, tainted, status, error, started_at, ms |
+| `runs` | id, chat_id, agent_id, trigger, model, tokens_in, tokens_out, tokens_cached, tokens_cache_write, tainted, status, error, started_at, ms |
 | `tool_calls` | id, run_id, connector_id, tool, class, args json, result_preview, status, ms |
 | `pending_approvals` | id, run_id, chat_id, ask_chat_id, approval_id, messages json, prompt_msg_id, expires_at, status |
 | `reminders` | id, chat_id, text, rrule, tz, fire_at, status, last_fired_at, snoozed_until |

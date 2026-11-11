@@ -9,6 +9,7 @@
 // tokens (from the `runs` row) to that counter.
 import { and, eq, sql } from "drizzle-orm"
 import { jobs, runs, usage, type DB } from "@palui/db"
+import { budgetTokens } from "../budget"
 import type { Logger } from "../log"
 import { utcToLocal } from "../reminders/time"
 import { SILENT_TOKEN } from "./presets"
@@ -87,8 +88,8 @@ export function createJobRunner(opts: { db: DB; log: Logger; runTurn: RunTurn; n
         modelRole: job.modelRole,
         silentToken: SILENT_TOKEN,
       })
-      const run = db.select({ tokensIn: runs.tokensIn, tokensOut: runs.tokensOut }).from(runs).where(eq(runs.id, res.runId)).get()
-      if (run) addUsage(db, key, run.tokensIn + run.tokensOut, clock())
+      const run = db.select({ tokensIn: runs.tokensIn, tokensOut: runs.tokensOut, tokensCached: runs.tokensCached }).from(runs).where(eq(runs.id, res.runId)).get()
+      if (run) addUsage(db, key, budgetTokens(run), clock())
       const silent = res.text.trim() === SILENT_TOKEN
       finish(job.id, { lastRunAt: startedAt, lastStatus: res.status, lastResult: truncate(silent ? `${SILENT_TOKEN} (nothing sent)` : res.text) })
       const ok = res.status === "ok" || res.status === "awaiting_approval"

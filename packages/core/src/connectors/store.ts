@@ -21,7 +21,7 @@ export function configHash(config: Record<string, unknown>, secretsBlob: string 
 }
 
 export function listConnectors(db: DB): ConnectorRow[] {
-  return db.select().from(connectors).orderBy(asc(connectors.sortOrder), asc(connectors.createdAt)).all()
+  return db.select().from(connectors).orderBy(asc(connectors.sortOrder), asc(connectors.createdAt), asc(connectors.id)).all()
 }
 
 export function getConnector(db: DB, id: string): ConnectorRow | undefined {

@@ -4,6 +4,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { chats, events, jobs, messages, pendingApprovals, reminders, runs, schema, toolCalls, type DB, type EventLevel } from "@palui/db"
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, sql, type SQL } from "drizzle-orm"
+import { budgetTokens } from "@palui/core/budget/index"
 import { DateTime } from "luxon"
 import { clip } from "@/lib/format"
 
@@ -259,6 +260,9 @@ export function runDetail(db: DB, id: string) {
     tokensIn: r.tokensIn,
     tokensOut: r.tokensOut,
     tokensCached: r.tokensCached,
+    tokensCacheWrite: r.tokensCacheWrite,
+    // What the run counted against the daily caps: cache reads at a tenth.
+    tokensCounted: budgetTokens(r),
     steps: r.steps,
     tainted: r.tainted,
     startedAt: r.startedAt,

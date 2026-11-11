@@ -7,6 +7,7 @@ import { APICallError, type LanguageModel } from "ai"
 import type { DB } from "@palui/db"
 import { getSetting, type ModelRole, type ReasoningEffort } from "../settings"
 import type { RunningConnector } from "../connectors/define"
+import { withPromptCache } from "./cache"
 
 export type ModelV4 = Extract<LanguageModel, { specificationVersion: "v4" }>
 
@@ -60,6 +61,11 @@ export function withEffort(options: CallOptions, link: ModelLink): CallOptions {
   return { ...options, reasoning: link.effort }
 }
 
+// What one link is sent: its effort, and cache breakpoints in its own protocol.
+function forLink(options: CallOptions, link: ModelLink): CallOptions {
+  return withPromptCache(withEffort(options, link), link.lm.provider)
+}
+
 export type FailoverModel = ModelV4 & {
   // The link that served the last successful call.
   served(): ModelLink | undefined
@@ -96,8 +102,8 @@ export function failoverModel(links: ModelLink[], onFailover?: (from: ModelLink,
       return (last ?? links[0]!).model
     },
     supportedUrls: first.supportedUrls,
-    doGenerate: (options: CallOptions) => attempt((link) => link.lm.doGenerate(withEffort(options, link))),
-    doStream: (options: Parameters<ModelV4["doStream"]>[0]) => attempt((link) => link.lm.doStream(withEffort(options, link))),
+    doGenerate: (options: CallOptions) => attempt((link) => link.lm.doGenerate(forLink(options, link))),
+    doStream: (options: Parameters<ModelV4["doStream"]>[0]) => attempt((link) => link.lm.doStream(forLink(options, link))),
     served: () => last,
     links,
   }

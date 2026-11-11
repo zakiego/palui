@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { memoryDb } from "@palui/db"
 import { getSetting, setSetting } from "../settings"
-import { activePause, addUsage, checkGlobalBudget, jobOverCap, usageKeys } from "./index"
+import { activePause, addUsage, agentTokensToday, budgetTokens, checkGlobalBudget, jobOverCap, recordAgentTokens, recordRunTokens, tokensToday, usageKeys } from "./index"
 
 const NOW = Date.parse("2026-11-10T02:00:00Z")
 const TZ = "Asia/Makassar"
@@ -96,5 +96,37 @@ describe("checkGlobalBudget daily token cap", () => {
     const check = checkGlobalBudget(db, NOW)
     expect(check).toMatchObject({ ok: false, fresh: true, until: Date.parse("2026-11-10T16:00:00Z") })
     expect(check.ok ? "" : check.reason).toContain("token per hari")
+  })
+})
+
+describe("budgetTokens: what a run counts against the daily caps", () => {
+  it("counts cache reads at a tenth, and fresh input, cache writes and output in full", () => {
+    // 52,000 in: 40,000 read from the cache, 2,000 written to it, 10,000 fresh. 800 out.
+    expect(budgetTokens({ tokensIn: 52_000, tokensOut: 800, tokensCached: 40_000 })).toBe(12_000 + 4_000 + 800)
+    // Nothing cached: every token counts, as before.
+    expect(budgetTokens({ tokensIn: 52_000, tokensOut: 800, tokensCached: 0 })).toBe(52_800)
+    expect(budgetTokens({ tokensIn: 52_000, tokensOut: 800 })).toBe(52_800)
+    // Everything cached still costs its tenth.
+    expect(budgetTokens({ tokensIn: 50_000, tokensOut: 0, tokensCached: 50_000 })).toBe(5_000)
+  })
+
+  it("rounds the cached share and never trusts a cached count above the input", () => {
+    expect(budgetTokens({ tokensIn: 15, tokensOut: 0, tokensCached: 15 })).toBe(2)
+    expect(budgetTokens({ tokensIn: 100, tokensOut: 5, tokensCached: 900 })).toBe(15)
+    expect(budgetTokens({ tokensIn: 100, tokensOut: 5, tokensCached: -3 })).toBe(105)
+    expect(budgetTokens({ tokensIn: 100, tokensOut: 5, tokensCached: null })).toBe(105)
+  })
+
+  it("is what the 2026-11-11 measurement would have counted: about 813k, not 1.96M", () => {
+    // 64 runs, 1,958,748 input tokens of which 1,275,047 were cache reads.
+    const counted = budgetTokens({ tokensIn: 1_958_748, tokensOut: 0, tokensCached: 1_275_047 })
+    expect(counted).toBe(683_701 + 127_505)
+    const db = memoryDb()
+    setSetting(db, "timezone", TZ, NOW)
+    recordRunTokens(db, counted, undefined, NOW)
+    recordAgentTokens(db, "agent_1", counted, NOW)
+    expect(tokensToday(db, NOW)).toBe(811_206)
+    expect(agentTokensToday(db, "agent_1", NOW)).toBe(811_206)
+    expect(checkGlobalBudget(db, NOW)).toEqual({ ok: true })
   })
 })

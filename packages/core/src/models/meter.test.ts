@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import { memoryDb } from "@palui/db"
 import { tokensToday } from "../budget"
 import { say, scriptedModel } from "../chat/testing"
-import { meteredModel, meterToBudget } from "./meter"
+import { meteredModel, meterToBudget, usageTokens } from "./meter"
 
 describe("meteredModel", () => {
   it("reports tokens from generate and stream calls", async () => {
@@ -25,5 +25,12 @@ describe("meteredModel", () => {
     const m = scriptedModel([say("summary")])
     await generateText({ model: meterToBudget(db, m.model, () => now), prompt: "x" })
     expect(tokensToday(db, now)).toBe(15)
+  })
+
+  it("counts cache reads at a tenth, like a turn does", () => {
+    expect(usageTokens({ inputTokens: { total: 1000, cacheRead: 800 }, outputTokens: { total: 50 } })).toBe(200 + 80 + 50)
+    expect(usageTokens({ inputTokens: { total: 1000 }, outputTokens: { total: 50 } })).toBe(1050)
+    expect(usageTokens({ inputTokens: 1000, outputTokens: 50 })).toBe(1050)
+    expect(usageTokens(undefined)).toBe(0)
   })
 })

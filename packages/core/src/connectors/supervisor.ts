@@ -373,7 +373,9 @@ export function createSupervisor(opts: SupervisorOptions) {
       if (!slot.handle || !row || !row.enabled || slot.stopWhenIdle) continue
       out.push({ id: slot.id, row, handle: slot.handle })
     }
-    return out.sort((a, b) => a.row.sortOrder - b.row.sortOrder || a.row.createdAt - b.row.createdAt)
+    // The id breaks ties: this order becomes the order of the model's tool list,
+    // and a tool list that reorders itself can't be read from the prompt cache.
+    return out.sort((a, b) => a.row.sortOrder - b.row.sortOrder || a.row.createdAt - b.row.createdAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   }
 
   function get(id: string): RunningEntry | undefined {

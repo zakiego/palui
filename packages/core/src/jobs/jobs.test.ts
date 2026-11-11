@@ -71,12 +71,12 @@ describe("job service", () => {
   })
 })
 
-function fakeTurn(db: ReturnType<typeof setup>["db"], text: string, tokens = 1000) {
+function fakeTurn(db: ReturnType<typeof setup>["db"], text: string, tokens = 1000, tokensCached = 0) {
   const calls: Parameters<RunTurn>[0][] = []
   const runTurn: RunTurn = async (o) => {
     calls.push(o)
     const id = newId("run")
-    db.insert(runs).values({ id, chatId: o.chatId, jobId: o.jobId, trigger: "schedule", tokensIn: tokens, tokensOut: 0, status: "ok", startedAt: NOW }).run()
+    db.insert(runs).values({ id, chatId: o.chatId, jobId: o.jobId, trigger: "schedule", tokensIn: tokens, tokensOut: 0, tokensCached, status: "ok", startedAt: NOW }).run()
     return { runId: id, text, status: "ok" }
   }
   return { runTurn, calls }
@@ -109,6 +109,23 @@ describe("job runner", () => {
     expect(db.select().from(outbox).all()).toHaveLength(0)
     expect(getUsage(db, jobUsageKey(j, NOW))).toBe(1200)
     expect(jobUsageKey(j, NOW)).toBe(`job:${j.id}:2026-11-10`)
+  })
+
+  it("counts a run's cache reads at a tenth against the job's daily cap", async () => {
+    const { db, chatId } = setup()
+    const j = createJob(db, { ...heartbeat(chatId, WITA, NOW), dailyTokenCap: 5000 }, NOW)
+    // 20,000 tokens in, 18,000 of them read from the cache: 2,000 + 1,800.
+    const { runTurn, calls } = fakeTurn(db, SILENT_TOKEN, 20_000, 18_000)
+    const runner = createJobRunner({ db, log: silentLogger, runTurn, now: () => NOW })
+    await runner.runNow(j.id)
+    expect(getUsage(db, jobUsageKey(j, NOW))).toBe(3800)
+    // Still under the 5,000 cap, where the raw 20,000 would have stopped the job for the day.
+    expect((await runner.runNow(j.id)).ok).toBe(true)
+    expect(calls).toHaveLength(2)
+    expect(getUsage(db, jobUsageKey(j, NOW))).toBe(7600)
+    expect((await runner.runNow(j.id)).ok).toBe(false)
+    expect(getJob(db, j.id)?.lastStatus).toBe("cap")
+    expect(calls).toHaveLength(2)
   })
 
   it("skips with status cap once the daily cap is used up, and resets the next day", async () => {

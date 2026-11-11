@@ -1,11 +1,11 @@
 // The agent turn (PLAN 8.4 to 8.8): context, tools, AI SDK loop within the
 // budget, approvals, reply, bookkeeping.
-import { and, eq, inArray, like } from "drizzle-orm"
-import { isStepCount, streamText, type ModelMessage, type ToolApprovalResponse } from "ai"
+import { and, asc, eq, inArray, like } from "drizzle-orm"
+import { isStepCount, streamText, type ModelMessage, type SystemModelMessage, type ToolApprovalResponse } from "ai"
 import { events, jobs, messages, newId, pendingApprovals, runs, sessions, toolCalls, type DB, type RunStatus, type RunTrigger } from "@palui/db"
 import { agentForChat, getAgent, isSharedChat, type AgentRow } from "../agents"
 import { approvalsForRun, createApproval, preview, supersedeSameCall, type ApprovalRow, type ResumeContext, type TurnMode } from "../approvals/store"
-import { agentOverCap, checkGlobalBudget, firstAgentNoticeToday, jobOverCap, pausedNotice, recordAgentTokens, recordRunStart, recordRunTokens } from "../budget"
+import { agentOverCap, budgetTokens, checkGlobalBudget, firstAgentNoticeToday, jobOverCap, pausedNotice, recordAgentTokens, recordRunStart, recordRunTokens } from "../budget"
 import { getChat, getSession, type ChatRow } from "../chats"
 import { ownerChat } from "../connectors/rules"
 import { logEvent } from "../events"
@@ -21,7 +21,7 @@ import { checkinsPrompt } from "../routines/service"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, emptyTools, SEARCH_TOOL, STICKY_MAX, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
-import { buildSystem, hasImages, loadHistory, loadToolCalls, quotesOutsider, toModelMessages, type StoredContent } from "./context"
+import { buildSystem, buildTurnContext, hasImages, loadHistory, loadToolCalls, quotesOutsider, systemBlocks, toModelMessages, withTurnContext, type StoredContent } from "./context"
 import type { EngineDeps } from "./deps"
 
 export const MODEL_OFF_TEXT = "Model lagi off. Nyalakan: `/connectors on cliproxy`"
@@ -165,8 +165,9 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   const batch = new Set(input.batchIds ?? [])
   let history = input.trigger === "message" && session ? loadHistory(db, session.id, session.summarizedUntil ?? null) : []
   // Messages of this batch always make it in, even past the 30-message window.
+  // In the order loadHistory returns them on the next turn, so the prompt repeats.
   if (batch.size && !history.some((h) => batch.has(h.id))) {
-    history = [...history, ...db.select().from(messages).where(inArray(messages.id, [...batch])).all()]
+    history = [...history, ...db.select().from(messages).where(inArray(messages.id, [...batch])).orderBy(asc(messages.createdAt), asc(messages.id)).all()]
   }
   const role: ModelRole = input.resume?.context.modelRole ?? input.modelRole ?? (hasImages(history, batch) ? "vision" : "default")
   const guestInBatch = history.some((h) => batch.has(h.id) && h.role === "user" && !h.fromOwner)
@@ -204,6 +205,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   let tokensIn = 0
   let tokensOut = 0
   let tokensCached = 0
+  let tokensCacheWrite = 0
   let steps = 0
   const approvalRequests: { approvalId: string; toolCallId: string; toolName: string; input: unknown }[] = []
   let model: ReturnType<typeof failoverModel> | undefined
@@ -240,10 +242,12 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     if (tools.deferred.length) rlog.info("more tools than maxTools, the rest load through tool search", { max_tools: settings.budgets.maxTools, active: tools.active.length, deferred: tools.deferred.length })
 
     // Messages and system prompt.
-    let system: string
+    let system: SystemModelMessage[]
     let modelMessages: ModelMessage[]
     if (input.resume) {
-      system = input.resume.context.system
+      // Approvals asked before the prompt was split into blocks stored one string.
+      const stored = input.resume.context.system
+      system = typeof stored === "string" ? [{ role: "system", content: stored }] : stored
       const responses: ToolApprovalResponse[] = input.resume.approvals.map((a) => ({
         type: "tool-approval-response",
         approvalId: a.approvalId,
@@ -257,26 +261,35 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         .map((h) => h.text)
         .join("\n")
       const recall = input.trigger === "message" ? await autoRecall(db, findMemory(ctx.host.running()), batchText, rlog, startedAt, agent) : null
-      system = buildSystem({
-        persona: agent.persona,
+      // Stable first, volatile last (see ./context): the system blocks and the
+      // history repeat from turn to turn, the clock, check-ins and recall ride
+      // at the end of the newest message.
+      system = systemBlocks(
+        buildSystem({
+          persona: agent.persona,
+          channel: chat.channel,
+          chat: { id: chat.id, externalId: chat.externalId, kind: chat.kind, sessionId: chat.sessionId },
+          capabilities: capabilityList(ctx, tools),
+          toolSearch: tools.deferred.length > 0,
+          notes: notesPrompt(db, agent),
+          trigger: origin,
+          shared: shared ? { kind: chat.kind, guest } : null,
+        }),
+        input.trigger === "message" ? session?.summary : null,
+      )
+      const turnContext = buildTurnContext({
         now: startedAt,
         tz: settings.timezone,
-        channel: chat.channel,
-        chat: { id: chat.id, externalId: chat.externalId, kind: chat.kind, sessionId: chat.sessionId },
-        capabilities: capabilityList(ctx, tools),
-        toolSearch: tools.deferred.length > 0,
-        notes: notesPrompt(db, agent),
         // Routine check-ins are the owner's; a shared chat never sees them.
         checkins: input.trigger === "message" && !shared ? [checkinsPrompt(db, chat.id, startedAt), flowCheckinsPrompt(db, chat.id, startedAt)].filter(Boolean).join("\n\n") || null : null,
         recall,
         recallAbout: agent.isDefault ? "owner" : "chats",
-        summary: input.trigger === "message" ? session?.summary : null,
-        trigger: origin,
-        shared: shared ? { kind: chat.kind, guest } : null,
       })
       // Past tool calls are replayed only next to a tool list: a request with tool parts and no tools is rejected by some providers.
       const pastCalls = Object.keys(tools.tools).length ? loadToolCalls(db, history) : []
-      modelMessages = input.trigger === "message" ? toModelMessages(history, batch, pastCalls, { labelSenders: shared }) : [{ role: "user", content: input.prompt ?? "" }]
+      const base: ModelMessage[] = input.trigger === "message" ? toModelMessages(history, batch, pastCalls, { labelSenders: shared }) : [{ role: "user", content: input.prompt ?? "" }]
+      // Only a chat's history comes back on the next turn; a job prompt stands alone.
+      modelMessages = withTurnContext(base, turnContext, { markTurnStart: input.trigger === "message" })
     }
 
     model = failoverModel(chain, (from, e) => rlog.warn("model failed, trying the next one in the chain", { connector_id: from.connectorId, model: from.model, error: (e as Error)?.message }))
@@ -382,7 +395,9 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         case "finish":
           tokensIn = p.totalUsage.inputTokens ?? 0
           tokensOut = p.totalUsage.outputTokens ?? 0
+          // inputTokens is all input; the details say how much of it the cache served or stored.
           tokensCached = p.totalUsage.inputTokenDetails?.cacheReadTokens ?? 0
+          tokensCacheWrite = p.totalUsage.inputTokenDetails?.cacheWriteTokens ?? 0
           break
       }
     }
@@ -472,6 +487,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
       tokensIn,
       tokensOut,
       tokensCached,
+      tokensCacheWrite,
       steps,
       tainted: state.tainted,
       model: served?.model ?? chain[0]!.model,
@@ -481,8 +497,10 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     })
     .where(eq(runs.id, runId))
     .run()
-  recordRunTokens(db, tokensIn + tokensOut, jobId, ctx.clock())
-  recordAgentTokens(db, agent.id, tokensIn + tokensOut, ctx.clock())
+  // Cache reads count for a tenth against the caps (budgetTokens).
+  const spent = budgetTokens({ tokensIn, tokensOut, tokensCached })
+  recordRunTokens(db, spent, jobId, ctx.clock())
+  recordAgentTokens(db, agent.id, spent, ctx.clock())
   const after = checkGlobalBudget(db, ctx.clock())
   if (!after.ok && after.fresh) {
     if (shared) sendToOwner(ctx, chat, pausedNotice(db, after))
@@ -490,7 +508,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     logEvent(db, { kind: "budget.pause", level: "warn", message: `Turns paused: ${after.reason}` }, ctx.clock())
   }
   ctx.bus.publish({ type: "turn-end", chatId: chat.id, runId, status: interrupted ? "aborted" : status, error })
-  rlog.info("turn finished", { status: interrupted ? "interrupted" : status, steps, tokens_in: tokensIn, tokens_out: tokensOut, ms, tainted: state.tainted, connector_id: served?.connectorId })
+  rlog.info("turn finished", { status: interrupted ? "interrupted" : status, steps, tokens_in: tokensIn, tokens_out: tokensOut, tokens_cached: tokensCached, tokens_cache_write: tokensCacheWrite, ms, tainted: state.tainted, connector_id: served?.connectorId })
   return { runId, text: interrupted ? "" : text, status: interrupted ? "interrupted" : status, tainted: state.tainted }
 }
 

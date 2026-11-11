@@ -15,7 +15,7 @@
 // so a restart only delays the next sweep.
 import { and, desc, eq, inArray, isNotNull, isNull, lte, max, min, or, sql } from "drizzle-orm"
 import { flowRuns, flows, flowStepRuns, flowTriggers, newId, runs, toolCalls, type DB, type FlowPollState, type FlowRunStatus, type FlowSkipReason, type OutboxPayload } from "@palui/db"
-import { addUsage, dayKey, getUsage } from "../budget"
+import { addUsage, budgetTokens, dayKey, getUsage } from "../budget"
 import { getChat } from "../chats"
 import type { TurnInfo } from "../connectors/define"
 import { logEvent } from "../events"
@@ -1206,8 +1206,9 @@ Balas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.`
         modelRole: step.model === "fast" ? "fast" : "default",
         tainted,
       })
-      const used = db.select({ i: runs.tokensIn, o: runs.tokensOut }).from(runs).where(eq(runs.id, res.runId || turnRunId)).get()
-      if (used) addUsage(db, usageKey, (used.i ?? 0) + (used.o ?? 0), clock())
+      // The same weighting as every other daily cap: cache reads count for a tenth (budgetTokens).
+      const used = db.select({ tokensIn: runs.tokensIn, tokensOut: runs.tokensOut, tokensCached: runs.tokensCached }).from(runs).where(eq(runs.id, res.runId || turnRunId)).get()
+      if (used) addUsage(db, usageKey, budgetTokens(used), clock())
       if (res.status !== "ok" && res.status !== "awaiting_approval") throw new Error(`the turn ended with status ${res.status}`)
       const silent = res.text.trim().toLowerCase() === SILENT_TOKEN.toLowerCase()
       const output = { text: silent ? "" : res.text, silent, runId: res.runId || turnRunId }

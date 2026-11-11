@@ -260,7 +260,11 @@ export const runs = sqliteTable(
     modelConnectorId: text("model_connector_id"),
     tokensIn: integer("tokens_in").notNull().default(0),
     tokensOut: integer("tokens_out").notNull().default(0),
+    // Input counts (PLAN 5.2). `tokensIn` is everything the model was sent. Of it,
+    // `tokensCached` was read from the prompt cache (about a tenth of the price)
+    // and `tokensCacheWrite` was stored in it for later turns (1.25x to 2x).
     tokensCached: integer("tokens_cached").notNull().default(0),
+    tokensCacheWrite: integer("tokens_cache_write").notNull().default(0),
     steps: integer("steps").notNull().default(0),
     tainted: bool("tainted").notNull().default(false),
     status: text("status").$type<RunStatus>().notNull().default("running"),

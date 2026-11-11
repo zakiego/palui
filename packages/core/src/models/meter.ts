@@ -2,17 +2,19 @@
 // parsing), so they go toward the daily token cap too (PLAN 5.2).
 import type { LanguageModel } from "ai"
 import type { DB } from "@palui/db"
-import { recordRunTokens } from "../budget"
+import { budgetTokens, recordRunTokens } from "../budget"
 import type { ModelV4 } from "./failover"
 
-type ProviderUsage = { inputTokens?: number | { total?: number }; outputTokens?: number | { total?: number } } | undefined
+type ProviderUsage = { inputTokens?: number | { total?: number; cacheRead?: number }; outputTokens?: number | { total?: number } } | undefined
 
 function count(v: number | { total?: number } | undefined): number {
   return (typeof v === "number" ? v : v?.total) ?? 0
 }
 
+// Tokens as they count against the daily cap: cache reads at a tenth (budgetTokens).
 export function usageTokens(u: ProviderUsage): number {
-  return count(u?.inputTokens) + count(u?.outputTokens)
+  const tokensCached = typeof u?.inputTokens === "object" ? u.inputTokens.cacheRead : 0
+  return budgetTokens({ tokensIn: count(u?.inputTokens), tokensOut: count(u?.outputTokens), tokensCached })
 }
 
 // A model that reports the tokens of every call it serves.

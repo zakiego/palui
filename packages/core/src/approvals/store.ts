@@ -2,7 +2,7 @@
 // parts is saved here with everything needed to resume it, so it survives a
 // restart. All requests from one run are answered together in one resume call.
 import { and, asc, eq, inArray, isNull, lte, or } from "drizzle-orm"
-import type { ModelMessage } from "ai"
+import type { ModelMessage, SystemModelMessage } from "ai"
 import { newId, pendingApprovals, runs, toolCalls, type DB, type ToolClass } from "@palui/db"
 
 export const APPROVAL_TTL_MS = 10 * 60_000
@@ -23,7 +23,9 @@ export type ResumeContext = {
   silentToken?: string
   tainted: boolean
   sessionId: string | null
-  system: string
+  // The system prompt as it was sent, block by block (a plain string on rows
+  // written before the prompt was split for caching).
+  system: string | SystemModelMessage[]
   // The run that took the owner's messages (TurnInfo.batchRunId), kept across resumes.
   batchRunId?: string
   // Set by markResumed once the run is claimed for resuming.

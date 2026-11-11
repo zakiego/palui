@@ -159,9 +159,12 @@ function RunStats({ run, timezone }: { run: Run; timezone: string }) {
     { label: t("table.started"), value: inZone(run.startedAt, timezone) },
     { label: t("table.time"), value: duration(run.ms) },
     { label: t("run.steps"), value: String(run.steps) },
+    // Input first, with how much of it the prompt cache served and stored.
     { label: t("run.tokensIn"), value: compact(run.tokensIn), title: run.tokensIn.toLocaleString() },
-    { label: t("run.tokensOut"), value: compact(run.tokensOut), title: run.tokensOut.toLocaleString() },
     { label: t("run.tokensCached"), value: compact(run.tokensCached), title: run.tokensCached.toLocaleString() },
+    { label: t("run.tokensCacheWrite"), value: compact(run.tokensCacheWrite), title: run.tokensCacheWrite.toLocaleString() },
+    { label: t("run.tokensOut"), value: compact(run.tokensOut), title: run.tokensOut.toLocaleString() },
+    { label: t("run.tokensCounted"), value: compact(run.tokensCounted), title: run.tokensCounted.toLocaleString() },
     { label: t("table.model"), value: run.model ?? t("runs.noModel"), title: run.model ?? undefined, wide: true },
   ]
   return (

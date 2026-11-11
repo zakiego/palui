@@ -112,11 +112,13 @@ export const httpError = (statusCode: number) => new APICallError({ message: `HT
 export type Step = Chunk[] | Error | (() => Promise<Chunk[]>)
 
 // A mock model that plays steps in order; the prompts it saw are kept.
-export function scriptedModel(steps: Step[], fallback: Step = say("ok")) {
+// `provider` names the protocol the way a real one does ("anthropic.messages").
+export function scriptedModel(steps: Step[], fallback: Step = say("ok"), opts: { provider?: string } = {}) {
   const prompts: unknown[] = []
   // Tool names offered on each model call, in call order.
   const offered: string[][] = []
   const model = new MockLanguageModelV4({
+    ...(opts.provider ? { provider: opts.provider } : {}),
     doStream: async (options) => {
       prompts.push(options.prompt)
       offered.push((options.tools ?? []).map((t) => t.name))

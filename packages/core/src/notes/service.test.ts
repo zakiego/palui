@@ -73,7 +73,7 @@ describe("notesPrompt", () => {
     expect(notes).toContain("- Jadwal sholat: Pakai mcp-jadwal-sholat.")
     expect(notes).toContain("- default_city: Banjarmasin")
     expect(notes).not.toContain("hidden")
-    const system = buildSystem({ persona: "P", now: NOW, tz: "Asia/Makassar", channel: "telegram", capabilities: [], notes, trigger: "message" })
+    const system = buildSystem({ persona: "P", channel: "telegram", capabilities: [], notes, trigger: "message" })
     expect(system).toContain("Standing instructions from the owner")
     expect(system).toContain("Owner preferences")
   })

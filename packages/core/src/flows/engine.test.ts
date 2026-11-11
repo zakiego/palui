@@ -275,6 +275,23 @@ describe("prompt steps (RFC 9d)", () => {
     expect(runsOf(h.db, flow.id)[0]).toMatchObject({ status: "skipped", skipReason: "budget" })
     expect(h.prompts).toHaveLength(0)
   })
+
+  it("counts a prompt step's cache reads at a tenth against the flow's daily cap", async () => {
+    const { runs } = await import("@palui/db")
+    const h = flowHarness({
+      connectors: exampleConnectors({ flows__ringkasan: recapTool(2) }),
+      // 20,000 tokens in, 18,000 of them read from the cache, 100 out.
+      prompt: (r) => {
+        h.db.insert(runs).values({ id: r.turnRunId, chatId: h.chatId, trigger: "flow", status: "ok", tokensIn: 20_000, tokensOut: 100, tokensCached: 18_000, startedAt: h.now() }).run()
+        return { status: "ok", text: "Semangat!", runId: r.turnRunId }
+      },
+    })
+    const { flow } = h.create(RECAP)
+    const { getUsage, dayKey } = await import("../budget")
+    await h.run(at("2026-11-15T20:00"))
+    expect(h.prompts).toHaveLength(1)
+    expect(getUsage(h.db, `flow:${flow.id}:${dayKey(at("2026-11-15T20:00"), "Asia/Makassar")}`)).toBe(2_000 + 1_800 + 100)
+  })
 })
 
 it("NOW is a Tuesday morning", () => {

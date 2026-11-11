@@ -255,7 +255,7 @@ export function worst(k: Kit) {
   const next = (step = MIN) => (t += step)
 
   const promptAt = next()
-  const bigRun = k.run({ chatId: web.id, trigger: "message", model: within(MODEL_LONG, LIMITS.model), tokensIn: 98_765_432, tokensOut: 1_234_567, tokensCached: 87_654_321, steps: 50, status: "ok", startedAt: t, ms: 3 * D })
+  const bigRun = k.run({ chatId: web.id, trigger: "message", model: within(MODEL_LONG, LIMITS.model), tokensIn: 98_765_432, tokensOut: 1_234_567, tokensCached: 87_654_321, tokensCacheWrite: 9_876_543, steps: 50, status: "ok", startedAt: t, ms: 3 * D })
   // A one-letter prompt, linked to its run so the run page shows it.
   k.message(web, "user", "p", promptAt, { runId: bigRun })
   const toolStatuses = ["ok", "error", "denied", "pending"] as const

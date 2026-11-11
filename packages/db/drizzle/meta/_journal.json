@@ -50,6 +50,13 @@
       "when": 1794407435805,
       "tag": "0006_naive_madame_web",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794413087655,
+      "tag": "0007_shallow_butterfly",
+      "breakpoints": true
     }
   ]
 }

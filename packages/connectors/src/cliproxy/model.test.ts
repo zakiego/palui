@@ -3,6 +3,7 @@ import { memoryDb } from "@palui/db"
 import { silentLogger } from "@palui/core/log"
 import { setSetting } from "@palui/core/settings"
 import { failoverModel } from "@palui/core/models/failover"
+import { buildTurnContext, systemBlocks, withTurnContext } from "@palui/core/chat/context"
 import { generateText } from "ai"
 import type { ConnectorContext } from "@palui/core/connectors/define"
 import aiGatewayManifest from "../ai-gateway/manifest"
@@ -91,5 +92,33 @@ describe("gateway model connectors", () => {
     const bodies = calls.filter((c) => c.url.endsWith("/chat/completions")).map((c) => c.body as { reasoning_effort?: string })
     expect(bodies[0]!.reasoning_effort).toBe("high")
     expect(bodies[1]!.reasoning_effort).toBeUndefined()
+  })
+
+  it("cache breakpoints reach the gateway on the anthropic protocol and never on the openai one", async () => {
+    const calls: { url: string; headers: Record<string, string>; body?: unknown }[] = []
+    const rt = gatewayRuntime(manifest, { fetch: fakeFetch(calls) })
+    const h = await rt.start(ctx({ protocols: { fast: "openai" } }, { apiKey: "k" }) as never)
+    // The prompt a turn builds: marked system block, summary, the owner's message, the per-turn block.
+    const turn = {
+      system: systemBlocks("You are Palui.", "talked about kopi"),
+      messages: withTurnContext([{ role: "user" as const, content: [{ type: "text" as const, text: "jam berapa?" }] }], buildTurnContext({ now: Date.UTC(2026, 10, 11, 6, 5), tz: "Asia/Makassar" }), { markTurnStart: true }),
+    }
+    await generateText({ model: failoverModel([{ connectorId: "cliproxy", model: "claude-sonnet-4-6", lm: h.model!("claude-sonnet-4-6", "default") as never }]), ...turn })
+    await generateText({ model: failoverModel([{ connectorId: "cliproxy", model: "gpt-5", lm: h.model!("gpt-5", "fast") as never }]), ...turn })
+
+    const anthropic = calls.find((c) => c.url.endsWith("/v1/messages"))!.body as { system: { text: string; cache_control?: unknown }[]; messages: { content: { text: string; cache_control?: unknown }[] }[] }
+    const hour = { type: "ephemeral", ttl: "1h" }
+    expect(anthropic.system).toEqual([
+      { type: "text", text: "You are Palui.", cache_control: hour },
+      { type: "text", text: "Summary of the earlier conversation:\ntalked about kopi" },
+    ])
+    expect(anthropic.messages[0]!.content.map((p) => p.cache_control)).toEqual([hour, undefined])
+    expect(anthropic.messages[0]!.content[1]!.text).toContain("Now: Rabu, 11 November 2026 14.05 WITA")
+
+    const openai = JSON.stringify(calls.find((c) => c.url.endsWith("/v1/chat/completions"))!.body)
+    expect(openai).not.toContain("cache_control")
+    expect(openai).not.toContain("cacheControl")
+    expect(openai).not.toContain("palui")
+    expect(openai).toContain("jam berapa?")
   })
 })

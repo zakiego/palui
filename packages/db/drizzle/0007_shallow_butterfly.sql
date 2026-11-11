@@ -1,0 +1,1 @@
+ALTER TABLE `runs` ADD `tokens_cache_write` integer DEFAULT 0 NOT NULL;
