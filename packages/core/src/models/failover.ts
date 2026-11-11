@@ -5,12 +5,12 @@
 // already have run tools).
 import { APICallError, type LanguageModel } from "ai"
 import type { DB } from "@palui/db"
-import { getSetting, type ModelRole } from "../settings"
+import { getSetting, type ModelRole, type ReasoningEffort } from "../settings"
 import type { RunningConnector } from "../connectors/define"
 
 export type ModelV4 = Extract<LanguageModel, { specificationVersion: "v4" }>
 
-export type ModelLink = { connectorId: string; model: string; lm: ModelV4 }
+export type ModelLink = { connectorId: string; model: string; effort?: ReasoningEffort; lm: ModelV4 }
 
 // What the failover model needs from the supervisor.
 export type ModelHost = {
@@ -27,7 +27,7 @@ export function resolveChain(db: DB, host: ModelHost, role: ModelRole): ModelLin
     try {
       const lm = entry.handle.model(link.model, role)
       if (typeof lm === "string" || lm.specificationVersion !== "v4") continue
-      out.push({ connectorId: link.connectorId, model: link.model, lm })
+      out.push({ connectorId: link.connectorId, model: link.model, ...(link.effort ? { effort: link.effort } : {}), lm })
     } catch {
       // A connector that can't build the model is skipped like a paused one.
     }
@@ -52,6 +52,14 @@ export function isFailoverError(e: unknown): boolean {
   return false
 }
 
+type CallOptions = Parameters<ModelV4["doGenerate"]>[0]
+
+// A link's effort applies unless the caller already chose one for this call.
+export function withEffort(options: CallOptions, link: ModelLink): CallOptions {
+  if (!link.effort || options.reasoning !== undefined) return options
+  return { ...options, reasoning: link.effort }
+}
+
 export type FailoverModel = ModelV4 & {
   // The link that served the last successful call.
   served(): ModelLink | undefined
@@ -63,12 +71,12 @@ export function failoverModel(links: ModelLink[], onFailover?: (from: ModelLink,
   if (!links.length) throw new Error("No model connector is running")
   let last: ModelLink | undefined
   const first = links[0]!.lm
-  async function attempt<T>(fn: (lm: ModelV4) => PromiseLike<T>): Promise<T> {
+  async function attempt<T>(fn: (link: ModelLink) => PromiseLike<T>): Promise<T> {
     let lastError: unknown
     for (let i = 0; i < links.length; i++) {
       const link = links[i]!
       try {
-        const r = await fn(link.lm)
+        const r = await fn(link)
         last = link
         return r
       } catch (e) {
@@ -88,8 +96,8 @@ export function failoverModel(links: ModelLink[], onFailover?: (from: ModelLink,
       return (last ?? links[0]!).model
     },
     supportedUrls: first.supportedUrls,
-    doGenerate: (options: Parameters<ModelV4["doGenerate"]>[0]) => attempt((lm) => lm.doGenerate(options)),
-    doStream: (options: Parameters<ModelV4["doStream"]>[0]) => attempt((lm) => lm.doStream(options)),
+    doGenerate: (options: CallOptions) => attempt((link) => link.lm.doGenerate(withEffort(options, link))),
+    doStream: (options: Parameters<ModelV4["doStream"]>[0]) => attempt((link) => link.lm.doStream(withEffort(options, link))),
     served: () => last,
     links,
   }
