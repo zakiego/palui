@@ -1,6 +1,7 @@
 // Connectors page: list, pause/resume, the connect wizard, test, actions, remove.
 import { config, masterKey } from "@palui/core/config"
 import { getOwner, setWhatsAppOwner } from "@palui/core/owner"
+import { getConnector } from "@palui/core/connectors/store"
 import { listEvents } from "@palui/core/events"
 import { getSetting } from "@palui/core/settings"
 import { createServerFn } from "@tanstack/react-start"
@@ -49,7 +50,11 @@ export const getConnectorDetail = createServerFn({ method: "GET" })
       telegram: !!getOwner(db, "telegram"),
       whatsapp: getOwner(db, "whatsapp")?.externalId.replace(/@.*/, "") ?? null,
     }
-    return { events: evts, live, runtimeUp, owners, timezone: getSetting(db, "timezone") }
+    // The page polls this, so it carries the status too: the loader's copy goes
+    // stale when a live event is missed and "Connecting" would stick.
+    const row = getConnector(db, data.id)
+    const status = row ? { status: row.status, statusDetail: row.statusDetail ?? null } : null
+    return { events: evts, live, runtimeUp, owners, status, timezone: getSetting(db, "timezone") }
   })
 
 export const pauseConnectorFn = createServerFn({ method: "POST" })

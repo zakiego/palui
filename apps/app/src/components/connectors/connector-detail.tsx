@@ -55,7 +55,9 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
   const [saved, setSaved] = React.useState(!target.isNew)
 
   const detail = usePoll(() => getConnectorDetail({ data: { id: target.id } }), { intervalMs: 3000, deps: [target.id] })
-  const status = target.status
+  // The poll keeps the status fresh; the loader's copy is only the first paint.
+  const status = detail.data?.status?.status ?? target.status
+  const statusDetail = detail.data?.status ? detail.data.status.statusDetail : target.statusDetail
 
   const set = (k: string, v: string | boolean) => {
     setValues((prev) => ({ ...prev, [k]: v }))
@@ -205,12 +207,12 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
       </div>
       <div className="flex w-full max-w-2xl flex-col gap-6">
       {detail.data && !detail.data.runtimeUp && <RuntimeAlert />}
-      {target.statusDetail && status === "error" && (
+      {statusDetail && status === "error" && (
         <Alert variant="destructive">
           <CircleAlertIcon aria-hidden="true" />
           <AlertTitle>{t("connectors.errorTitle", { name: label || m.name })}</AlertTitle>
           <AlertDescription className="break-words">
-            <span className="block">{target.statusDetail}</span>
+            <span className="block">{statusDetail}</span>
             <span className="block">{t("connectors.errorFix")}</span>
           </AlertDescription>
         </Alert>
