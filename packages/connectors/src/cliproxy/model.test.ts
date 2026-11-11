@@ -70,4 +70,12 @@ describe("gateway model connectors", () => {
     expect(vis.provider).toContain("cliproxy")
     expect(h.live!()).toMatchObject({ baseUrl: "http://host.docker.internal:8317" })
   })
+
+  it("start lists the gateway's models through the listModels action", async () => {
+    const calls: { url: string; headers: Record<string, string>; body?: unknown }[] = []
+    const rt = gatewayRuntime(manifest, { fetch: fakeFetch(calls) })
+    const h = await rt.start(ctx({}, { apiKey: "k" }) as never)
+    expect(await h.action!("listModels", {})).toEqual({ models: ["claude-sonnet-4-6", "gemini-3-flash-preview"] })
+    await expect(h.action!("nope", {})).rejects.toThrow("Unknown action nope")
+  })
 })
