@@ -24,6 +24,7 @@ export function demo(k: Kit) {
   k.connector("chats", "chats", { status: "on" })
   k.connector("webfetch", "webfetch", { status: "on" })
   k.connector("notes", "notes", { status: "on" })
+  k.connector("settings", "settings", { status: "on" })
   k.connector("remote-mcp", "remote-mcp", { status: "on" })
   k.connector("mcp-jadwal-sholat", "mcp", { label: "jadwal-sholat", status: "on", trust: "external", config: { url: "https://sholat.zakiego.com/mcp", authMode: "none", addedFromChat: true } })
   k.instruction({ title: "Jadwal sholat", body: "Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai JSON API di https://sholat.zakiego.com/api/v1 lewat web fetch.", createdAt: now - 3 * H })

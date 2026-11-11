@@ -1,0 +1,53 @@
+---
+title: Settings
+description: Let Palui read its own setup and change the Settings page values from chat, with your approval on every change.
+---
+
+Kind: `skill`, builtin. Palui can look up how it's set up (version, timezone, language, model roles, budgets, fallback channel, today's token use and which connectors are on) and change the same settings you'd change on the Settings page, when you ask in chat.
+
+## Connect
+
+Nothing to enter. It's on from the first boot. Ask Palui in chat:
+
+```text
+timezone kamu sekarang apa?
+ganti zona waktu ke Asia/Jakarta
+naikin batas token harian jadi 3 juta
+model fast pakai claude-haiku-4-5 aja
+```
+
+## Settings
+
+None. The tool covers these keys, with the same limits as the Settings page:
+
+| Key | What it is |
+|---|---|
+| `timezone` | IANA zone, like `Asia/Makassar`. |
+| `language` | Chat language: `auto`, `id` or `en`. |
+| `uiLanguage` | Dashboard language: `en` or `id`. |
+| `fallbackChannel` | `telegram`, `whatsapp` or `none`. |
+| `budgets` | `maxSteps`, `turnTimeoutMs`, `maxTools`, `dailyTokenCap` (0 turns it off), `maxRunsPerHour`. Palui can change one field and keep the rest. |
+| `modelRoles` | The failover chain for `default`, `fast` and `vision`. Palui can replace one role and keep the others. Each link must name a model connector you've added. |
+
+Personas live on the Agents page, and routine mode is set with `palui flows mode`, so neither is here.
+
+## Tools
+
+| Tool | Class | What it does |
+|---|---|---|
+| `lihat_setelan` | `read` | Read the settings above plus version, dashboard URL, today's token use, a budget pause and every connector with its status. |
+| `ubah_setelan` | `destructive` | Change one or more of the settings above. |
+
+## Safety
+
+<Callout type="warn" title="Settings change every later turn">
+  A setting decides which model answers, how many tokens a day Palui may spend and when reminders fall back to another channel. That's why changing one is `destructive`: it always asks you first and shows the new values in the approval, and scheduled jobs, flows and hooks can't do it at all.
+</Callout>
+
+- Only Palui, the default agent, gets `ubah_setelan`. Other agents can read the settings.
+- Secrets and API keys are never returned or changed. Connector setup stays on the Connectors page.
+- Every change made from chat is logged on the Activity page with the keys it touched.
+
+## Pause and remove
+
+Pausing hides both tools. The settings keep their values; change them on the Settings page.

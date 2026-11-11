@@ -17,6 +17,7 @@ import {
   PlugIcon,
   RepeatIcon,
   SendIcon,
+  SettingsIcon,
   ServerCogIcon,
   SquareTerminalIcon,
   WebhookIcon,
@@ -45,6 +46,7 @@ const ICONS: Record<string, LucideIcon> = {
   paperclip: PaperclipIcon,
   repeat: RepeatIcon,
   workflow: WorkflowIcon,
+  settings: SettingsIcon,
 }
 
 export function connectorIcon(name: string | undefined): LucideIcon {

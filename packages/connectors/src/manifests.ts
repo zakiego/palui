@@ -10,6 +10,7 @@ import hooks from "./hooks/manifest"
 import jobs from "./jobs/manifest"
 import mcp from "./mcp/manifest"
 import notes from "./notes/manifest"
+import settings from "./settings/manifest"
 import recall from "./recall/manifest"
 import reminders from "./reminders/manifest"
 import flows from "./flows/manifest"
@@ -41,6 +42,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   jobs,
   chats: chatHistory,
   notes,
+  settings,
   "remote-mcp": remoteMcp,
   attachments,
   voice,

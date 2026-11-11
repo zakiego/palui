@@ -141,6 +141,7 @@ export function worst(k: Kit) {
   k.connector("voice", "voice", { status: "not_set_up" })
   k.connector("hooks", "hooks", { status: "on" })
   k.connector("notes", "notes", { status: "on" })
+  k.connector("settings", "settings", { status: "on" })
   k.connector("routines", "routines", {
     status: "error",
     detail: within("Routine \"Sholat lima waktu, cek tiap waktu sampai waktu berikutnya\" couldn't read mcp-jadwal-sholat.get_prayer_times (try 14): 2026-11-12: fetch failed: getaddrinfo ENOTFOUND sholat.zakiego.com | 2026-11-13: fetch failed: getaddrinfo ENOTFOUND sholat.zakiego.com", LIMITS.statusDetail),

@@ -1,6 +1,7 @@
 // Settings page.
 import { config, masterKey } from "@palui/core/config"
-import { getAllSettings, REASONING_EFFORTS, setSetting, type Settings } from "@palui/core/settings"
+import { getAllSettings, setSetting, type Settings } from "@palui/core/settings"
+import { settingsPatchSchema } from "@palui/core/settings-schema"
 import { listConnectors } from "@palui/core/connectors/store"
 import { createServerFn } from "@tanstack/react-start"
 import { z } from "zod"
@@ -33,11 +34,6 @@ export const getSettingsPage = createServerFn({ method: "GET" }).handler(async (
   }
 })
 
-const chain = z
-  .array(z.object({ connectorId: z.string().min(1).max(64), model: z.string().trim().min(1).max(120), effort: z.enum(REASONING_EFFORTS).optional() }))
-  .min(1)
-  .max(6)
-
 // The model ids a running model connector offers, for the model picker. A
 // paused connector or a down runtime answers with an error the picker shows.
 export const listConnectorModels = createServerFn({ method: "GET" })
@@ -49,38 +45,8 @@ export const listConnectorModels = createServerFn({ method: "GET" })
     return { models: [...new Set(models)].sort((a, b) => a.localeCompare(b)) }
   })
 
-const patch = z.object({
-  timezone: z
-    .string()
-    .min(1)
-    .max(64)
-    .refine((tz) => {
-      try {
-        new Intl.DateTimeFormat("en", { timeZone: tz })
-        return true
-      } catch {
-        return false
-      }
-    }, "Use an IANA zone like Asia/Makassar.")
-    .optional(),
-  language: z.enum(["auto", "id", "en"]).optional(),
-  uiLanguage: z.enum(["en", "id"]).optional(),
-  modelRoles: z.object({ default: chain, fast: chain, vision: chain }).optional(),
-  budgets: z
-    .object({
-      maxSteps: z.number().int().min(1).max(50),
-      turnTimeoutMs: z.number().int().min(10_000).max(600_000),
-      maxTools: z.number().int().min(1).max(128),
-      // 0 turns the global cap off, the same as an agent's or a job's cap.
-      dailyTokenCap: z.union([z.literal(0), z.number().int().min(10_000).max(100_000_000)]),
-      maxRunsPerHour: z.number().int().min(1).max(1000),
-    })
-    .optional(),
-  fallbackChannel: z.enum(["telegram", "whatsapp", "none"]).optional(),
-})
-
 export const saveSettings = createServerFn({ method: "POST" })
-  .validator(patch)
+  .validator(settingsPatchSchema)
   .handler(async ({ data }) => {
     const { db } = await requireWriter()
     for (const [key, value] of Object.entries(data) as [keyof Settings, never][]) {

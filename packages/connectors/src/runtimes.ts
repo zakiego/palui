@@ -9,6 +9,7 @@ import hooks from "./hooks/runtime"
 import jobs from "./jobs/runtime"
 import mcp from "./mcp/runtime"
 import notes from "./notes/runtime"
+import settings from "./settings/runtime"
 import recall from "./recall/runtime"
 import reminders from "./reminders/runtime"
 import flows from "./flows/runtime"
@@ -39,6 +40,7 @@ export const runtimes: Record<string, AnyRuntime> = {
   jobs,
   chats: chatHistory,
   notes,
+  settings,
   "remote-mcp": remoteMcp,
   attachments,
   voice,
