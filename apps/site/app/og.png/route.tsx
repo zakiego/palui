@@ -8,6 +8,6 @@ export function GET() {
     kicker: "by Zaki",
     mascot: true,
     title: "An agent friend\nyou host yourself",
-    description: "Palui remembers what you tell it, reminds you on time, and talks to you on WhatsApp, Telegram or the web.",
+    description: "A simple, friendly agent that keeps you company.",
   })
 }
