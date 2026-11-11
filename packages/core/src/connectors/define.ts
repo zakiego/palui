@@ -12,7 +12,16 @@ import type { ModelRole } from "../settings"
 // --- Manifest ------------------------------------------------------------------------
 
 export type SetupStep =
-  | { field: string; label: string; help?: string; secret?: boolean; placeholder?: string; optional?: boolean }
+  | {
+      field: string
+      label: string
+      help?: string
+      // A shell command the help refers to, shown as a copyable block under it.
+      command?: string
+      secret?: boolean
+      placeholder?: string
+      optional?: boolean
+    }
   // Wizard actions the dashboard renders specially.
   | { action: "claimOwner" | "pairWhatsApp" | "ownerPhone" | "pickContainer" | "listTools" | "oauth"; label: string; help?: string }
 
