@@ -25,14 +25,8 @@ async function chat(steps: Step[], provider?: string) {
   const db = memoryDb()
   ownTelegram(db)
   setSetting(db, "modelRoles", { default: [{ connectorId: "cliproxy", model: "m" }], fast: [{ connectorId: "cliproxy", model: "m" }], vision: [{ connectorId: "cliproxy", model: "m" }] })
-  // The model takes a second to answer, so a reply is never stored in the same
-  // millisecond as the message it answers: history order must not hang on an id tie.
   const clock = { now: Date.UTC(2026, 10, 10, 6, 0, 0) }
-  const timed = steps.map((step): Step => (step instanceof Error ? step : async () => {
-    clock.now += 1000
-    return typeof step === "function" ? await step() : step
-  }))
-  const m = scriptedModel(timed, say("ok"), { provider })
+  const m = scriptedModel(steps, say("ok"), { provider })
   let recalls = 0
   const mem = { autoRecall: true, autoSave: false, recall: async () => `recalled fact ${++recalls}`, save: async () => {} }
   const h = await harness({

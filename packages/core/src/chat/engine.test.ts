@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, onTestFinished, vi } from "vitest"
 import { chats, events, memoryDb, messages, outbox, passkey, pendingApprovals, runs, toolCalls, user, type DB } from "@palui/db"
 import { ensureChat, getChat } from "../chats"
 import { listEvents } from "../events"
@@ -385,6 +385,11 @@ describe("turn", () => {
       registry: { alpha: toolsRuntime("alpha", () => ({ add: { tool: add, class: "read" } })) },
       rows: { alpha: "tools" },
     })
+    // The harness clock is fixed, so every message has the same created_at and history falls back to
+    // ordering by id. Holding the real clock still as well puts all of them in one id millisecond,
+    // the case where a reply used to sort before the message it answers about one run in 35.
+    const frozen = vi.spyOn(Date, "now").mockReturnValue(Date.now())
+    onTestFinished(() => frozen.mockRestore())
     await h.engine.inbound(tgMessage("1 tambah 2?"))
     await h.engine.idle()
     await h.engine.inbound(tgMessage("makasih"))
