@@ -1,5 +1,6 @@
 {
   "name": "palui",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.8.1",
@@ -15,6 +16,7 @@
     "cli": "pnpm --filter @palui/app cli",
     "site:dev": "pnpm --filter @palui/site dev",
     "site:build": "pnpm --filter @palui/site build",
-    "eval:reminders": "pnpm --filter @palui/core eval:reminders"
+    "eval:reminders": "pnpm --filter @palui/core eval:reminders",
+    "release": "node scripts/release.ts"
   }
 }

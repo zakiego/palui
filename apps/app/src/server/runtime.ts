@@ -19,13 +19,13 @@ export function runtime(): ControlClient {
 
 // GET /live on the runtime. The control client doesn't expose it yet (reported
 // for core), so it's fetched directly with the same header and a short timeout.
-export async function runtimeLive(fetchImpl: typeof fetch = fetch): Promise<{ ok: boolean; schema: string }> {
+export async function runtimeLive(fetchImpl: typeof fetch = fetch): Promise<{ ok: boolean; schema: string; version?: string }> {
   const res = await fetchImpl(`${config().runtimeUrl}/live`, {
     headers: { [CONTROL_HEADER]: controlToken(masterKey()) },
     signal: AbortSignal.timeout(2_000),
   })
   if (!res.ok) throw new ControlError(`runtime answered ${res.status}`, res.status)
-  return (await res.json()) as { ok: boolean; schema: string }
+  return (await res.json()) as { ok: boolean; schema: string; version?: string }
 }
 
 // Tests inject a fake client.
