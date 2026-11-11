@@ -35,6 +35,12 @@ The answer is matched by the router before the model sees anything. A "ya" that 
 
 A pending approval expires after 10 minutes. The turn then resumes with a denial, so the model can close the loop ("OK, I didn't delete it") instead of leaving the conversation hanging.
 
+## Asking again
+
+If you ask for the same thing again before answering, Palui drops the older request and only the newest prompt counts. The same happens when the call no longer needs approval and just runs, for example after you changed the tool's class in the dashboard. A dropped request doesn't expire later and doesn't send a follow-up. Pressing its old button answers "Itu udah dijawab atau udah kedaluwarsa."
+
+"The same thing" means the same tool with the same arguments. A request for something else stays pending.
+
 ## Why not just a confirmation in the prompt
 
 Telling the model "ask before deleting" is a label in the prompt, and a prompt injection can talk the model out of it. Approvals are enforced by the runtime: the tool call physically doesn't run until you answer.

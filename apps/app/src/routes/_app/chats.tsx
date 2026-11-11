@@ -4,7 +4,7 @@
 // calls sit inline and collapsible; pending approvals show Approve/Deny.
 import * as React from "react"
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
-import { ArrowUpIcon, CircleAlertIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SearchIcon, SendIcon, ShieldAlertIcon, SquareIcon, MessageCircleIcon, WebhookIcon, WrenchIcon } from "lucide-react"
+import { ArrowUpIcon, CircleAlertIcon, CopyIcon, HashIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SearchIcon, SendIcon, ShieldAlertIcon, SquareIcon, MessageCircleIcon, WebhookIcon, WrenchIcon } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -19,6 +19,7 @@ import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, InputGroupTextarea } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
@@ -32,6 +33,7 @@ import { RuntimeAlert } from "@/components/runtime-alert"
 import { decideApproval, getChats, getTranscript, sendWebMessage, stopTurn } from "@/lib/fns/chats"
 import { ago, duration, errorMessage } from "@/lib/format"
 import { markdownToPlain } from "@/lib/markdown"
+import { transcriptToMarkdown } from "@/lib/transcript-text"
 import { useLabel, useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -278,6 +280,7 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
           {transcript.chat.title}
         </h2>
         <Badge variant="outline">{transcript.chat.channel}</Badge>
+        <CopyMenu transcript={transcript} />
       </header>
       {isWeb && down && <RuntimeAlert className="m-3 w-auto" />}
       <MessageScrollerProvider autoScroll defaultScrollPosition="end">
@@ -355,6 +358,36 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
         />
       )}
     </Card>
+  )
+}
+
+// Copies what's loaded: the transcript query keeps the newest 150 messages.
+function CopyMenu({ transcript }: { transcript: Transcript }) {
+  const t = useT()
+  const copy = async (text: string, done: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success(done)
+    } catch {
+      toast.error(t("chats.copyFailed"))
+    }
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="ms-auto shrink-0" aria-label={t("chats.copyMenu")} />}>
+        <CopyIcon aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-48">
+        <DropdownMenuItem disabled={transcript.messages.length === 0} onClick={() => void copy(transcriptToMarkdown(transcript), t("chats.copiedConversation"))}>
+          <MessagesSquareIcon aria-hidden="true" />
+          {t("chats.copyConversation")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void copy(transcript.chat.id, t("chats.copiedId"))}>
+          <HashIcon aria-hidden="true" />
+          {t("chats.copyId")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

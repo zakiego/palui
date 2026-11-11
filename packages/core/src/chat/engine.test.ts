@@ -334,6 +334,28 @@ describe("turn", () => {
     expect(seen.at(-1)).toEqual(["alpha__read"])
     expect(outboxTexts(h.db).length).toBe(before)
   })
+
+  it("shows later turns the tool calls earlier turns made, so the model needn't re-check its own work", async () => {
+    const add = fnTool("add", (i) => ({ sum: Number(i.a) + Number(i.b) }))
+    const h = await basic([callTool("alpha__add", { a: 1, b: 2 }, "c1"), say("hasilnya 3"), say("sama-sama"), say("halo lagi")], {
+      registry: { alpha: toolsRuntime("alpha", () => ({ add: { tool: add, class: "read" } })) },
+      rows: { alpha: "tools" },
+    })
+    await h.engine.inbound(tgMessage("1 tambah 2?"))
+    await h.engine.idle()
+    await h.engine.inbound(tgMessage("makasih"))
+    await h.engine.idle()
+    const next = h.m.prompts[2] as { role: string; content: unknown }[]
+    expect(next.map((m) => m.role)).toEqual(["system", "user", "assistant", "tool", "assistant", "user"])
+    expect(JSON.stringify(next[2])).toContain('"toolCallId":"c1"')
+    expect(JSON.stringify(next[3])).toContain("sum")
+    // With no tools on, the calls stay out: some providers reject tool parts without a tool list.
+    pauseConnector(h.db, "alpha")
+    await h.sup.reconcile()
+    await h.engine.inbound(tgMessage("halo"))
+    await h.engine.idle()
+    expect((h.m.prompts[3] as { role: string }[]).map((m) => m.role)).toEqual(["system", "user", "assistant", "user", "assistant", "user"])
+  })
 })
 
 describe("approvals", () => {
@@ -989,5 +1011,94 @@ describe("approval answers by text", () => {
     await h.engine.idle()
     expect(executed).toEqual(["a"])
     expect(h.db.select().from(pendingApprovals).where(eq(pendingApprovals.id, b.id)).get()!.status).toBe("pending")
+  })
+})
+
+describe("the same call asked again", () => {
+  // `cls` is read on every turn, like a tool whose class the owner changes in the dashboard.
+  function alpha(executed: string[], cls: () => "read" | "destructive" = () => "destructive") {
+    return { alpha: toolsRuntime("alpha", () => ({ nuke: { tool: fnTool("delete", (i) => (executed.push(String(i.what)), { deleted: true })), class: cls() } })) }
+  }
+  const pendingRows = (db: DB) => db.select().from(pendingApprovals).where(eq(pendingApprovals.status, "pending")).all()
+
+  it("drops the older request, so only the newest one is live and only it expires with a follow-up", async () => {
+    const executed: string[] = []
+    const h = await basic([callTool("alpha__nuke", { what: "temp" }, "c1"), callTool("alpha__nuke", { what: "temp" }, "c2"), say("oke, gak jadi")], { registry: alpha(executed), rows: { alpha: "tools" } })
+    await h.engine.inbound(tgMessage("hapus temp"))
+    await h.engine.idle()
+    const first = h.db.select().from(pendingApprovals).get()!
+    await h.engine.inbound(tgMessage("hapus temp"))
+    await h.engine.idle()
+    expect(h.db.select().from(pendingApprovals).where(eq(pendingApprovals.id, first.id)).get()!.status).toBe("superseded")
+    expect(pendingRows(h.db).map((r) => r.toolCallId)).toEqual(["c2"])
+    expect(h.db.select().from(runs).where(eq(runs.id, first.runId)).get()!.status).toBe("ok")
+    expect(h.db.select().from(toolCalls).where(eq(toolCalls.id, `${first.runId}:c1`)).get()).toMatchObject({ status: "denied", resultPreview: "dropped: the same call was made again before the owner answered" })
+    expect(listEvents(h.db).some((e) => e.kind === "approval.superseded")).toBe(true)
+
+    // The old prompt's button no longer does anything.
+    await h.engine.inbound(tgMessage("", { callback: { data: `approve:${first.id}` } }))
+    await h.engine.idle()
+    expect(executed).toEqual([])
+    expect(outboxTexts(h.db).at(-1)).toBe("Itu udah dijawab atau udah kedaluwarsa.")
+
+    // Ten minutes on: one follow-up for the live request, none for the dropped one.
+    h.engine.expireApprovals(h.clock.now + 10 * 60_000)
+    await h.engine.idle()
+    expect(h.m.prompts).toHaveLength(3)
+    expect(outboxTexts(h.db).filter((t) => t === "oke, gak jadi")).toHaveLength(1)
+  })
+
+  it("drops the older request when the call now runs without asking", async () => {
+    const executed: string[] = []
+    let cls: "read" | "destructive" = "destructive"
+    const h = await basic([callTool("alpha__nuke", { what: "temp" }, "c1"), callTool("alpha__nuke", { what: "temp" }, "c2"), say("udah")], { registry: alpha(executed, () => cls), rows: { alpha: "tools" } })
+    await h.engine.inbound(tgMessage("hapus temp"))
+    await h.engine.idle()
+    cls = "read"
+    await h.engine.inbound(tgMessage("hapus temp"))
+    await h.engine.idle()
+    expect(executed).toEqual(["temp"])
+    expect(outboxTexts(h.db).at(-1)).toBe("udah")
+    // The second turn saw that the first call was still waiting, not a bare claim.
+    expect(promptText(h.m.prompts[1])).toContain("Not run yet: still waiting for the owner's approval.")
+    expect(h.db.select().from(pendingApprovals).get()!.status).toBe("superseded")
+    h.engine.expireApprovals(h.clock.now + 10 * 60_000)
+    await h.engine.idle()
+    expect(h.m.prompts).toHaveLength(3)
+    expect(outboxTexts(h.db).at(-1)).toBe("udah")
+  })
+
+  it("leaves a request for other arguments alone, whatever the key order", async () => {
+    const executed: string[] = []
+    const h = await basic([callTool("alpha__nuke", { what: "a", force: true }, "c1"), callTool("alpha__nuke", { what: "b", force: true }, "c2"), callTool("alpha__nuke", { force: true, what: "a" }, "c3")], { registry: alpha(executed), rows: { alpha: "tools" } })
+    for (const text of ["hapus a", "hapus b"]) {
+      await h.engine.inbound(tgMessage(text))
+      await h.engine.idle()
+    }
+    expect(pendingRows(h.db).map((r) => r.toolCallId)).toEqual(["c1", "c2"])
+    await h.engine.inbound(tgMessage("hapus a"))
+    await h.engine.idle()
+    expect(pendingRows(h.db).map((r) => r.toolCallId)).toEqual(["c2", "c3"])
+  })
+
+  it("still resumes a run whose other request was already answered", async () => {
+    const executed: string[] = []
+    const both = callTools([
+      { toolName: "alpha__nuke", input: { what: "a" }, toolCallId: "c1" },
+      { toolName: "alpha__nuke", input: { what: "b" }, toolCallId: "c2" },
+    ])
+    const h = await basic([both, callTool("alpha__nuke", { what: "b" }, "c3"), say("a kehapus")], { registry: alpha(executed), rows: { alpha: "tools" } })
+    await h.engine.inbound(tgMessage("hapus a dan b"))
+    await h.engine.idle()
+    const a = h.db.select().from(pendingApprovals).where(eq(pendingApprovals.toolCallId, "c1")).get()!
+    expect(await h.engine.decideApproval(a.id, true, "dashboard")).toBe(true)
+    await h.engine.idle()
+    expect(executed).toEqual([])
+    await h.engine.inbound(tgMessage("hapus b"))
+    await h.engine.idle()
+    expect(executed).toEqual(["a"])
+    expect(promptText(h.m.prompts[2])).toContain("Dropped: the same call was made again later")
+    expect(outboxTexts(h.db).at(-1)).toBe("a kehapus")
+    expect(pendingRows(h.db).map((r) => r.toolCallId)).toEqual(["c3"])
   })
 })
