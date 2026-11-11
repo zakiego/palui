@@ -18,6 +18,7 @@ export type Route =
   // `batch`: a bare "ya"/"batal" with several requests waiting answers every
   // pending request of the newest run (the reply says so).
   | { kind: "approval"; approvalId: string; approved: boolean; batch?: string[] }
+  // A reminder or routine check-in action, answered without the model.
   | { kind: "reminder"; reply: string }
   | { kind: "hook"; hook: NonNullable<StoredContent["hook"]>; text: string }
   | { kind: "turn" }
@@ -83,6 +84,7 @@ export type RouteInput = {
   text: string
   replyToChannelMsgId?: string
   reminderActions?: ReminderActions
+  routineActions?: ReminderActions
   now: number
 }
 
@@ -99,6 +101,10 @@ export async function route(i: RouteInput): Promise<Route> {
     if (s) return { kind: "command", name: "connectors", args: [s[1]!, s[2]!] }
     if (cb.startsWith("rem:") && i.reminderActions) {
       const reply = await i.reminderActions.fromCallback(i.db, cb, i.chat.id, i.now)
+      if (reply !== null) return { kind: "reminder", reply }
+    }
+    if (cb.startsWith("rt:") && i.routineActions) {
+      const reply = await i.routineActions.fromCallback(i.db, cb, i.chat.id, i.now)
       if (reply !== null) return { kind: "reminder", reply }
     }
     return { kind: "ignore", reason: `Unknown button "${cb}".` }
@@ -124,6 +130,10 @@ export async function route(i: RouteInput): Promise<Route> {
 
   if (i.reminderActions && i.text.trim()) {
     const reply = await i.reminderActions.fromText(i.db, i.text, i.replyToChannelMsgId, i.chat.id, i.now)
+    if (reply !== null) return { kind: "reminder", reply }
+  }
+  if (i.routineActions && i.text.trim()) {
+    const reply = await i.routineActions.fromText(i.db, i.text, i.replyToChannelMsgId, i.chat.id, i.now)
     if (reply !== null) return { kind: "reminder", reply }
   }
   if (!i.text.trim() && !(i.content.media ?? []).length) return { kind: "ignore", reason: "Empty message." }

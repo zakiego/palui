@@ -291,6 +291,17 @@ The feature most likely to be judged by its failures.
   - Fake-clock unit tests: America/New_York DST gap and overlap, "last Friday", the 31st in a 30-day month, the restart-with-overdue case, the 25-day-out timer.
   - A parse eval: 60 Indonesian and English phrases against a fixed "now", at least 95% exact.
 
+## 6b. Routines
+
+Generic automations the agent builds from chat (`packages/core/src/routines`, tools in the `routines` skill). Nothing in the core knows about a specific use case; prayer times, medicine or a weekly review are all plain config.
+
+- A routine is `source` (when) + `action` (what) + `recap`, with `tz`, `days` and pause (`enabled`, `paused_until`). Source and action are JSON with a `kind`, validated by zod in `routines/config.ts`; a new kind needs no migration.
+- Sources: `times` (fixed local times), `rrule`, `tool` (a read-only connector tool called server-side through `RunningConnector.callTool`, for today and tomorrow, refreshed daily at `refreshAt`; `items` map field paths to occurrences, `list` walks an array of dated entries).
+- Actions: `message`, `checkin` (answer options, re-ask every N minutes up to a max, deadline `next` occurrence or `after` N minutes, optional missed note), `prompt` (an unattended turn).
+- Each fire writes a `routine_occurrences` row keyed `(routine_id, key)` in the same transaction as its outbox row, so an occurrence fires once across restarts. The scheduler runs the routine engine as an extension on its timer.
+- A failing tool source retries with backoff, falls back to the last fetched day's clock times (marked on the message), and tells the owner once a day after 3 failures.
+- Answers: Telegram buttons `rt:<occ>:<answer>` and quoted replies matching an answer exactly go through the router. Anything else reaches the model, which sees the open check-ins in the system prompt and calls `jawab_checkin`.
+
 ## 7. Scheduled jobs
 
 - A job is an RRULE, a zone, a prompt, a target chat, a tool scope and a model role.
@@ -329,6 +340,8 @@ Delivery is at least once. Outbox rows stuck in `sending` for more than 5 minute
 | `pending_approvals` | id, run_id, chat_id, approval_id, messages json, prompt_msg_id, expires_at, status |
 | `reminders` | id, chat_id, text, rrule, tz, fire_at, status, last_fired_at, snoozed_until |
 | `jobs` | id, name, rrule, tz, prompt, chat_id, model_role, tool_scope, enabled, next_run_at, daily_token_cap |
+| `routines` | id, chat_id, name, tz, days, source json, action json, recap json, enabled, paused_until, status, next_fire_at, next_occ, cursor, source_state, next_refresh_at, next_recap_at, last_error |
+| `routine_occurrences` | id, routine_id, chat_id, key (unique per routine), label, scheduled_at, status, answer, answers json, follow_ups, next_follow_up_at, deadline_at, fallback |
 | `outbox` | id, chat_id, payload, status, attempts, next_attempt_at, claimed_at, channel_msg_id, source |
 | `events` | id, at, level, connector_id, kind, message |
 | `settings` | key, value |

@@ -15,6 +15,8 @@ import { createOutboxWorker } from "@palui/core/outbox/worker"
 import type { AnyRuntime, ConnectorManifest, ConnectorServices } from "@palui/core/connectors/define"
 import type { ConnectorRow } from "@palui/core/connectors/store"
 import { createSupervisor, type Supervisor } from "@palui/core/connectors/supervisor"
+import { connectorToolCaller } from "@palui/core/routines/call"
+import { getSetting } from "@palui/core/settings"
 import { createControlServer } from "./control"
 
 // Deps that need the engine (the job runner calls runTurn) are built by a factory
@@ -90,6 +92,7 @@ export async function startRuntime(opts: RuntimeOptions = {}): Promise<Runtime> 
   if (typeof opts.deps === "function") Object.assign(deps, opts.deps({ db, engine, log, supervisor }))
   Object.assign(services, engine.services)
   services.reconcile = () => supervisor.poke()
+  services.callTool = connectorToolCaller(() => supervisor.running(), { tz: () => getSetting(db, "timezone") })
   const worker = createOutboxWorker({ db, channel: (ch) => supervisor.channel(ch), log })
   const control = createControlServer({ db, token: getControlToken(cfg), engine, supervisor, deps, bus, log, startedAt })
 

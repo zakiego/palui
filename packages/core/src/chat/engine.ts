@@ -121,7 +121,7 @@ export function createEngine(opts: EngineOptions) {
     try {
       row = await prepareMedia(db, row, ctx.host.running(), log)
       const content = row.content as StoredContent
-      const r = await route({ db, chat, content, text: row.text, replyToChannelMsgId: row.replyToChannelMsgId ?? undefined, reminderActions: ctx.deps.reminderActions, now: ctx.clock() })
+      const r = await route({ db, chat, content, text: row.text, replyToChannelMsgId: row.replyToChannelMsgId ?? undefined, reminderActions: ctx.deps.reminderActions, routineActions: ctx.deps.routineActions, now: ctx.clock() })
       // Stop the button spinner whatever the press turned out to be.
       if (content.callback?.callbackId) answerCallback(chat, content.callback.callbackId)
       switch (r.kind) {

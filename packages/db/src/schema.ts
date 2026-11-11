@@ -397,6 +397,98 @@ export const jobs = sqliteTable(
   (t) => [index("jobs_next").on(t.enabled, t.nextRunAt)],
 )
 
+// --- Routines ---------------------------------------------------------------------
+// A routine is a chat-owned automation: a time source (when) plus an action (what).
+// Both are JSON configs with a `kind` that core/routines validates, so a new kind
+// needs no migration. Occurrences are the per-fire log (and the check-in state).
+
+export type RoutineConfigJson = { kind: string } & Record<string, unknown>
+
+// What a time source remembers between refreshes (tool sources cache fetched times).
+export type RoutineSourceState = {
+  // Fetched occurrences, UTC ms, with the local date they were fetched for.
+  entries?: { date: string; key: string; label: string; at: number }[]
+  // Local dates a per-day fetch succeeded for.
+  fetched?: string[]
+  failures?: number
+  lastError?: string | null
+  lastOkAt?: number | null
+  // The local date the owner was last told about a failing source.
+  noticeFor?: string | null
+}
+
+export type RoutineCursor = { at: number; key: string }
+
+export const routines = sqliteTable(
+  "routines",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id").notNull(),
+    name: text("name").notNull(),
+    tz: text("tz").notNull(),
+    // Weekday codes (MO..SU) the routine runs on, null for every day.
+    days: json<string[] | null>("days"),
+    source: json<RoutineConfigJson>("source").notNull(),
+    action: json<RoutineConfigJson>("action").notNull(),
+    recap: json<RoutineConfigJson>("recap").notNull(),
+    // Message and prompt actions skip an occurrence more than this late (downtime).
+    lateGraceMin: integer("late_grace_min").notNull().default(60),
+    enabled: bool("enabled").notNull().default(true),
+    // Paused with an end date: resumes on its own at this time (UTC ms).
+    pausedUntil: integer("paused_until"),
+    // idle -> firing while one sweep handles the due occurrence.
+    status: text("status").$type<"idle" | "firing">().notNull().default("idle"),
+    nextFireAt: integer("next_fire_at"),
+    nextOcc: json<{ at: number; key: string; label: string; fallback?: boolean } | null>("next_occ"),
+    // The last occurrence handled; the next one is computed after it.
+    cursor: json<RoutineCursor | null>("cursor"),
+    sourceState: json<RoutineSourceState>("source_state").notNull().default({}),
+    nextRefreshAt: integer("next_refresh_at"),
+    nextRecapAt: integer("next_recap_at"),
+    lastError: text("last_error"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [index("routines_chat").on(t.chatId), index("routines_next").on(t.enabled, t.status, t.nextFireAt)],
+)
+
+// open: a check-in waiting for an answer. done: answered with a closing answer.
+// missed: deadline passed without one. sent: a message or prompt went out.
+// skipped: too late to send (downtime). failed: the prompt turn failed.
+export type RoutineOccurrenceStatus = "open" | "done" | "missed" | "sent" | "skipped" | "failed"
+
+export const routineOccurrences = sqliteTable(
+  "routine_occurrences",
+  {
+    id: text("id").primaryKey(),
+    routineId: text("routine_id").notNull(),
+    chatId: text("chat_id").notNull(),
+    // "<local date>:<item key>" (or the local datetime for RRULE): one fire per key.
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    scheduledAt: integer("scheduled_at").notNull(),
+    firedAt: integer("fired_at").notNull(),
+    status: text("status").$type<RoutineOccurrenceStatus>().notNull(),
+    // Last answer id given (check-ins), with every answer in `answers`.
+    answer: text("answer"),
+    answeredAt: integer("answered_at"),
+    answers: json<{ answer: string; text?: string; at: number }[]>("answers").notNull().default([]),
+    followUps: integer("follow_ups").notNull().default(0),
+    nextFollowUpAt: integer("next_follow_up_at"),
+    deadlineAt: integer("deadline_at"),
+    // Times came from a stale cache because the source failed.
+    fallback: bool("fallback").notNull().default(false),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("routine_occ_key").on(t.routineId, t.key),
+    index("routine_occ_chat_status").on(t.chatId, t.status),
+    index("routine_occ_follow").on(t.status, t.nextFollowUpAt),
+    index("routine_occ_deadline").on(t.status, t.deadlineAt),
+  ],
+)
+
 // --- Outbox -----------------------------------------------------------------------
 
 export type OutboxStatus = "pending" | "sending" | "sent" | "failed" | "cancelled"

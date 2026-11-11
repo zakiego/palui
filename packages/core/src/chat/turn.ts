@@ -14,6 +14,7 @@ import { enqueueOutbox, notifyOutbox } from "../outbox/enqueue"
 import type { TurnInfo } from "../connectors/define"
 import type { Supervisor } from "../connectors/supervisor"
 import { notesPrompt } from "../notes/service"
+import { checkinsPrompt } from "../routines/service"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, emptyTools, SEARCH_TOOL, STICKY_MAX, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
@@ -233,6 +234,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         capabilities: capabilityList(ctx, tools),
         toolSearch: tools.deferred.length > 0,
         notes: notesPrompt(db),
+        checkins: input.trigger === "message" ? checkinsPrompt(db, chat.id, startedAt) : null,
         recall,
         summary: input.trigger === "message" ? session?.summary : null,
         trigger: origin,

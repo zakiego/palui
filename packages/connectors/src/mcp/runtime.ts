@@ -132,6 +132,17 @@ export default defineRuntime(manifest, {
         }
         return out
       },
+      // Direct call for routines: the tool must exist and not be turned off. The
+      // class is the saved one, else the server's own hint (readOnlyHint -> read).
+      async callTool(name, args) {
+        const def = (await conn.listTools()).tools.find((d) => d.name === name) ?? (await conn.listTools({ fresh: true })).tools.find((d) => d.name === name)
+        if (!def) throw new Error(`No tool ${name} on this server`)
+        const pref = ctx.config.toolPrefs?.[name]
+        if (pref && !pref.enabled) throw new Error(`Tool ${name} is turned off on the Connectors page`)
+        const cls: ToolClass = pref?.class ?? suggestClass(def.annotations)
+        if (cls !== "read") return { class: cls, output: null }
+        return { class: cls, output: await conn.callTool(name, args) }
+      },
       live() {
         return { tools: toolCount, url: ctx.config.url, error: lastError }
       },

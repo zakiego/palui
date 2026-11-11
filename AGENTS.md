@@ -28,7 +28,7 @@ packages/connectors  One folder per connector: <type>/manifest.ts (zod + UI meta
 - One SQLite file (`$DATA_DIR/palui.db`, WAL, busy_timeout 5000) shared by app and runtime through the same volume.
 - Inbound message: channel -> `services.inbound()` writes `messages` (status `pending`) -> router -> per-chat queue -> turn -> `outbox` -> outbox worker -> channel `send()` -> `sent`.
 - Inbound hooks: the app verifies `POST /api/hooks/:slug`, then inserts a `pending` message into the hook's chat whose `content` is `{ text, hook: { id, name, mode } }` and pokes the runtime. The engine treats it as untrusted: mode `forward` sends the text as is (no model), mode `summarize` runs a turn with zero tools, tainted.
-- Outbox actions use ids the router understands: `approve:<id>`, `deny:<id>`, `rem:done:<id>`, `rem:snooze:<id>:<10m|1h|tomorrow>`, `connector:<on|off>:<connectorId>`.
+- Outbox actions use ids the router understands: `approve:<id>`, `deny:<id>`, `rem:done:<id>`, `rem:snooze:<id>:<10m|1h|tomorrow>`, `connector:<on|off>:<connectorId>`, `rt:<occurrenceId>:<answerId>` (routine check-in answers).
 - Delivery is at least once. Never delete a reminder or outbox row before the channel acks.
 
 ## Conventions

@@ -171,6 +171,10 @@ export type RunningConnector = {
   model?(modelId: string, role: ModelRole): LanguageModel
   // Tool connectors: tools for this turn, keyed by tool name WITHOUT the namespace.
   tools?(turn: TurnInfo): Promise<Record<string, PaluiTool>>
+  // Call one tool by name outside a turn (routine sources read data on a timer).
+  // Returns the raw result and the tool's class; the caller decides what's allowed.
+  // Connectors without it are called through tools() instead.
+  callTool?(name: string, args: Record<string, unknown>): Promise<{ class: ToolClass; output: unknown }>
   memory?: MemoryHandle
   // Voice-in skills: speech to text for inbound audio (PLAN 5.5).
   transcribe?(audio: InboundMedia): Promise<string>
@@ -192,6 +196,9 @@ export type ConnectorServices = {
   // Reconcile connector rows now instead of on the next 30 s tick (a tool added
   // or removed a connector). Optional so test hosts can leave it out.
   reconcile?(): void
+  // Call a read-only tool of another running connector, server-side (routines).
+  // Throws when the connector isn't running, the tool is missing or not `read`.
+  callTool?(connectorId: string, tool: string, args: Record<string, unknown>): Promise<unknown>
 }
 
 export type ConnectorContext<C = Record<string, unknown>, S = Record<string, string | undefined>> = {

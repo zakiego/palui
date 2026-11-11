@@ -39,6 +39,15 @@ export type SchedulerOptions = {
   // Runs a claimed job (createJobRunner().run). The scheduler sets the job back to
   // idle once this settles.
   onJobDue?: (job: JobRow) => Promise<void>
+  // More things to sweep on the same timer (routines). Each claims its own rows.
+  extensions?: SchedulerExtension[]
+}
+
+export type SchedulerExtension = {
+  recover?(now: number): void
+  sweep(now: number): number
+  nextDue(): number | null
+  idle?(): Promise<void>
 }
 
 export type Scheduler = {
@@ -248,6 +257,13 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     } catch (e) {
       log.error("job sweep failed", { err: e as Error })
     }
+    for (const ext of opts.extensions ?? []) {
+      try {
+        ext.sweep(now)
+      } catch (e) {
+        log.error("scheduler extension sweep failed", { err: e as Error })
+      }
+    }
     return { reminders: r, jobs: j }
   }
 
@@ -259,9 +275,8 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
         .from(jobs)
         .where(and(eq(jobs.enabled, true), eq(jobs.status, "idle"), isNotNull(jobs.nextRunAt)))
         .get()?.v ?? null
-    if (a === null) return b
-    if (b === null) return a
-    return Math.min(a, b)
+    const all = [a, b, ...(opts.extensions ?? []).map((e) => e.nextDue())].filter((v): v is number => typeof v === "number")
+    return all.length ? Math.min(...all) : null
   }
 
   function arm() {
@@ -297,6 +312,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
       const now = clock()
       db.update(reminders).set({ status: "pending", updatedAt: now }).where(eq(reminders.status, "firing")).run()
       db.update(jobs).set({ status: "idle", updatedAt: now }).where(eq(jobs.status, "running")).run()
+      for (const ext of opts.extensions ?? []) ext.recover?.(now)
       unsubscribe = onScheduleChanged(() => this.poke())
       interval = timers.setInterval(() => void tick(), SWEEP_INTERVAL_MS)
       await tick()
@@ -316,6 +332,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     sweep,
     async idle() {
       while (inFlight.size) await Promise.all([...inFlight])
+      for (const ext of opts.extensions ?? []) await ext.idle?.()
     },
   }
 }

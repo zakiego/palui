@@ -112,6 +112,24 @@ describe("mcp connector", () => {
     }
   })
 
+  it("callTool() calls a tool directly with its class, refusing turned-off tools and not running non-read ones", async () => {
+    srv = await startMcpServer({ register, token: TOKEN })
+    const cfg = config(srv.url, { toolPrefs: { delete_all: { enabled: false, class: "destructive" }, add_note: { enabled: true, class: "write" } } })
+    const running = await runtime.start(fakeCtx(cfg, { token: TOKEN }))
+    try {
+      // No saved pref: the server's readOnlyHint makes it read.
+      const res = await running.callTool!("search", { q: "jadwal" })
+      expect(res.class).toBe("read")
+      expect(JSON.stringify(res.output)).toContain("found jadwal")
+      expect(await running.callTool!("add_note", { text: "x" })).toEqual({ class: "write", output: null })
+      expect(await running.callTool!("mystery", {})).toEqual({ class: "destructive", output: null })
+      await expect(running.callTool!("delete_all", {})).rejects.toThrow(/turned off/)
+      await expect(running.callTool!("nope", {})).rejects.toThrow(/No tool nope/)
+    } finally {
+      await running.stop()
+    }
+  })
+
   it("marks tools trusted for an own server", async () => {
     srv = await startMcpServer({ register })
     const running = await runtime.start(fakeCtx(config(srv.url, { authMode: "none" }), {}, { trust: "own" }))

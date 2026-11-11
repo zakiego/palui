@@ -13,6 +13,8 @@ export type ReminderActions = {
 
 export type EngineDeps = {
   reminderActions?: ReminderActions
+  // Same shape: Telegram "rt:" buttons and quoted replies to routine check-ins.
+  routineActions?: ReminderActions
   parseReminder?: (text: string, tz: string, now: number, model: LanguageModel) => Promise<ParsedReminder>
   scheduler?: { start(): void | Promise<void>; stop(): Promise<void>; poke(): void }
   jobs?: { runNow(jobId: string): Promise<{ ok: boolean; runId?: string; detail?: string }> }

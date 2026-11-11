@@ -15,6 +15,7 @@ import {
   NotebookPenIcon,
   PaperclipIcon,
   PlugIcon,
+  RepeatIcon,
   SendIcon,
   ServerCogIcon,
   SquareTerminalIcon,
@@ -41,6 +42,7 @@ const ICONS: Record<string, LucideIcon> = {
   "notebook-pen": NotebookPenIcon,
   "server-cog": ServerCogIcon,
   paperclip: PaperclipIcon,
+  repeat: RepeatIcon,
 }
 
 export function connectorIcon(name: string | undefined): LucideIcon {

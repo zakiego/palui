@@ -29,6 +29,13 @@
       "when": 1794401783332,
       "tag": "0003_curved_devos",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794402940580,
+      "tag": "0004_swift_ronan",
+      "breakpoints": true
     }
   ]
 }
