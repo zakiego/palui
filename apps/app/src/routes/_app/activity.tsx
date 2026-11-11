@@ -10,6 +10,7 @@ import { AppError } from "@/components/app-error"
 import { ClampText } from "@/components/clamp-text"
 import { ListCapNote } from "@/components/list-cap-note"
 import { PageHeader } from "@/components/page-header"
+import { PageHeaderSkeleton, PagePending, SkeletonButton, SkeletonText, TableSkeleton, TabsSkeleton } from "@/components/page-pending"
 import { SimpleSelect } from "@/components/simple-select"
 import { Badge } from "@/components/ui/badge"
 import { StatusText } from "@/components/ui/status-text"
@@ -345,19 +346,78 @@ function Breakdown({ title, list, mono, unnamed }: { title: string; list: { rows
 }
 
 function ActivitySkeleton() {
+  const { tab = "events" } = Route.useSearch()
   return (
-    <>
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-8 w-28" />
-        <Skeleton className="h-4 w-96 max-w-full" />
+    <PagePending page="nav.activity">
+      <PageHeaderSkeleton title="w-28" description="w-96" />
+      <div className="flex flex-col gap-4">
+        <TabsSkeleton className="w-48" />
+        {tab === "events" && (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <SkeletonButton className="w-48" />
+              <SkeletonButton className="w-52" />
+            </div>
+            <TableSkeleton
+              rows={10}
+              columns={[
+                { className: "w-36 max-sm:hidden", head: "w-10", text: "font-mono text-caption", short: "w-28" },
+                { className: "w-20", head: "w-10", status: true, short: "w-8" },
+                { className: "w-36 max-md:hidden", head: "w-16", text: "font-mono text-caption", short: "w-20" },
+                { head: "w-16" },
+              ]}
+            />
+          </div>
+        )}
+        {tab === "runs" && (
+          <TableSkeleton
+            rows={10}
+            columns={[
+              { className: "w-36 max-sm:hidden", head: "w-12", text: "font-mono text-caption", short: "w-28" },
+              { head: "w-8", sub: true },
+              { className: "hidden w-56 @5xl/main:table-cell", head: "w-12", text: "font-mono text-caption", short: "w-32" },
+              { className: "w-28 text-end", head: "w-12", text: "font-mono text-caption", short: "w-12", align: "end" },
+              { className: "w-24 text-end max-sm:hidden", head: "w-8", text: "font-mono text-caption", short: "w-10", align: "end" },
+            ]}
+          />
+        )}
+        {tab === "usage" && (
+          <div className="flex flex-col gap-4">
+            <Card>
+              <CardHeader>
+                <SkeletonText className="font-heading text-heading" width="w-40" />
+                <SkeletonText className="text-sm" width="w-72" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-64 w-full rounded-lg" />
+              </CardContent>
+            </Card>
+            <div className="grid gap-4 @4xl/main:grid-cols-3">
+              {["w-24", "w-20", "w-20"].map((title, i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <SkeletonText className="font-heading text-heading" width={title} />
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="flex flex-col gap-3">
+                      {["w-2/3", "w-1/2", "w-3/5"].map((w, k) => (
+                        <li key={k} className="flex flex-col gap-1">
+                          <span className="flex items-center justify-between gap-2">
+                            <SkeletonText className="min-w-0 flex-1 text-sm" width={w} />
+                            <SkeletonText className="text-caption" width="w-20" />
+                          </span>
+                          <Skeleton className="h-1 w-full rounded-full" />
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-      <Skeleton className="h-8 w-60" />
-      <div className="flex flex-col gap-2 rounded-xl p-2 shadow-(--shadow-border)">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-10" />
-        ))}
-      </div>
-    </>
+    </PagePending>
   )
 }
 

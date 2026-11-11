@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 import { AppError } from "@/components/app-error"
 import { PageHeader } from "@/components/page-header"
+import { PageHeaderSkeleton, PagePending, SkeletonText, StatusTextSkeleton } from "@/components/page-pending"
 import { RuntimeAlert } from "@/components/runtime-alert"
 import { ConnectorMap } from "@/components/connectors/connector-map"
 import { StatusAnnouncer } from "@/components/connectors/shared"
@@ -21,6 +22,7 @@ import { compact, duration, errorMessage, inOtherZone, inZone } from "@/lib/form
 import { dismissChecklist, getHome } from "@/lib/fns/home"
 import { useCount, useLabel, useT, type Key } from "@/lib/i18n"
 import { runTitle } from "@/lib/runs"
+import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_app/")({
   loader: () => getHome(),
@@ -309,21 +311,111 @@ function RunsCard({ runs, timezone }: { runs: HomeData["runs"]; timezone: string
   )
 }
 
+// The connector map's rows while it loads: a group label, then its connectors.
+const MAP_ROWS: { group?: string; name?: string }[] = [{ group: "w-16" }, { name: "w-24" }, { name: "w-28" }, { group: "w-14" }, { name: "w-32" }, { name: "w-20" }, { group: "w-16" }, { name: "w-24" }]
+
 function HomeSkeleton() {
   return (
-    <>
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-8 w-32" />
-        <Skeleton className="h-4 w-full max-w-md" />
-      </div>
+    <PagePending page="nav.home">
+      <PageHeaderSkeleton title="w-24" description="w-80" />
       <div className="grid items-start gap-4 @3xl/main:grid-cols-2">
-        <Skeleton className="h-80 rounded-xl" />
-        <div className="grid gap-4">
-          <Skeleton className="h-32 rounded-xl" />
-          <Skeleton className="h-44 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
+        <Card>
+          <CardHeaderSkeleton title="w-28" description="w-20" action="w-14" />
+          <CardContent>
+            <ul className="@container/map flex flex-col">
+              <li className="flex min-h-9 items-center gap-3">
+                <Skeleton className="size-9 rounded-lg" />
+                <SkeletonText className="text-sm" width="w-12" />
+              </li>
+              {MAP_ROWS.map((row, i) =>
+                row.group ? (
+                  <li key={i} className="flex min-h-9 items-center gap-3 pt-2">
+                    <span className="w-9 shrink-0" />
+                    <SkeletonText className="text-overline" width={row.group} />
+                  </li>
+                ) : (
+                  <li key={i} className="flex min-h-9 items-center gap-3">
+                    <span className="w-9 shrink-0" />
+                    <span className="flex min-w-0 flex-1 items-center gap-2.5 py-1">
+                      <Skeleton className="size-8 rounded-md" />
+                      <SkeletonText className="min-w-0 flex-1 text-sm" width={row.name!} />
+                      <StatusTextSkeleton className="hidden @sm/map:flex" />
+                      <span className="-me-2 flex size-11 shrink-0 items-center justify-center">
+                        <Skeleton className="h-[18.4px] w-8 rounded-full" />
+                      </span>
+                    </span>
+                  </li>
+                ),
+              )}
+            </ul>
+          </CardContent>
+        </Card>
+        <div className="grid min-w-0 content-start gap-4">
+          <Card>
+            <CardHeader>
+              <SkeletonText className="text-sm" width="w-24" />
+              <SkeletonText className="text-display" width="w-24" />
+              <CardAction>
+                <Skeleton className="h-7 w-16 pointer-coarse:h-9" />
+              </CardAction>
+            </CardHeader>
+            <CardContent>
+              <SkeletonText className="text-caption" width="w-48" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeaderSkeleton title="w-32" action="w-14" />
+            <CardContent>
+              <ItemListSkeleton rows={3} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeaderSkeleton title="w-24" action="w-12" />
+            <CardContent>
+              <ItemListSkeleton rows={5} status />
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </>
+    </PagePending>
+  )
+}
+
+const ITEM_WIDTHS = ["w-3/4", "w-1/2", "w-2/3", "w-3/5", "w-4/5"]
+const SUB_WIDTHS = ["w-56", "w-40", "w-48", "w-36", "w-52"]
+
+// Item rows as RemindersCard and RunsCard render them: a title, a mono line under it.
+function ItemListSkeleton({ rows, status }: { rows: number; status?: boolean }) {
+  return (
+    <ItemGroup className="gap-0">
+      {Array.from({ length: rows }, (_, i) => (
+        <Item key={i} size="sm" className="px-0">
+          <ItemContent className="min-w-0">
+            <SkeletonText className="text-sm" width={ITEM_WIDTHS[i % ITEM_WIDTHS.length]} />
+            <SkeletonText className="text-sm" width={SUB_WIDTHS[i % SUB_WIDTHS.length]} />
+          </ItemContent>
+          {status && (
+            <ItemActions>
+              <StatusTextSkeleton />
+            </ItemActions>
+          )}
+        </Item>
+      ))}
+    </ItemGroup>
+  )
+}
+
+// A CardHeader with a title, an optional description and a small action button.
+function CardHeaderSkeleton({ title, description, action }: { title: string; description?: string; action?: string }) {
+  return (
+    <CardHeader>
+      <SkeletonText className="font-heading text-heading" width={title} />
+      {description && <SkeletonText className="text-sm" width={description} />}
+      {action && (
+        <CardAction>
+          <Skeleton className={cn("h-7 pointer-coarse:h-9", action)} />
+        </CardAction>
+      )}
+    </CardHeader>
   )
 }

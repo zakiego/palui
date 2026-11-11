@@ -11,6 +11,7 @@ import { AppError } from "@/components/app-error"
 import { ClampText } from "@/components/clamp-text"
 import { ListCapNote } from "@/components/list-cap-note"
 import { PageHeader } from "@/components/page-header"
+import { PageHeaderSkeleton, PagePending, TableSkeleton, TabsSkeleton } from "@/components/page-pending"
 import { SimpleSelect } from "@/components/simple-select"
 import {
   AlertDialog,
@@ -31,7 +32,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -412,20 +412,20 @@ function NewReminderDialog({ open, onOpenChange, data }: { open: boolean; onOpen
 
 function RemindersSkeleton() {
   return (
-    <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-36" />
-          <Skeleton className="h-4 w-80 max-w-full" />
-        </div>
-        <Skeleton className="h-8 w-36" />
+    <PagePending page="nav.reminders">
+      <PageHeaderSkeleton title="w-36" description="w-80" action="w-36" />
+      <div className="flex flex-col gap-4">
+        <TabsSkeleton className="w-64" />
+        <TableSkeleton
+          rows={8}
+          columns={[
+            { head: "w-16", sub: "sm:hidden" },
+            { className: "w-52 max-sm:hidden", head: "w-10", text: "font-mono text-caption", short: "w-28", sub: true },
+            { className: "w-56 max-md:hidden", head: "w-8", short: "w-28" },
+            { className: "w-12", controls: ["size-4 rounded-sm"] },
+          ]}
+        />
       </div>
-      <Skeleton className="h-8 w-72" />
-      <div className="flex flex-col gap-2 rounded-xl p-2 shadow-(--shadow-border)">
-        {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-12" />
-        ))}
-      </div>
-    </>
+    </PagePending>
   )
 }

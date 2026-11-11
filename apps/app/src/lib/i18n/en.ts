@@ -47,6 +47,7 @@ export const en = {
   "common.copy": "Copy",
   "common.copied": "Copied",
   "common.loading": "Loading",
+  "common.loadingPage": "Loading {page}…",
   "common.never": "Never",
   "common.all": "All",
   "common.search": "Search",

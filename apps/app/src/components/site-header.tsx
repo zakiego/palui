@@ -5,6 +5,7 @@ import * as React from "react"
 import { Link, useRouterState } from "@tanstack/react-router"
 import { CircleAlertIcon, CircleCheckIcon, CircleDashedIcon, SearchIcon } from "lucide-react"
 
+import { RouteProgress } from "@/components/route-progress"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
@@ -72,6 +73,7 @@ export function SiteHeader({ onOpenCommand }: { onOpenCommand: () => void }) {
       <span role="status" aria-live="polite" className="sr-only">
         {announcement}
       </span>
+      <RouteProgress />
     </header>
   )
 }

@@ -11,6 +11,7 @@ import type { ConnectorManifest } from "@palui/core/connectors/define"
 import { AppError } from "@/components/app-error"
 import { connectorIcon } from "@/components/connector-icon"
 import { PageHeader } from "@/components/page-header"
+import { PageHeaderSkeleton, PagePending } from "@/components/page-pending"
 import { RuntimeAlert } from "@/components/runtime-alert"
 import { ConnectorSheet, type SheetTarget } from "@/components/connectors/connector-sheet"
 import { DEFAULT_CONNECTOR_LAYOUT, CONNECTOR_LAYOUTS } from "@/components/connectors/layouts"
@@ -22,7 +23,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Skeleton } from "@/components/ui/skeleton"
 import { useLiveRefresh } from "@/hooks/use-live-events"
 import { getConnectorsPage } from "@/lib/fns/connectors"
 import { useT } from "@/lib/i18n"
@@ -225,17 +225,11 @@ function ConnectorsSkeleton() {
   const { v } = Route.useSearch()
   const { Skeleton: LayoutSkeleton } = CONNECTOR_LAYOUTS[v ? v - 1 : DEFAULT_CONNECTOR_LAYOUT]
   return (
-    <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-28" />
-          <Skeleton className="h-4 w-72 max-w-full" />
-        </div>
-        <Skeleton className="h-8 w-36" />
-      </div>
+    <PagePending page="nav.connectors">
+      <PageHeaderSkeleton title="w-36" description="w-80" action="w-36" />
       <div className="flex flex-col gap-6">
         <LayoutSkeleton />
       </div>
-    </>
+    </PagePending>
   )
 }
