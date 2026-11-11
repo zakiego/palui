@@ -1,0 +1,103 @@
+---
+title: Host commands
+description: Let Palui run an allowlist of CLI commands on the Docker host through the host bridge, a small MCP server you install next to Docker.
+---
+
+Palui's containers can't run programs on the machine Docker runs on. The host bridge closes that gap on purpose and narrowly. It's a small MCP server that runs on the host, outside Docker. It turns each command you list in its config into one tool. Palui connects to it like any other [MCP server](/docs/connectors/mcp).
+
+Nothing runs that isn't in the allowlist. Commands run without a shell, so pipes, `;` and `$(...)` are plain text. The model can only fill in the params you declare, and each value is checked against an enum or a pattern.
+
+## Install
+
+On the Docker host, from a checkout of the repository:
+
+```bash
+ops/install-host-bridge.sh
+```
+
+The script:
+
+1. Builds the bridge into one file, `~/selfhost/bin/palui-host-bridge.mjs`.
+2. On the first run, writes `~/.config/palui/host-bridge.json` with a fresh token and two read-only starter commands. It prints the token once.
+3. Installs a LaunchAgent that keeps the bridge running on `127.0.0.1:4893`. The log is `~/selfhost/palui-host-bridge.log`.
+
+The bridge listens on loopback only. Docker Desktop and OrbStack route `host.docker.internal` to the host's loopback, so the runtime container still reaches it.
+
+## Connect it in Palui
+
+1. On the Connectors page, choose Add connector, then MCP server, then the Host commands preset. The URL is `http://host.docker.internal:4893/mcp`.
+2. Paste the token from the install step.
+3. Set the trust flag to `own`.
+4. Press Test, then review the tool table and connect.
+
+## The allowlist
+
+Each entry in `commands` becomes one tool:
+
+```json
+{
+  "token": "<at least 32 characters>",
+  "commands": [
+    {
+      "name": "git_log",
+      "description": "Show recent commits of a repo in ~/Code.",
+      "class": "read",
+      "command": "/usr/bin/git",
+      "cwd": "~/Code",
+      "args": ["-C", "{repo}", "log", "--oneline", "-n", "{count}"],
+      "params": {
+        "repo": { "pattern": "[\\w-]+", "description": "Folder name in ~/Code" },
+        "count": { "pattern": "\\d{1,3}", "optional": true }
+      },
+      "timeoutMs": 10000
+    }
+  ]
+}
+```
+
+| Field | Notes |
+|---|---|
+| `name` | The tool name: lowercase letters, digits and `_`. Palui shows it as `mcp-<slug>__<name>`. |
+| `description` | What the model reads to decide when to call it. |
+| `class` | `read`, `write` or `destructive`. It prefills the tool's class in Palui. See [Tool classes](/docs/concepts/tool-classes). |
+| `command` | An absolute path (or `~/...`). Bare names are refused, since launchd's `PATH` is minimal. |
+| `args` | Fixed args. There's no shell, so `~` and globs in args stay literal. `{param}` is replaced inside an arg. An arg that is exactly `{...param}` spreads a list param into several args. |
+| `params` | One entry per placeholder. Each has exactly one of `enum` or `pattern`. |
+| `cwd`, `env` | Optional working directory and extra environment variables. |
+| `timeoutMs` | Default 30 s, at most 10 min. The bridge kills the whole process group when it runs out. |
+| `maxOutputBytes` | Default 64 KB per stream. Longer output is cut and marked as truncated. |
+
+Each param can also set:
+
+| Field | Notes |
+|---|---|
+| `optional` | An arg that mentions a missing optional param is dropped. |
+| `list` | The value is a list of strings, used with `{...param}`. |
+| `allowDash` | Values starting with `-` are refused unless this is on, so a value can't become a flag like `--exec=...`. |
+
+Patterns are anchored, so the whole value has to match. Control characters are always refused.
+
+After editing the file, check it and restart the bridge:
+
+```bash
+node ~/selfhost/bin/palui-host-bridge.mjs check
+launchctl kickstart -k gui/$(id -u)/com.zakiego.palui-host-bridge
+```
+
+Then press Test on the connector in Palui to pick up the new tool list.
+
+<Callout type="warn" title="What you list is what the model can do">
+  A tool can run anything its command can, with your user's permissions. Prefer narrow commands with enum params over a general one with a loose pattern. Never list a shell (`/bin/sh -c`, `bash`) with a param in its script.
+</Callout>
+
+## What the model gets back
+
+The exit status first, then stdout and stderr:
+
+```text
+exit 0
+--- stdout ---
+18:02  up 1 day,  6:08, 1 user, load averages: 4.14 4.13 3.69
+```
+
+A non-zero exit or a timeout is reported as a tool error, so the model knows the command failed. Every call is logged with its args, exit code and duration.

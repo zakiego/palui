@@ -43,7 +43,7 @@ For now only I can use it. Anyone else who messages the bot gets nothing.
 | Group chats | both | deferred (the code path exists, the UI is hidden) |
 | Voice replies (TTS) | both | deferred. Voice-in only |
 | Multiple profiles or agents | both | deferred |
-| stdio MCP, shell, browser | both | deferred (needs binaries in the container and a sandbox) |
+| stdio MCP, shell, browser | both | deferred (needs binaries in the container and a sandbox). Host commands work today through `apps/host-bridge`, an allowlist MCP server on the host |
 
 ### Non-goals for v1
 
