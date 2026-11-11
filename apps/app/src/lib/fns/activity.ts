@@ -3,7 +3,7 @@ import { getSetting } from "@palui/core/settings"
 import { listConnectors } from "@palui/core/connectors/store"
 import { createServerFn } from "@tanstack/react-start"
 import { z } from "zod"
-import { eventList, recentRuns, usage } from "@/server/queries"
+import { eventCount, eventList, recentRuns, runCount, usage } from "@/server/queries"
 import { requireUser } from "@/server/session"
 
 const level = z.enum(["debug", "info", "warn", "error"])
@@ -14,6 +14,7 @@ export const getEvents = createServerFn({ method: "GET" })
     const { db } = await requireUser()
     return {
       events: eventList(db, { connectorId: data.connectorId, levels: data.levels, limit: 300 }),
+      total: eventCount(db, { connectorId: data.connectorId, levels: data.levels }),
       connectors: listConnectors(db).map((c) => ({ id: c.id, label: c.label })),
       timezone: getSetting(db, "timezone"),
     }
@@ -21,7 +22,7 @@ export const getEvents = createServerFn({ method: "GET" })
 
 export const getRuns = createServerFn({ method: "GET" }).handler(async () => {
   const { db } = await requireUser()
-  return { runs: recentRuns(db, 100), timezone: getSetting(db, "timezone") }
+  return { runs: recentRuns(db, 100), total: runCount(db), timezone: getSetting(db, "timezone") }
 })
 
 export const getUsage = createServerFn({ method: "GET" }).handler(async () => {

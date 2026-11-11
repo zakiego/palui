@@ -15,6 +15,10 @@ import { getShell } from "@/lib/fns/home"
 import { getSession } from "@/lib/fns/session"
 import { LocaleProvider, useT } from "@/lib/i18n"
 
+// Dev only: the fixture toggle (break-ui). The import is behind the dev check,
+// so a production build never loads or ships it.
+const FixtureToggle = import.meta.env.DEV ? React.lazy(() => import("@/components/dev/fixture-toggle")) : null
+
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
     const session = await getSession()
@@ -89,6 +93,11 @@ function Shell() {
         </main>
       </SidebarInset>
       <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} connectors={shell.connectors} />
+      {FixtureToggle && (
+        <React.Suspense fallback={null}>
+          <FixtureToggle />
+        </React.Suspense>
+      )}
     </SidebarProvider>
   )
 }

@@ -27,6 +27,26 @@ export function useT() {
   return React.useCallback((key: Key, vars?: Record<string, string | number>) => translate(locale, key, vars), [locale])
 }
 
+// A stored enum value ("awaiting_approval", "briefing") as words: its
+// translation under `prefix` when there is one, else the raw value with spaces.
+// A status the dashboard has never heard of still renders as itself.
+export function useLabel() {
+  const locale = React.useContext(LocaleContext)
+  return React.useCallback(
+    (prefix: string, value: string) => {
+      const key = `${prefix}.${value}`
+      return key in en ? translate(locale, key as Key) : value.replaceAll("_", " ")
+    },
+    [locale],
+  )
+}
+
+// "1 run" / "12 runs": picks the singular or plural key and formats the number.
+export function useCount() {
+  const locale = React.useContext(LocaleContext)
+  return React.useCallback((n: number, one: Key, many: Key) => translate(locale, n === 1 ? one : many, { n: n.toLocaleString("en") }), [locale])
+}
+
 export function useLocale() {
   return React.useContext(LocaleContext)
 }

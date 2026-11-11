@@ -19,7 +19,8 @@ import { useT } from "@/lib/i18n"
 export function NavUser({ username, onLogout }: { username: string; onLogout: () => void }) {
   const { isMobile, setOpenMobile } = useSidebar()
   const t = useT()
-  const initial = username.slice(0, 1).toUpperCase() || "O"
+  // The first character as a reader sees it: slice(0, 1) would halve an emoji.
+  const initial = (Array.from(username.trim())[0] ?? "O").toUpperCase()
   const who = (
     <>
       <Avatar className="rounded-lg">

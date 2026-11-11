@@ -16,9 +16,10 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLiveRefresh } from "@/hooks/use-live-events"
-import { compact, duration, errorMessage, inZone } from "@/lib/format"
+import { compact, duration, errorMessage, inOtherZone, inZone } from "@/lib/format"
 import { dismissChecklist, getHome } from "@/lib/fns/home"
-import { useT, type Key } from "@/lib/i18n"
+import { useCount, useLabel, useT, type Key } from "@/lib/i18n"
+import { runTitle } from "@/lib/runs"
 
 export const Route = createFileRoute("/_app/")({
   loader: () => getHome(),
@@ -45,14 +46,15 @@ function HomePage() {
       <PageHeader title={t("home.title")} description={t("home.description")} />
       {!data.runtimeUp && <RuntimeAlert />}
       {showChecklist && <Checklist checklist={c} />}
-      <div className="grid gap-4 @3xl/main:grid-cols-2">
+      {/* Two independent columns, so a long connector list never stretches the cards beside it. */}
+      <div className="grid items-start gap-4 @3xl/main:grid-cols-2">
         <ConnectorSummary connectors={data.connectors} />
         <StatusAnnouncer items={data.connectors} />
-        <div className="grid content-start gap-4">
+        <div className="grid min-w-0 content-start gap-4">
           <TokensCard tokens={data.tokens} />
-          <RemindersCard reminders={data.reminders} />
+          <RemindersCard reminders={data.reminders} timezone={data.timezone} />
+          <RunsCard runs={data.runs} timezone={data.timezone} />
         </div>
-        <RunsCard runs={data.runs} timezone={data.timezone} />
       </div>
     </>
   )
@@ -91,7 +93,7 @@ function Checklist({ checklist }: { checklist: HomeData["checklist"] }) {
               <ItemContent>
                 <ItemTitle className={s.done ? "text-muted-foreground line-through decoration-from-font" : undefined}>{t(s.label)}</ItemTitle>
               </ItemContent>
-              <span className="sr-only">{s.done ? "Done" : "To do"}</span>
+              <span className="sr-only">{s.done ? t("home.check.done") : t("home.check.todo")}</span>
             </Item>
           ))}
         </ItemGroup>
@@ -122,7 +124,7 @@ function ConnectorSummary({ connectors }: { connectors: HomeConnector[] }) {
   const shown = connectors.filter((c) => c.status !== "not_set_up")
   const on = shown.filter((c) => c.status === "on").length
   return (
-    <Card className="@3xl/main:row-span-2">
+    <Card className="min-w-0">
       <CardHeader>
         <CardTitle>{t("home.connectors")}</CardTitle>
         {shown.length > 0 && <CardDescription className="tabular-nums">{t("home.map.on", { n: on, total: shown.length })}</CardDescription>}
@@ -158,6 +160,7 @@ function ConnectorSummary({ connectors }: { connectors: HomeConnector[] }) {
 
 function TokensCard({ tokens }: { tokens: { tokensIn: number; tokensOut: number; runs: number } }) {
   const t = useT()
+  const count = useCount()
   return (
     <Card>
       <CardHeader>
@@ -176,13 +179,13 @@ function TokensCard({ tokens }: { tokens: { tokensIn: number; tokensOut: number;
         <span>
           {compact(tokens.tokensOut)} {t("home.tokensOut")}
         </span>
-        <span>{tokens.runs} runs</span>
+        <span>{count(tokens.runs, "count.run", "count.runs")}</span>
       </CardContent>
     </Card>
   )
 }
 
-function RemindersCard({ reminders }: { reminders: HomeData["reminders"] }) {
+function RemindersCard({ reminders, timezone }: { reminders: HomeData["reminders"]; timezone: string }) {
   const t = useT()
   return (
     <Card>
@@ -215,11 +218,15 @@ function RemindersCard({ reminders }: { reminders: HomeData["reminders"] }) {
               <Item key={r.id} size="sm" className="px-0">
                 <ItemContent className="min-w-0">
                   <ItemTitle className="w-full min-w-0">
-                    <span className="line-clamp-2 break-words">{r.text}</span>
+                    <span dir="auto" className="line-clamp-2 break-words text-start" title={r.text}>
+                      {r.text}
+                    </span>
                   </ItemTitle>
+                  {/* In the owner's zone, like every other time here; a reminder set elsewhere adds its own clock. */}
                   <ItemDescription className="font-mono tabular-nums">
-                    {inZone(r.fireAt, r.tz)}
-                    {r.rrule ? " · repeats" : ""}
+                    {inZone(r.fireAt, timezone)}
+                    {inOtherZone(r.fireAt, r.tz, timezone) ? ` (${inOtherZone(r.fireAt, r.tz, timezone)})` : ""}
+                    {r.rrule ? ` · ${t("reminders.repeats")}` : ""}
                   </ItemDescription>
                 </ItemContent>
               </Item>
@@ -242,6 +249,7 @@ const RUN_TONE: Record<string, "success" | "destructive" | "secondary" | "outlin
 
 function RunsCard({ runs, timezone }: { runs: HomeData["runs"]; timezone: string }) {
   const t = useT()
+  const label = useLabel()
   return (
     <Card>
       <CardHeader>
@@ -273,14 +281,23 @@ function RunsCard({ runs, timezone }: { runs: HomeData["runs"]; timezone: string
               <Item key={r.id} size="sm" className="px-0">
                 <ItemContent className="min-w-0">
                   <ItemTitle className="w-full min-w-0">
-                    <span className="truncate">{r.job ?? r.chat ?? r.trigger}</span>
+                    <span dir="auto" className="truncate text-start" title={runTitle(r, t, label)}>
+                      {runTitle(r, t, label)}
+                    </span>
                   </ItemTitle>
-                  <ItemDescription className="truncate font-mono tabular-nums">
-                    {inZone(r.startedAt, timezone)} · {r.model ?? "no model"} · {compact(r.tokensIn + r.tokensOut)} tok{r.ms ? ` · ${duration(r.ms)}` : ""}
-                  </ItemDescription>
+                  {/* The numbers wrap to a second line before they get cut; only the model name truncates. */}
+                  <div className="flex min-w-0 flex-wrap gap-x-2 font-mono text-sm text-muted-foreground tabular-nums">
+                    <span className="shrink-0">{inZone(r.startedAt, timezone)}</span>
+                    <span className="max-w-full min-w-0 truncate" title={r.model ?? undefined}>
+                      {r.model ?? t("runs.noModel")}
+                    </span>
+                    <span className="shrink-0">
+                      {compact(r.tokensIn + r.tokensOut)} tok{r.ms != null ? ` · ${duration(r.ms)}` : ""}
+                    </span>
+                  </div>
                 </ItemContent>
                 <ItemActions>
-                  <Badge variant={RUN_TONE[r.status] ?? "outline"}>{r.status.replace("_", " ")}</Badge>
+                  <Badge variant={RUN_TONE[r.status] ?? "outline"}>{label("run.status", r.status)}</Badge>
                 </ItemActions>
               </Item>
             ))}
@@ -298,11 +315,13 @@ function HomeSkeleton() {
         <Skeleton className="h-8 w-32" />
         <Skeleton className="h-4 w-full max-w-md" />
       </div>
-      <div className="grid gap-4 @3xl/main:grid-cols-2">
-        <Skeleton className="h-80 rounded-xl @3xl/main:row-span-2" />
-        <Skeleton className="h-32 rounded-xl" />
-        <Skeleton className="h-44 rounded-xl" />
-        <Skeleton className="h-64 rounded-xl" />
+      <div className="grid items-start gap-4 @3xl/main:grid-cols-2">
+        <Skeleton className="h-80 rounded-xl" />
+        <div className="grid gap-4">
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-44 rounded-xl" />
+          <Skeleton className="h-64 rounded-xl" />
+        </div>
       </div>
     </>
   )
