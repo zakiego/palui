@@ -11,6 +11,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.7.0 (2026-11-12)
+
 ### Breaking
 
 - Routines are gone; flows do everything they did. The routine engine, the routine tools (`buat_rutinitas` and the rest), the Routines page, the `palui flows status` and `palui flows mode` commands and the old routine answer buttons are removed, and the app deletes the Routines connector on start. Routines that weren't handed over to flows stop firing, so if `palui flows status` on 0.6.0 still shows routines, run `palui flows mode flows` there and wait a minute before you upgrade. The routine tables stay for one more release, so rolling back to 0.6.0 still works.
