@@ -12,7 +12,7 @@ const reminders = () => ({ reminders: [{ text: "Bayar listrik", date: "2026-11-1
 
 function briefingHarness(over: Parameters<typeof exampleConnectors>[0] = {}) {
   return flowHarness({
-    connectors: exampleConnectors({ "mcp-jadwal-sholat__get_prayer_times": prayer, webfetch__ambil_halaman: weather, reminders__daftar_pengingat: reminders, ...over }),
+    connectors: exampleConnectors({ "mcp-jadwal-sholat__get_prayer_times": prayer, webfetch__fetch_page: weather, reminders__list_reminders: reminders, ...over }),
   })
 }
 
@@ -38,7 +38,7 @@ describe("schedule trigger + read tools + message (RFC 9a, end to end)", () => {
     expect(run!.taint).toEqual(["steps.prayer", "steps.weather"])
     expect(h.calls.every((c) => c.turn.chatId === h.chatId && c.turn.flowId === flow.id && c.turn.trigger === "flow")).toBe(true)
     // Tool steps leave tool_calls rows like turns do.
-    expect(h.db.select().from(toolCalls).all().map((t) => t.tool)).toEqual(["mcp-jadwal-sholat__get_prayer_times", "webfetch__ambil_halaman", "reminders__daftar_pengingat"])
+    expect(h.db.select().from(toolCalls).all().map((t) => t.tool)).toEqual(["mcp-jadwal-sholat__get_prayer_times", "webfetch__fetch_page", "reminders__list_reminders"])
 
     // The same sweep again, and a restart in between: still one run, one message.
     h.engine.recover(at("2026-11-11T06:00"))
@@ -141,8 +141,8 @@ describe("manual runs, branches and limits", () => {
 
   it("pauses a flow after five failed runs in a row and says so once", async () => {
     // The tool always fails.
-    const failing = flowHarness({ connectors: exampleConnectors({ reminders__daftar_pengingat: () => { throw new Error("boom") } }) })
-    const f2 = failing.create({ name: "Rusak", steps: [{ id: "t", kind: "tool", tool: "reminders__daftar_pengingat", retry: { max: 0, backoffSec: 5 } }] }).flow
+    const failing = flowHarness({ connectors: exampleConnectors({ reminders__list_reminders: () => { throw new Error("boom") } }) })
+    const f2 = failing.create({ name: "Rusak", steps: [{ id: "t", kind: "tool", tool: "reminders__list_reminders", retry: { max: 0, backoffSec: 5 } }] }).flow
     for (let i = 0; i < 5; i++) {
       failing.engine.startRun({ flowId: f2.id, triggerKind: "manual", runKey: `m${i}`, payload: {}, now: failing.now() })
       await failing.run(failing.now())
@@ -163,7 +163,7 @@ describe("write steps and the version approval", () => {
       name: "Catat",
       steps: [
         { id: "hi", kind: "message", text: "Mulai" },
-        { id: "note", kind: "tool", tool: "notes__simpan_catatan", args: { text: "{{now.date}}" } },
+        { id: "note", kind: "tool", tool: "notes__save_note", args: { text: "{{now.date}}" } },
         { id: "done", kind: "message", text: "Beres" },
       ],
     }
@@ -174,13 +174,13 @@ describe("write steps and the version approval", () => {
     await h.run(h.now())
     let [run] = runsOf(h.db, saved.flow.id)
     expect(run).toMatchObject({ status: "awaiting_approval", skipReason: "not_approved", cursor: "note" })
-    expect(h.calls.filter((c) => c.tool === "simpan_catatan")).toHaveLength(0)
+    expect(h.calls.filter((c) => c.tool === "save_note")).toHaveLength(0)
 
     expect(decideVersion(h.db, saved.version.id, true, "test", h.now()).ok).toBe(true)
     await h.run(h.now())
     ;[run] = runsOf(h.db, saved.flow.id)
     expect(run!.status).toBe("done")
-    expect(h.calls.filter((c) => c.tool === "simpan_catatan")).toHaveLength(1)
+    expect(h.calls.filter((c) => c.tool === "save_note")).toHaveLength(1)
     expect(sentTexts(h.db).slice(1).map((s) => s.text)).toEqual(["Mulai", "Beres"])
   })
 })
@@ -205,20 +205,20 @@ describe("restart recovery", () => {
 
   it("never repeats a write tool cut off mid-call; it tells the owner and takes onError", async () => {
     const h = flowHarness()
-    const saved = h.create({ name: "Tulis", steps: [{ id: "note", kind: "tool", tool: "notes__simpan_catatan", args: { text: "x" } }] })
+    const saved = h.create({ name: "Tulis", steps: [{ id: "note", kind: "tool", tool: "notes__save_note", args: { text: "x" } }] })
     decideVersion(h.db, saved.version.id, true, "test", h.now())
     const { run } = h.engine.startRun({ flowId: saved.flow.id, triggerKind: "manual", runKey: "m1", payload: {}, now: h.now() })
     h.db.update(flowRuns).set({ status: "running" }).where(eq(flowRuns.id, run!.id)).run()
     h.db.insert(flowStepRuns).values({ id: "fls_y", runId: run!.id, seq: 1, stepId: "note", kind: "tool", status: "running", startedAt: h.now() }).run()
     h.engine.recover(h.now())
     await h.run(h.now())
-    expect(h.calls.filter((c) => c.tool === "simpan_catatan")).toHaveLength(0)
+    expect(h.calls.filter((c) => c.tool === "save_note")).toHaveLength(0)
     expect(getRun(h.db, run!.id)).toMatchObject({ status: "failed", error: "Step note: unknown outcome after restart" })
     expect(sentTexts(h.db).some((s) => s.text.includes("kepotong restart"))).toBe(true)
   })
 
   it("takes a finished prompt turn's output instead of running it again", async () => {
-    const h = flowHarness({ connectors: exampleConnectors({ flows__ringkasan: () => ({ total: 10, missed: 2, byAnswer: {}, text: "rekap" }) }) })
+    const h = flowHarness({ connectors: exampleConnectors({ flows__recap: () => ({ total: 10, missed: 2, byAnswer: {}, text: "rekap" }) }) })
     const { flow } = h.create(RECAP)
     const { run } = h.engine.startRun({ flowId: flow.id, triggerKind: "manual", runKey: "m1", payload: {}, now: h.now(), start: "cheer" })
     h.db.update(flowRuns).set({ status: "running", vars: { steps: { recap: { ok: true, data: { total: 10 } } }, vars: {} } }).where(eq(flowRuns.id, run!.id)).run()
@@ -236,7 +236,7 @@ describe("prompt steps (RFC 9d)", () => {
   const recapTool = (missed: number) => () => ({ total: 35, missed, byAnswer: { done: 35 - missed }, text: `📊 Rekap: terlewat ${missed}` })
 
   it("puts data in blocks, never in the instruction, and sends the model's text", async () => {
-    const h = flowHarness({ connectors: exampleConnectors({ flows__ringkasan: recapTool(2) }) })
+    const h = flowHarness({ connectors: exampleConnectors({ flows__recap: recapTool(2) }) })
     const { flow } = h.create(RECAP)
     await h.run(at("2026-11-15T20:00"))
     const [run] = runsOf(h.db, flow.id)
@@ -251,7 +251,7 @@ describe("prompt steps (RFC 9d)", () => {
   })
 
   it("falls back to the plain recap when the model fails", async () => {
-    const h = flowHarness({ connectors: exampleConnectors({ flows__ringkasan: recapTool(1) }), prompt: () => ({ status: "error", text: "", runId: "" }) })
+    const h = flowHarness({ connectors: exampleConnectors({ flows__recap: recapTool(1) }), prompt: () => ({ status: "error", text: "", runId: "" }) })
     const { flow } = h.create(RECAP)
     await h.run(at("2026-11-15T20:00"))
     expect(sentTexts(h.db).map((s) => s.text)).toEqual(["📊 Rekap: terlewat 1"])
@@ -259,7 +259,7 @@ describe("prompt steps (RFC 9d)", () => {
   })
 
   it("takes the clean branch with no model call when nothing was missed", async () => {
-    const h = flowHarness({ connectors: exampleConnectors({ flows__ringkasan: recapTool(0) }) })
+    const h = flowHarness({ connectors: exampleConnectors({ flows__recap: recapTool(0) }) })
     h.create(RECAP)
     await h.run(at("2026-11-15T20:00"))
     expect(h.prompts).toHaveLength(0)
@@ -267,7 +267,7 @@ describe("prompt steps (RFC 9d)", () => {
   })
 
   it("respects the flow's daily token cap", async () => {
-    const h = flowHarness({ connectors: exampleConnectors({ flows__ringkasan: recapTool(2) }) })
+    const h = flowHarness({ connectors: exampleConnectors({ flows__recap: recapTool(2) }) })
     const { flow } = h.create({ ...RECAP, limits: { dailyTokens: 1000 } })
     const { addUsage, dayKey } = await import("../budget")
     addUsage(h.db, `flow:${flow.id}:${dayKey(at("2026-11-15T20:00"), "Asia/Makassar")}`, 1000)
@@ -279,7 +279,7 @@ describe("prompt steps (RFC 9d)", () => {
   it("counts a prompt step's cache reads at a tenth against the flow's daily cap", async () => {
     const { runs } = await import("@palui/db")
     const h = flowHarness({
-      connectors: exampleConnectors({ flows__ringkasan: recapTool(2) }),
+      connectors: exampleConnectors({ flows__recap: recapTool(2) }),
       // 20,000 tokens in, 18,000 of them read from the cache, 100 out.
       prompt: (r) => {
         h.db.insert(runs).values({ id: r.turnRunId, chatId: h.chatId, trigger: "flow", status: "ok", tokensIn: 20_000, tokensOut: 100, tokensCached: 18_000, startedAt: h.now() }).run()

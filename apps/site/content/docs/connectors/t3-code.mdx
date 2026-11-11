@@ -31,13 +31,13 @@ The token is full access, so threads Palui starts run like the ones you start yo
 
 | Tool | Class | What it does |
 |---|---|---|
-| `daftar_proyek` | `read` | Lists your T3 Code projects. |
-| `daftar_thread` | `read` | Lists recent threads, in one project or all of them. |
-| `mulai_thread` | `write` | Starts a thread with a task, in a new worktree unless you ask for the project's own checkout. |
-| `kirim_ke_thread` | `write` | Sends a follow-up to a thread. An idle thread starts working on it. |
-| `thread_chat_ini` | `read` | Lists the threads started or followed up from the current chat, with their ids and links. |
-| `lihat_thread` | `read` | Shows a thread's status, branch, pull requests and latest messages. |
-| `hentikan_thread` | `destructive` | Interrupts a thread's running turn. Always asks first. |
+| `list_projects` | `read` | Lists your T3 Code projects. |
+| `list_threads` | `read` | Lists recent threads, in one project or all of them. |
+| `start_thread` | `write` | Starts a thread with a task, in a new worktree unless you ask for the project's own checkout. |
+| `send_to_thread` | `write` | Sends a follow-up to a thread. An idle thread starts working on it. |
+| `list_chat_threads` | `read` | Lists the threads started or followed up from the current chat, with their ids and links. |
+| `get_thread` | `read` | Shows a thread's status, branch, pull requests and latest messages. |
+| `stop_thread` | `destructive` | Interrupts a thread's running turn. Always asks first. |
 
 A thread link looks like `…/threads/<environmentId>/<threadId>`. The first id is your T3 Code install and is the same for every thread. The last part is the thread id.
 

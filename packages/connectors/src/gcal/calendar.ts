@@ -1,5 +1,5 @@
 // Calendar API v3 over plain REST (no googleapis dependency), plus the date
-// range parsing for lihat_kalender.
+// range parsing for get_calendar.
 import { DateTime } from "luxon"
 import { CALENDAR_API, GoogleError, refreshAccessToken } from "./oauth"
 

@@ -448,7 +448,7 @@ export function formatSeriesStart(s: Schedule & { rrule: string }, fireAt: numbe
   return `mulai ${formatDate(fireAt, s.tz, now)}${clock}`
 }
 
-// --- First fire (shared by the parser and the service, so the ingatkan tool too) -------
+// --- First fire (shared by the parser and the service, so the set_reminder tool too) -------
 
 // A first fire further out than this is refused as a likely misparse.
 export const MAX_LEAD_MS = 731 * DAY

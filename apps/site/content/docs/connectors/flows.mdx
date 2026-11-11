@@ -48,21 +48,21 @@ Steps pass data with templates (`{{steps.weather.data.temp}}`, `{{now.date | dat
 
 | Tool | What it does |
 |---|---|
-| `buat_flow` | Create a flow |
-| `ubah_flow` | Change a flow (a new version). Accepts a patch of one step |
-| `cek_flow` | Check a draft: problems with their place, resolved tools and what it may change |
-| `uji_flow` | Dry run: read tools run for real, messages and changes are only shown |
-| `daftar_flow` | List flows with their next time and last run |
-| `lihat_flow` | One flow with its versions and trigger state |
-| `jeda_flow` | Pause (optionally until a date) or resume |
-| `hapus_flow` | Delete a flow and its log (destructive, always asks) |
-| `jalankan_flow` | Run a flow now, for real |
-| `riwayat_flow` | Runs with status, skip reason, answers and counts |
-| `lihat_run` | The step log of one run |
-| `kenapa_flow` | Why a flow didn't run or send at a given time |
-| `jawab_checkin` | Record your answer to a check-in |
-| `batal_run` | Cancel a waiting run |
-| `ringkasan` | A recap of a flow's log (counts by answer and ready-to-send text), usable as a step |
+| `create_flow` | Create a flow |
+| `update_flow` | Change a flow (a new version). Accepts a patch of one step |
+| `check_flow` | Check a draft: problems with their place, resolved tools and what it may change |
+| `test_flow` | Dry run: read tools run for real, messages and changes are only shown |
+| `list_flows` | List flows with their next time and last run |
+| `get_flow` | One flow with its versions and trigger state |
+| `pause_flow` | Pause (optionally until a date) or resume |
+| `delete_flow` | Delete a flow and its log (destructive, always asks) |
+| `run_flow` | Run a flow now, for real |
+| `flow_history` | Runs with status, skip reason, answers and counts |
+| `get_run` | The step log of one run |
+| `explain_flow` | Why a flow didn't run or send at a given time |
+| `answer_checkin` | Record your answer to a check-in |
+| `cancel_run` | Cancel a waiting run |
+| `recap` | A recap of a flow's log (counts by answer and ready-to-send text), usable as a step |
 
 These are only offered in your own DMs and the web chat, never in a group or someone else's chat.
 

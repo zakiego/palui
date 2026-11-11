@@ -153,7 +153,7 @@ export function toolData(output: unknown): unknown {
           .join("\n")
       : null
     // The error text is the server's, so it isn't repeated (it could carry instructions).
-    if (o.isError) throw new SourceError("The tool returned an error result. Check the args with uji_flow.")
+    if (o.isError) throw new SourceError("The tool returned an error result. Check the args with test_flow.")
     if (o.structuredContent && typeof o.structuredContent === "object") return o.structuredContent
     if (texts !== null) {
       try {

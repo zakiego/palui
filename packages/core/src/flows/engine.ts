@@ -143,7 +143,7 @@ export type FlowEngine = {
   sweep(now: number): number
   nextDue(): number | null
   idle(): Promise<void>
-  // Start a run now (jalankan_flow, webhook/chat/event entry points).
+  // Start a run now (run_flow, webhook/chat/event entry points).
   startRun(input: StartInput): { run: RunRow | null; skipped?: FlowSkipReason }
   // Executes a run to its next stop. Exposed for dry runs and tests.
   execute(runId: string, opts?: ExecOptions): Promise<RunRow | undefined>
@@ -823,7 +823,7 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
       db.update(flows).set({ enabled: false, pausedUntil: null, updatedAt: now }).where(eq(flows.id, f.id)).run()
       db.update(flowTriggers).set({ nextFireAt: null, nextOcc: null }).where(eq(flowTriggers.flowId, f.id)).run()
       logEvent(db, { level: "warn", kind: "flow.auto_paused", message: `Flow "${f.name}" was paused after ${failures} failed runs in a row.`, data: { flowId: f.id } }, now)
-      send(f.chatId, { text: `⏸️ Flow "${f.name}" aku jeda: ${failures} kali gagal berturut-turut. Terakhir: ${run.error ?? "error"}. Cek pakai kenapa_flow, terus jalankan lagi kalau udah beres.`, format: "plain" }, `flow-notice:${f.id}`, now)
+      send(f.chatId, { text: `⏸️ Flow "${f.name}" aku jeda: ${failures} kali gagal berturut-turut. Terakhir: ${run.error ?? "error"}. Cek pakai explain_flow, terus jalankan lagi kalau udah beres.`, format: "plain" }, `flow-notice:${f.id}`, now)
     } else if (f.noticeFor !== today) {
       db.update(flows).set({ noticeFor: today }).where(eq(flows.id, f.id)).run()
       send(f.chatId, { text: `⚠️ Flow "${f.name}" gagal: ${run.error ?? "error"}`, format: "plain" }, `flow-notice:${f.id}`, now)

@@ -125,7 +125,7 @@ export function flowSummaryView(db: DB, flow: FlowRow, now: number) {
         const row = rows.find((r) => r.triggerId === t.id)
         return { id: t.id, kind: t.kind, summary: describeTrigger(t), next: flow.enabled && row?.nextFireAt ? formatWhen(row.nextFireAt, flow.tz, now) : null, lastError: row?.lastError ?? null }
       }),
-      { id: "manual", kind: "manual", summary: "jalankan_flow", next: null, lastError: null },
+      { id: "manual", kind: "manual", summary: "run_flow", next: null, lastError: null },
     ],
     lastRun: last ? { id: last.id, status: last.status, skipReason: last.skipReason, at: formatWhen(last.startedAt, flow.tz, now), error: last.error } : null,
     lastError: flow.lastError,
@@ -177,7 +177,7 @@ export function stepRowsCount(db: DB, runId: string): number {
   return db.select({ id: flowStepRuns.id }).from(flowStepRuns).where(eq(flowStepRuns.runId, runId)).all().length
 }
 
-// flows__ringkasan (RFC 8): counts by answer, missed labels and the recap
+// flows__recap (RFC 8): counts by answer, missed labels and the recap
 // text for a flow over the last `days`, so a recap is a plain tool step.
 export function flowRecap(db: DB, flow: FlowRow, input: { days: number; triggerId?: string | null }, now: number) {
   const def = definitionOf(currentVersion(db, flow))

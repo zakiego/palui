@@ -9,7 +9,7 @@ import manifest from "./manifest"
 
 export function jobTools(db: DB, clock: () => number = () => Date.now()): Record<string, PaluiTool> {
   return {
-    daftar_jadwal: {
+    list_jobs: {
       class: "read",
       title: "List scheduled jobs",
       tool: tool({

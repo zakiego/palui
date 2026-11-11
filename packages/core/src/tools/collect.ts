@@ -2,7 +2,7 @@
 // namespaced `<connectorId>__<tool>`. When there are more than budgets.maxTools,
 // only a core set is active up front (tools loaded earlier in the session, then
 // skills, memory and the rest) and the others are loadable through tool search
-// (`palui__cari_tool`), so nothing is dropped however many connectors are on.
+// (`palui__search_tools`), so nothing is dropped however many connectors are on.
 import { connectorServesAgent } from "../connectors/store"
 import { asSchema, tool, type Tool } from "ai"
 import { z } from "zod"
@@ -14,7 +14,7 @@ import { searchTools, type SearchDoc } from "./search"
 
 export const TOOL_SEP = "__"
 // The tool search meta tool. Namespaced like the rest, under the `palui` prefix.
-export const SEARCH_TOOL = `palui${TOOL_SEP}cari_tool`
+export const SEARCH_TOOL = `palui${TOOL_SEP}search_tools`
 // Matches loaded per search call.
 export const SEARCH_LIMIT = 5
 // Loaded tools a session keeps, most recent first.
@@ -127,7 +127,7 @@ export async function collectTools(running: RunningEntry[], opts: CollectOptions
   }
   out.active = [...active]
   out.deferred = order.filter((n) => !active.has(n))
-  const searchMeta: ToolMeta = { name: SEARCH_TOOL, connectorId: "palui", tool: "cari_tool", class: "read", untrusted: false, title: "Cari tool" }
+  const searchMeta: ToolMeta = { name: SEARCH_TOOL, connectorId: "palui", tool: "search_tools", class: "read", untrusted: false, title: "Search tools" }
   out.tools[SEARCH_TOOL] = wrapTool(searchTool(out, order, opts), searchMeta, opts)
   out.meta[SEARCH_TOOL] = searchMeta
   out.active.push(SEARCH_TOOL)

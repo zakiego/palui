@@ -10,7 +10,7 @@ const doc = (connectorId: string, connectorLabel: string, tool: string, descript
 })
 
 const docs = [
-  doc("reminders", "Reminders", "ingatkan", "Buat pengingat pada waktu tertentu"),
+  doc("reminders", "Reminders", "set_reminder", "Buat pengingat pada waktu tertentu"),
   doc("mcp-jadwal-sholat", "jadwal-sholat", "search_cities", "Search Indonesian cities by name"),
   doc("mcp-jadwal-sholat", "jadwal-sholat", "get_prayer_times", "Get the prayer times for a city and a date"),
   doc("mcp-host", "host", "disk_free", "Free disk space on the host"),

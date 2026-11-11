@@ -1,7 +1,7 @@
 // Flow tools for the model (RFC flows 8). The agent builds a flow from chat:
-// it finds tools with palui__cari_tool, checks a draft with cek_flow, dry-runs it
-// with uji_flow (read tools run for real, everything else is stubbed), shows the
-// owner the triggers and write calls, then saves with buat_flow. Every tool works
+// it finds tools with palui__search_tools, checks a draft with check_flow, dry-runs it
+// with test_flow (read tools run for real, everything else is stubbed), shows the
+// owner the triggers and write calls, then saves with create_flow. Every tool works
 // on the turn's chat only, and the tools are only offered in the owner's own
 // chats (DMs and the web chat), never in shared or guest turns, jobs or hooks.
 import { tool } from "ai"
@@ -58,10 +58,10 @@ Triggers (each has id, kind, start = first step id):
 - chat: { command: "/beres" } or { phrases: ["udah bayar"] }, the owner's messages in this chat. trigger.text, trigger.args.
 - poll: { tool, connectorId?, args, everyMin: 5..1440, select: "path.in.result", fire: "change"|"truthy" }. trigger.value, trigger.previous.
 - event: { event: "checkin.answered"|"checkin.missed"|"run.failed"|"run.done", flow: "<flow name>"|"self" }.
-- Every flow can also run manually (jalankan_flow); trigger.args are its args.
+- Every flow can also run manually (run_flow); trigger.args are its args.
 Names: trigger ids, step ids and set value names are lowercase letters, digits and _, starting with a letter, max 32 ("ask_1", "last_at"; not "L" or "Ask1"). Answer ids are lowercase letters, digits and _, max 20.
 Steps (each has id, kind, optional next (step id or null to end; default the next in the array), name, onError: "fail"|"continue"|<step id>, timeoutSec):
-- tool: { tool: "<connectorId>__<tool>" (as palui__cari_tool shows), args, parse?: {field:"text", as:"json"}, retry?: {max, backoffSec} }. Output steps.<id>.data (or .error with onError).
+- tool: { tool: "<connectorId>__<tool>" (as palui__search_tools shows), args, parse?: {field:"text", as:"json"}, retry?: {max, backoffSec} }. Output steps.<id>.data (or .error with onError).
 - if: { when: "<expression>", then: <id|null>, else: <id|null> }.
 - message: { text, to?: <another chat id the owner allowed> }.
 - checkin: { text, answers: [{id, label, words?, closes}], followUp: {everyMin, max, text?}, deadline, missedText?, on?: {<answer id>: <step id>}, onMissed? }. Output answer, label, missed (skipped too when the deadline had already passed).
@@ -74,7 +74,7 @@ Templates "{{path | filter}}" go only in tool args, message/check-in text, promp
 Expressions (if.when, set, each.where): and or not, == != < <= > >=, + - * /, functions exists empty contains startsWith len lower any count number round min max choose(cond, a, b) date daysUntil hoursUntil minutesSince weekday today.
 Destructive tools are never allowed. Write tools need the owner's approval once per version.`
 
-const definitionInput = z.record(z.string(), z.unknown()).describe("The flow definition (see buat_flow).")
+const definitionInput = z.record(z.string(), z.unknown()).describe("The flow definition (see create_flow).")
 
 // The flow id a draft is checked under, before it has one.
 export const DRAFT_FLOW_ID = "draft"
@@ -91,7 +91,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
   const engine = deps.engine ?? createFlowEngine({ db, log: silentLogger, now: clock, tools: deps.tools })
 
   async function validateCtx(): Promise<ValidateContext> {
-    // A tool step's view: a flow's own tools (flows__ringkasan) only come with a flow id.
+    // A tool step's view: a flow's own tools (flows__recap) only come with a flow id.
     const list = deps.tools ? await deps.tools.list({ ...turn, trigger: "flow", flowId: DRAFT_FLOW_ID }) : []
     return {
       resolveTool: deps.tools ? resolverFrom(list) : undefined,
@@ -103,7 +103,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
 
   function own(ref: string): FlowRow | Fail {
     const f = resolveFlow(db, chatId, ref)
-    if (!f) return { ok: false, error: `No flow "${ref}" in this chat. Call daftar_flow for the ids.` }
+    if (!f) return { ok: false, error: `No flow "${ref}" in this chat. Call list_flows for the ids.` }
     return f
   }
 
@@ -125,11 +125,11 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
   }
 
   const tools: Record<string, PaluiTool> = {
-    buat_flow: {
+    create_flow: {
       class: "write",
       title: "Create a flow",
       tool: tool({
-        description: `Create an automation (a flow) in this chat. Use it when the logic is deterministic (fetch, check, send, ask), instead of a job. Always cek_flow and uji_flow first, show the owner the triggers, the next times and any write calls, then save. Find tools for tool steps with palui__cari_tool (for: "flow"), dry-run a tool step alone to learn its output shape, then write conditions against the real output. Never put fetched text in a prompt instruction; pass it in input.\n\n${FLOW_HELP}`,
+        description: `Create an automation (a flow) in this chat. Use it when the logic is deterministic (fetch, check, send, ask), instead of a job. Always check_flow and test_flow first, show the owner the triggers, the next times and any write calls, then save. Find tools for tool steps with palui__search_tools (for: "flow"), dry-run a tool step alone to learn its output shape, then write conditions against the real output. Never put fetched text in a prompt instruction; pass it in input.\n\n${FLOW_HELP}`,
         inputSchema: z.object({ definition: definitionInput }),
         execute: async ({ definition }) => {
           const now = clock()
@@ -143,14 +143,14 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    ubah_flow: {
+    update_flow: {
       class: "write",
       title: "Change a flow",
       tool: tool({
         description:
           'Change a flow: a new version from a full definition, or a JSON merge patch on the current one. In a patch, "steps" and "triggers" may be objects keyed by id ({"steps": {"send": {"text": "..."}, "old": null}}) to change, add or remove one entry. Returns the diff and whether the owner must approve again (only when the write calls change).',
         inputSchema: z.object({
-          id: z.string().describe("Flow id or name from daftar_flow."),
+          id: z.string().describe("Flow id or name from list_flows."),
           definition: definitionInput.optional(),
           patch: z.record(z.string(), z.unknown()).optional(),
           note: z.string().max(200).optional().describe("Why it changed, kept with the version."),
@@ -170,7 +170,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    cek_flow: {
+    check_flow: {
       class: "read",
       title: "Check a flow",
       tool: tool({
@@ -196,7 +196,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    uji_flow: {
+    test_flow: {
       class: "read",
       // Read tools run for real, so their output is outside data.
       untrusted: true,
@@ -220,7 +220,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
             let writeCalls
             if (definition) {
               const v = validateDefinition(definition, await validateCtx())
-              if (!v.ok || !v.definition) return { ok: false as const, error: "The draft has problems; fix them first (cek_flow).", problems: v.problems }
+              if (!v.ok || !v.definition) return { ok: false as const, error: "The draft has problems; fix them first (check_flow).", problems: v.problems }
               def = v.definition
               writeCalls = v.writeCalls
             } else if (id) {
@@ -237,7 +237,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    daftar_flow: {
+    list_flows: {
       class: "read",
       title: "List flows",
       tool: tool({
@@ -254,7 +254,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    lihat_flow: {
+    get_flow: {
       class: "read",
       title: "Show a flow",
       tool: tool({
@@ -270,7 +270,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    jeda_flow: {
+    pause_flow: {
       class: "write",
       title: "Pause or resume a flow",
       tool: tool({
@@ -291,11 +291,11 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    hapus_flow: {
+    delete_flow: {
       class: "destructive",
       title: "Delete a flow",
       tool: tool({
-        description: "Delete a flow with its versions and run log. To stop it for a while, use jeda_flow instead.",
+        description: "Delete a flow with its versions and run log. To stop it for a while, use pause_flow instead.",
         inputSchema: z.object({ id: z.string() }),
         execute: async ({ id }) => {
           const f = own(id)
@@ -306,11 +306,11 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    jalankan_flow: {
+    run_flow: {
       class: "write",
       title: "Run a flow now",
       tool: tool({
-        description: "Run a flow now, for real (messages go out, approved writes run). trigger picks which trigger's start step to use; args become trigger.args. To try it without side effects, use uji_flow.",
+        description: "Run a flow now, for real (messages go out, approved writes run). trigger picks which trigger's start step to use; args become trigger.args. To try it without side effects, use test_flow.",
         inputSchema: z.object({ id: z.string(), trigger: z.string().optional(), args: z.record(z.string(), z.unknown()).optional() }),
         execute: async ({ id, trigger, args }) => {
           const now = clock()
@@ -321,12 +321,12 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
           if (trigger && !t) return { ok: false as const, error: `No trigger "${trigger}". Triggers: ${def.triggers.map((x) => x.id).join(", ") || "none"}.` }
           const r = engine.startRun({ flowId: f.id, triggerId: t?.id ?? null, triggerKind: "manual", runKey: `manual:${randomUUID()}`, payload: { kind: "manual", args: args ?? {} }, now, start: t?.start })
           if (!r.run || r.skipped) return { ok: false as const, error: r.skipped === "paused" ? `Flow "${f.name}" lagi dijeda.` : `Run skipped: ${r.skipped}.` }
-          return { ok: true as const, runId: r.run.id, message: `Flow "${f.name}" dijalankan. Cek hasilnya dengan lihat_run.` }
+          return { ok: true as const, runId: r.run.id, message: `Flow "${f.name}" dijalankan. Cek hasilnya dengan get_run.` }
         },
       }),
     },
 
-    riwayat_flow: {
+    flow_history: {
       class: "read",
       title: "Flow history",
       tool: tool({
@@ -355,7 +355,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    lihat_run: {
+    get_run: {
       class: "read",
       title: "Show a flow run",
       tool: tool({
@@ -370,7 +370,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    batal_run: {
+    cancel_run: {
       class: "write",
       title: "Cancel a flow run",
       tool: tool({
@@ -390,12 +390,12 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    jawab_checkin: {
+    answer_checkin: {
       class: "write",
       title: "Record a check-in answer",
       tool: tool({
         description:
-          'Record the owner\'s answer to a check-in. Use it when their message answers one ("udah", "belum", "skip hari ini"). Without runId it answers the newest open check-in in this chat; pass the run id from the system prompt or riwayat_flow for another one, or to correct an earlier answer. answer is an answer id or its label.',
+          'Record the owner\'s answer to a check-in. Use it when their message answers one ("udah", "belum", "skip hari ini"). Without runId it answers the newest open check-in in this chat; pass the run id from the system prompt or flow_history for another one, or to correct an earlier answer. answer is an answer id or its label.',
         inputSchema: z.object({
           answer: z.string().min(1).max(40),
           runId: z.string().optional().describe("A flow run id (flr_...)."),
@@ -413,7 +413,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       }),
     },
 
-    kenapa_flow: {
+    explain_flow: {
       class: "read",
       title: "Why didn't a flow run",
       tool: tool({
@@ -437,7 +437,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
   return tools
 }
 
-// flows__ringkasan: a recap of a flow's log as data. Callable by the agent and,
+// flows__recap: a recap of a flow's log as data. Callable by the agent and,
 // as a tool step, by a flow (where "self" or no flow means the calling flow).
 export function recapTool(db: DB, turn: TurnInfo, clock: () => number = () => Date.now()): PaluiTool {
   return {
@@ -482,10 +482,10 @@ export default defineRuntime(manifest, {
       stop: async () => {},
       tools: async (turn): Promise<Record<string, PaluiTool>> => {
         // A flow's own tool steps get the recap; prompt steps and jobs get nothing.
-        if (turn.trigger === "flow" && turn.flowId) return { ringkasan: recapTool(ctx.db, turn) }
+        if (turn.trigger === "flow" && turn.flowId) return { recap: recapTool(ctx.db, turn) }
         if (!offerFlowTools(ctx.db, turn)) return {}
         engine ??= createFlowEngine({ db: ctx.db, log: ctx.log, tools: ctx.services.flowTools })
-        return { ...flowTools(ctx.db, turn, { tools: ctx.services.flowTools, engine }), ringkasan: recapTool(ctx.db, turn) }
+        return { ...flowTools(ctx.db, turn, { tools: ctx.services.flowTools, engine }), recap: recapTool(ctx.db, turn) }
       },
     }
   },

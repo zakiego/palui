@@ -5,7 +5,7 @@
 //                 "ya"/"batal" quoting a version prompt
 //   fromChat      a `chat` trigger: the owner's command or phrase in the flow's chat
 // A reply that doesn't match goes to a turn: open check-ins are in the system
-// prompt and the model records them with jawab_checkin.
+// prompt and the model records them with answer_checkin.
 import { and, eq, gte, like } from "drizzle-orm"
 import { outbox, type DB } from "@palui/db"
 import { parseYesNo } from "../chat/router"

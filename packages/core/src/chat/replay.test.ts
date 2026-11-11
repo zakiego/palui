@@ -26,7 +26,7 @@ describe("replayed tool call arguments", () => {
 
   it("keeps the newest large draft of a tool and leaves out older ones", () => {
     const rows = [row("m1", "user", "buat flow", "run_a", NOW), row("m2", "assistant", "draft 1", "run_a", NOW + 10), row("m3", "user", "lanjut", "run_b", NOW + 20), row("m4", "assistant", "draft 2", "run_b", NOW + 30)]
-    const calls = [call("run_a", "c1", "flows__uji_flow", big("old"), NOW + 5), call("run_b", "c2", "flows__uji_flow", big("new"), NOW + 25)]
+    const calls = [call("run_a", "c1", "flows__test_flow", big("old"), NOW + 5), call("run_b", "c2", "flows__test_flow", big("new"), NOW + 25)]
     const got = inputs(toModelMessages(rows, new Set(), calls))
     expect(got.c1).toEqual({ note: expect.stringMatching(/^arguments left out of the history/) })
     expect(got.c2).toEqual(big("new"))

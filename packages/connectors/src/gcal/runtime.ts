@@ -17,7 +17,7 @@ function explain(err: unknown): string {
   return (err as Error)?.message ?? String(err)
 }
 
-export function lihatKalenderTool(deps: { tokens: GoogleTokens; config: Config; turn: TurnInfo; fetchImpl?: typeof fetch }): Tool {
+export function getCalendarTool(deps: { tokens: GoogleTokens; config: Config; turn: TurnInfo; fetchImpl?: typeof fetch }): Tool {
   return tool({
     description:
       "Read the owner's Google Calendar (read only). `from`/`to` are ISO dates (YYYY-MM-DD) or ISO times, or the words today, tomorrow or week. Without arguments it shows today. Times come back in the owner's timezone.",
@@ -93,7 +93,7 @@ export function createGcalRuntime(fetchImpl?: typeof fetch) {
         async tools(turn) {
           // Event titles and descriptions come from whoever sends an invite, so the
           // results taint the turn like web pages do (PLAN 10).
-          return { lihat_kalender: { tool: lihatKalenderTool({ tokens, config: ctx.config, turn, fetchImpl }), class: "read", untrusted: true, title: "Check the calendar" } }
+          return { get_calendar: { tool: getCalendarTool({ tokens, config: ctx.config, turn, fetchImpl }), class: "read", untrusted: true, title: "Check the calendar" } }
         },
         live() {
           return { email: ctx.config.email ?? null, calendars: ctx.config.calendarIds }

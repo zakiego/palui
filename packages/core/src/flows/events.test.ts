@@ -48,8 +48,8 @@ describe("event triggers", () => {
   })
 
   it("passes run.failed from one flow to another", async () => {
-    const h = flowHarness({ connectors: exampleConnectors({ reminders__daftar_pengingat: () => { throw new Error("down") } }) })
-    const { flow: a } = h.create({ name: "A", steps: [{ id: "t", kind: "tool", tool: "reminders__daftar_pengingat", retry: { max: 0, backoffSec: 5 } }] })
+    const h = flowHarness({ connectors: exampleConnectors({ reminders__list_reminders: () => { throw new Error("down") } }) })
+    const { flow: a } = h.create({ name: "A", steps: [{ id: "t", kind: "tool", tool: "reminders__list_reminders", retry: { max: 0, backoffSec: 5 } }] })
     const { flow: b } = h.create({ name: "B", triggers: [{ id: "f", kind: "event", event: "run.failed", flow: "A", start: "m" }], steps: [{ id: "m", kind: "message", text: "A gagal: {{trigger.error}}" }] })
     h.engine.startRun({ flowId: a.id, triggerKind: "manual", runKey: "m1", payload: {}, now: h.now() })
     await h.run(h.now())

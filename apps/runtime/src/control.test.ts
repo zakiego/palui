@@ -111,7 +111,7 @@ describe("control server", () => {
     expect((await call("POST", "/control/agents/agt_missing/tools", {})).status).toBe(404)
     const palui = getDefaultAgent(db)
     const { tools } = (await json(await call("POST", `/control/agents/${palui.id}/tools`, {}))) as { tools: { name: string; class: string; guestSafe: boolean }[] }
-    expect(tools.find((x) => x.name === "reminders__ingatkan")).toMatchObject({ class: "write", guestSafe: false })
+    expect(tools.find((x) => x.name === "reminders__set_reminder")).toMatchObject({ class: "write", guestSafe: false })
     expect((await call("POST", "/control/nope", {})).status).toBe(404)
     expect((await call("POST", "/control/remove/nope", {})).status).toBe(404)
   })

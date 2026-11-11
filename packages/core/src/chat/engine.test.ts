@@ -1376,7 +1376,7 @@ describe("tool search", () => {
   // tools-per-turn cap cut all its tools while it still showed as enabled.
   const read = (d: string) => ({ tool: fnTool(d, () => d), class: "read" as const })
   const skill = () =>
-    toolsRuntime("notes", () => ({ simpan_instruksi: read("Save a standing instruction"), daftar_instruksi: read("List instructions"), hapus_instruksi: read("Delete an instruction") }), "skill")
+    toolsRuntime("notes", () => ({ save_instruction: read("Save a standing instruction"), list_instructions: read("List instructions"), delete_instruction: read("Delete an instruction") }), "skill")
   const sholat = (calls: string[]) =>
     toolsRuntime("mcp-jadwal-sholat", () => ({
       search_cities: read("Search cities"),
@@ -1394,50 +1394,50 @@ describe("tool search", () => {
   it("finds a remote MCP tool over the cap and calls it in the same turn", async () => {
     const calls: string[] = []
     const h = await setup(
-      [callTool("palui__cari_tool", { query: "jadwal sholat" }), callTool("mcp-jadwal-sholat__get_prayer_times", { city: "Banjarbaru" }), say("Subuh 04:30")],
+      [callTool("palui__search_tools", { query: "jadwal sholat" }), callTool("mcp-jadwal-sholat__get_prayer_times", { city: "Banjarbaru" }), say("Subuh 04:30")],
       calls,
     )
     await h.engine.inbound(tgMessage("jadwal sholat banjarbaru"))
     await h.engine.idle()
     const [first, second] = h.m.offered
-    expect(first).toEqual(["notes__simpan_instruksi", "notes__daftar_instruksi", "notes__hapus_instruksi", "palui__cari_tool"])
+    expect(first).toEqual(["notes__save_instruction", "notes__list_instructions", "notes__delete_instruction", "palui__search_tools"])
     expect(second).toContain("mcp-jadwal-sholat__get_prayer_times")
     expect(calls).toEqual(["Banjarbaru"])
     const prompt = promptText(h.m.prompts[0])
-    expect(prompt).toContain("jadwal-sholat (3 to load with palui__cari_tool: search_cities, get_prayer_times, list_methods)")
+    expect(prompt).toContain("jadwal-sholat (3 to load with palui__search_tools: search_cities, get_prayer_times, list_methods)")
     expect(prompt).toContain("Never tell the owner a tool or capability doesn't exist without searching first.")
   })
 
   it("keeps loaded tools for the next turns of the session", async () => {
-    const h = await setup([callTool("palui__cari_tool", { names: ["get_prayer_times"] }), say("ok"), say("lagi")])
+    const h = await setup([callTool("palui__search_tools", { names: ["get_prayer_times"] }), say("ok"), say("lagi")])
     await h.engine.inbound(tgMessage("jadwal sholat"))
     await h.engine.idle()
     await h.engine.inbound(tgMessage("besok?"))
     await h.engine.idle()
     const next = h.m.offered.at(-1)!
     expect(next, JSON.stringify(h.m.offered)).toContain("mcp-jadwal-sholat__get_prayer_times")
-    expect(next).toContain("palui__cari_tool")
+    expect(next).toContain("palui__search_tools")
     expect(next).toHaveLength(4)
   })
 
   it("never finds tools of a disabled connector or a disabled tool", async () => {
     const off = toolsRuntime("mcp-off", () => ({ prayer_alarm: read("Prayer alarm") }))
-    const h = await setup([callTool("palui__cari_tool", { query: "prayer alarm" }), say("ok")], [], { "mcp-off": off })
+    const h = await setup([callTool("palui__search_tools", { query: "prayer alarm" }), say("ok")], [], { "mcp-off": off })
     pauseConnector(h.db, "mcp-off")
     await h.sup.reconcile()
     await h.engine.inbound(tgMessage("alarm sholat"))
     await h.engine.idle()
-    const result = h.db.select().from(toolCalls).where(eq(toolCalls.tool, "palui__cari_tool")).get()!
+    const result = h.db.select().from(toolCalls).where(eq(toolCalls.tool, "palui__search_tools")).get()!
     expect(result.resultPreview).not.toContain("prayer_alarm")
     expect(promptText(h.m.prompts[0])).not.toContain("mcp-off")
   })
 
   it("tells a flow search each tool's class and trust, and leaves destructive ones out", async () => {
     const extra = toolsRuntime("mcp-ops", () => ({ prayer_wipe: { tool: fnTool("Wipe prayer data", () => "ok"), class: "destructive" as const }, prayer_log: { tool: fnTool("Log a prayer", () => "ok"), class: "write" as const } }))
-    const h = await setup([callTool("palui__cari_tool", { query: "prayer", for: "flow" }), say("ok")], [], { "mcp-ops": extra })
+    const h = await setup([callTool("palui__search_tools", { query: "prayer", for: "flow" }), say("ok")], [], { "mcp-ops": extra })
     await h.engine.inbound(tgMessage("cari tool sholat buat flow"))
     await h.engine.idle()
-    const result = h.db.select().from(toolCalls).where(eq(toolCalls.tool, "palui__cari_tool")).get()!
+    const result = h.db.select().from(toolCalls).where(eq(toolCalls.tool, "palui__search_tools")).get()!
     expect(result.resultPreview).toContain('"class":"write","untrusted"')
     expect(result.resultPreview).not.toContain("prayer_wipe")
   })
@@ -1447,7 +1447,7 @@ describe("tool search", () => {
     await h.engine.inbound(tgMessage("halo"))
     await h.engine.idle()
     expect(h.m.offered[0]).toHaveLength(6)
-    expect(h.m.offered[0]).not.toContain("palui__cari_tool")
+    expect(h.m.offered[0]).not.toContain("palui__search_tools")
     expect(promptText(h.m.prompts[0])).toContain("jadwal-sholat (3 tools)")
   })
 })

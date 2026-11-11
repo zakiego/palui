@@ -267,7 +267,7 @@ export function worst(k: Kit) {
     k.tool({
       runId: bigRun,
       connectorId: i % 2 ? "mcp-northwind-industries-holdings-internal-knowledge-base-prod" : "reminders",
-      tool: i % 5 === 0 ? within(TOOL_LONG, LIMITS.toolName) : i % 5 === 1 ? "x__y" : "reminders__ingatkan",
+      tool: i % 5 === 0 ? within(TOOL_LONG, LIMITS.toolName) : i % 5 === 1 ? "x__y" : "reminders__set_reminder",
       class: toolClasses[i % 3]!,
       // A pasted blob in the arguments: one string with no place to wrap.
       args: i === 0 ? { query: PASTED_BLOB, filters: { department: "Platform Infrastructure", url: LONG_URL }, limit: 1284 } : i === 2 ? null : { text: "bayar listrik", when: "besok 09:00" },

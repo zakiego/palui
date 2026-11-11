@@ -51,8 +51,8 @@ describe("chat tools", () => {
   it("exposes two read tools, both untrusted", () => {
     const { tools } = setup()
     expect(Object.fromEntries(Object.entries(tools).map(([k, v]) => [k, [v.class, v.untrusted]]))).toEqual({
-      cari_chat: ["read", true],
-      baca_chat: ["read", true],
+      search_chats: ["read", true],
+      read_chat: ["read", true],
     })
   })
 
@@ -67,10 +67,10 @@ describe("chat tools", () => {
   })
 })
 
-describe("cari_chat", () => {
+describe("search_chats", () => {
   it("lists the newest conversation first, chats with no messages last", async () => {
     const { tools } = setup()
-    const res = await call(tools.cari_chat, {})
+    const res = await call(tools.search_chats, {})
     expect(res.chats.map((c: { title: string }) => c.title)).toEqual(["Zaki", "Tim Vorneo", "Keluarga Besar", "Palui (web)"])
     expect(res.chats[2]).toEqual({
       id: expect.stringMatching(/^chat_/),
@@ -86,29 +86,29 @@ describe("cari_chat", () => {
 
   it("matches title, external id and chat id, case-insensitive", async () => {
     const { tools, family } = setup()
-    expect((await call(tools.cari_chat, { query: "keluarga" })).chats.map((c: { id: string }) => c.id)).toEqual([family.id])
-    expect((await call(tools.cari_chat, { query: "@g.us" })).chats.map((c: { id: string }) => c.id)).toEqual([family.id])
-    expect((await call(tools.cari_chat, { query: family.id })).chats.map((c: { id: string }) => c.id)).toEqual([family.id])
+    expect((await call(tools.search_chats, { query: "keluarga" })).chats.map((c: { id: string }) => c.id)).toEqual([family.id])
+    expect((await call(tools.search_chats, { query: "@g.us" })).chats.map((c: { id: string }) => c.id)).toEqual([family.id])
+    expect((await call(tools.search_chats, { query: family.id })).chats.map((c: { id: string }) => c.id)).toEqual([family.id])
   })
 
   it("treats % and _ in the query literally", async () => {
     const { db, tools } = setup()
     ensureChat(db, { channel: "telegram", externalId: "9", title: "Diskon 50% hari ini" }, NOW)
-    expect((await call(tools.cari_chat, { query: "0% h" })).chats.map((c: { title: string }) => c.title)).toEqual(["Diskon 50% hari ini"])
-    expect((await call(tools.cari_chat, { query: "k%r" })).count).toBe(0)
-    expect((await call(tools.cari_chat, { query: "t_m" })).count).toBe(0)
+    expect((await call(tools.search_chats, { query: "0% h" })).chats.map((c: { title: string }) => c.title)).toEqual(["Diskon 50% hari ini"])
+    expect((await call(tools.search_chats, { query: "k%r" })).count).toBe(0)
+    expect((await call(tools.search_chats, { query: "t_m" })).count).toBe(0)
   })
 
   it("filters by channel and kind", async () => {
     const { tools } = setup()
-    expect((await call(tools.cari_chat, { channel: "whatsapp" })).chats.map((c: { title: string }) => c.title)).toEqual(["Zaki", "Keluarga Besar"])
-    expect((await call(tools.cari_chat, { kind: "group" })).chats.map((c: { title: string }) => c.title)).toEqual(["Tim Vorneo", "Keluarga Besar"])
-    expect((await call(tools.cari_chat, { channel: "telegram", kind: "dm" })).count).toBe(0)
+    expect((await call(tools.search_chats, { channel: "whatsapp" })).chats.map((c: { title: string }) => c.title)).toEqual(["Zaki", "Keluarga Besar"])
+    expect((await call(tools.search_chats, { kind: "group" })).chats.map((c: { title: string }) => c.title)).toEqual(["Tim Vorneo", "Keluarga Besar"])
+    expect((await call(tools.search_chats, { channel: "telegram", kind: "dm" })).count).toBe(0)
   })
 
   it("says so when nothing matches", async () => {
     const { tools } = setup()
-    expect(await call(tools.cari_chat, { query: "arisan" })).toEqual({ ok: true, count: 0, chats: [], message: 'Nggak ada chat yang cocok sama "arisan".' })
+    expect(await call(tools.search_chats, { query: "arisan" })).toEqual({ ok: true, count: 0, chats: [], message: 'Nggak ada chat yang cocok sama "arisan".' })
   })
 
   it("caps results at 20", () => {
@@ -119,10 +119,10 @@ describe("cari_chat", () => {
   })
 })
 
-describe("baca_chat", () => {
+describe("read_chat", () => {
   it("reads owner and Palui messages oldest first, skipping tool and system rows", async () => {
     const { tools, family } = setup()
-    const res = await call(tools.baca_chat, { chat: family.id })
+    const res = await call(tools.read_chat, { chat: family.id })
     expect(res.ok).toBe(true)
     expect(res.chat).toMatchObject({ id: family.id, title: "Keluarga Besar" })
     expect(res.messages).toEqual([
@@ -133,13 +133,13 @@ describe("baca_chat", () => {
 
   it("finds a chat by its exact external id, and asks for the channel when that's ambiguous", async () => {
     const { db, tools, work } = setup()
-    expect((await call(tools.baca_chat, { chat: "-100777" })).chat.id).toBe(work.id)
-    expect((await call(tools.baca_chat, { chat: "-1007" })).error).toBe('No chat "-1007". Call cari_chat to get the id.')
+    expect((await call(tools.read_chat, { chat: "-100777" })).chat.id).toBe(work.id)
+    expect((await call(tools.read_chat, { chat: "-1007" })).error).toBe('No chat "-1007". Call search_chats to get the id.')
     ensureChat(db, { channel: "whatsapp", externalId: "-100777" }, NOW)
-    const res = await call(tools.baca_chat, { chat: "-100777" })
+    const res = await call(tools.read_chat, { chat: "-100777" })
     expect(res.ok).toBe(false)
     expect(res.error).toBe('"-100777" matches chats on telegram, whatsapp. Pass channel, or use the chat id.')
-    expect((await call(tools.baca_chat, { chat: "-100777", channel: "telegram" })).chat.id).toBe(work.id)
+    expect((await call(tools.read_chat, { chat: "-100777", channel: "telegram" })).chat.id).toBe(work.id)
   })
 
   it("returns the newest N, capped at 100", () => {
@@ -155,13 +155,13 @@ describe("baca_chat", () => {
     const { db, tools, web } = setup()
     for (let i = 0; i < 6; i++) addMessage(db, web, i % 2 ? "assistant" : "user", `Rapat ${i}`, NOW + i * 60 * MIN)
     // NOW is 10:00 WITA, so messages are at 10:00, 11:00 ... 15:00.
-    const read = async (input: Record<string, unknown>) => (await call(tools.baca_chat, { chat: web.id, ...input })).messages.map((m: { text: string }) => m.text)
+    const read = async (input: Record<string, unknown>) => (await call(tools.read_chat, { chat: web.id, ...input })).messages.map((m: { text: string }) => m.text)
     expect(await read({ before: "2026-11-10T12:00" })).toEqual(["Rapat 0", "Rapat 1"])
     expect(await read({ since: "2026-11-10T14:00" })).toEqual(["Rapat 4", "Rapat 5"])
     expect(await read({ since: "2026-11-10T11:00", before: "2026-11-10T13:00" })).toEqual(["Rapat 1", "Rapat 2"])
     expect(await read({ since: "2026-11-10T05:00:00Z" })).toEqual(["Rapat 3", "Rapat 4", "Rapat 5"])
     expect(await read({ query: "rapat 3" })).toEqual(["Rapat 3"])
-    expect((await call(tools.baca_chat, { chat: web.id, before: "kemarin" })).error).toBe('"kemarin" isn\'t a time. Use YYYY-MM-DDTHH:mm.')
+    expect((await call(tools.read_chat, { chat: web.id, before: "kemarin" })).error).toBe('"kemarin" isn\'t a time. Use YYYY-MM-DDTHH:mm.')
   })
 
   it("clips long messages and shows media, quotes and hooks as short markers", async () => {
@@ -171,7 +171,7 @@ describe("baca_chat", () => {
     addMessage(db, web, "user", "", NOW + 2, { media: [{ kind: "audio", mimeType: "audio/ogg" }] })
     addMessage(db, web, "user", "setuju", NOW + 3, { quoted: { from: "other", text: "y".repeat(500) } })
     addMessage(db, web, "user", "build failed", NOW + 4, { hook: { id: "hook_1", name: "GitHub", mode: "summarize" } })
-    const [long, media, audio, quote, hook] = (await call(tools.baca_chat, { chat: web.id })).messages
+    const [long, media, audio, quote, hook] = (await call(tools.read_chat, { chat: web.id })).messages
     expect(long.text).toBe(`${"x".repeat(MESSAGE_MAX_CHARS)}… [dipotong, 2000 karakter]`)
     expect(media.text).toBe("ini KTP [gambar] [dokumen: tiket.pdf]")
     expect(JSON.stringify(media)).not.toContain("AAAA")

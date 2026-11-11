@@ -65,7 +65,7 @@ export type SystemInput = {
   // so it never goes into the prompt.
   chat?: { id: string; externalId: string; kind: string; sessionId?: string | null } | null
   capabilities: string[]
-  // More tools than budgets.maxTools: some load through `palui__cari_tool`.
+  // More tools than budgets.maxTools: some load through `palui__search_tools`.
   toolSearch?: boolean
   // Standing instructions and preferences (notes/service notesPrompt).
   notes?: string | null
@@ -112,7 +112,7 @@ export function buildSystem(i: SystemInput): string {
   parts.push(i.capabilities.length ? `Enabled capabilities: ${i.capabilities.join(", ")}.` : "No tools are enabled right now.")
   if (i.toolSearch)
     parts.push(
-      "Not every tool is loaded. When you need one that isn't in your tool list, call palui__cari_tool first (keywords or exact names from the list above), then call what it loads. Never tell the owner a tool or capability doesn't exist without searching first.",
+      "Not every tool is loaded. When you need one that isn't in your tool list, call palui__search_tools first (keywords or exact names from the list above), then call what it loads. Never tell the owner a tool or capability doesn't exist without searching first.",
     )
   parts.push("If a tool call is not approved, do not retry it; tell the owner it was not run.")
   if (i.shared) {

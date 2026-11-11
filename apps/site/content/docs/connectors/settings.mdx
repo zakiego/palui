@@ -35,8 +35,8 @@ Personas live on the Agents page, so they aren't here.
 
 | Tool | Class | What it does |
 |---|---|---|
-| `lihat_setelan` | `read` | Read the settings above plus version, dashboard URL, today's token use, a budget pause and every connector with its status. |
-| `ubah_setelan` | `destructive` | Change one or more of the settings above. |
+| `get_settings` | `read` | Read the settings above plus version, dashboard URL, today's token use, a budget pause and every connector with its status. |
+| `update_settings` | `destructive` | Change one or more of the settings above. |
 
 ## Safety
 
@@ -44,7 +44,7 @@ Personas live on the Agents page, so they aren't here.
   A setting decides which model answers, how many tokens a day Palui may spend and when reminders fall back to another channel. That's why changing one is `destructive`: it always asks you first and shows the new values in the approval, and scheduled jobs, flows and hooks can't do it at all.
 </Callout>
 
-- Only Palui, the default agent, gets `ubah_setelan`. Other agents can read the settings.
+- Only Palui, the default agent, gets `update_settings`. Other agents can read the settings.
 - Secrets and API keys are never returned or changed. Connector setup stays on the Connectors page.
 - Every change made from chat is logged on the Activity page with the keys it touched.
 

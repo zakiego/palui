@@ -73,7 +73,7 @@ export function remoteMcpTools(deps: RemoteMcpDeps): Record<string, PaluiTool> {
   const { db } = deps
   const clock = deps.clock ?? (() => Date.now())
   return {
-    tambah_server_mcp: {
+    add_mcp_server: {
       class: "destructive",
       title: "Add an MCP server",
       tool: tool({
@@ -134,7 +134,7 @@ export function remoteMcpTools(deps: RemoteMcpDeps): Record<string, PaluiTool> {
       }),
     },
 
-    daftar_server_mcp: {
+    list_mcp_servers: {
       class: "read",
       title: "List MCP servers",
       tool: tool({
@@ -147,16 +147,16 @@ export function remoteMcpTools(deps: RemoteMcpDeps): Record<string, PaluiTool> {
       }),
     },
 
-    hapus_server_mcp: {
+    remove_mcp_server: {
       class: "destructive",
       title: "Remove an MCP server",
       tool: tool({
-        description: "Remove an MCP server that was added from chat, by name or id (from daftar_server_mcp). Servers set up on the Connectors page are removed there.",
+        description: "Remove an MCP server that was added from chat, by name or id (from list_mcp_servers). Servers set up on the Connectors page are removed there.",
         inputSchema: z.object({ name: z.string().min(1).max(60).describe("Server name or connector id, e.g. jadwal-sholat or mcp-jadwal-sholat.") }),
         execute: async ({ name }) => {
           const id = idFor(name)
           const row = getConnector(db, id)
-          if (!row || row.type !== "mcp") return { ok: false as const, error: `Nggak ada server MCP ${id}. Panggil daftar_server_mcp untuk lihat id-nya.` }
+          if (!row || row.type !== "mcp") return { ok: false as const, error: `Nggak ada server MCP ${id}. Panggil list_mcp_servers untuk lihat id-nya.` }
           if ((row.config as McpConfig)?.addedFromChat !== true) return { ok: false as const, error: `${row.label} dipasang dari dashboard. Hapus dari halaman Connectors ya.` }
           deleteConnector(db, id, clock())
           deps.reconcile?.()

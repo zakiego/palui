@@ -13,10 +13,10 @@ Nothing to set up. Attachments is a built-in skill and is created on first boot.
 
 | Tool | Class | What it does |
 |---|---|---|
-| `simpan_lampiran` | `write` | Save a file from the message being answered, with a title and a description. With several files, `nomor` picks one (1-based). |
-| `daftar_lampiran` | `read` | List saved files in this chat, with an optional search over titles, descriptions and file names |
-| `ambil_lampiran` | `read` | One file's details and its dashboard link |
-| `hapus_lampiran` | `destructive` | Delete a saved file. Always asks first. |
+| `save_attachment` | `write` | Save a file from the message being answered, with a title and a description. With several files, `nomor` picks one (1-based). |
+| `list_attachments` | `read` | List saved files in this chat, with an optional search over titles, descriptions and file names |
+| `get_attachment` | `read` | One file's details and its dashboard link |
+| `delete_attachment` | `destructive` | Delete a saved file. Always asks first. |
 
 Each tool's class decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
 

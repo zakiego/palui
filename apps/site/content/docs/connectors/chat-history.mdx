@@ -24,8 +24,8 @@ Messages other people send in a chat aren't stored, so they can't be read either
 
 | Tool | Class | What it does |
 |---|---|---|
-| `cari_chat` | `read` | Find chats by title, WhatsApp JID, Telegram chat id or chat id, with an optional channel (`whatsapp`, `telegram`, `web`) and kind (`dm`, `group`) filter. Newest conversation first, at most 20. Each result has its channel, external id, title, kind, last message time and message count. |
-| `baca_chat` | `read` | Read one chat by its chat id or an exact external id. The newest 30 messages by default (at most 100), returned oldest first. Optional `before` and `since` times and a text search. Each message is clipped at 500 characters. |
+| `search_chats` | `read` | Find chats by title, WhatsApp JID, Telegram chat id or chat id, with an optional channel (`whatsapp`, `telegram`, `web`) and kind (`dm`, `group`) filter. Newest conversation first, at most 20. Each result has its channel, external id, title, kind, last message time and message count. |
+| `read_chat` | `read` | Read one chat by its chat id or an exact external id. The newest 30 messages by default (at most 100), returned oldest first. Optional `before` and `since` times and a text search. Each message is clipped at 500 characters. |
 
 Times in and out are in your zone (Settings, default `Asia/Makassar`). Each tool's class decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
 

@@ -10,7 +10,7 @@ Scope: the design and its reasoning. The accepted behavior now lives in `docs/PL
 - Steps pass data with templates (`{{steps.weather.data.temp}}`) and conditions use a tiny expression language that is parsed at save time. No user code runs.
 - Everything is deterministic except an explicit `prompt` step. Tool calls and conditions run without the model and every step is logged with its inputs, outputs and the values a condition compared.
 - Write tools in a flow are approved once per flow version, for the exact calls in that version. Tainted arguments, a class change or a new version ask again. Destructive tools are not allowed in flows.
-- The agent builds flows from chat with `buat_flow`, `cek_flow`, `uji_flow` (dry run), `kenapa_flow` ("why didn't it fire?") and friends. It finds tools with the existing `palui__cari_tool`.
+- The agent builds flows from chat with `create_flow`, `check_flow`, `test_flow` (dry run), `explain_flow` ("why didn't it fire?") and friends. It finds tools with the existing `palui__search_tools`.
 
 ## 1. Goals and non-goals
 
@@ -29,7 +29,7 @@ Non-goals
 - Parallel branches, sub-flows, and flows calling other flows (beyond event triggers).
 - Destructive tools in flows.
 - Multi-user flows or flows owned by guests. Flows belong to the owner, like routines.
-- An HTTP request step. Web access goes through existing tool connectors (`webfetch.ambil_halaman`, MCP servers), which already have the SSRF guard and trust labels.
+- An HTTP request step. Web access goes through existing tool connectors (`webfetch.fetch_page`, MCP servers), which already have the SSRF guard and trust labels.
 
 ## 2. Where we start from
 
@@ -51,7 +51,7 @@ What else the design leans on:
 - Approvals are per call today, with no allow list (`chat/turn.ts:290`, `approvals/store.ts`).
 - Taint is a per-turn boolean that turns on for untrusted tools and hook input (`turn.ts:185`).
 - Budgets: `maxSteps` 12, `turnTimeoutMs` 120 s, `maxRunsPerHour` 60, daily token caps (`settings.ts:61`).
-- Tool search: when a turn has more than `budgets.maxTools` tools, the rest are found through `palui__cari_tool` (`tools/collect.ts`, PR #42).
+- Tool search: when a turn has more than `budgets.maxTools` tools, the rest are found through `palui__search_tools` (`tools/collect.ts`, PR #42).
 - Hooks: HMAC-verified `POST /api/hooks/:slug`, modes `forward` and `summarize` (`hooks/index.ts`, `chat/engine.ts:193`).
 - One scheduler timer, armed for the earliest due time, with a 30 s safety sweep (`reminders/scheduler.ts`).
 
@@ -163,7 +163,7 @@ The step log. One row per step attempt.
 | `tool_call_id`, `turn_run_id` | Links to `tool_calls` and `runs` when a step used them, so the existing run page can open them |
 | `error`, `started_at`, `ms` | |
 
-Retention matches `tool_calls`: step inputs and outputs are cleared after 30 days, the rows and statuses stay. Runs stay 180 days so recaps and `riwayat_flow` can count.
+Retention matches `tool_calls`: step inputs and outputs are cleared after 30 days, the rows and statuses stay. Runs stay 180 days so recaps and `flow_history` can count.
 
 ### 3.6 Migration of routines
 
@@ -175,7 +175,7 @@ The plan is a one-time data migration in phase 2, after the flow engine can run 
    - `routine_occurrences` to `flow_runs`. `key` becomes `run_key`. Status maps: `open` to `waiting` (with the check-in wait state and `wake_at` = min of next re-ask and deadline), `done` and `missed` and `sent` to `done` (the check-in output keeps `answer`, `answers`, `missed`), `skipped` to `skipped`, `failed` to `failed`.
    - Migrated flows have no write steps, so they need no approval.
 3. Compatibility for in-flight messages: outbox rows with source `routine:<occId>` and Telegram buttons `rt:<occId>:<answer>` keep working. The router looks the occurrence up through `flow_runs.legacy_occurrence_id`. After 7 days no open check-in can still point at an old id, and the lookup can go.
-4. The routine tools (`buat_rutinitas` and the rest) stay for one release as thin wrappers that create or edit a flow of the canonical shape, and the system prompt stops advertising them. `jawab_checkin` stays with the same name and learns run ids.
+4. The routine tools (`buat_rutinitas` and the rest) stay for one release as thin wrappers that create or edit a flow of the canonical shape, and the system prompt stops advertising them. `answer_checkin` stays with the same name and learns run ids.
 5. The `routines` and `routine_occurrences` tables are dropped two releases later, after a pre-deploy snapshot.
 
 Rejected alternative: keep routines as a separate engine forever and add flows next to it. Two schedulers for the same thing means two places to fix every timing bug, and the agent would have to choose between two tools for the same request.
@@ -196,7 +196,7 @@ Rejected alternative: keep routines as a separate engine forever and add flows n
 
 `schema` is the definition format version. It's optional on input and always stored. When the format changes in a way old definitions can't parse, a pure `upgradeDefinition(v, def)` step runs on read and the next save stores the new number. Old versions stay readable forever, so a run page from last year still renders. This is what lets the format grow (new step kinds, renamed fields) without a data migration each time.
 
-Rules, all checked at save by `cek_flow` and by every write:
+Rules, all checked at save by `check_flow` and by every write:
 
 - Step ids and trigger ids match `^[a-z][a-z0-9_]{0,31}$` and are unique. They are literals, never templates.
 - Edges: a step's `next` is a step id or `null` (end). If omitted, it is the next step in the array, and the last step ends. `if`, `checkin`, `each` and `onError` name step ids for their branches.
@@ -215,7 +215,7 @@ Every trigger has `id`, `kind`, `start` (the first step id) and optional `lateGr
 | `chat` | `command` (`/beres`) or `phrases` (exact, normalized like check-in answers), owner only | `text`, `args` (the rest after the command), `messageId` | Message id |
 | `poll` | `connectorId`, `tool`, `args`, `everyMin` (5 to 1440), `select` (a path into the result), `fire` (`change` or `truthy`) | `value`, `previous`, `checkedAt` | sha256 of the selected value. Untrusted when the tool is |
 | `event` | `event` (`checkin.answered`, `checkin.missed`, `run.failed`, `run.done`), `flow` (a flow name or `"self"`) | `event`, `flowId`, `runId`, `step`, `answer`, `error` | The source event's id |
-| `manual` | none. Every flow has it implicitly | `args` given to `jalankan_flow` | `manual:<uuid>` |
+| `manual` | none. Every flow has it implicitly | `args` given to `run_flow` | `manual:<uuid>` |
 
 Notes:
 
@@ -253,7 +253,7 @@ Where templates are allowed: tool `args` values, `message.text`, `checkin.text` 
 Each value in `vars` is tracked by its root. A root is tainted when it came from:
 
 - a webhook trigger, a `poll` or `schedule` tool source on an untrusted tool,
-- a `tool` step on an untrusted tool (`untrusted: true`, or a connector with trust `external`, or `webfetch.ambil_halaman`),
+- a `tool` step on an untrusted tool (`untrusted: true`, or a connector with trust `external`, or `webfetch.fetch_page`),
 - a `prompt` step whose turn was tainted,
 - a `set` or `each` that read a tainted root.
 
@@ -279,7 +279,7 @@ Considered and left out: `switch` (chained `if` is enough at this size), `http` 
 
 ```jsonc
 { "id": "weather", "kind": "tool",
-  "tool": "webfetch__ambil_halaman",         // or "connectorId" + "tool"
+  "tool": "webfetch__fetch_page",         // or "connectorId" + "tool"
   "args": { "url": "https://wttr.in/Banjarmasin?format=j1" },
   "parse": { "field": "text", "as": "json" }, // optional
   "retry": { "max": 2, "backoffSec": 30 },    // optional
@@ -287,7 +287,7 @@ Considered and left out: `switch` (chained `if` is enough at this size), `http` 
 ```
 
 - Input: rendered `args`, validated against the tool's input schema before the call.
-- Output: `{ ok: true, data }`. `data` is the tool's JSON (MCP `structuredContent`, parsed text, or the plain value, the same `toolData()` routines use). `parse` turns a text field into JSON, for tools like `ambil_halaman` that return a JSON body as text.
+- Output: `{ ok: true, data }`. `data` is the tool's JSON (MCP `structuredContent`, parsed text, or the plain value, the same `toolData()` routines use). `parse` turns a text field into JSON, for tools like `fetch_page` that return a JSON body as text.
 - Class: resolved before the call, from the connector's tool list. `read` runs. `write` needs the version approval and an untainted call, otherwise the run waits for approval. `destructive` is refused at save.
 - Called server-side by an extended `connectorToolCaller`, outside any turn, with the flow's `chatId` in the tool context. The turn's `maxTools` and tool search don't apply here.
 - Failure: timeout (default 20 s, max 60 s), an error result, or a schema mismatch. Retries default to 2 for read tools (30 s, then 2 min, kept in the run so a restart doesn't lose them) and 0 for write tools, which retry only if the step says so. Then `onError`.
@@ -332,7 +332,7 @@ Same config as today's check-in action, plus branches:
 ```
 
 - The run goes to `waiting` with `wait = { kind: "checkin", stepId, followUps, nextFollowUpAt, deadlineAt, answers: [] }` and `wake_at` = the earlier of the next re-ask and the deadline.
-- Answers come in exactly as today: buttons `fl:<runId>:<answerId>`, a quoted reply that matches an answer, or the model calling `jawab_checkin` (open check-ins stay in the system prompt).
+- Answers come in exactly as today: buttons `fl:<runId>:<answerId>`, a quoted reply that matches an answer, or the model calling `answer_checkin` (open check-ins stay in the system prompt).
 - `deadline: next` means the next occurrence of the trigger that started the run. Only valid on a `schedule` trigger path, checked at save. `plusMin` shifts it (`{ "kind": "next", "plusMin": -10 }` is 10 minutes before).
 - `deadline: after` takes `minutes` as a number or a template that renders to one (`"{{vars.left}}"`).
 - `deadline: at` takes a computed time like `wait.until` (a template or an ISO date/datetime) plus an optional `plusMin`: `{ "kind": "at", "at": "{{steps.nextp.data.next.timestamp}}", "plusMin": -10 }`. A value that isn't a time goes through `onError`.
@@ -509,7 +509,7 @@ On failure: retries as in 5.1, then `onError`. A failed run notifies the owner o
 
 ### 7.6 Dry run
 
-`uji_flow` executes a definition (saved or a draft) against a fake trigger payload, with:
+`test_flow` executes a definition (saved or a draft) against a fake trigger payload, with:
 
 - `read` tools called for real (that's the point: the agent sees real output shapes),
 - `write` tools, `message`, `checkin` and `prompt` stubbed. The step log shows exactly what would be sent or called, with rendered args, and stub outputs that the agent can override (`"stubs": { "ask": { "answer": "done" } }`) to walk a branch,
@@ -519,47 +519,47 @@ On failure: retries as in 5.1, then `onError`. A failed run notifies the owner o
 
 ## 8. Agent-facing tools
 
-A new built-in skill connector `flows` (replacing `routines`). Names follow the existing pattern: an Indonesian verb plus the product noun, so `buat_flow` like `buat_rutinitas` and `ingatkan`. "Flow" is the one product word everywhere (tools, dashboard, docs, events), and the agent still understands "rutinitas" or "alur" in chat. All tools are scoped to the turn's chat.
+A new built-in skill connector `flows` (replacing `routines`). Names are English, a verb plus the product noun, so `create_flow` like `set_reminder`. "Flow" is the one product word everywhere (tools, dashboard, docs, events), and the agent still understands "rutinitas" or "alur" in chat. All tools are scoped to the turn's chat.
 
 The tools are only offered in owner turns that aren't strict: the owner's DMs and the web chat. Guest turns and shared chats never see them, even with `owner_powers: approve` (12.9).
 
 | Tool | Class | Args | What it does |
 |---|---|---|---|
-| `buat_flow` | write | `definition` | Validate, save version 1, show the trigger summary and the next 3 times. Asks for approval if it has write calls |
-| `ubah_flow` | write | `id`, `definition` or `patch` (JSON merge patch on the definition), `note?` | New version. Returns the diff and whether approval is needed again |
-| `cek_flow` | read | `definition` or `id` | Validation only: problems as sentences with the JSON path, resolved tools and classes, `write_calls` |
-| `uji_flow` | read, untrusted | `id` or `definition`, `trigger?` (fake payload), `stubs?`, `start?` (a trigger id) | Dry run, 7.6. Returns the step log |
-| `daftar_flow` | read | `filter?` (`active`, `paused`, `failing`) | Flows with triggers, next time, last run status, approval state |
-| `lihat_flow` | read | `id`, `version?` | Full definition, versions, approval state, trigger state |
-| `jeda_flow` | write | `id`, `paused`, `until?` | Pause or resume |
-| `hapus_flow` | destructive | `id` | Delete with its runs. Always asks |
-| `jalankan_flow` | write | `id`, `trigger?`, `args?` | Manual run now, real |
-| `riwayat_flow` | read | `id?`, `days?`, `status?`, `limit?` | Runs with status, skip reason, branch taken, counts by answer (the recap data) |
-| `lihat_run` | read | `runId` | The step log of one run: inputs, outputs, branches, errors |
-| `kenapa_flow` | read | `id`, `at?` (a local datetime, default now) | Diagnosis, section 10 |
-| `jawab_checkin` | write | `answer`, `runId?`, `note?` | Unchanged from routines, accepts run ids |
-| `batal_run` | write | `runId` | Cancel a waiting or queued run |
+| `create_flow` | write | `definition` | Validate, save version 1, show the trigger summary and the next 3 times. Asks for approval if it has write calls |
+| `update_flow` | write | `id`, `definition` or `patch` (JSON merge patch on the definition), `note?` | New version. Returns the diff and whether approval is needed again |
+| `check_flow` | read | `definition` or `id` | Validation only: problems as sentences with the JSON path, resolved tools and classes, `write_calls` |
+| `test_flow` | read, untrusted | `id` or `definition`, `trigger?` (fake payload), `stubs?`, `start?` (a trigger id) | Dry run, 7.6. Returns the step log |
+| `list_flows` | read | `filter?` (`active`, `paused`, `failing`) | Flows with triggers, next time, last run status, approval state |
+| `get_flow` | read | `id`, `version?` | Full definition, versions, approval state, trigger state |
+| `pause_flow` | write | `id`, `paused`, `until?` | Pause or resume |
+| `delete_flow` | destructive | `id` | Delete with its runs. Always asks |
+| `run_flow` | write | `id`, `trigger?`, `args?` | Manual run now, real |
+| `flow_history` | read | `id?`, `days?`, `status?`, `limit?` | Runs with status, skip reason, branch taken, counts by answer (the recap data) |
+| `get_run` | read | `runId` | The step log of one run: inputs, outputs, branches, errors |
+| `explain_flow` | read | `id`, `at?` (a local datetime, default now) | Diagnosis, section 10 |
+| `answer_checkin` | write | `answer`, `runId?`, `note?` | Unchanged from routines, accepts run ids |
+| `cancel_run` | write | `runId` | Cancel a waiting or queued run |
 
 Built-in read tools for use inside flows (also callable by the agent):
 
 | Tool | Returns |
 |---|---|
-| `flows__ringkasan` | For a flow (default: the calling flow) and a period: counts by answer, missed labels, and `text` (today's `recapText`), so a recap is a plain `tool` step |
+| `flows__recap` | For a flow (default: the calling flow) and a period: counts by answer, missed labels, and `text` (today's `recapText`), so a recap is a plain `tool` step |
 
 ### 8.1 How the agent finds tools for a `tool` step
 
-1. The agent already has `palui__cari_tool` (PR #42). Its results carry the namespaced name, the description and the input schema. This RFC adds the tool's `class` and `untrusted` flag to each hit, so the agent knows up front whether a step will need approval or taint data.
-2. A `tool` step can name the tool either as `"tool": "<connectorId>__<tool>"` (what `cari_tool` returns) or as `connectorId` + `tool`. `cek_flow` resolves both against the running connectors and stores the pair. Namespacing can truncate or replace characters (`collect.ts:50`), so the stored pair is the source of truth.
-3. Output shapes aren't in MCP schemas most of the time. The agent learns them with `uji_flow`, which calls read tools for real and returns their output (capped) in the step log. The flow prompt guidance tells the agent: search, then dry-run the tool step alone, then write the conditions against the real output.
-4. Flows call tools server-side, not through a turn, so a flow can use any enabled tool even when the turn only loaded `maxTools` of them. Destructive tools are left out of `cari_tool` results when the caller asks with `for: "flow"`.
+1. The agent already has `palui__search_tools` (PR #42). Its results carry the namespaced name, the description and the input schema. This RFC adds the tool's `class` and `untrusted` flag to each hit, so the agent knows up front whether a step will need approval or taint data.
+2. A `tool` step can name the tool either as `"tool": "<connectorId>__<tool>"` (what `search_tools` returns) or as `connectorId` + `tool`. `check_flow` resolves both against the running connectors and stores the pair. Namespacing can truncate or replace characters (`collect.ts:50`), so the stored pair is the source of truth.
+3. Output shapes aren't in MCP schemas most of the time. The agent learns them with `test_flow`, which calls read tools for real and returns their output (capped) in the step log. The flow prompt guidance tells the agent: search, then dry-run the tool step alone, then write the conditions against the real output.
+4. Flows call tools server-side, not through a turn, so a flow can use any enabled tool even when the turn only loaded `maxTools` of them. Destructive tools are left out of `search_tools` results when the caller asks with `for: "flow"`.
 
 ### 8.2 System prompt
 
-The skill's guidance block (like routines today) tells the model: prefer a flow over a job when the logic is deterministic; always `cek_flow` then `uji_flow` before `buat_flow`; never put fetched text in `prompt`, use `input`; show Zaki the trigger summary and write calls before saving. Open check-ins stay in the system prompt as now.
+The skill's guidance block (like routines today) tells the model: prefer a flow over a job when the logic is deterministic; always `check_flow` then `test_flow` before `create_flow`; never put fetched text in `prompt`, use `input`; show Zaki the trigger summary and write calls before saving. Open check-ins stay in the system prompt as now.
 
 ## 9. Worked examples
 
-Connector ids and tool output shapes below are illustrative where the real ones aren't in this repo (jadwal-sholat, GitHub, a bills source). `uji_flow` is how the agent would confirm them.
+Connector ids and tool output shapes below are illustrative where the real ones aren't in this repo (jadwal-sholat, GitHub, a bills source). `test_flow` is how the agent would confirm them.
 
 ### 9a. Morning briefing
 
@@ -575,10 +575,10 @@ Prayer times, weather and today's reminders, one message, no model.
   "steps": [
     { "id": "prayer", "kind": "tool", "tool": "mcp-jadwal-sholat__get_prayer_times",
       "args": { "city": "Banjarmasin", "date": "{{now.date}}" }, "onError": "continue" },
-    { "id": "weather", "kind": "tool", "tool": "webfetch__ambil_halaman",
+    { "id": "weather", "kind": "tool", "tool": "webfetch__fetch_page",
       "args": { "url": "https://wttr.in/Banjarmasin?format=j1" },
       "parse": { "field": "text", "as": "json" }, "onError": "continue" },
-    { "id": "reminders", "kind": "tool", "tool": "reminders__daftar_pengingat",
+    { "id": "reminders", "kind": "tool", "tool": "reminders__list_reminders",
       "args": { "filter": "upcoming", "limit": 20 } },
     { "id": "today", "kind": "set",
       "values": { "count": "count(steps.reminders.data.reminders, \"date\", now.date)" } },
@@ -670,7 +670,7 @@ Today's routines can already do a simpler version of this (a `tool` source with 
       "source": { "kind": "rrule", "rrule": "FREQ=WEEKLY;BYDAY=SU", "start": "2026-11-15T20:00" } }
   ],
   "steps": [
-    { "id": "recap", "kind": "tool", "tool": "flows__ringkasan",
+    { "id": "recap", "kind": "tool", "tool": "flows__recap",
       "args": { "flow": "Sholat 5 waktu", "days": 7 } },
     { "id": "any_missed", "kind": "if",
       "when": "steps.recap.data.missed > 0 or number(steps.recap.data.byAnswer.not_yet) > 0",
@@ -725,7 +725,7 @@ This is what `routineToFlow` produces for the live routine. Trigger `main` is th
       "followUp": { "everyMin": 15, "max": 4 },
       "deadline": { "kind": "next" },
       "next": null },
-    { "id": "recap_read", "kind": "tool", "tool": "flows__ringkasan",
+    { "id": "recap_read", "kind": "tool", "tool": "flows__recap",
       "args": { "flow": "self", "days": 7, "trigger": "main" } },
     { "id": "recap_send", "kind": "message", "text": "{{steps.recap_read.data.text}}" }
   ]
@@ -735,7 +735,7 @@ This is what `routineToFlow` produces for the live routine. Trigger `main` is th
 Two details the migration has to keep:
 
 - The routine's `{{date}}` in tool source args means "the local date being fetched", not today. It stays a source-arg template, separate from step templates, as it is now.
-- Today a recap with nothing logged in the period sends nothing. `flows__ringkasan` returns `total: 0`, and the migrated flow gets an `if` (`steps.recap_read.data.total > 0`) in front of `recap_send`. Left out above for readability.
+- Today a recap with nothing logged in the period sends nothing. `flows__recap` returns `total: 0`, and the migrated flow gets an `if` (`steps.recap_read.data.total > 0`) in front of `recap_send`. Left out above for readability.
 
 The exact check-in text, answers and missed text come from the live row, not from this example.
 
@@ -751,7 +751,7 @@ Dashboard (read-only, phase 4): a Flows page listing flows with next time and la
 
 ### 10.1 "Why didn't X fire?"
 
-`kenapa_flow` walks a fixed checklist for a flow and a moment, and answers with the first thing that explains it plus the supporting facts:
+`explain_flow` walks a fixed checklist for a flow and a moment, and answers with the first thing that explains it plus the supporting facts:
 
 1. Does the flow exist in this chat, is it enabled, is it paused (until when)?
 2. Was there a run near that time? If yes: its status, skip reason, and the step where it ended, with the branch each `if` took and the values it compared. "Jalan jam 06:00, tapi berhenti di `due_soon`: `daysUntil(\"2026-11-16\") = 5`, nggak `< 3`."
@@ -771,18 +771,18 @@ Phase 1, MVP (about 6 days)
 - Tables `flows`, `flow_versions`, `flow_triggers`, `flow_runs`, `flow_step_runs`.
 - Engine with `schedule` (all three sources, reusing `routines/sources.ts`) and `manual` triggers, and steps `tool` (read only), `if`, `set`, `message`, `prompt`.
 - Fix the two gaps from section 2: class before call, flow `chatId` in the tool context.
-- Agent tools: `buat_flow`, `ubah_flow`, `cek_flow`, `uji_flow`, `daftar_flow`, `lihat_flow`, `jeda_flow`, `hapus_flow`, `jalankan_flow`, `riwayat_flow`, `lihat_run`.
-- `cari_tool` hits gain `class` and `untrusted`.
+- Agent tools: `create_flow`, `update_flow`, `check_flow`, `test_flow`, `list_flows`, `get_flow`, `pause_flow`, `delete_flow`, `run_flow`, `flow_history`, `get_run`.
+- `search_tools` hits gain `class` and `untrusted`.
 - `routineToFlow` with the round-trip schedule test. Routines keep running on their own engine.
 - Example 9a works end to end.
 
 Phase 2, waits and the migration (about 5 days)
 
-- `checkin` and `wait` steps with persisted waits, re-asks and deadlines, `fl:` callbacks, quoted-reply matching, `jawab_checkin` on runs.
-- `flows__ringkasan`, recap as a trigger.
+- `checkin` and `wait` steps with persisted waits, re-asks and deadlines, `fl:` callbacks, quoted-reply matching, `answer_checkin` on runs.
+- `flows__recap`, recap as a trigger.
 - Write tool steps with per-version approval and the per-run exceptions.
 - Data migration of routines, the legacy id lookup, routine tools as wrappers.
-- `kenapa_flow`. Examples 9d and 9e work.
+- `explain_flow`. Examples 9d and 9e work.
 - Shadow week (12.6): the flow engine computes, for every migrated routine, which runs it would start and when, and logs any difference from what the routine engine actually sent. After 7 days with no unexplained difference, a settings flag hands sending to flows and the routine engine stops.
 
 Phase 3, more triggers (about 4 days)
@@ -805,13 +805,13 @@ Out for good: destructive tools in flows, user-defined functions or code, an `ht
 
 These were open questions. Each is decided for the long term, and the sections above already follow them.
 
-1. Names. Tools are `buat_flow`, `ubah_flow` and so on, and the product word is "Flows" in the dashboard and docs. It matches the existing verb-plus-noun tool names, and one word across tools, UI, docs and events is easier to search and explain than "rutinitas" on one screen and "flow" in the code. "Alur" reads fine but nobody types it. The agent still maps "rutinitas" and "alur" in chat to flows (section 8).
+1. Names. Tools are `create_flow`, `update_flow` and so on, and the product word is "Flows" in the dashboard and docs. It matches the existing verb-plus-noun tool names, and one word across tools, UI, docs and events is easier to search and explain than "rutinitas" on one screen and "flow" in the code. "Alur" reads fine but nobody types it. The agent still maps "rutinitas" and "alur" in chat to flows (section 8).
 2. Approval. Once per version is the default, plus a per-tool `flowApproval: every_run` setting for tools whose side effects reach other people (7.2 point 5). A connector can ship that default. Per-run approval also kicks in for tainted args and class changes. This keeps daily flows free of prompt fatigue without making email or public posts silent.
 3. Destructive tools. Never in flows, permanently (7.2). The safe pattern is a check-in that asks the owner, who then acts from chat.
 4. Other chats. Yes, through a literal `message.to` limited to chats the owner owns or allowed, and it counts as a write call that needs the version approval (5.3). Templates can't pick the target, so a webhook can't redirect messages.
 5. `each`. Default 20, up to 50 per step, no nesting, with truncation always visible in the output (5.8). Nesting is where flows turn into a programming language. A second level can be a second flow fed by an event trigger.
 6. Migration. In phase 2 with a 7-day shadow comparison before the routine engine hands over (section 11). One engine long term is the goal, and the shadow week is cheap insurance for the one routine that runs five times a day.
-7. Flow state. Keep `set` with `scope: "flow"`, capped at 16 KB. Some things can't be derived from history cheaply, like "already notified about this PR" or a streak that resets on a rule. `flows__ringkasan` stays the way to read the log.
+7. Flow state. Keep `set` with `scope: "flow"`, capped at 16 KB. Some things can't be derived from history cheaply, like "already notified about this PR" or a streak that resets on a rule. `flows__recap` stays the way to read the log.
 8. Tokens. 50k per flow per day by default, raisable to 500k in `limits.dailyTokens`, counted on top of the agent and global caps (7.5). Deterministic steps cost nothing, so only prompt steps spend it.
 9. Group chats. Flows are owner-only. The flow tools are never offered in guest or shared-chat turns. A flow created in the owner's DM can still post to an allowed group with `message.to`, and it can run its prompt steps as a group's agent through `flows.agent_id`. That covers "send a weekly summary to the family group" without letting anyone in that group install automations.
 

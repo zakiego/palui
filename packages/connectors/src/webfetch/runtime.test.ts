@@ -84,12 +84,12 @@ describe("fetchPage", () => {
 })
 
 describe("webfetch runtime", () => {
-  it("exposes ambil_halaman as an untrusted read tool", async () => {
+  it("exposes fetch_page as an untrusted read tool", async () => {
     const turn: TurnInfo = { runId: "r", chatId: "c", channel: "web", trigger: "message", tz: "Asia/Makassar", now: 0 }
     const running = await runtime.start(fakeCtx({}, {}, { id: "webfetch" }))
     const tools = await running.tools!(turn)
-    expect(Object.keys(tools)).toEqual(["ambil_halaman"])
-    expect(tools.ambil_halaman).toMatchObject({ class: "read", untrusted: true })
+    expect(Object.keys(tools)).toEqual(["fetch_page"])
+    expect(tools.fetch_page).toMatchObject({ class: "read", untrusted: true })
     expect(await runtime.test(fakeCtx({}, {}))).toMatchObject({ ok: true })
   })
 })

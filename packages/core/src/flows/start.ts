@@ -1,5 +1,5 @@
 // Starting a flow run (RFC flows 7.1, 7.5): every entry point (the schedule
-// fire, jalankan_flow, a webhook, a chat command, an event) inserts its run here,
+// fire, run_flow, a webhook, a chat command, an event) inserts its run here,
 // keyed (flow, run_key) so a trigger fires at most once per key, with the hourly
 // limits checked first. A skipped start is still a row, so "why didn't it run"
 // always has an answer.

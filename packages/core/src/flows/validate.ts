@@ -3,7 +3,7 @@
 // every expression and template parsed, templates only where they're allowed,
 // `item` only inside an each body, and every tool resolved against the running
 // connectors with its class. Problems come back as sentences with a JSON path,
-// for cek_flow and every write. The derived `writeCalls` list is what the owner
+// for check_flow and every write. The derived `writeCalls` list is what the owner
 // approves for a version.
 import { BUILTIN_COMMANDS } from "../chat/command-names"
 import { isValidZone } from "../reminders/time"
@@ -29,7 +29,7 @@ export type FlowApprovalMode = "version" | "every_run"
 
 // A tool as the running connectors describe it.
 export type ToolInfo = {
-  // Namespaced, as cari_tool shows it.
+  // Namespaced, as search_tools shows it.
   name: string
   connectorId: string
   tool: string
@@ -233,7 +233,7 @@ export function validateDefinition(raw: unknown, ctx: ValidateContext = {}): Val
       case "poll":
         if (ctx.resolveTool) {
           const info = ctx.resolveTool({ tool: t.tool, connectorId: t.connectorId })
-          if (!info) p(["triggers", i, "tool"], `No enabled tool ${t.connectorId ? `${t.connectorId}.` : ""}${t.tool}. Find it with palui__cari_tool.`)
+          if (!info) p(["triggers", i, "tool"], `No enabled tool ${t.connectorId ? `${t.connectorId}.` : ""}${t.tool}. Find it with palui__search_tools.`)
           else if (info.class !== "read") p(["triggers", i, "tool"], `${info.name} is ${info.class}; a poll only calls read tools.`)
         }
         for (const x of templatesIn(t.args)) if (x) p(["triggers", i, "args"], "Poll args are literals; templates aren't allowed there.")
@@ -259,7 +259,7 @@ export function validateDefinition(raw: unknown, ctx: ValidateContext = {}): Val
     if (s.kind === "tool" && ctx.resolveTool) {
       const info = ctx.resolveTool({ tool: s.tool, connectorId: s.connectorId })
       if (!info) {
-        p(["steps", i, "tool"], `No enabled tool ${s.connectorId ? `${s.connectorId}.` : ""}${s.tool}. Find it with palui__cari_tool.`)
+        p(["steps", i, "tool"], `No enabled tool ${s.connectorId ? `${s.connectorId}.` : ""}${s.tool}. Find it with palui__search_tools.`)
         return
       }
       out.tools[s.id] = info

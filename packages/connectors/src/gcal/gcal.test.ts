@@ -238,14 +238,14 @@ describe("gcal runtime", () => {
     expect(res).toMatchObject({ ok: false, detail: /Connect with Google again/ })
   })
 
-  it("lihat_kalender returns events for today in the turn tz, caching the token", async () => {
+  it("get_calendar returns events for today in the turn tz, caching the token", async () => {
     const g = google()
     const running = await createGcalRuntime(g.f).start(fakeCtx(cfg, { ...CLIENT, refreshToken: "1//r" }, { id: "gcal" }))
     const tools = await running.tools!(turn)
-    expect(tools.lihat_kalender?.class).toBe("read")
+    expect(tools.get_calendar?.class).toBe("read")
     // Invite titles come from anyone: results taint the turn.
-    expect(tools.lihat_kalender?.untrusted).toBe(true)
-    const exec = tools.lihat_kalender!.tool.execute!
+    expect(tools.get_calendar?.untrusted).toBe(true)
+    const exec = tools.get_calendar!.tool.execute!
     const out = (await exec({ from: "today" }, { toolCallId: "1", messages: [] } as never)) as { count: number; events: { title: string; when: string }[] }
     expect(out.count).toBe(2)
     expect(out.events.map((e) => e.title)).toEqual(["Libur", "Standup"])

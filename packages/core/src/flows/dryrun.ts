@@ -1,4 +1,4 @@
-// Dry runs (RFC flows 7.6, uji_flow). A definition, saved or a draft, runs
+// Dry runs (RFC flows 7.6, test_flow). A definition, saved or a draft, runs
 // against a fake trigger payload: read tools are called for real (so the agent
 // sees real output shapes), while write tools, messages, check-ins and prompts
 // are stubbed and logged with what they would have sent. Waits are skipped and

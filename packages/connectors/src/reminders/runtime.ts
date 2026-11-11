@@ -49,7 +49,7 @@ function zoneFor(db: DB, turn: TurnInfo, tz?: string | null): string {
 
 function ownReminder(db: DB, id: string, chatId: string): ReminderRow | Fail {
   const r = getReminder(db, id)
-  if (!r || r.chatId !== chatId) return { ok: false, error: `No reminder ${id} in this chat. Call daftar_pengingat to get the ids.` }
+  if (!r || r.chatId !== chatId) return { ok: false, error: `No reminder ${id} in this chat. Call list_reminders to get the ids.` }
   return r
 }
 
@@ -71,7 +71,7 @@ const tz = z.string().optional().describe("IANA time zone, e.g. Asia/Makassar. O
 export function reminderTools(db: DB, turn: TurnInfo, clock: () => number = () => Date.now()): Record<string, PaluiTool> {
   const chatId = turn.chatId
   return {
-    ingatkan: {
+    set_reminder: {
       class: "write",
       title: "Set a reminder",
       tool: tool({
@@ -97,7 +97,7 @@ export function reminderTools(db: DB, turn: TurnInfo, clock: () => number = () =
       }),
     },
 
-    daftar_pengingat: {
+    list_reminders: {
       class: "read",
       title: "List reminders",
       tool: tool({
@@ -119,13 +119,13 @@ export function reminderTools(db: DB, turn: TurnInfo, clock: () => number = () =
       }),
     },
 
-    ubah_pengingat: {
+    update_reminder: {
       class: "write",
       title: "Change a reminder",
       tool: tool({
         description: "Change a reminder's text, time, repeat rule or zone. Changing the time reschedules it. Pass rrule null to make it a one-off.",
         inputSchema: z.object({
-          id: z.string().describe("Reminder id from daftar_pengingat."),
+          id: z.string().describe("Reminder id from list_reminders."),
           text: z.string().min(1).max(500).optional(),
           localDateTime: localDateTime.optional(),
           rrule,
@@ -156,12 +156,12 @@ export function reminderTools(db: DB, turn: TurnInfo, clock: () => number = () =
       }),
     },
 
-    batal_pengingat: {
+    cancel_reminder: {
       class: "write",
       title: "Cancel a reminder",
       tool: tool({
         description: "Cancel a reminder (a repeating one stops for good). It stays in the done list.",
-        inputSchema: z.object({ id: z.string().describe("Reminder id from daftar_pengingat.") }),
+        inputSchema: z.object({ id: z.string().describe("Reminder id from list_reminders.") }),
         execute: async ({ id }) => {
           const now = clock()
           const own = ownReminder(db, id, chatId)
@@ -173,14 +173,14 @@ export function reminderTools(db: DB, turn: TurnInfo, clock: () => number = () =
       }),
     },
 
-    tunda_pengingat: {
+    snooze_reminder: {
       class: "write",
       title: "Snooze a reminder",
       tool: tool({
         description:
           "Snooze a reminder: preset 10m, 1h or tomorrow (tomorrow 09:00 in the reminder's zone), or an exact localDateTime. A repeating reminder keeps its rule afterwards.",
         inputSchema: z.object({
-          id: z.string().describe("Reminder id from daftar_pengingat."),
+          id: z.string().describe("Reminder id from list_reminders."),
           preset: z.enum(["10m", "1h", "tomorrow"]).optional(),
           localDateTime: localDateTime.optional().describe("Snooze until this wall-clock time instead of a preset."),
         }),

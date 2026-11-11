@@ -38,7 +38,7 @@ export function demo(k: Kit) {
   const runId = k.run({ chatId: web.id, trigger: "message", model: "claude-sonnet-4-6", tokensIn: 18234, tokensOut: 912, status: "ok", startedAt: now - 2 * H, ms: 8342 })
   k.message(web, "user", "ingetin bayar listrik besok jam 9, terus cek pipeline vorneo minggu ini ya", now - 2 * H)
   k.tool({ runId, connectorId: "mcp-vorneo", tool: "mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent", class: "read", args: { stage: "masuk", week: "2026-W46" }, resultPreview: '[{"id":"deal_01","title":"Rumah 2 lantai di Banjarbaru"}]', status: "ok", ms: 1240, createdAt: now - 2 * H + 1000 })
-  k.tool({ runId, connectorId: "reminders", tool: "reminders__ingatkan", class: "write", args: { text: "bayar listrik", when: "besok 09:00" }, resultPreview: "Besok, Rabu 11 Nov, 09.00 WITA", status: "ok", ms: 85, createdAt: now - 2 * H + 2000 })
+  k.tool({ runId, connectorId: "reminders", tool: "reminders__set_reminder", class: "write", args: { text: "bayar listrik", when: "besok 09:00" }, resultPreview: "Besok, Rabu 11 Nov, 09.00 WITA", status: "ok", ms: 85, createdAt: now - 2 * H + 2000 })
   k.message(web, "assistant", "Siap. Pengingat: Besok, Rabu 11 Nov, 09.00 WITA.\nPipeline Vorneo minggu ini: 3 deal masuk, 1 survei.", now - 2 * H + 9000, { runId })
   k.approval({ runId, chatId: web.id, tool: "mcp-linear__delete_issue", toolClass: "destructive", argsPreview: '{"id":"PAL-123"}', expiresAt: now + 10 * MIN, createdAt: now })
   k.message(tg, "user", "https://example.com/a/very/long/url/that/never/breaks/naturally/0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz", now - H)
@@ -80,7 +80,7 @@ export function demo(k: Kit) {
     ],
   })
   const recap = k.flow(tg, RECAP, { versions: [{ definition: { ...RECAP, description: "Rekap mingguan dengan semangat" }, note: "tambah deskripsi" }] })
-  k.flowRun(recap, { status: "failed", triggerId: "weekly", startedAt: now - 3 * D, error: "Step recap: Tool flows__ringkasan isn't available (connector off or tool removed).", steps: [{ stepId: "recap", kind: "tool", status: "error", error: "Tool flows__ringkasan isn't available (connector off or tool removed)." }] })
+  k.flowRun(recap, { status: "failed", triggerId: "weekly", startedAt: now - 3 * D, error: "Step recap: Tool flows__recap isn't available (connector off or tool removed).", steps: [{ stepId: "recap", kind: "tool", status: "error", error: "Tool flows__recap isn't available (connector off or tool removed)." }] })
 
   const rem = (text: string, inHours: number, rrule: string | null = null, status: "pending" | "done" = "pending") => k.reminder({ chatId: tg.id, text, rrule, tz: "Asia/Makassar", fireAt: now + inHours * H, status })
   rem("Bayar listrik", 15)

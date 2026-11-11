@@ -27,12 +27,12 @@ Limits: 20 instructions per agent of up to 1000 characters, and 50 preferences o
 
 | Tool | Class | What it does |
 |---|---|---|
-| `simpan_instruksi` | `destructive` | Save a new instruction, or update one by id. |
-| `daftar_instruksi` | `read` | List instructions with their ids. |
-| `hapus_instruksi` | `destructive` | Delete an instruction. |
-| `simpan_preferensi` | `write` | Set a preference (replaces the old value). |
-| `lihat_preferensi` | `read` | List preferences. |
-| `hapus_preferensi` | `write` | Delete a preference. |
+| `save_instruction` | `destructive` | Save a new instruction, or update one by id. |
+| `list_instructions` | `read` | List instructions with their ids. |
+| `delete_instruction` | `destructive` | Delete an instruction. |
+| `save_preference` | `write` | Set a preference (replaces the old value). |
+| `get_preferences` | `read` | List preferences. |
+| `delete_preference` | `write` | Delete a preference. |
 
 ## Safety
 

@@ -59,11 +59,11 @@ describe("remote-mcp tools", () => {
     srv = await startMcpServer({ register })
     const reconcile = vi.fn()
     const tools = remoteMcpTools({ db, masterKey: KEY, reconcile, resolver: PUBLIC, fetch: toLocal(srv), clock: () => 1000 })
-    expect(tools.tambah_server_mcp!.class).toBe("destructive")
-    expect(tools.hapus_server_mcp!.class).toBe("destructive")
-    expect(tools.daftar_server_mcp!.class).toBe("read")
+    expect(tools.add_mcp_server!.class).toBe("destructive")
+    expect(tools.remove_mcp_server!.class).toBe("destructive")
+    expect(tools.list_mcp_servers!.class).toBe("read")
 
-    const added = await call(tools.tambah_server_mcp, { name: "jadwal-sholat", url: "https://sholat.example.com/mcp" })
+    const added = await call(tools.add_mcp_server, { name: "jadwal-sholat", url: "https://sholat.example.com/mcp" })
     expect(added.ok).toBe(true)
     expect(added.tools.map((t: { name: string; class: string }) => [t.name, t.class])).toEqual([
       ["mcp-jadwal-sholat__jadwal", "read"],
@@ -74,15 +74,15 @@ describe("remote-mcp tools", () => {
     expect(row.config).toMatchObject({ url: "https://sholat.example.com/mcp", authMode: "none", addedFromChat: true })
     expect(reconcile).toHaveBeenCalledTimes(1)
 
-    const again = await call(tools.tambah_server_mcp, { name: "jadwal-sholat", url: "https://sholat.example.com/mcp" })
+    const again = await call(tools.add_mcp_server, { name: "jadwal-sholat", url: "https://sholat.example.com/mcp" })
     expect(again.ok).toBe(false)
 
-    const list = await call(tools.daftar_server_mcp, {})
+    const list = await call(tools.list_mcp_servers, {})
     expect(list.servers).toEqual([
       { id: "mcp-jadwal-sholat", name: "jadwal-sholat", url: "https://sholat.example.com/mcp", status: "connecting", auth: "none", toolsEnabled: 2, addedFromChat: true },
     ])
 
-    expect((await call(tools.hapus_server_mcp, { name: "jadwal-sholat" })).ok).toBe(true)
+    expect((await call(tools.remove_mcp_server, { name: "jadwal-sholat" })).ok).toBe(true)
     expect(getConnector(db, "mcp-jadwal-sholat")).toBeUndefined()
     expect(reconcile).toHaveBeenCalledTimes(2)
   })
@@ -91,7 +91,7 @@ describe("remote-mcp tools", () => {
     db = memoryDb()
     const fetchSpy = vi.fn()
     const tools = remoteMcpTools({ db, masterKey: KEY, resolver: PRIVATE, fetch: fetchSpy as never })
-    const r = await call(tools.tambah_server_mcp, { name: "evil", url: "https://evil.example.com/mcp" })
+    const r = await call(tools.add_mcp_server, { name: "evil", url: "https://evil.example.com/mcp" })
     expect(r.ok).toBe(false)
     expect(r.error).toContain("URL ditolak")
     expect(fetchSpy).not.toHaveBeenCalled()
@@ -102,10 +102,10 @@ describe("remote-mcp tools", () => {
     db = memoryDb()
     upsertConnector(db, { id: "mcp-vorneo", manifest: mcpManifest, config: { url: "https://vorneo.id/api/mcp/?key=abc", authMode: "bearer" }, secrets: { token: "zkg_secret" } }, KEY)
     const tools = remoteMcpTools({ db, masterKey: KEY, resolver: PUBLIC })
-    const list = await call(tools.daftar_server_mcp, {})
+    const list = await call(tools.list_mcp_servers, {})
     expect(JSON.stringify(list)).not.toContain("zkg_secret")
     expect(list.servers[0].url).toBe("https://vorneo.id/api/mcp/")
-    const r = await call(tools.hapus_server_mcp, { name: "mcp-vorneo" })
+    const r = await call(tools.remove_mcp_server, { name: "mcp-vorneo" })
     expect(r.ok).toBe(false)
     expect(getConnector(db, "mcp-vorneo")).toBeDefined()
   })

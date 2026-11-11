@@ -32,7 +32,7 @@ export default defineManifest({
   removeWarning: "This deletes the Google tokens. Revoke Palui at myaccount.google.com/permissions too.",
   docs: {
     notes: [
-      "Tool: lihat_kalender (read). Times are shown in your timezone.",
+      "Tool: get_calendar (read). Times are shown in your timezone.",
       "Anyone can put text in your calendar by sending an invite, so calendar results taint the turn: any write after them asks you first.",
     ],
   },

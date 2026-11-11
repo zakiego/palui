@@ -278,12 +278,12 @@ export function t3Tools(input: {
   }
 
   return {
-    daftar_proyek: {
+    list_projects: {
       class: "read",
       untrusted,
       title: "List T3 Code projects",
       tool: tool({
-        description: "List the owner's T3 Code projects (repos on their Mac). Use the name with mulai_thread.",
+        description: "List the owner's T3 Code projects (repos on their Mac). Use the name with start_thread.",
         inputSchema: z.object({}),
         execute: () =>
           guard(async () => {
@@ -292,12 +292,12 @@ export function t3Tools(input: {
           }),
       }),
     },
-    daftar_thread: {
+    list_threads: {
       class: "read",
       untrusted,
       title: "List T3 Code threads",
       tool: tool({
-        description: `List recent T3 Code threads, newest first, in one project or across all of them. For the threads started from this chat, use thread_chat_ini. ${LINK_NOTE}`,
+        description: `List recent T3 Code threads, newest first, in one project or across all of them. For the threads started from this chat, use list_chat_threads. ${LINK_NOTE}`,
         inputSchema: z.object({
           project: z.string().optional().describe("Project name, id or path. Omit for all projects."),
           activeOnly: z.boolean().optional().describe("Only threads that are running, queued or waiting for an answer"),
@@ -317,7 +317,7 @@ export function t3Tools(input: {
           }),
       }),
     },
-    mulai_thread: {
+    start_thread: {
       class: "write",
       untrusted,
       title: "Start a T3 Code thread",
@@ -325,7 +325,7 @@ export function t3Tools(input: {
         description:
           "Start a new T3 Code thread: a coding agent on the owner's Mac works on `task` in the project. By default it runs in a fresh git worktree off the default base branch, so the owner's checkout is untouched. Write `task` as a complete brief, in the owner's words plus any detail from this chat. Palui messages this chat when the thread finishes, so don't promise to check back. Give the owner the returned link.",
         inputSchema: z.object({
-          project: z.string().min(1).describe("Project name, id or path. Call daftar_proyek when unsure."),
+          project: z.string().min(1).describe("Project name, id or path. Call list_projects when unsure."),
           task: z.string().min(1).max(100_000).describe("The full instructions for the coding agent"),
           title: z.string().max(80).optional().describe("Short thread title. Defaults to the task's first line."),
           baseRef: z.string().max(200).optional().describe(`Branch, tag or commit for the new worktree. Default: ${config.baseRef}`),
@@ -365,7 +365,7 @@ export function t3Tools(input: {
           }),
       }),
     },
-    kirim_ke_thread: {
+    send_to_thread: {
       class: "write",
       untrusted,
       title: "Message a T3 Code thread",
@@ -386,7 +386,7 @@ export function t3Tools(input: {
           }),
       }),
     },
-    thread_chat_ini: {
+    list_chat_threads: {
       class: "read",
       untrusted,
       title: "List this chat's T3 Code threads",
@@ -402,7 +402,7 @@ export function t3Tools(input: {
         },
       }),
     },
-    lihat_thread: {
+    get_thread: {
       class: "read",
       untrusted,
       title: "Check a T3 Code thread",
@@ -419,7 +419,7 @@ export function t3Tools(input: {
           }),
       }),
     },
-    hentikan_thread: {
+    stop_thread: {
       class: "destructive",
       untrusted,
       title: "Stop a T3 Code thread",

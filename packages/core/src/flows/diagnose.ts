@@ -1,4 +1,4 @@
-// kenapa_flow (RFC flows 10.1): "why didn't X fire?" walks a fixed checklist for
+// explain_flow (RFC flows 10.1): "why didn't X fire?" walks a fixed checklist for
 // a flow and a moment and returns the first thing that explains it, plus the
 // facts behind it. The checklist lives here, so the answer doesn't depend on the
 // model guessing; the model only phrases it.
@@ -128,7 +128,7 @@ export function diagnoseFlow(db: DB, flow: FlowRow, at: number, now: number): Di
     }
     if (t.kind === "event") facts.push(`Trigger ${t.id}: waits for ${t.event} from ${t.flow === "self" ? "this flow" : `flow "${t.flow}"`}; no such event started a run then.`)
   }
-  if (!def.triggers.length) facts.push("The flow has no triggers; it only runs with jalankan_flow.")
+  if (!def.triggers.length) facts.push("The flow has no triggers; it only runs with run_flow.")
   // The engine itself.
   if (at < engineClock.startedAt) {
     const gap = db

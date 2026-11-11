@@ -115,7 +115,7 @@ describe("check-in steps", () => {
 
   it("9e: deadline next is the next prayer time; the recap trigger reads the log", async () => {
     const prayer = fakePrayerTool()
-    const h = flowHarness({ engine: { readSource: prayer }, connectors: exampleConnectors({ flows__ringkasan: () => ({ total: 3, text: "📊 Rekap" }) }) })
+    const h = flowHarness({ engine: { readSource: prayer }, connectors: exampleConnectors({ flows__recap: () => ({ total: 3, text: "📊 Rekap" }) }) })
     const { flow } = h.create(SHOLAT)
     await h.run(at("2026-11-10T10:00"))
     expect(prayer.calls.map((c) => c.args.date)).toEqual(["2026-11-10", "2026-11-11"])
@@ -244,7 +244,7 @@ describe("write steps: per-run approval (RFC 7.2)", () => {
   const def = {
     name: "Komentar",
     steps: [
-      { id: "note", kind: "tool", tool: "notes__simpan_catatan", args: { text: "{{trigger.args.text}}" } },
+      { id: "note", kind: "tool", tool: "notes__save_note", args: { text: "{{trigger.args.text}}" } },
       { id: "done", kind: "message", text: "Tersimpan." },
     ],
   }
@@ -260,7 +260,7 @@ describe("write steps: per-run approval (RFC 7.2)", () => {
     const flow = await approved(h)
     h.engine.startRun({ flowId: flow.id, triggerKind: "manual", runKey: "m1", payload: { args: { text: "halo" } }, now: h.now() })
     await h.run(h.now())
-    expect(h.calls.filter((c) => c.tool === "simpan_catatan").map((c) => c.args)).toEqual([{ text: "halo" }])
+    expect(h.calls.filter((c) => c.tool === "save_note").map((c) => c.args)).toEqual([{ text: "halo" }])
     expect(h.db.select().from(pendingApprovals).all()).toEqual([])
   })
 
@@ -271,7 +271,7 @@ describe("write steps: per-run approval (RFC 7.2)", () => {
     await h.run(h.now())
     expect(getRun(h.db, run!.id)!.status).toBe("waiting")
     const [ap] = h.db.select().from(pendingApprovals).all()
-    expect(ap).toMatchObject({ runId: run!.id, tool: "notes__simpan_catatan", toolClass: "write", argsPreview: '{"text":"dari web"}' })
+    expect(ap).toMatchObject({ runId: run!.id, tool: "notes__save_note", toolClass: "write", argsPreview: '{"text":"dari web"}' })
     expect(sentTexts(h.db).at(-1)).toMatchObject({ source: `approval:${ap!.id}`, actions: [`approve:${ap!.id}`, `deny:${ap!.id}`] })
     expect(sentTexts(h.db).at(-1)!.text).toContain("argumen dari data luar (text)")
     expect(h.calls).toEqual([])
@@ -309,15 +309,15 @@ describe("write steps: per-run approval (RFC 7.2)", () => {
   it("asks when a tool approved as read became write since", async () => {
     // Saved while the tool was read: no write calls, no version approval.
     const h = flowHarness({ connectors: exampleConnectors() })
-    const saved = h.create({ name: "Daftar", steps: [{ id: "r", kind: "tool", tool: "reminders__daftar_pengingat" }] })
+    const saved = h.create({ name: "Daftar", steps: [{ id: "r", kind: "tool", tool: "reminders__list_reminders" }] })
     expect(saved.needsApproval).toBe(false)
     // The owner reclassified it on the Connectors page.
-    const h2 = flowHarness({ connectors: exampleConnectors().map((c) => (c.id === "reminders" ? { ...c, tools: { ...c.tools, daftar_pengingat: { ...c.tools.daftar_pengingat!, class: "write" as const } } } : c)) })
-    const saved2 = h2.create({ name: "Daftar", steps: [{ id: "r", kind: "tool", tool: "reminders__daftar_pengingat" }] })
+    const h2 = flowHarness({ connectors: exampleConnectors().map((c) => (c.id === "reminders" ? { ...c, tools: { ...c.tools, list_reminders: { ...c.tools.list_reminders!, class: "write" as const } } } : c)) })
+    const saved2 = h2.create({ name: "Daftar", steps: [{ id: "r", kind: "tool", tool: "reminders__list_reminders" }] })
     h2.engine.startRun({ flowId: saved2.flow.id, triggerKind: "manual", runKey: "m1", payload: {}, now: h2.now() })
     await h2.run(h2.now())
     expect(sentTexts(h2.db).at(-1)!.text).toContain("kelas tool berubah sejak disetujui")
-    expect(h2.db.select().from(pendingApprovals).where(eq(pendingApprovals.tool, "reminders__daftar_pengingat")).all()).toHaveLength(1)
+    expect(h2.db.select().from(pendingApprovals).where(eq(pendingApprovals.tool, "reminders__list_reminders")).all()).toHaveLength(1)
   })
 })
 

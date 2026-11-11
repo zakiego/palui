@@ -60,12 +60,12 @@ export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOpti
   const appUrl = opts.appUrl ?? (() => config().appUrl)
   const own = (id: string): AttachmentMeta | Fail => {
     const a = getAttachment(db, id)
-    if (!a || a.chatId !== chatId) return { ok: false, error: `No saved attachment ${id} in this chat. Call daftar_lampiran to get the ids.` }
+    if (!a || a.chatId !== chatId) return { ok: false, error: `No saved attachment ${id} in this chat. Call list_attachments to get the ids.` }
     return a
   }
 
   return {
-    simpan_lampiran: {
+    save_attachment: {
       class: "write",
       title: "Save an attachment",
       tool: tool({
@@ -112,12 +112,12 @@ export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOpti
         },
       }),
     },
-    daftar_lampiran: {
+    list_attachments: {
       class: "read",
       title: "List saved attachments",
       tool: tool({
         description:
-          "List files saved in this chat with simpan_lampiran, newest first. Use `query` to search titles, descriptions and file names, e.g. when the owner asks where their KTP or a ticket is.",
+          "List files saved in this chat with save_attachment, newest first. Use `query` to search titles, descriptions and file names, e.g. when the owner asks where their KTP or a ticket is.",
         inputSchema: z.object({
           query: z.string().max(100).optional().describe("Words to look for, e.g. \"ktp\" or \"tiket\"."),
           limit: z.number().int().min(1).max(50).optional(),
@@ -128,7 +128,7 @@ export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOpti
         },
       }),
     },
-    ambil_lampiran: {
+    get_attachment: {
       class: "read",
       title: "Get a saved attachment",
       tool: tool({
@@ -142,7 +142,7 @@ export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOpti
         },
       }),
     },
-    hapus_lampiran: {
+    delete_attachment: {
       class: "destructive",
       title: "Delete a saved attachment",
       tool: tool({

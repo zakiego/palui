@@ -16,13 +16,13 @@ function draft(def: unknown) {
 
 describe("dry runs (RFC 7.6)", () => {
   it("9a: calls read tools for real, stubs the message, writes nothing else", async () => {
-    const h = flowHarness({ connectors: exampleConnectors({ "mcp-jadwal-sholat__get_prayer_times": prayer, reminders__daftar_pengingat: () => ({ reminders: [] }) }) })
+    const h = flowHarness({ connectors: exampleConnectors({ "mcp-jadwal-sholat__get_prayer_times": prayer, reminders__list_reminders: () => ({ reminders: [] }) }) })
     const v = draft(BRIEFING)
     const res = await dryRunFlow(h.db, h.engine, { chatId: h.chatId, definition: v.definition!, writeCalls: v.writeCalls, tz: "Asia/Makassar", now: at("2026-11-10T10:00") })
     expect(res.status).toBe("done")
     expect(res.steps.map((s) => `${s.step}:${s.status}`)).toEqual(["prayer:ok", "weather:ok", "reminders:ok", "today:ok", "send:stubbed"])
     expect((res.steps.at(-1)!.output as { text: string }).text).toContain("Subuh 04:39")
-    expect(h.calls.map((c) => c.tool)).toEqual(["get_prayer_times", "ambil_halaman", "daftar_pengingat"])
+    expect(h.calls.map((c) => c.tool)).toEqual(["get_prayer_times", "fetch_page", "list_reminders"])
     expect(h.db.select().from(outbox).all()).toEqual([])
     const rows = h.db.select().from(flowRuns).all()
     expect(rows).toHaveLength(1)
@@ -33,7 +33,7 @@ describe("dry runs (RFC 7.6)", () => {
   })
 
   it("9d: stubs the prompt with an override and walks the chosen branch", async () => {
-    const h = flowHarness({ connectors: exampleConnectors({ flows__ringkasan: () => ({ total: 35, missed: 3, byAnswer: {}, text: "rekap" }) }) })
+    const h = flowHarness({ connectors: exampleConnectors({ flows__recap: () => ({ total: 35, missed: 3, byAnswer: {}, text: "rekap" }) }) })
     const v = draft(RECAP)
     const res = await dryRunFlow(h.db, h.engine, { chatId: h.chatId, definition: v.definition!, stubs: { cheer: "Tetap semangat!" }, tz: "Asia/Makassar", now: at("2026-11-10T10:00") })
     expect(res.steps.map((s) => `${s.step}:${s.status}`)).toEqual(["recap:ok", "any_missed:ok", "cheer:stubbed", "send_cheer:stubbed"])
@@ -43,7 +43,7 @@ describe("dry runs (RFC 7.6)", () => {
   })
 
   it("a saved flow dry-runs its current version with a sample schedule payload", async () => {
-    const h = flowHarness({ connectors: exampleConnectors({ flows__ringkasan: () => ({ total: 0, missed: 0, byAnswer: {}, text: "" }) }) })
+    const h = flowHarness({ connectors: exampleConnectors({ flows__recap: () => ({ total: 0, missed: 0, byAnswer: {}, text: "" }) }) })
     const { flow } = h.create(RECAP)
     const res = await dryRunFlow(h.db, h.engine, { chatId: h.chatId, flow, tz: "Asia/Makassar", now: at("2026-11-10T10:00") })
     expect(res.status).toBe("done")
@@ -52,7 +52,7 @@ describe("dry runs (RFC 7.6)", () => {
 
   it("stubs write tools with the rendered args", async () => {
     const h = flowHarness()
-    const v = draft({ name: "Catat", steps: [{ id: "note", kind: "tool", tool: "notes__simpan_catatan", args: { text: "Tanggal {{now.date}}" } }] })
+    const v = draft({ name: "Catat", steps: [{ id: "note", kind: "tool", tool: "notes__save_note", args: { text: "Tanggal {{now.date}}" } }] })
     const res = await dryRunFlow(h.db, h.engine, { chatId: h.chatId, definition: v.definition!, writeCalls: v.writeCalls, tz: "Asia/Makassar", now: at("2026-11-10T10:00") })
     expect(res.steps[0]).toMatchObject({ status: "stubbed", input: { args: { text: "Tanggal 2026-11-10" }, class: "write" } })
     expect(h.calls).toEqual([])
@@ -71,7 +71,7 @@ describe("dry runs (RFC 7.6)", () => {
   })
 
   it("9e: the check-in is stubbed with the chosen answer, and the recap trigger can be tried alone", async () => {
-    const h = flowHarness({ connectors: exampleConnectors({ flows__ringkasan: () => ({ total: 0, text: "" }) }) })
+    const h = flowHarness({ connectors: exampleConnectors({ flows__recap: () => ({ total: 0, text: "" }) }) })
     const v = draft(SHOLAT)
     const ask = await dryRunFlow(h.db, h.engine, { chatId: h.chatId, definition: v.definition!, trigger: { label: "Subuh", time: "04.39" }, stubs: { ask: "not_yet" }, tz: "Asia/Makassar", now: at("2026-11-10T10:00") })
     expect(ask.steps[0]).toMatchObject({ step: "ask", status: "stubbed", output: { answer: "not_yet", asked: "Udah sholat Subuh (04.39)?" } })

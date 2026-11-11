@@ -106,7 +106,7 @@ export function setPreference(db: DB, rawKey: string, rawValue: string, now = Da
   const key = normalizePreferenceKey(rawKey)
   if (!PREFERENCE_KEY.test(key)) throw new NotesError("Key pakai huruf kecil, angka dan underscore, diawali huruf (contoh: default_city).")
   const value = clean(rawValue).replace(/\n+/g, " ")
-  if (!value) throw new NotesError("Nilai preferensi kosong. Pakai hapus_preferensi untuk menghapus.")
+  if (!value) throw new NotesError("Nilai preferensi kosong. Pakai delete_preference untuk menghapus.")
   if (value.length > MAX_PREFERENCE_VALUE) throw new NotesError(`Nilai maksimal ${MAX_PREFERENCE_VALUE} karakter.`)
   const exists = db.select({ key: preferences.key }).from(preferences).where(eq(preferences.key, key)).get()
   if (!exists && listPreferences(db).length >= MAX_PREFERENCES) throw new NotesError(`Udah ada ${MAX_PREFERENCES} preferensi. Hapus yang nggak dipakai dulu.`)

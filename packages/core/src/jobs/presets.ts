@@ -15,7 +15,7 @@ export const HEARTBEAT_RRULE = `FREQ=DAILY;BYHOUR=${Array.from({ length: 15 }, (
 
 export const DAILY_BRIEFING_PROMPT = `Buat briefing pagi singkat buat Zaki untuk hari ini. Pakai tools yang tersedia, lewati bagian yang tool-nya nggak ada atau gagal, jangan mengarang.
 
-1. Pengingat hari ini (daftar_pengingat): jam dan isinya.
+1. Pengingat hari ini (list_reminders): jam dan isinya.
 2. Profil dan konteks dari recall kalau ada (get_profile): hal penting yang lagi berjalan.
 3. Tugas dari todomap lewat MCP kalau tersedia: yang jatuh tempo hari ini atau telat.
 4. Pipeline vorneo lewat MCP kalau tersedia: deal yang butuh tindakan hari ini.
@@ -24,7 +24,7 @@ export const DAILY_BRIEFING_PROMPT = `Buat briefing pagi singkat buat Zaki untuk
 
 Format: bahasa Indonesia santai, poin-poin pendek, maksimal sekitar 12 baris. Mulai dengan sapaan satu baris. Jangan ulangi instruksi ini.`
 
-export const HEARTBEAT_PROMPT = `Kamu sedang cek berkala (heartbeat). Lihat pengingat yang akan datang (daftar_pengingat) dan inbox atau notifikasi dari MCP tools yang tersedia.
+export const HEARTBEAT_PROMPT = `Kamu sedang cek berkala (heartbeat). Lihat pengingat yang akan datang (list_reminders) dan inbox atau notifikasi dari MCP tools yang tersedia.
 
 Kirim pesan hanya kalau ada yang benar-benar perlu perhatian Zaki dalam 30 menit ke depan atau sesuatu yang mendesak dan baru. Kalau ada, tulis singkat (1 sampai 3 baris) dalam bahasa Indonesia santai.
 

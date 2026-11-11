@@ -641,7 +641,7 @@ function callFn(name: string, args: unknown[], env: EvalEnv, warn: (w: string) =
   return null
 }
 
-// "daysUntil(item.due) = 2" lines for logs and kenapa_flow.
+// "daysUntil(item.due) = 2" lines for logs and explain_flow.
 export function explainTrace(trace: TraceEntry[]): string {
   return trace.map((t) => `${t.expr} = ${JSON.stringify(t.value) ?? "null"}`).join(", ")
 }

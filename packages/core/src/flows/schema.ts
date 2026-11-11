@@ -91,7 +91,7 @@ const stepBase = {
 export const toolStepSchema = z.object({
   ...stepBase,
   kind: z.literal("tool"),
-  // "<connectorId>__<tool>" as cari_tool returns it, or the bare tool name with connectorId.
+  // "<connectorId>__<tool>" as search_tools returns it, or the bare tool name with connectorId.
   tool: text(130),
   connectorId: text(80).optional(),
   args: z.record(z.string(), z.unknown()).default({}),

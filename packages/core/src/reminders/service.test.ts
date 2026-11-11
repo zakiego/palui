@@ -43,7 +43,7 @@ describe("createReminder", () => {
     expect(() => createReminder(db, { chatId: "chat_missing", text: "x", localStart: "2026-11-11T09:00", tz: WITA }, NOW)).toThrow(ReminderError)
   })
 
-  it("rolls a one-off earlier today to tomorrow, like the parser (the ingatkan tool path)", () => {
+  it("rolls a one-off earlier today to tomorrow, like the parser (the set_reminder tool path)", () => {
     const { db, chatId } = setup()
     const r = createReminder(db, { chatId, text: "cek email", localStart: "2026-11-10T09:00", tz: WITA }, NOW)
     expect(r.localStart).toBe("2026-11-11T09:00:00")

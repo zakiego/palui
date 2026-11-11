@@ -84,13 +84,13 @@ describe("reportText", () => {
       db.insert(toolCalls).values({ id: `${r}:${id}`, runId: r, tool, class: cls, status: "ok", resultPreview, createdAt: NOW - 10 * MIN + at }).run()
     call("t1", "routines__hapus_rutinitas", "destructive", '{"ok":true,"message":"dihapus"}', 4000)
     call("t2", "routines__daftar_rutinitas", "read", '{"ok":true,"count":1}', 4000)
-    call("t3", "flows__daftar_flow", "read", '{"ok":true,"count":0}', 4100)
+    call("t3", "flows__list_flows", "read", '{"ok":true,"count":0}', 4100)
     db.insert(pendingApprovals).values({ id: "apr_1", runId: r, chatId: chat.id, approvalId: "a1", toolCallId: "t1", tool: "routines__hapus_rutinitas", toolClass: "destructive", messages: [], expiresAt: NOW, status: "approved", decidedAt: NOW - 9 * MIN, createdAt: NOW - 10 * MIN }).run()
     const rows = section(reportText(db, chat, "rpt_x", "", NOW), "Runs").split("\n").slice(2)
     expect(rows).toEqual([
       '  ↳ +4.0s routines__hapus_rutinitas destructive ok [approval apr_1 approved]: {"ok":true,"message":"dihapus"}',
       '  ↳ +4.0s routines__daftar_rutinitas read ok: {"ok":true,"count":1}',
-      '  ↳ +4.1s flows__daftar_flow read ok: {"ok":true,"count":0}',
+      '  ↳ +4.1s flows__list_flows read ok: {"ok":true,"count":0}',
     ])
   })
 

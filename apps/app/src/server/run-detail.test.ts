@@ -18,7 +18,7 @@ function seed() {
     .run()
   db.insert(toolCalls)
     .values([
-      { id: "tc_2", runId: "run_1", tool: "reminders__ingatkan", class: "write", args: { when: "besok" }, resultPreview: "ok", status: "ok", ms: 80, createdAt: NOW + 1 },
+      { id: "tc_2", runId: "run_1", tool: "reminders__set_reminder", class: "write", args: { when: "besok" }, resultPreview: "ok", status: "ok", ms: 80, createdAt: NOW + 1 },
       { id: "tc_1", runId: "run_1", tool: "recall__cari", class: "read", args: null, resultPreview: null, status: "error", ms: null, createdAt: NOW },
     ])
     .run()
@@ -34,7 +34,7 @@ describe("runDetail", () => {
     expect(run?.prompt.map((m) => m.text)).toEqual(["ingatkan besok"])
     // Empty assistant messages (a turn that only called tools) are left out.
     expect(run?.reply.map((m) => m.text)).toEqual(["Siap, besok 09.00"])
-    expect(run?.tools.map((x) => x.tool)).toEqual(["recall__cari", "reminders__ingatkan"])
+    expect(run?.tools.map((x) => x.tool)).toEqual(["recall__cari", "reminders__set_reminder"])
     expect(run?.tools[0]?.args).toBe("")
     expect(run?.tools[1]?.args).toContain('"when": "besok"')
   })

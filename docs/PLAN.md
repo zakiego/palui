@@ -7,7 +7,7 @@ Status: v2, 2026-11-10. Draft v1 had a cold review (25 findings, 6 HIGH), and ev
 - Display name: Palui Agent. Domain, CLI, package and repo are plain `palui` (`palui.zakiego.com`, `github.com/zakiego/palui`, private).
 - Named after Si Palui, the Banjar folk comic hero from Kalimantan Selatan: simple-looking but sharp. Pronounced PAH-loo-ee.
 - A web search found no AI product or GitHub repo named palui. That isn't a formal trademark check.
-- It doesn't clash with utusan or recall. Tool names may use Indonesian verbs, the way utusan's do (`ingatkan`, `kirim`).
+- It doesn't clash with utusan or recall. Tool names are English (`set_reminder`, `list_flows`), like every other identifier. Indonesian is for bot-facing copy only.
 
 ## 1. What it is
 
@@ -240,7 +240,7 @@ ai-gateway
 - Same shape, `zkg_` key. The fallback in every chain.
 
 Budget
-- Per turn: 12 steps, 120 s wall clock, about 64 tools loaded up front. Past that, tool search takes over: tools loaded earlier in the session go first, then skills, memory and the rest, one slot goes to `palui__cari_tool`, and every other enabled tool is named in the capability list and loaded on demand by keyword or exact name. Loaded tools join the active set from the next step and stay for the session (`sessions.loaded_tools`, 20 most recent).
+- Per turn: 12 steps, 120 s wall clock, about 64 tools loaded up front. Past that, tool search takes over: tools loaded earlier in the session go first, then skills, memory and the rest, one slot goes to `palui__search_tools`, and every other enabled tool is named in the capability list and loaded on demand by keyword or exact name. Loaded tools join the active set from the next step and stay for the session (`sessions.loaded_tools`, 20 most recent).
 - Global: a daily token cap, a per-job daily cap, and a max of 60 runs per hour. Hitting a cap pauses turns and tells me on the channel.
 - Tokens read from the prompt cache count at 10% against the global, agent, job and flow caps, about their price next to fresh input. Fresh input, cache writes and output count in full.
 - `/stop` aborts the running turn (`abortSignal`). `/status` shows the model, tokens today and connector states.
@@ -265,7 +265,7 @@ Budget
 
 - Connects to the T3 Code server on the Mac (`http://host.docker.internal:3773` from Docker) over its `/mcp` endpoint.
 - Setup takes a pairing code (`t3 auth pairing create`). The runtime trades it through T3 Code's OAuth endpoints (register, pairing-code decision, token) for a 30-day full-access token and stores it encrypted with `patchSecrets`. T3 Code has no refresh grant, so an expired token is a connector `error` and a new code fixes it.
-- Tools: `daftar_proyek`, `daftar_thread`, `thread_chat_ini`, `lihat_thread` (read), `mulai_thread`, `kirim_ke_thread` (write), `hentikan_thread` (destructive). New threads get their own worktree off a default base branch.
+- Tools: `list_projects`, `list_threads`, `list_chat_threads`, `get_thread` (read), `start_thread`, `send_to_thread` (write), `stop_thread` (destructive). New threads get their own worktree off a default base branch.
 - A watcher polls the runs Palui started every 20 s and messages the chat they came from when one finishes (the agent's reply, clipped, plus the link), or once when it waits for an answer. Watches live in the connector's config and expire after 24 h.
 
 ### 5.5 Skills (built-in connectors)
@@ -275,14 +275,14 @@ Budget
 - Web fetch: fetch + readability behind the SSRF guard. Results taint the turn.
 - Inbound webhooks: `POST /api/hooks/:slug` with an HMAC secret per hook. It forwards the event to me as text. The "summarize" option runs with zero tools.
 - Calendar: D7 decides whether a Google Calendar read connector is in v1.
-- Attachments: `simpan_lampiran`, `daftar_lampiran`, `ambil_lampiran`, `hapus_lampiran`. The model keeps only files that matter (ID cards, receipts, tickets) from the message being answered. Allowlisted types, 10 MB cap, stored encrypted with MASTER_KEY in `saved_attachments`, listed and downloaded (signed in only) on the Attachments page.
+- Attachments: `save_attachment`, `list_attachments`, `get_attachment`, `delete_attachment`. The model keeps only files that matter (ID cards, receipts, tickets) from the message being answered. Allowlisted types, 10 MB cap, stored encrypted with MASTER_KEY in `saved_attachments`, listed and downloaded (signed in only) on the Attachments page.
 
 ## 6. Reminders
 
 The feature most likely to be judged by its failures.
 
 - Created by chat ("ingetin bayar listrik besok jam 9", "remind me every Monday 8am to send the report") or in the dashboard.
-- Tools: `ingatkan` (create), `daftar_pengingat`, `ubah_pengingat`, `batal_pengingat`, `tunda_pengingat`.
+- Tools: `set_reminder` (create), `list_reminders`, `update_reminder`, `cancel_reminder`, `snooze_reminder`.
 - Time: the default zone is `Asia/Makassar` (WITA). Each reminder stores an IANA zone. Recurrence uses one grammar, RRULE, but the next occurrence is computed in wall-clock time with Luxon in the stored zone (not `rrule`'s TZID handling, which returns floating dates). `fire_at` is stored in UTC. The tool echoes the parsed time back ("Besok, Rabu 11 Nov, 09.00 WITA") so a wrong parse shows right away.
 - Delivery: a due reminder becomes an outbox row, marked `sent` only after the channel acks. Retry with backoff for up to 24 h. After 2 failed attempts it falls back to the other channel (a setting).
 - Downtime: on start, overdue reminders fire once with "(telat, harusnya 09.00)". A recurring reminder that missed several runs fires once.
@@ -302,16 +302,16 @@ Routines were the first generic automation (a time source, one action, a recap).
 Automations the agent builds from chat out of triggers and steps (`packages/core/src/flows`, tools in the `flows` skill). Accepted from `docs/rfc/flows.md`, which keeps the reasoning and the rejected alternatives; this section is the source of truth for behavior. Flows replaced routines (6b).
 
 - Definition: JSON `{ schema, name, description?, tz?, triggers[], steps[], limits? }`, validated by zod (`flows/schema.ts`) and by the graph and data checks in `flows/validate.ts`: unique literal ids, known branch targets, no cycles, nothing unreachable, at most 40 steps, 8 triggers, 32 KB. `schema` versions the format; `upgradeDefinition()` reads old shapes, so a format change needs no data migration.
-- Triggers: `schedule` (fixed `times`, an `rrule`, or times read daily from a read `tool`, `flows/source-config.ts`), `webhook` (a hook in mode `flow`, payload always tainted), `chat` (an owner command or exact phrase in the flow's chat, matched by the router before the model; built-in commands are refused), `poll` (a read tool every 5 to 1440 minutes; the first poll only seeds; fires on change or on a new non-empty value), `event` (`checkin.answered`, `checkin.missed`, `run.done`, `run.failed` from a named flow or `self`; chain depth over 3 is skipped; never your own `run.failed`), and manual (`jalankan_flow`). Each fires at most once per run key.
+- Triggers: `schedule` (fixed `times`, an `rrule`, or times read daily from a read `tool`, `flows/source-config.ts`), `webhook` (a hook in mode `flow`, payload always tainted), `chat` (an owner command or exact phrase in the flow's chat, matched by the router before the model; built-in commands are refused), `poll` (a read tool every 5 to 1440 minutes; the first poll only seeds; fires on change or on a new non-empty value), `event` (`checkin.answered`, `checkin.missed`, `run.done`, `run.failed` from a named flow or `self`; chain depth over 3 is skipped; never your own `run.failed`), and manual (`run_flow`). Each fires at most once per run key.
 - Steps: `tool`, `if`, `set` (run or flow scope, flow state capped at 16 KB), `message` (optional literal `to` an owner or allowed chat), `checkin` (answers, re-asks, deadline `next` or `after`, `on.<answer>` and `onMissed` branches), `wait` (up to 7 days), `prompt` (a literal instruction, data in `<data>`/`<untrusted>` blocks, tools allowlisted, `"*"` for every tool under unattended rules), `each` (one child run per item, key-deduped across runs as `each:<step>:<key>`, 20 by default and 50 at most, no nesting). Every step has `next`, `onError` (`fail`, `continue` or a step id) and `timeoutSec`.
 - Data: templates `{{path | filter}}` only in tool args, message and check-in text, prompt input, set values, `wait.until` and `each.key`; ids, tool names, branch targets, `message.to` and the prompt instruction are literals. Expressions (`flows/expr.ts`) are parsed at save into an AST: and/or/not, comparisons, arithmetic (null counts as 0 in + and -), a fixed function list; no eval and no regex from the flow, bounded to 200 nodes.
 - Taint: per run, a set of roots (`trigger`, `steps.<id>`, `vars.<name>`, `flow.<name>`, `item`). Untrusted tools, webhook bodies, untrusted poll or source tools and tainted prompt turns taint their root; `set` and `each` carry it. Message values are sanitized (control characters out, sent as plain text); tainted ones also lose line breaks and are capped at 500 characters. Conditions read tainted values freely.
 - Tool calls: server-side through `connectorFlowCaller`, which resolves the class from the connector's tool list before calling and passes the flow's chat and id in the tool context. Destructive tools are refused at save and at run time. Read tools retry twice (30 s, 2 min).
 - Approvals: write calls (and `message.to` an allowed chat) are listed per version (`flow_versions.write_calls`) and approved once per version with `flowver:approve|deny:<versionId>`; an edit with the same write calls keeps the approval. Until then, runs stop at the write step as `awaiting_approval` / `not_approved` and continue on approval. A single run asks again through `pending_approvals` (10 minutes) when an argument is tainted, the tool's class or connector type changed since the approval, or the tool's `flowApproval` is `every_run` (per tool on the MCP tool list, or set by a connector on its tools, read at run time).
 - Runtime: the flow engine is a scheduler extension (resume, refresh, fire, polls, wake, execute, recover, daily prune). Every wait (delay, check-in, approval, retry) is a run row with `wake_at`; a step finishes in one transaction with its outbox row and cursor move. After a crash a read step runs again, a write step never repeats (`unknown outcome after restart`, the owner is told, `onError` decides), and a prompt step takes the finished turn's output. Limits: 30 runs per flow per hour, 120 in total, 3 running per flow, 100 step executions and 10 messages per run (re-asks and missed notes don't count), 50k tokens per flow per day (`limits.dailyTokens` up to 500k), runs live 8 days. Five failed runs in a row pause the flow; one failure notice per flow per day.
-- Observability: every firing is a `flow_runs` row, skips included with a reason; every step attempt is a `flow_step_runs` row with its input, output, branch (an `if` keeps the values it compared), timing and error. `kenapa_flow` walks a fixed checklist for a flow and a moment. Retention: step inputs and outputs 30 days, runs 180 days, dry runs 30 days.
-- Dry runs (`uji_flow`): read tools for real; writes, messages, check-ins and prompts stubbed (overridable per step); waits skipped; an each runs 3 items. Only a `dry_run` row and its step log are written.
-- Tools: `buat_flow`, `ubah_flow` (a full definition or a merge patch, `steps`/`triggers` patchable by id), `cek_flow`, `uji_flow`, `daftar_flow`, `lihat_flow`, `jeda_flow`, `hapus_flow`, `jalankan_flow`, `riwayat_flow`, `lihat_run`, `kenapa_flow`, `jawab_checkin`, `batal_run`, and `flows__ringkasan` (the recap as data, usable as a step). Offered only in owner turns in the owner's DMs and the web chat. `palui__cari_tool` hits carry `class` and `untrusted`, and leave destructive tools out with `for: "flow"`.
+- Observability: every firing is a `flow_runs` row, skips included with a reason; every step attempt is a `flow_step_runs` row with its input, output, branch (an `if` keeps the values it compared), timing and error. `explain_flow` walks a fixed checklist for a flow and a moment. Retention: step inputs and outputs 30 days, runs 180 days, dry runs 30 days.
+- Dry runs (`test_flow`): read tools for real; writes, messages, check-ins and prompts stubbed (overridable per step); waits skipped; an each runs 3 items. Only a `dry_run` row and its step log are written.
+- Tools: `create_flow`, `update_flow` (a full definition or a merge patch, `steps`/`triggers` patchable by id), `check_flow`, `test_flow`, `list_flows`, `get_flow`, `pause_flow`, `delete_flow`, `run_flow`, `flow_history`, `get_run`, `explain_flow`, `answer_checkin`, `cancel_run`, and `flows__recap` (the recap as data, usable as a step). Offered only in owner turns in the owner's DMs and the web chat. `palui__search_tools` hits carry `class` and `untrusted`, and leave destructive tools out with `for: "flow"`.
 - Dashboard: a read-only Flows page and a flow page (triggers, steps with branches, write calls, versions with their diffs, recent runs); a flow run opens its step log on the run page.
 
 ## 7. Scheduled jobs
@@ -585,7 +585,7 @@ The first boot after the migration creates Palui as the default agent from `sett
 
 ### 19.4 Tools and approvals
 
-- Guest turn: any message in the batch is from someone other than the owner. It gets no tools (`guest_tools: none`) or only tools marked `guestSafe` in the connector contract (`guest_tools: safe`). Unmarked tools are never guest safe (fail closed). Today that's web fetch (`ambil_halaman`).
+- Guest turn: any message in the batch is from someone other than the owner. It gets no tools (`guest_tools: none`) or only tools marked `guestSafe` in the connector contract (`guest_tools: safe`). Unmarked tools are never guest safe (fail closed). Today that's web fetch (`fetch_page`).
 - Owner turn in a shared chat: with `owner_powers: off` it's treated like a guest turn. With `approve` it gets every tool, and every write or destructive call needs approval.
 - Guest and shared-chat turns are strict: every `write` needs approval, like jobs.
 - Approval prompts from a shared chat never go to that chat. They go to the owner's DM on the same channel (the web chat when there's none), and they name the chat they came from. `pending_approvals.ask_chat_id` is where the prompt went, and only an answer from there counts.

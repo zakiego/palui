@@ -246,7 +246,7 @@ export function createFlow(db: DB, input: SaveInput, now = Date.now()): SaveResu
   if (listFlows(db, input.chatId).length >= MAX_FLOWS_PER_CHAT) throw new FlowError(`This chat already has ${MAX_FLOWS_PER_CHAT} flows. Delete one first.`)
   const tz = def.tz ?? getSetting(db, "timezone")
   if (!isValidZone(tz)) throw new FlowError(`Unknown time zone "${tz}".`)
-  if (findFlowByName(db, input.chatId, def.name)) throw new FlowError(`A flow named "${def.name}" already exists in this chat. Pick another name or change that one with ubah_flow.`)
+  if (findFlowByName(db, input.chatId, def.name)) throw new FlowError(`A flow named "${def.name}" already exists in this chat. Pick another name or change that one with update_flow.`)
   const flowId = newId("flw")
   const versionId = newId("flv")
   const needsApproval = r.writeCalls.length > 0

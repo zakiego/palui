@@ -5,16 +5,16 @@ import type { ToolInfo } from "./validate"
 
 export const EXAMPLE_TOOLS: ToolInfo[] = [
   { name: "mcp-jadwal-sholat__get_prayer_times", connectorId: "mcp-jadwal-sholat", tool: "get_prayer_times", class: "read", untrusted: true, connectorType: "mcp" },
-  { name: "webfetch__ambil_halaman", connectorId: "webfetch", tool: "ambil_halaman", class: "read", untrusted: true, connectorType: "webfetch" },
-  { name: "reminders__daftar_pengingat", connectorId: "reminders", tool: "daftar_pengingat", class: "read", untrusted: false, connectorType: "reminders" },
-  { name: "reminders__ingatkan", connectorId: "reminders", tool: "ingatkan", class: "write", untrusted: false, connectorType: "reminders" },
-  { name: "reminders__batal_pengingat", connectorId: "reminders", tool: "batal_pengingat", class: "destructive", untrusted: false, connectorType: "reminders" },
+  { name: "webfetch__fetch_page", connectorId: "webfetch", tool: "fetch_page", class: "read", untrusted: true, connectorType: "webfetch" },
+  { name: "reminders__list_reminders", connectorId: "reminders", tool: "list_reminders", class: "read", untrusted: false, connectorType: "reminders" },
+  { name: "reminders__set_reminder", connectorId: "reminders", tool: "set_reminder", class: "write", untrusted: false, connectorType: "reminders" },
+  { name: "reminders__cancel_reminder", connectorId: "reminders", tool: "cancel_reminder", class: "destructive", untrusted: false, connectorType: "reminders" },
   { name: "mcp-github__get_commit_status", connectorId: "mcp-github", tool: "get_commit_status", class: "read", untrusted: true, connectorType: "mcp" },
   { name: "mcp-github__add_comment", connectorId: "mcp-github", tool: "add_comment", class: "write", untrusted: true, connectorType: "mcp", flowApproval: "every_run" },
   { name: "mcp-keuangan__list_bills", connectorId: "mcp-keuangan", tool: "list_bills", class: "read", untrusted: false, connectorType: "mcp" },
   { name: "mcp-keuangan__mark_paid", connectorId: "mcp-keuangan", tool: "mark_paid", class: "write", untrusted: false, connectorType: "mcp" },
-  { name: "notes__simpan_catatan", connectorId: "notes", tool: "simpan_catatan", class: "write", untrusted: false, connectorType: "notes" },
-  { name: "flows__ringkasan", connectorId: "flows", tool: "ringkasan", class: "read", untrusted: false, connectorType: "flows" },
+  { name: "notes__save_note", connectorId: "notes", tool: "save_note", class: "write", untrusted: false, connectorType: "notes" },
+  { name: "flows__recap", connectorId: "flows", tool: "recap", class: "read", untrusted: false, connectorType: "flows" },
 ]
 
 // 9a. Morning briefing.
@@ -23,8 +23,8 @@ export const BRIEFING = {
   triggers: [{ id: "main", kind: "schedule", start: "prayer", source: { kind: "times", times: [{ time: "06:00", label: "Briefing" }] } }],
   steps: [
     { id: "prayer", kind: "tool", tool: "mcp-jadwal-sholat__get_prayer_times", args: { city: "Banjarmasin", date: "{{now.date}}" }, onError: "continue" },
-    { id: "weather", kind: "tool", tool: "webfetch__ambil_halaman", args: { url: "https://wttr.in/Banjarmasin?format=j1" }, parse: { field: "text", as: "json" }, onError: "continue" },
-    { id: "reminders", kind: "tool", tool: "reminders__daftar_pengingat", args: { filter: "upcoming", limit: 20 } },
+    { id: "weather", kind: "tool", tool: "webfetch__fetch_page", args: { url: "https://wttr.in/Banjarmasin?format=j1" }, parse: { field: "text", as: "json" }, onError: "continue" },
+    { id: "reminders", kind: "tool", tool: "reminders__list_reminders", args: { filter: "upcoming", limit: 20 } },
     { id: "today", kind: "set", values: { count: 'count(steps.reminders.data.reminders, "date", now.date)' } },
     {
       id: "send",
@@ -86,7 +86,7 @@ export const RECAP = {
   name: "Rekap sholat",
   triggers: [{ id: "weekly", kind: "schedule", start: "recap", source: { kind: "rrule", rrule: "FREQ=WEEKLY;BYDAY=SU", start: "2026-11-15T20:00" } }],
   steps: [
-    { id: "recap", kind: "tool", tool: "flows__ringkasan", args: { flow: "Sholat 5 waktu", days: 7 } },
+    { id: "recap", kind: "tool", tool: "flows__recap", args: { flow: "Sholat 5 waktu", days: 7 } },
     { id: "any_missed", kind: "if", when: "steps.recap.data.missed > 0 or number(steps.recap.data.byAnswer.not_yet) > 0", then: "cheer", else: "clean" },
     {
       id: "cheer",
@@ -144,7 +144,7 @@ export const SHOLAT = {
       deadline: { kind: "next" },
       next: null,
     },
-    { id: "recap_read", kind: "tool", tool: "flows__ringkasan", args: { flow: "self", days: 7, trigger: "main" } },
+    { id: "recap_read", kind: "tool", tool: "flows__recap", args: { flow: "self", days: 7, trigger: "main" } },
     { id: "recap_any", kind: "if", when: "steps.recap_read.data.total > 0", then: "recap_send", else: null },
     { id: "recap_send", kind: "message", text: "{{steps.recap_read.data.text}}" },
   ],

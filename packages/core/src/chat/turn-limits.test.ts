@@ -33,23 +33,23 @@ describe("shouldWrapUp", () => {
 describe("limitNotice", () => {
   it("lists what ran, counts repeats and says nothing changed", () => {
     const text = limitNotice({ timeoutMs: 120_000 }, [
-      { name: "lihat_flow", write: false, ok: true },
-      { name: "uji_flow", write: false, ok: true },
-      { name: "uji_flow", write: false, ok: true },
+      { name: "get_flow", write: false, ok: true },
+      { name: "test_flow", write: false, ok: true },
+      { name: "test_flow", write: false, ok: true },
     ])
     expect(text).toContain("batas 2 menit")
-    expect(text).toContain("Yang sempat jalan: lihat_flow, uji_flow (2x).")
+    expect(text).toContain("Yang sempat jalan: get_flow, test_flow (2x).")
     expect(text).toContain("Belum ada yang diubah.")
     expect(text).toContain('Bilang "lanjut"')
   })
 
   it("names the writes that went through", () => {
     const text = limitNotice({ timeoutMs: 90_000 }, [
-      { name: "buat_flow", write: true, ok: true },
-      { name: "hapus_flow", write: true, ok: false },
+      { name: "create_flow", write: true, ok: true },
+      { name: "delete_flow", write: true, ok: false },
     ])
     expect(text).toContain("batas 90 detik")
-    expect(text).toContain("Yang udah ngubah sesuatu: buat_flow.")
+    expect(text).toContain("Yang udah ngubah sesuatu: create_flow.")
     expect(text).not.toContain("Belum ada yang diubah")
   })
 

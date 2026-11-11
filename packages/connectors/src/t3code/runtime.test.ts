@@ -248,13 +248,13 @@ describe("t3code tools and watcher", () => {
   it("offers seven tools with the right classes", async () => {
     const { tools, started } = await setup()
     expect(Object.fromEntries(Object.entries(tools).map(([k, v]) => [k, v.class]))).toEqual({
-      daftar_proyek: "read",
-      daftar_thread: "read",
-      mulai_thread: "write",
-      kirim_ke_thread: "write",
-      thread_chat_ini: "read",
-      lihat_thread: "read",
-      hentikan_thread: "destructive",
+      list_projects: "read",
+      list_threads: "read",
+      start_thread: "write",
+      send_to_thread: "write",
+      list_chat_threads: "read",
+      get_thread: "read",
+      stop_thread: "destructive",
     })
     expect(Object.values(tools).every((t) => t.untrusted === false)).toBe(true)
     await started.handle.stop()
@@ -262,7 +262,7 @@ describe("t3code tools and watcher", () => {
 
   it("starts a thread in a worktree, then tells the chat when it finishes", async () => {
     const { s, ctx, tools, started } = await setup()
-    const out = await exec(tools.mulai_thread, { project: "palui", task: "Fix the bug\nin the router" })
+    const out = await exec(tools.start_thread, { project: "palui", task: "Fix the bug\nin the router" })
     expect(out).toMatchObject({ ok: true, threadId: "11111111-aaaa", environmentId: "env1", title: "Fix the bug", project: "palui", workspace: "new worktree from main" })
     expect(s.launches[0]).toMatchObject({
       projectId: "p1",
@@ -286,24 +286,24 @@ describe("t3code tools and watcher", () => {
     expect(started.watcher.list()).toHaveLength(0)
     expect(ctx.patches.at(-1)).toEqual({ watches: [] })
     // The thread stays listed for this chat after the watch is gone.
-    expect(await exec(tools.thread_chat_ini, {})).toMatchObject({ ok: true, threads: [{ threadId: "11111111-aaaa", action: "started", environmentId: "env1" }] })
+    expect(await exec(tools.list_chat_threads, {})).toMatchObject({ ok: true, threads: [{ threadId: "11111111-aaaa", action: "started", environmentId: "env1" }] })
     await started.handle.stop()
   })
 
   it("works in place when asked and reports an unknown project", async () => {
     const { s, tools, started } = await setup()
-    await exec(tools.mulai_thread, { project: "vorneo", task: "Bump deps", inPlace: true })
+    await exec(tools.start_thread, { project: "vorneo", task: "Bump deps", inPlace: true })
     expect(s.launches[0]).not.toHaveProperty("workspaceStrategy")
     // A project with its own default model keeps it.
-    await exec(tools.mulai_thread, { project: "site", task: "Fix CSS" })
+    await exec(tools.start_thread, { project: "site", task: "Fix CSS" })
     expect(s.launches[1]).not.toHaveProperty("modelSelection")
-    expect(await exec(tools.mulai_thread, { project: "nope", task: "x" })).toMatchObject({ ok: false, error: expect.stringContaining("No T3 Code project") })
+    expect(await exec(tools.start_thread, { project: "nope", task: "x" })).toMatchObject({ ok: false, error: expect.stringContaining("No T3 Code project") })
     await started.handle.stop()
   })
 
   it("says once when a thread waits for an answer", async () => {
     const { s, ctx, tools, started } = await setup()
-    await exec(tools.mulai_thread, { project: "palui", task: "Fix it" })
+    await exec(tools.start_thread, { project: "palui", task: "Fix it" })
     s.pending = 1
     await started.watcher.poll()
     await started.watcher.poll()
@@ -315,36 +315,36 @@ describe("t3code tools and watcher", () => {
   it("sends follow-ups, reads and stops threads by id or link", async () => {
     const { s, tools, started } = await setup()
     const link = "https://app.t3.codes/threads/env1/11111111-aaaa"
-    expect(await exec(tools.kirim_ke_thread, { thread: link, message: "Also add a test" })).toMatchObject({ ok: true, thread: { id: link.split("/").pop(), status: "running" } })
+    expect(await exec(tools.send_to_thread, { thread: link, message: "Also add a test" })).toMatchObject({ ok: true, thread: { id: link.split("/").pop(), status: "running" } })
     expect(s.sends[0]).toMatchObject({ threadId: "11111111-aaaa", message: "Also add a test", mode: "auto" })
     expect(started.watcher.list()[0]).toMatchObject({ threadId: "11111111-aaaa", runId: "run-1" })
 
-    const read = (await exec(tools.lihat_thread, { thread: "11111111-aaaa" })) as { messages: { from: string }[] }
+    const read = (await exec(tools.get_thread, { thread: "11111111-aaaa" })) as { messages: { from: string }[] }
     expect(read.messages.map((m) => m.from)).toEqual(["owner", "agent"])
-    expect(await exec(tools.daftar_thread, { project: "palui", activeOnly: true })).toMatchObject({ ok: true, threads: [{ id: "11111111-aaaa" }] })
-    expect(await exec(tools.daftar_proyek, {})).toMatchObject({ ok: true, projects: [{ name: "palui" }, { name: "vorneo" }, { name: "site" }] })
+    expect(await exec(tools.list_threads, { project: "palui", activeOnly: true })).toMatchObject({ ok: true, threads: [{ id: "11111111-aaaa" }] })
+    expect(await exec(tools.list_projects, {})).toMatchObject({ ok: true, projects: [{ name: "palui" }, { name: "vorneo" }, { name: "site" }] })
 
-    expect(await exec(tools.hentikan_thread, { thread: link })).toEqual({ ok: true, threadId: "11111111-aaaa" })
+    expect(await exec(tools.stop_thread, { thread: link })).toEqual({ ok: true, threadId: "11111111-aaaa" })
     expect(s.interrupts).toEqual(["11111111-aaaa"])
-    expect(await exec(tools.lihat_thread, { thread: "gone" })).toEqual({ ok: false, error: "Thread gone was not found." })
+    expect(await exec(tools.get_thread, { thread: "gone" })).toEqual({ ok: false, error: "Thread gone was not found." })
     await started.handle.stop()
   })
 
   it("lists only the threads started or followed from this chat", async () => {
     const { ctx, tools, turn, started } = await setup()
-    expect(await exec(tools.thread_chat_ini, {})).toEqual({ ok: true, chatId: turn.chatId, threads: [], message: "Belum ada thread T3 Code dari chat ini." })
-    await exec(tools.mulai_thread, { project: "palui", task: "Fix it" })
-    await exec(tools.kirim_ke_thread, { thread: "11111111-aaaa", message: "More" })
+    expect(await exec(tools.list_chat_threads, {})).toEqual({ ok: true, chatId: turn.chatId, threads: [], message: "Belum ada thread T3 Code dari chat ini." })
+    await exec(tools.start_thread, { project: "palui", task: "Fix it" })
+    await exec(tools.send_to_thread, { thread: "11111111-aaaa", message: "More" })
 
     const other = ensureChat(ctx.db, { channel: "whatsapp", externalId: "628@s.whatsapp.net" })
     const otherTools = await started.handle.tools({ ...turn, chatId: other.id })
-    expect(await exec(otherTools.thread_chat_ini, {})).toMatchObject({ ok: true, chatId: other.id, threads: [] })
+    expect(await exec(otherTools.list_chat_threads, {})).toMatchObject({ ok: true, chatId: other.id, threads: [] })
 
-    const out = (await exec(tools.thread_chat_ini, {})) as { threads: Record<string, unknown>[] }
+    const out = (await exec(tools.list_chat_threads, {})) as { threads: Record<string, unknown>[] }
     expect(out.threads).toEqual([
       { threadId: "11111111-aaaa", title: "Fix the bug", action: "followed", at: new Date(0).toISOString(), link: "https://app.t3.codes/threads/env1/11111111-aaaa", environmentId: "env1" },
     ])
-    expect(await exec(tools.daftar_thread, {})).toMatchObject({ threads: [{ id: "11111111-aaaa", environmentId: "env1" }] })
+    expect(await exec(tools.list_threads, {})).toMatchObject({ threads: [{ id: "11111111-aaaa", environmentId: "env1" }] })
     await started.handle.stop()
   })
 
@@ -361,7 +361,7 @@ describe("t3code tools and watcher", () => {
     const chat = ensureChat(ctx.db, { channel: "telegram", externalId: "42" })
     const started = startT3(ctx, TOKEN, { pollMs: 3_600_000 })
     const tools = await started.handle.tools({ runId: "r", chatId: chat.id, channel: "telegram", trigger: "message", tz: "UTC", now: 0 })
-    await exec(tools.mulai_thread, { project: "palui", task: "Do it" })
+    await exec(tools.start_thread, { project: "palui", task: "Do it" })
     expect(s.launches[0]).toMatchObject({ modelSelection: { instanceId: "claudeAgent", model: "claude-sonnet-5-5" }, workspaceStrategy: { baseRef: "develop" } })
     await started.handle.stop()
   })

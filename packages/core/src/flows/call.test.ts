@@ -13,9 +13,9 @@ describe("connectorFlowCaller", () => {
       {
         id: "reminders",
         tools: {
-          daftar_pengingat: { class: "read", run: (_a, t) => ({ chat: t.chatId }) },
-          ingatkan: { class: "write", input: z.object({ text: z.string() }), run: (a) => ({ ok: true, text: a.text }) },
-          batal_pengingat: { class: "destructive", run: () => ({ ok: true }) },
+          list_reminders: { class: "read", run: (_a, t) => ({ chat: t.chatId }) },
+          set_reminder: { class: "write", input: z.object({ text: z.string() }), run: (a) => ({ ok: true, text: a.text }) },
+          cancel_reminder: { class: "destructive", run: () => ({ ok: true }) },
         },
       },
       { id: "mcp-x", trust: "external", tools: { get: { class: "read", run: () => ({ content: [{ type: "text", text: '{"a":1}' }] }) } } },
@@ -25,32 +25,32 @@ describe("connectorFlowCaller", () => {
   const caller = connectorFlowCaller(() => entries)
 
   it("resolves the class and trust before any call", async () => {
-    const info = await caller.resolve({ tool: "reminders__batal_pengingat" }, turn)
-    expect(info).toMatchObject({ class: "destructive", connectorId: "reminders", tool: "batal_pengingat" })
+    const info = await caller.resolve({ tool: "reminders__cancel_reminder" }, turn)
+    expect(info).toMatchObject({ class: "destructive", connectorId: "reminders", tool: "cancel_reminder" })
     expect(log).toHaveLength(0)
     expect(await caller.resolve({ tool: "get", connectorId: "mcp-x" }, turn)).toMatchObject({ untrusted: true, connectorType: "mcp-x" })
     expect(await caller.resolve({ tool: "nope__x" }, turn)).toBeNull()
   })
 
   it("refuses a destructive tool without running it", async () => {
-    const info = (await caller.resolve({ tool: "reminders__batal_pengingat" }, turn))!
+    const info = (await caller.resolve({ tool: "reminders__cancel_reminder" }, turn))!
     await expect(caller.call(info, {}, turn)).rejects.toThrow(/destructive/)
-    expect(log.filter((l) => l.tool === "batal_pengingat")).toHaveLength(0)
+    expect(log.filter((l) => l.tool === "cancel_reminder")).toHaveLength(0)
   })
 
   it("refuses when the class changed since it was resolved", async () => {
-    const info = { ...(await caller.resolve({ tool: "reminders__ingatkan" }, turn))!, class: "read" as const }
+    const info = { ...(await caller.resolve({ tool: "reminders__set_reminder" }, turn))!, class: "read" as const }
     await expect(caller.call(info, { text: "x" }, turn)).rejects.toThrow(/now classified write/)
   })
 
   it("passes the flow's chat and id in the tool context", async () => {
-    const info = (await caller.resolve({ tool: "reminders__daftar_pengingat" }, turn))!
+    const info = (await caller.resolve({ tool: "reminders__list_reminders" }, turn))!
     expect(await caller.call(info, {}, turn)).toEqual({ chat: "chat_owner" })
     expect(log.at(-1)!.turn).toMatchObject({ chatId: "chat_owner", flowId: "flw_1", trigger: "flow" })
   })
 
   it("validates args against the input schema", async () => {
-    const info = (await caller.resolve({ tool: "reminders__ingatkan" }, turn))!
+    const info = (await caller.resolve({ tool: "reminders__set_reminder" }, turn))!
     await expect(caller.call(info, { text: 5 }, turn)).rejects.toThrow(/don't match the tool's input/)
     expect(await caller.call(info, { text: "beli obat" }, turn)).toEqual({ ok: true, text: "beli obat" })
   })

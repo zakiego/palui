@@ -52,10 +52,10 @@ function listTools(id: string) {
 const BUILTIN_TOOLS: Record<string, { tool: string; class: string; title?: string; guestSafe?: boolean; untrusted?: boolean }[]> = {
   reminders: [
     { tool: "buat_pengingat", class: "write", title: "Bikin pengingat" },
-    { tool: "daftar_pengingat", class: "read", title: "Lihat pengingat" },
+    { tool: "list_reminders", class: "read", title: "Lihat pengingat" },
     { tool: "hapus_pengingat", class: "destructive", title: "Hapus pengingat" },
   ],
-  webfetch: [{ tool: "ambil_halaman", class: "read", title: "Ambil isi halaman web", guestSafe: true, untrusted: true }],
+  webfetch: [{ tool: "fetch_page", class: "read", title: "Ambil isi halaman web", guestSafe: true, untrusted: true }],
   notes: [{ tool: "tambah_instruksi", class: "write", title: "Tambah instruksi tetap" }],
   chats: [{ tool: "cari_obrolan", class: "read" }],
 }

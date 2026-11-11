@@ -26,7 +26,7 @@ describe("the worked examples (RFC 9)", () => {
   it("fills defaults and records the resolved tools", () => {
     const r = validateDefinition(EXAMPLES.BRIEFING, ctx)
     expect(r.definition!.schema).toBe(1)
-    expect(r.tools.weather).toMatchObject({ connectorId: "webfetch", tool: "ambil_halaman", class: "read", untrusted: true })
+    expect(r.tools.weather).toMatchObject({ connectorId: "webfetch", tool: "fetch_page", class: "read", untrusted: true })
   })
 })
 
@@ -83,7 +83,7 @@ describe("expressions and templates", () => {
   it("keeps templates out of literal places", () => {
     expect(problems(base([{ id: "a", kind: "prompt", prompt: "Summarize {{trigger.payload}}" }]))[0]).toMatch(/prompt instruction is a literal/)
     expect(problems(base([{ id: "a", kind: "message", text: "x", to: "{{trigger.chat}}" }]))[0]).toMatch(/message.to is a literal/)
-    expect(problems(base([{ id: "a", kind: "tool", tool: "reminders__daftar_pengingat", args: { "{{trigger.k}}": 1 } }]))[0]).toMatch(/Arg names are literals/)
+    expect(problems(base([{ id: "a", kind: "tool", tool: "reminders__list_reminders", args: { "{{trigger.k}}": 1 } }]))[0]).toMatch(/Arg names are literals/)
     // Ids, kinds and targets are literals by shape.
     expect(problems(base([{ id: "{{trigger.x}}", kind: "message", text: "x" }])).some((x) => x.startsWith("steps[0].id:"))).toBe(true)
   })
@@ -110,9 +110,9 @@ describe("expressions and templates", () => {
 
 describe("tools and write calls", () => {
   it("refuses destructive tools and unknown tools", () => {
-    expect(problems(base([{ id: "a", kind: "tool", tool: "reminders__batal_pengingat" }]))[0]).toMatch(/destructive. Flows never run destructive tools/)
+    expect(problems(base([{ id: "a", kind: "tool", tool: "reminders__cancel_reminder" }]))[0]).toMatch(/destructive. Flows never run destructive tools/)
     expect(problems(base([{ id: "a", kind: "tool", tool: "nope__x" }]))[0]).toMatch(/No enabled tool nope__x/)
-    expect(problems(base([{ id: "a", kind: "prompt", prompt: "x", tools: ["reminders__batal_pengingat"] }]))[0]).toMatch(/never get destructive/)
+    expect(problems(base([{ id: "a", kind: "prompt", prompt: "x", tools: ["reminders__cancel_reminder"] }]))[0]).toMatch(/never get destructive/)
   })
 
   it("resolves connectorId + tool and lists write calls with templates as written", () => {

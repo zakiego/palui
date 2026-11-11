@@ -41,53 +41,53 @@ describe("attachment tools", () => {
   it("exposes four tools with classes and tells the model to save only what matters", () => {
     const { tools } = setup()
     expect(Object.fromEntries(Object.entries(tools).map(([k, v]) => [k, v.class]))).toEqual({
-      simpan_lampiran: "write",
-      daftar_lampiran: "read",
-      ambil_lampiran: "read",
-      hapus_lampiran: "destructive",
+      save_attachment: "write",
+      list_attachments: "read",
+      get_attachment: "read",
+      delete_attachment: "destructive",
     })
-    expect(tools.simpan_lampiran!.tool.description).toMatch(/Only save files that are worth keeping/)
-    expect(tools.simpan_lampiran!.tool.description).toMatch(/Do NOT save casual photos/)
+    expect(tools.save_attachment!.tool.description).toMatch(/Only save files that are worth keeping/)
+    expect(tools.save_attachment!.tool.description).toMatch(/Do NOT save casual photos/)
   })
 
   it("saves the file from the batch run, asks for nomor when there are several, and dedupes", async () => {
     const { db, chat, other, tools } = setup()
-    expect(await call(tools.simpan_lampiran, { title: "x" })).toMatchObject({ ok: false, error: expect.stringMatching(/no image or document/) })
+    expect(await call(tools.save_attachment, { title: "x" })).toMatchObject({ ok: false, error: expect.stringMatching(/no image or document/) })
 
     inbound(db, chat.id, "run_1", [
       { kind: "image", mimeType: "image/jpeg", data: JPG },
       { kind: "document", mimeType: "application/pdf", filename: "tiket.pdf", data: PDF },
     ])
     inbound(db, other.id, "run_1", [{ kind: "image", mimeType: "image/jpeg", data: JPG }])
-    const ambiguous = await call(tools.simpan_lampiran, { title: "Tiket" })
+    const ambiguous = await call(tools.save_attachment, { title: "Tiket" })
     expect(ambiguous).toMatchObject({ ok: false, files: [{ nomor: 1, kind: "image" }, { nomor: 2, filename: "tiket.pdf" }] })
-    expect(await call(tools.simpan_lampiran, { nomor: 3, title: "Tiket" })).toMatchObject({ ok: false, error: "There is no file number 3." })
+    expect(await call(tools.save_attachment, { nomor: 3, title: "Tiket" })).toMatchObject({ ok: false, error: "There is no file number 3." })
 
-    const saved = await call(tools.simpan_lampiran, { nomor: 2, title: "Tiket BDJ-CGK", description: "Tiket pesawat 12 Des" })
+    const saved = await call(tools.save_attachment, { nomor: 2, title: "Tiket BDJ-CGK", description: "Tiket pesawat 12 Des" })
     expect(saved).toMatchObject({ ok: true, deduped: false, message: 'Oke, "Tiket BDJ-CGK" udah aku simpan.', attachment: { title: "Tiket BDJ-CGK", kind: "document", filename: "tiket.pdf", mimeType: "application/pdf" } })
     expect(saved.attachment.url).toBe(`https://palui.test/app/attachments?id=${saved.attachment.id}`)
     expect(readAttachment(db, saved.attachment.id, KEY)!.meta).toMatchObject({ chatId: chat.id, runId: "run_2" })
-    expect(await call(tools.simpan_lampiran, { nomor: 2, title: "lagi" })).toMatchObject({ ok: true, deduped: true })
+    expect(await call(tools.save_attachment, { nomor: 2, title: "lagi" })).toMatchObject({ ok: true, deduped: true })
   })
 
   it("refuses files that fail validation", async () => {
     const { db, chat, tools } = setup()
     inbound(db, chat.id, "run_1", [{ kind: "document", mimeType: "application/pdf", filename: "fake.pdf", data: Buffer.from("MZ").toString("base64") }])
-    expect(await call(tools.simpan_lampiran, { title: "x" })).toMatchObject({ ok: false, error: expect.stringMatching(/doesn't match/) })
+    expect(await call(tools.save_attachment, { title: "x" })).toMatchObject({ ok: false, error: expect.stringMatching(/doesn't match/) })
   })
 
   it("lists, gets and deletes within the turn's chat only", async () => {
     const { db, chat, other, tools } = setup()
     inbound(db, chat.id, "run_1", [{ kind: "image", mimeType: "image/jpeg", data: JPG }])
-    const { attachment } = await call(tools.simpan_lampiran, { title: "KTP Zaki" })
+    const { attachment } = await call(tools.save_attachment, { title: "KTP Zaki" })
     const otherTools = attachmentTools(db, { runId: "run_9", chatId: other.id, channel: "telegram", trigger: "message", tz: "Asia/Makassar", now: NOW }, { key: () => KEY })
 
-    expect(await call(tools.daftar_lampiran, { query: "ktp" })).toMatchObject({ ok: true, count: 1, attachments: [{ id: attachment.id }] })
-    expect(await call(otherTools.daftar_lampiran, {})).toMatchObject({ ok: true, count: 0 })
-    expect(await call(tools.ambil_lampiran, { id: attachment.id })).toMatchObject({ ok: true, attachment: { title: "KTP Zaki", size: "6 B" } })
-    expect(await call(otherTools.ambil_lampiran, { id: attachment.id })).toMatchObject({ ok: false })
-    expect(await call(otherTools.hapus_lampiran, { id: attachment.id })).toMatchObject({ ok: false })
-    expect(await call(tools.hapus_lampiran, { id: attachment.id })).toMatchObject({ ok: true })
-    expect(await call(tools.daftar_lampiran, {})).toMatchObject({ count: 0 })
+    expect(await call(tools.list_attachments, { query: "ktp" })).toMatchObject({ ok: true, count: 1, attachments: [{ id: attachment.id }] })
+    expect(await call(otherTools.list_attachments, {})).toMatchObject({ ok: true, count: 0 })
+    expect(await call(tools.get_attachment, { id: attachment.id })).toMatchObject({ ok: true, attachment: { title: "KTP Zaki", size: "6 B" } })
+    expect(await call(otherTools.get_attachment, { id: attachment.id })).toMatchObject({ ok: false })
+    expect(await call(otherTools.delete_attachment, { id: attachment.id })).toMatchObject({ ok: false })
+    expect(await call(tools.delete_attachment, { id: attachment.id })).toMatchObject({ ok: true })
+    expect(await call(tools.list_attachments, {})).toMatchObject({ count: 0 })
   })
 })

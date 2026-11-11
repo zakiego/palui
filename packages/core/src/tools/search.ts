@@ -1,5 +1,5 @@
 // Tool search (PLAN 5.2): when a turn has more tools than budgets.maxTools, only a
-// core set is loaded and the rest is found by keyword through `palui__cari_tool`.
+// core set is loaded and the rest is found by keyword through `palui__search_tools`.
 // Pure ranking here; loading lives in collect.ts.
 
 export type SearchDoc = {
