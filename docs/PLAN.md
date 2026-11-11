@@ -215,7 +215,7 @@ Telegram (the first channel built)
 WhatsApp
 - Connect: the wizard first asks for the owner's phone number. Then it pairs by phone-number code (8 chars, big Geist Mono, `ABCD-EFGH`, copy button), with QR as a fallback tab. Expiry is driven by Baileys `connection.update`: a new `qr` arrives on each rotation, and the pairing code is requested after the socket opens. A text label ("expires in about 2 min") isn't announced on every tick. Session files live in `/data/wa-auth`.
 - Owner match: messages from the stored number are accepted. The LID is learned from the first DM whose `key.remoteJidAlt` (or the LID mapping) matches the number, and both are stored. Anything with `fromMe` is dropped.
-- Number: utusan's number (D2), linked as its own extra linked device with its own auth (WhatsApp allows 4). Separate credentials means no 440 fight. Both devices receive every message, so chats are split, never shared: Palui answers only the chats in its own allowlist, and each chat moved to Palui gets its utusan binding removed in the same step (section 18). A wizard check refuses a chat that utusan still binds (it reads `~/.utusan/utusan.json` through a read-only mount, or I tick a box when it can't).
+- Number: Palui's own number (D2), not utusan's. Nothing is shared with utusan, so there's no chat split and no utusan check. Every DM from the owner is answered. Groups start outside the allowlist.
 - Runtime: a lock on the auth dir, reconnect with exponential backoff, and 440 means "another session took over", so it pauses with that reason instead of fighting. A logout means `error: unlinked`.
 - DM only. An ⏳ reaction while thinking, cleared on reply.
 - Risk: Baileys is unofficial. Keep volume low, use one owner, never broadcast. Telegram is the reliable channel.
@@ -224,7 +224,7 @@ Web chat
 - Lives in the dashboard. It goes through the same router and turn, streamed, with tool calls visible. It's for testing without a phone.
 
 Dev vs prod
-- Dev uses a separate Telegram bot token, since two `getUpdates` consumers on one token get 409. No WhatsApp in dev: the shared number already carries utusan and prod Palui. `pnpm dev` refuses to start a channel whose token matches prod.
+- Dev uses a separate Telegram bot token, since two `getUpdates` consumers on one token get 409. No WhatsApp in dev: the number is already linked to prod Palui. `pnpm dev` refuses to start a channel whose token matches prod.
 
 ### 5.2 Models
 
@@ -462,7 +462,7 @@ About 21 days in total. Every UI milestone runs the full zaki-design-ui pipeline
 | # | Question | Recommendation |
 |---|---|---|
 | D1 | Name | Decided: Palui Agent (`palui`) |
-| D2 | WhatsApp number | Decided: utusan's number, as a separate linked device, chats split per section 18. utusan will be sunset |
+| D2 | WhatsApp number | Decided (changed 2026-11-11): Palui's own number. It used to be utusan's number with chats split, which is gone |
 | D3 | Replace utusan? | Decided: yes, someday. Roadmap in section 18 |
 | D4 | Landing indexable now? | Decided: yes |
 | D5 | Open source? | Decided: private |
@@ -477,8 +477,7 @@ About 21 days in total. Every UI milestone runs the full zaki-design-ui pipeline
 | Tool calling through CLIProxyAPI is flaky for some models | Medium | M0 spike, anthropic protocol for Claude, ai-gateway failover |
 | Subscription quota burn from loops or jobs | Medium | Budgets and caps in M1, `/stop`, cache-friendly routing (D8) |
 | Prompt injection through recall, MCP, fetch or hooks | Medium | Taint rule, approvals, auto-save without tool output |
-| Baileys ban or protocol break | Low/Medium | Low volume, Telegram primary, pinned version. A ban now hits utusan and Palui together, which is one more reason to keep Palui's WhatsApp traffic small until utusan is gone |
-| Both bots answer the same chat | Medium | One owner per chat, enforced by the wizard check and the move step in section 18. `fromMe` dropped, so neither bot answers the other |
+| Baileys ban or protocol break | Low/Medium | Low volume, Telegram primary, pinned version |
 | Disk on the mini | High | Free space in M0, retention, capped logs |
 | Deploy drops a message or reminder | Medium | Durable inbox, outbox, drain on SIGTERM, liveness-only runtime health |
 | Scope creep toward OpenClaw parity | High | The parity table. Every new feature must be a connector |
@@ -493,13 +492,7 @@ About 21 days in total. Every UI milestone runs the full zaki-design-ui pipeline
 
 ## 18. Roadmap: sunsetting utusan
 
-Palui takes over utusan's number one chat at a time, then utusan is switched off. Same idea as utusan's ADR 0004: a parity checklist, then a parallel run.
-
-Moving a chat (Palui CLI `palui wa move <chat>`, and later a button):
-1. Add the chat to Palui's WhatsApp allowlist, paused.
-2. Remove the chat's binding from `~/.utusan/utusan.json` (hot reloaded, no restart).
-3. Turn the chat on in Palui. Send a test message.
-Undo is the same steps reversed.
+Palui runs on its own WhatsApp number, so it never shares a chat with utusan. Replacing utusan means moving each use over to Palui's number (my DM, then groups, then notification sends), then switching utusan off. Same idea as utusan's ADR 0004: a parity checklist, then a parallel run.
 
 Order:
 
