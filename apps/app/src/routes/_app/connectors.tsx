@@ -2,36 +2,39 @@
 // one element: each connector shows its state and is one tap from off. Pause
 // never asks; remove (in the sheet) always does. The layout is the Explore pick
 // (PLAN 11.7); `?v=1|2|3` shows the picker to flip between the three variants.
+// Adding one happens on /connectors/new, which comes back with `?add=<type>`
+// (and `&preset=<id>`) to open the setup sheet here.
 import * as React from "react"
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router"
 import { PlusIcon, ToggleRightIcon } from "lucide-react"
 import { z } from "zod"
 import type { ConnectorManifest } from "@palui/core/connectors/define"
 
 import { AppError } from "@/components/app-error"
-import { connectorIcon } from "@/components/connector-icon"
 import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending } from "@/components/page-pending"
 import { RuntimeAlert } from "@/components/runtime-alert"
 import { ConnectorSheet, type SheetTarget } from "@/components/connectors/connector-sheet"
 import { DEFAULT_CONNECTOR_LAYOUT, CONNECTOR_LAYOUTS } from "@/components/connectors/layouts"
 import { PrototypePicker } from "@/components/connectors/prototype-picker"
-import { CONNECTOR_GROUPS, StatusAnnouncer } from "@/components/connectors/shared"
+import { StatusAnnouncer } from "@/components/connectors/shared"
 import type { ConnectorItem } from "@/components/connectors/variants/types"
 import { slugify } from "@/lib/slug"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { useLiveRefresh } from "@/hooks/use-live-events"
 import { getConnectorsPage } from "@/lib/fns/connectors"
 import { useT } from "@/lib/i18n"
-import { manifestFor, manifests } from "@/lib/manifests"
+import { manifestFor } from "@/lib/manifests"
+import { presetFor, type Preset } from "@/lib/presets"
 import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_app/connectors")({
   validateSearch: z.object({
     open: z.string().max(64).optional(),
+    // Set by /connectors/new: start a new connector of this type, from this preset.
+    add: z.string().max(64).optional().catch(undefined),
+    preset: z.string().max(64).optional().catch(undefined),
     // The Explore picker: 1 Cards, 2 Rows, 3 Board. Absent means the pick.
     v: z.number().int().min(1).max(CONNECTOR_LAYOUTS.length).optional().catch(undefined),
   }),
@@ -43,7 +46,6 @@ export const Route = createFileRoute("/_app/connectors")({
 })
 
 type Item = ConnectorItem
-const GROUPS = CONNECTOR_GROUPS
 
 function toTarget(item: Item): SheetTarget {
   return {
@@ -60,7 +62,7 @@ function toTarget(item: Item): SheetTarget {
   }
 }
 
-function newTarget(m: ConnectorManifest, existing: Item[], preset?: NonNullable<ConnectorManifest["presets"]>[number]): SheetTarget {
+function newTarget(m: ConnectorManifest, existing: Item[], preset?: Preset): SheetTarget {
   let id = m.id
   let label = m.name
   if (m.multiple) {
@@ -85,11 +87,10 @@ function newTarget(m: ConnectorManifest, existing: Item[], preset?: NonNullable<
 
 function ConnectorsPage() {
   const data = Route.useLoaderData()
-  const { open: openId, v } = Route.useSearch()
+  const { open: openId, add, preset, v } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const router = useRouter()
   const t = useT()
-  const [catalogOpen, setCatalogOpen] = React.useState(false)
   const [draft, setDraft] = React.useState<SheetTarget | null>(null)
 
   useLiveRefresh(() => void router.invalidate(), (e) => !!e.connectorId)
@@ -104,14 +105,19 @@ function ConnectorsPage() {
   const shownTarget = target ?? lastTarget.current
   const setOpen = (id: string | undefined) => void navigate({ search: (prev) => ({ ...prev, open: id }), replace: !id })
 
-  const startNew = (m: ConnectorManifest, preset?: NonNullable<ConnectorManifest["presets"]>[number]) => {
-    setCatalogOpen(false)
-    const existing = !m.multiple ? data.items.find((i) => i.type === m.id) : undefined
-    if (existing) return setOpen(existing.id)
-    const next = newTarget(m, data.items, preset)
-    setDraft(next)
-    setOpen(next.id)
-  }
+  // Coming back from /connectors/new: build the draft once and swap ?add for ?open.
+  const started = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (!add) return
+    const key = `${add}:${preset ?? ""}`
+    if (started.current === key) return
+    started.current = key
+    const m = manifestFor(add)
+    const existing = m && !m.multiple ? data.items.find((i) => i.type === m.id) : undefined
+    const next = m && !existing ? newTarget(m, data.items, presetFor(m, preset)) : null
+    if (next) setDraft(next)
+    void navigate({ search: (prev) => ({ ...prev, add: undefined, preset: undefined, open: existing?.id ?? next?.id }), replace: true })
+  }, [add, preset, data.items, navigate])
 
   const visible = data.items
   const layoutIndex = v ? v - 1 : DEFAULT_CONNECTOR_LAYOUT
@@ -123,7 +129,7 @@ function ConnectorsPage() {
         title={t("connectors.title")}
         description={t("connectors.description")}
         actions={
-          <Button onClick={() => setCatalogOpen(true)}>
+          <Button render={<Link to="/connectors/new" />}>
             <PlusIcon data-icon="inline-start" />
             {t("connectors.add")}
           </Button>
@@ -141,7 +147,7 @@ function ConnectorsPage() {
             <EmptyDescription>{t("connectors.emptyBody")}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button onClick={() => setCatalogOpen(true)}>
+            <Button render={<Link to="/connectors/new" />}>
               <PlusIcon data-icon="inline-start" />
               {t("connectors.add")}
             </Button>
@@ -161,7 +167,6 @@ function ConnectorsPage() {
           onChange={(i) => void navigate({ search: (prev) => ({ ...prev, v: i + 1 }), replace: true })}
         />
       )}
-      <Catalog open={catalogOpen} onOpenChange={setCatalogOpen} items={data.items} onPick={startNew} />
       <ConnectorSheet
         open={!!openId && !!target}
         onOpenChange={(o) => {
@@ -172,52 +177,6 @@ function ConnectorsPage() {
         appUrl={data.appUrl}
       />
     </>
-  )
-}
-
-function Catalog({ open, onOpenChange, items, onPick }: { open: boolean; onOpenChange: (o: boolean) => void; items: Item[]; onPick: (m: ConnectorManifest, preset?: NonNullable<ConnectorManifest["presets"]>[number]) => void }) {
-  const t = useT()
-  return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} title={t("connectors.add")} description={t("connectors.catalog")}>
-      <Command>
-      <CommandInput placeholder={t("connectors.catalog")} />
-      <CommandList>
-        <CommandEmpty>{t("command.empty")}</CommandEmpty>
-        {GROUPS.map(({ kind, label }) => {
-          const list = manifests.filter((m) => m.kind === kind)
-          if (!list.length) return null
-          return (
-            <CommandGroup key={kind} heading={t(label)}>
-              {list.flatMap((m) => {
-                const Icon = connectorIcon(m.icon)
-                const added = !m.multiple && items.some((i) => i.type === m.id)
-                const main = (
-                  <CommandItem key={m.id} value={`${m.name} ${m.id} ${m.summary}`} onSelect={() => onPick(m)}>
-                    <Icon aria-hidden="true" />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate">{m.name}</span>
-                      <span className="truncate text-caption text-muted-foreground">{m.summary}</span>
-                    </span>
-                    {added && <Badge variant="outline">{t("connectors.added")}</Badge>}
-                  </CommandItem>
-                )
-                const presets = (m.presets ?? []).map((p) => (
-                  <CommandItem key={`${m.id}-${p.id}`} value={`${p.label} ${m.name} preset`} onSelect={() => onPick(m, p)}>
-                    <Icon aria-hidden="true" />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate">{p.label}</span>
-                      <span className="truncate text-caption text-muted-foreground">{t("connectors.presetHint", { name: m.name })}</span>
-                    </span>
-                  </CommandItem>
-                ))
-                return [main, ...presets]
-              })}
-            </CommandGroup>
-          )
-        })}
-      </CommandList>
-      </Command>
-    </CommandDialog>
   )
 }
 

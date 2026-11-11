@@ -148,7 +148,7 @@ function ConnectorSummary({ connectors }: { connectors: HomeConnector[] }) {
               <EmptyDescription>{t("connectors.emptyBody")}</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Button size="sm" render={<Link to="/connectors" />}>
+              <Button size="sm" render={<Link to="/connectors/new" />}>
                 {t("connectors.add")}
               </Button>
             </EmptyContent>
