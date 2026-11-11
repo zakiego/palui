@@ -307,6 +307,15 @@ function SheetBody({
       </FieldGroup>
       )}
 
+      {m.multiple && (
+        <Field orientation="horizontal">
+          <Switch id={`${target.id}-trust`} checked={trust === "external"} onCheckedChange={(v) => (setTrust(v ? "external" : "own"), setDirty(true))} />
+          <FieldLabel htmlFor={`${target.id}-trust`} className="font-normal">
+            {t("connectors.trustLabel")}
+          </FieldLabel>
+        </Field>
+      )}
+
       {actionSteps.map((step) => (
         <FieldSet key={step.action} className="gap-3">
           <FieldLegend variant="label">{step.label}</FieldLegend>
@@ -384,14 +393,6 @@ function SheetBody({
             </AlertDialog>
           </section>
         </>
-      )}
-      {m.multiple && (
-        <Field orientation="horizontal">
-          <Switch id={`${target.id}-trust`} checked={trust === "external"} onCheckedChange={(v) => (setTrust(v ? "external" : "own"), setDirty(true))} />
-          <FieldLabel htmlFor={`${target.id}-trust`} className="font-normal">
-            {t("connectors.trustLabel")}
-          </FieldLabel>
-        </Field>
       )}
     </ResponsiveSheet>
   )

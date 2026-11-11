@@ -1,0 +1,178 @@
+---
+title: Host commands
+description: Let Palui run an allowlist of CLI commands on the Docker host through the host bridge, a small MCP server you install next to Docker.
+---
+
+Palui's containers can't run programs on the machine Docker runs on. The host bridge closes that gap on purpose and narrowly. It's a small MCP server that runs on the host, outside Docker. It turns each command you list in its config into one tool. Palui connects to it like any other [MCP server](/docs/connectors/mcp).
+
+Nothing runs that isn't in the allowlist. Commands run without a shell, so pipes, `;` and `$(...)` are plain text. The model can only fill in the params you declare, and each value is checked against an enum or a pattern. If you want Palui to run anything at all, there's an opt-in [escape hatch](#allow-any-command-dangerous).
+
+The installer uses launchd, so it's macOS only. The bridge itself runs anywhere Node 24 does.
+
+## Install
+
+On the Docker host, from a checkout of the repository:
+
+```bash
+ops/install-host-bridge.sh
+```
+
+The script:
+
+1. Builds the bridge into one file, `~/selfhost/bin/palui-host-bridge.mjs`.
+2. On the first run, writes `~/.config/palui/host-bridge.json` with a fresh token and two read-only starter commands. The token is printed, and it's always the `token` field in that file.
+3. Installs a LaunchAgent that keeps the bridge running on `127.0.0.1:4893`, then checks that it answers. The log is `~/selfhost/palui-host-bridge.log`.
+
+The bridge listens on loopback only. Docker Desktop and OrbStack route `host.docker.internal` to the host's loopback, so the runtime container still reaches it.
+
+The LaunchAgent pins the `node` binary the script found. Rerun the script after upgrading Node, or after removing that version with nvm.
+
+## Connect it in Palui
+
+1. On the Connectors page, choose Add connector, then MCP server, then the Host commands preset. The URL is `http://host.docker.internal:4893/mcp`.
+2. Paste the token and press Connect.
+3. Press Load tools. Check the class of each tool, then press Save tool settings. Until you save, Palui treats every tool as destructive and asks before each call.
+
+The preset leaves the "External server" switch off, which means trust is `own`. That fits when every command only reports on your own machine. Turn the switch on if any command returns text written by someone else, like `curl`, mail or web server logs. Then that text [taints the turn](/docs/concepts/taint-rule), and write tools ask first.
+
+## The allowlist
+
+Each entry in `commands` becomes one tool:
+
+```json
+{
+  "token": "<at least 32 characters>",
+  "commands": [
+    {
+      "name": "git_log",
+      "title": "Recent commits of a repo on the Mac mini",
+      "description": "Show recent commits of a repo in ~/Code.",
+      "class": "read",
+      "command": "/usr/bin/git",
+      "cwd": "~/Code",
+      "args": ["-C", "{repo}", "log", "--oneline", "-n", "{count}"],
+      "params": {
+        "repo": { "pattern": "[\\w-]+", "description": "Folder name in ~/Code" },
+        "count": { "pattern": "\\d{1,3}", "optional": true }
+      },
+      "timeoutMs": 10000
+    }
+  ]
+}
+```
+
+| Field | Notes |
+|---|---|
+| `name` | The tool name: lowercase letters, digits and `_`. Palui calls it `mcp-<slug>__<name>`. |
+| `title` | What you see in the tool table, the chat transcript and approval prompts. Say what it does and where, especially for write and destructive commands. Default: `Host: <name>`. |
+| `description` | What the model reads to decide when to call it. |
+| `class` | `read`, `write` or `destructive`. It prefills the tool's class in Palui. See [Tool classes](/docs/concepts/tool-classes). |
+| `command` | An absolute path (or `~/...`). Bare names are refused, since launchd's `PATH` is minimal. |
+| `args` | Fixed args. There's no shell, so `~` and globs in args stay literal. `{param}` is replaced inside an arg. An arg that is exactly `{...param}` spreads a list param into several args. |
+| `params` | One entry per placeholder. Each has exactly one of `enum` or `pattern`. |
+| `cwd`, `env` | Optional working directory and extra environment variables. |
+| `timeoutMs` | Default 30 s, at most 10 min. The bridge kills the whole process group when it runs out. |
+| `maxOutputBytes` | Default 16 KB per stream. Longer output keeps its first and last half, since errors are usually at the end. |
+| `okExitCodes` | Exit codes that count as success. Default `[0]`. Use `[0, 1]` for `grep`, which exits 1 when nothing matches. |
+| `note` | Free text for yourself, since JSON has no comments. Allowed on the file, each command and each param. |
+
+Each param can also set:
+
+| Field | Notes |
+|---|---|
+| `optional` | An arg that mentions a missing optional param is dropped. |
+| `list` | The value is a list of strings, used with `{...param}`. |
+| `allowDash` | Values starting with `-` are refused unless this is on, so a value can't become a flag like `--exec=...`. |
+
+Patterns are anchored, so the whole value has to match. Control characters are always refused. Unknown keys are errors, so a typo like `"timeout"` is caught instead of silently ignored.
+
+<Callout type="warn" title="What you list is what the model can do">
+  A tool can run anything its command can, with your user's permissions. Prefer narrow commands with enum params over a general one with a loose pattern. Never list a shell (`/bin/sh -c`, `bash`) with a param in its script.
+</Callout>
+
+## Allow any command (dangerous)
+
+If you'd rather not write an allowlist, turn on `dangerouslyAllowAnyCommand` at the top of the config:
+
+```json
+{
+  "token": "...",
+  "dangerouslyAllowAnyCommand": true,
+  "commands": []
+}
+```
+
+This adds one tool, `shell`, that runs any command line the model writes through your login shell (`$SHELL -lc "<command>"`). Pipes, redirects and multi-line scripts work, and `PATH` comes from your profile, so Homebrew tools resolve. It runs as your user, with everything your user can do.
+
+Use an object instead of `true` to tune it:
+
+| Field | Notes |
+|---|---|
+| `shell` | Absolute path. Default: `$SHELL`, else `/bin/zsh`, else `/bin/sh`. |
+| `cwd` | Default working directory. Default: your home folder. The model can pass its own `cwd` per call. |
+| `timeoutMs` | Default 2 min, at most 10 min. |
+| `maxOutputBytes` | Default 16 KB per stream. |
+
+The tool is always marked destructive, so with the class left as `destructive` in Palui, every call asks first and shows the exact command:
+
+```text
+Boleh aku jalanin Run any shell command on the host? (aksi destruktif)
+{"command":"brew upgrade && brew cleanup"}
+```
+
+<Callout type="error" title="This hands your machine to the model">
+  Keep the `shell` tool's class at `destructive` in the dashboard, so nothing runs without your yes. Never lower it to `read` or `write`: a prompt injection in any text Palui reads (a web page, an email, a hook payload) could then run commands without asking. `check` and the bridge log print a DANGER line while this is on, and every call is logged with its command.
+</Callout>
+
+You can keep allowlisted commands next to it. Narrow `read` tools still run without asking, and `shell` covers the rest. A command can't be named `shell` while this is on.
+
+## Change the allowlist
+
+1. Edit `~/.config/palui/host-bridge.json`.
+2. Check it. Errors name the command and the key.
+
+   ```bash
+   node ~/selfhost/bin/palui-host-bridge.mjs check
+   ```
+
+3. Restart the bridge:
+
+   ```bash
+   launchctl kickstart -k gui/$(id -u)/com.zakiego.palui-host-bridge
+   ```
+
+4. In Palui, open the connector and press Reload in the tool table. Check the new tool's class, then press Save tool settings.
+
+## What you see in chat
+
+Read tools run right away. Write tools ask first when the turn is tainted, and destructive tools always ask, with the tool's `title` and its args:
+
+```text
+Boleh aku jalanin Restart nginx on the Mac mini? (aksi destruktif)
+{"service":"nginx"}
+```
+
+The model gets the exit status first, then stdout and stderr:
+
+```text
+exit 0
+--- stdout ---
+18:02  up 1 day,  6:08, 1 user, load averages: 4.14 4.13 3.69
+```
+
+An exit code outside `okExitCodes`, or a timeout, is reported as a tool error, so the model knows the command failed. Every call is logged with its args, exit code and duration.
+
+## Troubleshooting
+
+Start with:
+
+```bash
+node ~/selfhost/bin/palui-host-bridge.mjs status
+tail -n 20 ~/selfhost/palui-host-bridge.log
+```
+
+- Connection refused, or the connector shows a fetch error. The bridge isn't running. A config error makes it exit, and launchd retries every 30 s, so every host tool is down until you fix it. Run `check`, fix what it names, then restart.
+- 401 from the server. The token in Palui doesn't match the `token` field in the config. Paste it again in the connector.
+- A new tool doesn't show up. Restart the bridge, then press Reload in the connector's tool table. Test only counts tools.
+- The bridge stopped after a Node upgrade. The LaunchAgent still points at the old `node`. Rerun `ops/install-host-bridge.sh`.
+- Every call asks for approval. The tool classes aren't saved. Open the connector, press Save tool settings.

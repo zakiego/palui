@@ -11,9 +11,18 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
+### Added
+
+- Palui can run CLI commands on the Docker host through the new host bridge, a small MCP server you install with `ops/install-host-bridge.sh` and connect with the Host commands preset. Only commands you list in `~/.config/palui/host-bridge.json` run, with the values the model fills in checked against your patterns.
+- The host bridge has an opt-in `dangerouslyAllowAnyCommand` setting that adds a `shell` tool for any command line. It's marked destructive, so every call asks first.
+
 ### Changed
 
 - Add connector is now its own page (`/app/connectors/new`) instead of a dialog. The MCP server has its own section that separates Custom (any URL you set up yourself) from the presets, and each preset shows the host it connects to.
+
+### Fixed
+
+- The MCP tool table now lets you save tool classes you didn't change. Before, Save stayed disabled, so every tool from a new MCP server asked for approval as destructive. The "External server" switch moved up next to the tool table.
 
 ## 0.2.0 (2026-11-11)
 

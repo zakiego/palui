@@ -359,7 +359,9 @@ function PickContainer(props: WizardActionProps) {
   )
 }
 
-type ToolRow = { name: string; description: string; suggestedClass: ToolClass; enabled: boolean; class: ToolClass }
+// `saved`: the owner has saved a pref for this tool. Until then the runtime
+// offers it as destructive, whatever the table shows (fail closed).
+type ToolRow = { name: string; title: string; description: string; suggestedClass: ToolClass; enabled: boolean; class: ToolClass; saved: boolean }
 type ToolClass = "read" | "write" | "destructive"
 const CLASSES: ToolClass[] = ["read", "write", "destructive"]
 const asClass = (v: Json | undefined): ToolClass => (v === "read" || v === "write" ? v : "destructive")
@@ -382,10 +384,12 @@ function ListTools(props: WizardActionProps) {
         .filter((t): t is JsonObject => !!t && typeof t === "object" && !Array.isArray(t))
         .map((t) => ({
           name: str(t.name) ?? "",
+          title: str(t.title) ?? "",
           description: str(t.description) ?? "",
           suggestedClass: asClass(t.suggestedClass),
           enabled: t.enabled === true,
           class: asClass(t.class ?? t.suggestedClass),
+          saved: t.saved === true,
         }))
         .filter((t) => t.name),
     )
@@ -406,6 +410,7 @@ function ListTools(props: WizardActionProps) {
       if (!res.ok) toast.error(res.message)
       else {
         toast.success("Tool settings saved")
+        setTools((prev) => prev?.map((t) => ({ ...t, saved: true })) ?? null)
         setDirty(false)
         void router.invalidate()
       }
@@ -426,6 +431,7 @@ function ListTools(props: WizardActionProps) {
   const q = query.trim().toLowerCase()
   const shown = q ? tools.filter((t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)) : tools
   const enabledCount = tools.filter((t) => t.enabled).length
+  const unsaved = tools.filter((t) => !t.saved).length
 
   return (
     <div className="flex flex-col gap-3">
@@ -469,6 +475,7 @@ function ListTools(props: WizardActionProps) {
             {shown.map((t) => (
               <TableRow key={t.name}>
                 <TableCell className="max-w-0 whitespace-normal">
+                  {t.title && <span className="block text-sm">{t.title}</span>}
                   <span className="block font-mono text-caption break-all">{t.name}</span>
                   {t.description && <span className="line-clamp-2 text-caption text-muted-foreground">{t.description}</span>}
                   {t.class !== t.suggestedClass && <Badge variant="outline">suggested {t.suggestedClass}</Badge>}
@@ -484,8 +491,14 @@ function ListTools(props: WizardActionProps) {
           </TableBody>
         </Table>
       )}
+      {unsaved > 0 && (
+        <p className="text-caption text-muted-foreground">
+          {unsaved === 1 ? "1 tool isn't saved yet" : `${unsaved} tools aren't saved yet`}. Until you save, Palui treats{" "}
+          {unsaved === 1 ? "it" : "them"} as destructive and asks before every call.
+        </p>
+      )}
       <div className="flex gap-2">
-        <Button size="sm" disabled={!dirty || saving} onClick={() => void save()}>
+        <Button size="sm" disabled={(!dirty && unsaved === 0) || saving} onClick={() => void save()}>
           {saving && <Spinner data-icon="inline-start" />}
           Save tool settings
         </Button>

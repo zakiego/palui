@@ -81,7 +81,7 @@ function newTarget(m: ConnectorManifest, existing: Item[], preset?: Preset): She
     config: (preset?.config ?? {}) as SheetTarget["config"],
     secrets: {},
     secretsError: null,
-    trust: (preset?.config?.trust as "own" | "external" | undefined) ?? m.trust ?? "own",
+    trust: preset?.trust ?? m.trust ?? "own",
   }
 }
 
