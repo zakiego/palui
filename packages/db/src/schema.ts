@@ -140,6 +140,8 @@ export const connectors = sqliteTable("connectors", {
 // --- Channels, chats, sessions, messages ------------------------------------------
 
 export type Channel = "telegram" | "whatsapp" | "web"
+export const REPLY_MODES = ["mention", "all"] as const
+export type ReplyMode = (typeof REPLY_MODES)[number]
 
 export const identities = sqliteTable(
   "identities",
@@ -184,6 +186,9 @@ export const chats = sqliteTable(
     allowed: bool("allowed").notNull().default(true),
     // The agent that answers here; null means the default agent (Palui).
     agentId: text("agent_id"),
+    // Groups only: "mention" answers @mentions and replies to the bot, "all"
+    // answers every message. DMs always answer every message.
+    replyMode: text("reply_mode").$type<ReplyMode>().notNull().default("mention"),
     lastMessageAt: integer("last_message_at"),
     createdAt: integer("created_at").notNull(),
   },

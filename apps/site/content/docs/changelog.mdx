@@ -11,7 +11,17 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- Groups have a reply mode: mentions only (the default) or every message. Set it with `/reply all` and `/reply mention` in the group, or with the new select on the Chats page. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
+- Setting up a WhatsApp group no longer needs the dashboard. Mention Palui in a new group and it replies with your agents and the `/agent <slug>` to send. Before, every message in a group that wasn't allowed yet was dropped, `/agent` included.
+- The Chats page marks chats whose "Answer here" is off as Off.
+
+### Changed
+
+- Picking an agent for a chat, Palui included, turns the chat on. You no longer have to flip "Answer here" as well.
+- In a group that has no agent, your own messages now need a mention like everyone else's, unless the group's reply mode is every message. That includes phrases meant for a flow's chat trigger; commands still work without one.
+- In a WhatsApp group that's still off, only `/agent`, `/reply`, `/help` and `/id` run.
 
 ## 0.7.0 (2026-11-12)
 

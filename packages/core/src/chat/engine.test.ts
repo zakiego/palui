@@ -99,16 +99,48 @@ describe("router: ownership", () => {
     expect(db.select().from(messages).where(eq(messages.id, r!.messageId)).get()!.status).toBe("handled")
   })
 
-  it("drops messages in a WhatsApp chat outside the allowlist", async () => {
+  it("keeps a new WhatsApp group off until the owner picks an agent from inside it", async () => {
     const db = memoryDb()
     setWhatsAppOwner(db, "08123456789")
     const wa = fakeChannel("whatsapp")
     const h = await harness({ db, registry: { whatsapp: channelRuntime("whatsapp", wa) }, rows: { whatsapp: "channel" } })
-    const r = await h.engine.inbound({ channel: "whatsapp", connectorId: "whatsapp", chatKind: "group", chatExternalId: "123@g.us", senderExternalId: "628123456789@s.whatsapp.net", text: "halo", at: 0 })
+    const owner = { channel: "whatsapp", connectorId: "whatsapp", chatKind: "group", chatExternalId: "123@g.us", senderExternalId: "628123456789@s.whatsapp.net", at: 0 } as const
+    const lastText = () => db.select().from(outbox).orderBy(sql`rowid`).all().at(-1)?.payload.text
+    // Chatter nobody addressed to the agent is dropped before it's stored.
+    expect(await h.engine.inbound({ ...owner, text: "halo" })).toBeNull()
+    // A mention gets the setup prompt, and the group stays off.
+    const r = await h.engine.inbound({ ...owner, text: "halo @Palui", addressed: true })
+    await h.engine.idle()
+    expect(db.select().from(messages).where(eq(messages.id, r!.messageId)).get()!.status).toBe("handled")
+    expect(lastText()).toContain("Aku belum aktif di grup ini. Pilih siapa yang jawab:")
+    expect(lastText()).toContain("• /agent palui: Palui, cuma jawab kamu")
+    expect(db.select().from(chats).where(eq(chats.externalId, "123@g.us")).get()!.allowed).toBe(false)
+    // Only the setup commands run while it's off, and a path isn't a mention.
+    const sent = db.select().from(outbox).all().length
+    for (const text of ["/status", "/Users/me/notes.txt"]) {
+      const m = await h.engine.inbound({ ...owner, text })
+      await h.engine.idle()
+      expect(db.select().from(messages).where(eq(messages.id, m!.messageId)).get()!.status).toBe("ignored")
+    }
+    expect(db.select().from(outbox).all().length).toBe(sent)
+    // The owner's /agent turns it on, no dashboard needed.
+    await h.engine.inbound({ ...owner, text: "/agent palui" })
+    await h.engine.idle()
+    expect(db.select().from(chats).where(eq(chats.externalId, "123@g.us")).get()).toMatchObject({ allowed: true, agentId: null })
+    expect(lastText()).toBe("Oke, Palui yang jawab di sini, cuma buat kamu.")
+  })
+
+  it("never answers a guest or a button in a WhatsApp group that's off", async () => {
+    const db = memoryDb()
+    setWhatsAppOwner(db, "08123456789")
+    const h = await harness({ db, registry: { whatsapp: channelRuntime("whatsapp", fakeChannel("whatsapp")) }, rows: { whatsapp: "channel" } })
+    const chat = ensureChat(db, { channel: "whatsapp", externalId: "123@g.us", kind: "group", allowed: false })
+    const r = await h.engine.inbound({ channel: "whatsapp", connectorId: "whatsapp", chatKind: "group", chatExternalId: "123@g.us", senderExternalId: "628123456789@s.whatsapp.net", text: "", callback: { data: "approve:apr_x" }, at: 0 })
     await h.engine.idle()
     const row = db.select().from(messages).where(eq(messages.id, r!.messageId)).get()!
-    expect(row.status).toBe("ignored")
+    expect(row).toMatchObject({ chatId: chat.id, status: "ignored" })
     expect(row.ignoreReason).toContain("allowlist")
+    expect(await h.engine.inbound({ channel: "whatsapp", connectorId: "whatsapp", chatKind: "group", chatExternalId: "123@g.us", senderExternalId: "62899@s.whatsapp.net", text: "halo", addressed: true, at: 0 })).toBeNull()
   })
 })
 

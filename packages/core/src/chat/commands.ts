@@ -5,7 +5,7 @@ import { getSetting } from "../settings"
 import { activePause, formatClock, tokensToday, getUsage, usageKeys } from "../budget"
 import { eq } from "drizzle-orm"
 import { chats } from "@palui/db"
-import { rotateSession, type ChatRow } from "../chats"
+import { rotateSession, setReplyMode, type ChatRow } from "../chats"
 import { autoSave, findMemory } from "../memory"
 import { channelName, ownerChat, selfChannelOffUndo } from "../connectors/rules"
 import { getConnector, listConnectors, pauseConnector, resumeConnector } from "../connectors/store"
@@ -62,6 +62,8 @@ export async function runCommand(ctx: EngineCtx, chat: ChatRow, name: CommandNam
       return cmdConnectors(ctx, chat, args)
     case "agent":
       return cmdAgent(ctx, chat, args)
+    case "reply":
+      return cmdReply(ctx, chat, args)
     case "report":
       return cmdReport(ctx, chat, args)
   }
@@ -88,23 +90,60 @@ export async function switchAgent(ctx: EngineCtx, chatId: string, agentId: strin
   return { ...r, changed: !same }
 }
 
+const REPLY_MODE_TEXT = { mention: "kalau di-mention atau di-reply", all: "semua pesan" } as const
+
 async function cmdAgent(ctx: EngineCtx, chat: ChatRow, args: string[]): Promise<CommandReply> {
   const { db } = ctx
   const current = agentForChat(db, chat)
   const arg = args[0]?.toLowerCase()
-  if (!arg) {
-    const lines = [`Agent di chat ini: ${current.name}`, "", "Agent yang ada:", ...listAgents(db).map((a) => `• ${a.slug}: ${a.name}${a.isDefault ? " (default)" : ""}`), "", "Ganti pakai /agent <slug>. Balik ke Palui: /agent off."]
-    return { text: lines.join("\n") }
+  const where = chat.kind === "group" ? "grup ini" : "chat ini"
+  // A chat on an agent's own bot keeps that agent.
+  const pickable = chat.connectorId ? [current] : listAgents(db)
+  const choices = () => pickable.map((a) => `• /agent ${a.slug}: ${a.name}${a.isDefault && isSharedChat(db, chat) ? ", cuma jawab kamu" : ""}`)
+  if (!arg && !chat.allowed) {
+    // The setup prompt: the first thing the owner sees in a new group.
+    const head = chat.channel === "whatsapp" ? `Aku belum aktif di ${where}.` : `Orang lain di ${where} belum dijawab.`
+    const more = chat.connectorId ? [] : ["", "Agent baru bisa dibikin di dashboard, menu Agents."]
+    return { text: [`${head} Pilih siapa yang jawab:`, ...choices(), ...more].join("\n") }
   }
-  if (chat.connectorId) return { text: `Chat ini masuk lewat bot milik ${current.name}, jadi agent-nya tetap.` }
+  if (!arg) {
+    const mode = chat.kind === "group" ? [`Jawab ${REPLY_MODE_TEXT[chat.replyMode]}. Ganti pakai /reply.`] : []
+    if (chat.connectorId) return { text: [`Agent di ${where}: ${current.name} (lewat bot-nya sendiri)`, ...mode].join("\n") }
+    return { text: [`Agent di ${where}: ${current.name}`, ...mode, "", "Agent yang ada:", ...choices(), "", "Balik ke Palui: /agent off."].join("\n") }
+  }
   const target = arg === "off" ? getDefaultAgent(db) : getAgentBySlug(db, arg)
+  if (chat.connectorId && target?.id !== current.id) return { text: `Chat ini masuk lewat bot milik ${current.name}, jadi agent-nya tetap.` }
   if (!target) return { text: `Gak ada agent \`${arg}\`. Cek daftarnya pakai /agent.` }
-  if (target.id === current.id) return { text: `Udah pakai ${target.name}.` }
-  await switchAgent(ctx, chat.id, target.isDefault ? null : target.id)
+  if (target.id === current.id && chat.allowed) return { text: `Udah pakai ${target.name}.` }
+  const { changed } = await switchAgent(ctx, chat.id, target.isDefault ? null : target.id)
+  const fresh = changed ? " Mulai sesi baru." : ""
   const shared = isSharedChat(db, chat)
-  if (target.isDefault) return { text: shared ? "Oke, balik ke Palui. Di sini cuma kamu yang aku jawab." : "Oke, balik ke Palui. Mulai sesi baru." }
-  const who = shared ? (chat.kind === "group" ? " Orang lain di grup ini bisa ngobrol sama dia kalau mention atau reply pesannya." : " Orang di chat ini sekarang dijawab sama dia.") : ""
-  return { text: `Oke, sekarang ${target.name} yang jawab di sini. Mulai sesi baru.${who}` }
+  if (target.isDefault) return { text: shared ? `Oke, ${target.name} yang jawab di sini, cuma buat kamu.${fresh}` : `Oke, ${target.name} yang jawab di sini.${fresh}` }
+  if (chat.kind === "group") {
+    const mode = chat.replyMode === "all" ? "Dia jawab semua pesan di grup ini." : "Dia jawab kalau di-mention atau di-reply. Biar jawab semua pesan: /reply all"
+    return { text: `Oke, sekarang ${target.name} yang jawab di sini.${fresh}\n${mode}` }
+  }
+  const who = shared ? " Orang di chat ini sekarang dijawab sama dia." : ""
+  return { text: `Oke, sekarang ${target.name} yang jawab di sini.${fresh}${who}` }
+}
+
+// Groups only (PLAN 19.2): answer @mentions and replies, or every message.
+function cmdReply(ctx: EngineCtx, chat: ChatRow, args: string[]): CommandReply {
+  if (chat.kind !== "group") return { text: "Di chat pribadi semua pesan selalu dijawab. /reply cuma buat grup." }
+  const name = agentForChat(ctx.db, chat).name
+  const arg = args[0]?.toLowerCase()
+  if (!arg) {
+    const other = chat.replyMode === "all" ? "mention" : "all"
+    return { text: `${name} jawab ${REPLY_MODE_TEXT[chat.replyMode]}. Ganti: /reply ${other}` }
+  }
+  if (arg !== "all" && arg !== "mention") return { text: "Pilih /reply all atau /reply mention." }
+  setReplyMode(ctx.db, chat.id, arg)
+  const off = chat.allowed ? "" : "\nGrup ini belum nyala. Pilih agent dulu: /agent"
+  if (arg === "mention") return { text: `Oke, ${name} sekarang cuma jawab ${REPLY_MODE_TEXT.mention}.${off}` }
+  // A Telegram bot with privacy mode on never sees messages that don't mention
+  // it, and the change only reaches groups it joins afterwards.
+  const tg = chat.channel === "telegram" ? "\nDi Telegram, matiin dulu privacy mode bot-nya di @BotFather, lalu keluarin dan masukin lagi bot-nya ke grup." : ""
+  return { text: `Oke, ${name} sekarang jawab semua pesan di grup ini.${off}${tg}` }
 }
 
 const REPORT_NOTE_TIP = "Lain kali tulis juga apa yang salah, biar lebih gampang dilacak: /report <apa yang salah>"

@@ -14,15 +14,25 @@ Palui is your personal agent. Its memory is your memory and its preferences are 
 ## Give a chat an agent
 
 1. Create the agent on the Agents page: a name, a slug like `chef`, and a persona.
-2. Pick it for a chat on the Chats page, or send `/agent chef` in that chat yourself.
+2. Send `/agent chef` in that chat, or pick it for the chat on the Chats page.
 
-That allows the chat and starts a new session. The old one is saved to the old agent's memory first, the same as `/new`. `/agent off` goes back to Palui, and other people stop getting answers.
+That turns the chat on and starts a new session. The old one is saved to the old agent's memory first, the same as `/new`. `/agent off` goes back to Palui, and other people stop getting answers.
 
-Someone who messages Palui in a chat you haven't set up gets no reply. The chat still shows up on the Chats page, so you can set it up.
+Someone who messages Palui in a chat you haven't set up gets no reply. The chat still shows up on the Chats page, marked Off, so you can set it up.
+
+## Add Palui to a WhatsApp group
+
+1. Add Palui's number to the group.
+2. Mention it. It replies with the agents you have and the command for each.
+3. Send one of them, like `/agent chef`.
+
+A new WhatsApp group stays off until you do. Until then Palui answers your mentions there with that list and nothing else.
 
 ## Groups
 
-In a group, an agent answers only when someone @mentions Palui's number (or the agent's own bot) or replies to one of its messages. Everything else in the group is ignored and never stored. That applies to you too, except for commands.
+In a group, an agent answers when someone @mentions Palui's number (or the agent's own bot) or replies to one of its messages. Everything else is ignored and never stored. That applies to you too, except for commands.
+
+To have it answer every message instead, send `/reply all` in the group, or pick "Every message" on the Chats page. `/reply mention` goes back. A Telegram bot only sees every message after you turn off its privacy mode in BotFather and add it to the group again.
 
 Every message records who sent it. The model sees other people's messages as `[Name]: ...` and yours as `[Owner]: ...`, and it's told that only `[Owner]` lines come from you.
 

@@ -1,0 +1,1 @@
+ALTER TABLE `chats` ADD `reply_mode` text DEFAULT 'mention' NOT NULL;

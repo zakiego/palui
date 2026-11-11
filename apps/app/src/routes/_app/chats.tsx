@@ -4,7 +4,7 @@
 // calls sit inline and collapsible; pending approvals show Approve/Deny.
 import * as React from "react"
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
-import { ArrowUpIcon, CircleAlertIcon, CopyIcon, HashIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SearchIcon, SendIcon, ShieldAlertIcon, SquareIcon, MessageCircleIcon, WebhookIcon } from "lucide-react"
+import { ArrowUpIcon, AtSignIcon, CircleAlertIcon, CircleDashedIcon, CopyIcon, HashIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SearchIcon, SendIcon, ShieldAlertIcon, SquareIcon, MessageCircleIcon, WebhookIcon } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -33,7 +33,7 @@ import { CLASS_TONE, ToolTrace } from "@/components/tool-trace"
 import { AgentAvatar } from "@/components/agent-avatar"
 import { SimpleSelect } from "@/components/simple-select"
 import { Switch } from "@/components/ui/switch"
-import { setChatAgentFn, setChatAllowedFn } from "@/lib/fns/agents"
+import { setChatAgentFn, setChatAllowedFn, setChatReplyModeFn } from "@/lib/fns/agents"
 import { decideApproval, getChats, getTranscript, sendWebMessage, stopTurn } from "@/lib/fns/chats"
 import { ago, errorMessage } from "@/lib/format"
 import { markdownToPlain } from "@/lib/markdown"
@@ -189,6 +189,11 @@ function ChatList({ chats, activeId, onPick }: { chats: ChatRow[]; activeId: str
               </ItemTitle>
               <ItemDescription className="line-clamp-1 break-all">
                 <span className="sr-only">{c.channel}. </span>
+                {!c.allowed && c.channel !== "web" && (
+                  <StatusText icon={<CircleDashedIcon aria-hidden="true" />} className="mr-1.5 align-[-2px]">
+                    {t("chats.off")}
+                  </StatusText>
+                )}
                 {c.preview ? (c.previewRole === "assistant" ? markdownToPlain(c.preview) : c.preview) : t("chats.noMessages")}
               </ItemDescription>
             </ItemContent>
@@ -373,22 +378,27 @@ function AgentBar({ transcript }: { transcript: Transcript }) {
   const chat = transcript.chat
   const [agentId, setAgentId] = React.useState(transcript.agent.id)
   const [allowed, setAllowed] = React.useState(chat.allowed)
+  const [replyMode, setReplyMode] = React.useState(chat.replyMode)
   const [busy, setBusy] = React.useState(false)
   React.useEffect(() => setAgentId(transcript.agent.id), [transcript.agent.id])
   React.useEffect(() => setAllowed(chat.allowed), [chat.allowed])
+  React.useEffect(() => setReplyMode(chat.replyMode), [chat.replyMode])
 
   const pick = async (id: string) => {
     const next = transcript.agents.find((a) => a.id === id)
     if (!next || id === agentId) return
-    const before = agentId
+    const before = { agentId, allowed }
+    // Picking an agent turns the chat on.
     setAgentId(id)
+    setAllowed(true)
     setBusy(true)
     try {
       const r = await setChatAgentFn({ data: { chatId: chat.id, agentId: next.isDefault ? null : id } })
       toast.success(t(r.saved ? "chats.agentSaved" : "chats.agentSavedNoMemory", { name: next.name }))
       void router.invalidate()
     } catch (err) {
-      setAgentId(before)
+      setAgentId(before.agentId)
+      setAllowed(before.allowed)
       toast.error(errorMessage(err))
     } finally {
       setBusy(false)
@@ -402,6 +412,19 @@ function AgentBar({ transcript }: { transcript: Transcript }) {
       void router.invalidate()
     } catch (err) {
       setAllowed(!next)
+      toast.error(errorMessage(err))
+    }
+  }
+
+  const changeMode = async (next: string) => {
+    if (next !== "mention" && next !== "all") return
+    const before = replyMode
+    setReplyMode(next)
+    try {
+      await setChatReplyModeFn({ data: { chatId: chat.id, mode: next } })
+      void router.invalidate()
+    } catch (err) {
+      setReplyMode(before)
       toast.error(errorMessage(err))
     }
   }
@@ -422,12 +445,26 @@ function AgentBar({ transcript }: { transcript: Transcript }) {
             onChange={(id) => void pick(id)}
           />
         )}
+        {chat.kind === "group" && (
+          <SimpleSelect
+            size="sm"
+            className="w-fit min-w-0"
+            aria-label={t("chats.replyModeFor", { name: chat.title })}
+            value={replyMode}
+            options={[
+              { value: "mention", label: t("chats.replyMention"), icon: <AtSignIcon aria-hidden="true" /> },
+              { value: "all", label: t("chats.replyAll"), icon: <MessagesSquareIcon aria-hidden="true" /> },
+            ]}
+            onChange={(v) => void changeMode(v)}
+          />
+        )}
         <label className="flex items-center gap-2 text-sm">
-          <Switch checked={allowed} onCheckedChange={(v) => void toggle(v)} aria-label={t("chats.allowedFor", { name: chat.title })} />
+          <Switch checked={allowed} disabled={busy} onCheckedChange={(v) => void toggle(v)} aria-label={t("chats.allowedFor", { name: chat.title })} />
           {t("chats.allowed")}
         </label>
       </div>
       {transcript.shared && transcript.agent.isDefault && <p className="text-caption text-muted-foreground">{t("chats.guestsWaiting")}</p>}
+      {chat.channel === "telegram" && chat.kind === "group" && replyMode === "all" && <p className="text-caption text-muted-foreground">{t("chats.privacyMode")}</p>}
     </div>
   )
 }

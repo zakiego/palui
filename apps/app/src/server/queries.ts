@@ -110,7 +110,7 @@ export function transcript(db: DB, chatId: string, limit = 150) {
     .all()
     .map((a) => ({ id: a.id, tool: a.tool, class: a.toolClass, argsPreview: a.argsPreview, expiresAt: a.expiresAt }))
   return {
-    chat: { id: chat.id, channel: chat.channel, title: chat.title || chat.externalId, kind: chat.kind, agentId: chat.agentId, allowed: chat.allowed, connectorId: chat.connectorId },
+    chat: { id: chat.id, channel: chat.channel, title: chat.title || chat.externalId, kind: chat.kind, agentId: chat.agentId, allowed: chat.allowed, replyMode: chat.replyMode, connectorId: chat.connectorId },
     messages: items,
     approvals,
   }

@@ -235,8 +235,8 @@ export function deleteAgent(db: DB, id: string): boolean {
   return true
 }
 
-// Give a chat an agent (PLAN 19.2). A non-default agent also allows the chat.
-// The default agent can't go into a shared chat: its memory is the owner's.
+// Give a chat an agent (PLAN 19.2) and turn the chat on. The default agent
+// answers only the owner in a shared chat: its memory is the owner's.
 // The caller rotates the session (it saves the old one to memory first).
 export function assignAgent(db: DB, chatId: string, agentId: string | null): { chat: ChatRow; agent: AgentRow } {
   const chat = db.select().from(chats).where(eq(chats.id, chatId)).get()
@@ -244,11 +244,8 @@ export function assignAgent(db: DB, chatId: string, agentId: string | null): { c
   const agent = agentId ? getAgent(db, agentId) : getDefaultAgent(db)
   if (!agent) throw new AgentError(`No agent ${agentId}.`)
   if (chat.connectorId && agent.telegramConnectorId !== chat.connectorId) throw new AgentError("This chat came in on another agent's bot, so its agent is fixed.")
-  // Back to the default agent: guests stop being answered (they need an agent).
-  if (agent.isDefault) {
-    const updated = db.update(chats).set({ agentId: null }).where(eq(chats.id, chatId)).returning().get()
-    return { chat: updated, agent }
-  }
-  const updated = db.update(chats).set({ agentId: agent.id, allowed: true }).where(eq(chats.id, chatId)).returning().get()
+  // Picking an agent turns the chat on. Back to the default agent, guests stop
+  // being answered (they need an agent) but the owner still is.
+  const updated = db.update(chats).set({ agentId: agent.isDefault ? null : agent.id, allowed: true }).where(eq(chats.id, chatId)).returning().get()
   return { chat: updated, agent }
 }

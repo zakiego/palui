@@ -166,7 +166,7 @@ export function worst(k: Kit) {
   const jo = k.chat("telegram", "1000000001", "Jo")
   say(jo, "ok", now + 2 * H)
 
-  const family = k.chat("telegram", "-1001234567890", "Keluarga Besar Bani H. Abdurrahman Siddiq 👨‍👩‍👧‍👦 Banjarmasin, Martapura, Banjarbaru, Pelaihari (arisan, haul, dan info acara)", { kind: "group" })
+  const family = k.chat("telegram", "-1001234567890", "Keluarga Besar Bani H. Abdurrahman Siddiq 👨‍👩‍👧‍👦 Banjarmasin, Martapura, Banjarbaru, Pelaihari (arisan, haul, dan info acara)", { kind: "group", replyMode: "all" })
   // Seven characters, then emoji: the list's 140-character preview cut lands in the middle of one.
   say(family, `Wkwkwk ${"😂".repeat(80)}`, now - 50_000)
 
@@ -241,6 +241,9 @@ export function worst(k: Kit) {
   const link = k.chat("telegram", "-1009876543210", "t.me/northwind_industries_holdings_announcements_indonesia", { kind: "group" })
   say(link, "first.last+billing-notifications@example.com", now - 13 * D)
   k.assign(link, arisan, false)
+  // A WhatsApp group the owner just added the bot to: off, no agent, one unanswered mention.
+  const fresh = k.chat("whatsapp", "120363049876543210987654@g.us", "Finansial Keluarga & Tabungan Haji Bani Abdurrahman 2027", { kind: "group", allowed: false })
+  k.message(fresh, "user", "Halo @Palui Agent", now - 2 * MIN)
   // Not on the WhatsApp allowlist, and a chat that has never had a message.
   k.chat("whatsapp", "6281200000005@s.whatsapp.net", "Konstantin Oberhauser-Wettstein", { allowed: false, createdAt: now - 14 * D })
   k.chat("telegram", "1000000008", "María José de la Cruz y Fernández", { createdAt: now - 15 * D })

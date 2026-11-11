@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { memoryDb } from "@palui/db"
+import { eq } from "drizzle-orm"
+import { chats, memoryDb } from "@palui/db"
 import { AgentError, agentContainer, assignAgent, createAgent, deleteAgent, getDefaultAgent, listAgents, updateAgent } from "./agents"
 import { ensureChat, getChat } from "./chats"
 import { createInstruction, listInstructions } from "./notes/service"
@@ -56,7 +57,9 @@ describe("agents", () => {
     createInstruction(db, { title: "a", body: "b", agentId: chef.id })
     const group = ensureChat(db, { channel: "whatsapp", externalId: "1@g.us", kind: "group", allowed: false })
     expect(assignAgent(db, group.id, chef.id).chat).toMatchObject({ agentId: chef.id, allowed: true })
-    expect(assignAgent(db, group.id, null).chat.agentId).toBeNull()
+    db.update(chats).set({ allowed: false }).where(eq(chats.id, group.id)).run()
+    // Back to Palui still turns the chat on: Palui answers the owner there.
+    expect(assignAgent(db, group.id, null).chat).toMatchObject({ agentId: null, allowed: true })
     assignAgent(db, group.id, chef.id)
     deleteAgent(db, chef.id)
     expect(getChat(db, group.id)!.agentId).toBeNull()

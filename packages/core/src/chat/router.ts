@@ -50,18 +50,22 @@ export function senderCheck(db: DB, msg: InboundMessage, now = Date.now()): Send
   const owner = isOwner(db, { channel: msg.channel, externalId: msg.senderExternalId, altId: msg.senderAltId })
   const scope = chatScope(msg)
   let chat = findChat(db, msg.channel, msg.chatExternalId, scope)
-  const agentId = chat ? chat.agentId : scopeAgentId(db, scope)
   const group = msg.chatKind === "group"
+  // In a group the agent answers @mentions and replies to it, or every message
+  // once the chat is on and its reply mode is "all".
+  const addressed = !group || !!msg.addressed || (!!chat?.allowed && chat.replyMode === "all")
   if (owner) {
-    // In a group with an agent, the owner addresses it like everyone else. Commands and buttons always go through.
-    if (group && agentId && !msg.addressed && !msg.callback && !msg.text.trim().startsWith("/")) return { ok: false, reason: "Group message not addressed to the agent.", quiet: true }
+    // Commands and buttons always go through, even before the chat is set up.
+    if (!addressed && !msg.callback && !msg.text.trim().startsWith("/")) return { ok: false, reason: "Group message not addressed to the agent.", quiet: true }
     return { ok: true, fromOwner: true }
   }
   if (!chat) {
-    chat = ensureChat(db, { channel: msg.channel, externalId: msg.chatExternalId, title: msg.chatTitle, kind: msg.chatKind, allowed: false, connectorId: scope, agentId }, now)
+    chat = ensureChat(db, { channel: msg.channel, externalId: msg.chatExternalId, title: msg.chatTitle, kind: msg.chatKind, allowed: false, connectorId: scope, agentId: scopeAgentId(db, scope) }, now)
   }
-  if (group && !msg.addressed) return { ok: false, reason: "Group message not addressed to the agent.", quiet: true }
+  if (!addressed) return { ok: false, reason: "Group message not addressed to the agent.", quiet: true }
   if (!chat.allowed || !chat.agentId) {
+    // Chatter in an "all" group nobody set up for guests isn't worth an event.
+    if (group && !msg.addressed) return { ok: false, reason: "Group message in a chat that isn't set up for guests.", quiet: true }
     const who = `${msg.senderName ? `${msg.senderName} ` : ""}(${msg.senderExternalId}${msg.senderAltId ? `, alt ${msg.senderAltId}` : ""})`
     return { ok: false, reason: `Dropped a ${msg.channel} message from ${who}: not the owner, and this chat isn't set up for guests (allow it and give it an agent on the Chats page).` }
   }
@@ -127,9 +131,22 @@ export type RouteInput = {
   now: number
 }
 
+// The commands that work in a chat that's off (PLAN 19.2).
+const SETUP_COMMANDS = new Set<CommandName>(["agent", "reply", "help", "id"])
+
 export async function route(i: RouteInput): Promise<Route> {
   const blocked = chatCheck(i.chat)
-  if (blocked) return { kind: "ignore", reason: blocked }
+  if (blocked) {
+    // The owner sets a chat up from inside it: the setup commands still run, and
+    // anything else they address to the agent gets the setup prompt (/agent's
+    // list). Nothing else (status, usage, model calls) reaches a chat that's off.
+    if (i.fromOwner === false || i.content.hook || i.content.callback) return { kind: "ignore", reason: blocked }
+    const text = i.text.trim()
+    const cmd = parseCommand(text)
+    if (cmd && SETUP_COMMANDS.has(cmd.name)) return { kind: "command", ...cmd }
+    if (!cmd && i.chat.kind === "group" && text && !text.startsWith("/")) return { kind: "command", name: "agent", args: [] }
+    return { kind: "ignore", reason: blocked }
+  }
   if (i.content.hook) return { kind: "hook", hook: i.content.hook, text: i.text }
   if (i.fromOwner === false) {
     if (i.content.callback) return { kind: "ignore", reason: "A guest pressed a button; buttons are the owner's." }

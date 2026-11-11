@@ -27,8 +27,10 @@ Commands start with a slash. The router handles them before anything else, so th
 | `/report` | Replies with a debug snapshot of this chat to paste into a coding agent. |
 | `/report <note>` | Same, with your note on what went wrong at the top. |
 | `/agent` | Shows which agent answers in this chat and lists the agents. |
-| `/agent <slug>` | Gives this chat that agent, allows it and starts a new session. See [Agents](/docs/concepts/agents). |
+| `/agent <slug>` | Gives this chat that agent, turns it on and starts a new session. Works in a group Palui isn't answering yet. See [Agents](/docs/concepts/agents). |
 | `/agent off` | Goes back to Palui. Other people in this chat stop getting answers. |
+| `/reply all` | In a group, answers every message instead of only mentions and replies. |
+| `/reply mention` | In a group, answers only @mentions and replies to the agent again. This is the default. |
 
 `<id>` is the connector id shown by `/connectors`, for example `telegram`, `cliproxy` or `recall`.
 

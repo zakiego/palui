@@ -2,9 +2,9 @@
 // recall container and Telegram bot. The runtime reads them at the start of
 // every turn, so writes go straight to the table.
 import { AgentError, AGENT_COLORS, AGENT_ICONS, MAX_AVATAR_IMAGE, assignAgent, createAgent, deleteAgent, getAgentBySlug, listAgents, MAX_AGENT_NAME, MAX_PERSONA, updateAgent } from "@palui/core/agents"
-import { rotateSession } from "@palui/core/chats"
+import { rotateSession, setReplyMode } from "@palui/core/chats"
 import { listInstructions } from "@palui/core/notes/service"
-import { chats } from "@palui/db"
+import { chats, REPLY_MODES } from "@palui/db"
 import { createServerFn } from "@tanstack/react-start"
 import { eq, isNull } from "drizzle-orm"
 import { z } from "zod"
@@ -106,6 +106,16 @@ export const setChatAgentFn = createServerFn({ method: "POST" })
     } catch (err) {
       rethrow(err)
     }
+  })
+
+// Groups only: answer @mentions and replies, or every message. The runtime
+// reads the chat row on every inbound message, so this goes straight to the table.
+export const setChatReplyModeFn = createServerFn({ method: "POST" })
+  .validator(z.object({ chatId: z.string().min(1).max(100), mode: z.enum(REPLY_MODES) }))
+  .handler(async ({ data }) => {
+    const { db } = await requireWriter()
+    if (!setReplyMode(db, data.chatId, data.mode)) throw new Error("That chat doesn't exist anymore.")
+    return { ok: true }
   })
 
 export const setChatAllowedFn = createServerFn({ method: "POST" })

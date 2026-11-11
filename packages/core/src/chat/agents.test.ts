@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { chats, memoryDb, messages, outbox, pendingApprovals, reports, runs, type DB } from "@palui/db"
 import { createAgent, getDefaultAgent, updateAgent } from "../agents"
+import { setReplyMode } from "../chats"
 import { listEvents } from "../events"
 import { createInstruction, notesPrompt, setPreference } from "../notes/service"
 import { claimOwner, createClaim } from "../owner"
@@ -125,6 +126,80 @@ describe("agents: who gets answered", () => {
     await h.engine.idle()
     expect(h.db.select().from(chats).where(eq(chats.externalId, GROUP)).get()!.agentId).toBeNull()
     expect(await h.engine.inbound(guestMsg("@bot halo"))).toBeNull()
+  })
+})
+
+describe("agents: reply mode in groups", () => {
+  const groupChat = (db: DB) => db.select().from(chats).where(eq(chats.externalId, GROUP)).get()!
+
+  it("answers every message after /reply all, and only mentions again after /reply mention", async () => {
+    const h = await world([say("a"), say("b"), say("c")])
+    await h.engine.inbound(ownerInGroup("/agent chef"))
+    await h.engine.idle()
+    expect(outboxRows(h.db).at(-1)!.payload.text).toContain("Dia jawab kalau di-mention atau di-reply. Biar jawab semua pesan: /reply all")
+
+    await h.engine.inbound(ownerInGroup("/reply all"))
+    await h.engine.idle()
+    expect(groupChat(h.db).replyMode).toBe("all")
+    expect(outboxRows(h.db).at(-1)!.payload.text).toContain("privacy mode")
+
+    expect(await h.engine.inbound(guestMsg("ngobrol biasa", { addressed: false }))).not.toBeNull()
+    await h.engine.idle()
+    expect(promptText(h.m.prompts.at(-1))).toContain("[Budi]: ngobrol biasa")
+    expect(await h.engine.inbound(ownerInGroup("ngobrol juga"))).not.toBeNull()
+    await h.engine.idle()
+
+    await h.engine.inbound(ownerInGroup("/reply mention"))
+    await h.engine.idle()
+    expect(groupChat(h.db).replyMode).toBe("mention")
+    expect(await h.engine.inbound(guestMsg("lagi", { addressed: false }))).toBeNull()
+    expect(await h.engine.inbound(ownerInGroup("lagi juga"))).toBeNull()
+  })
+
+  it("needs the owner's mention too in a group with no agent", async () => {
+    const h = await world([say("a")])
+    expect(await h.engine.inbound(ownerInGroup("ngobrol"))).toBeNull()
+    expect(await h.engine.inbound(ownerInGroup("@bot halo", { addressed: true }))).not.toBeNull()
+  })
+
+  it("in an all group with no agent, answers the owner's every message and drops guests without an event", async () => {
+    const h = await world([say("a")])
+    await h.engine.inbound(ownerInGroup("/reply all"))
+    await h.engine.idle()
+    const events = listEvents(h.db).length
+    expect(await h.engine.inbound(guestMsg("ngobrol", { addressed: false }))).toBeNull()
+    expect(listEvents(h.db).length).toBe(events)
+    expect(await h.engine.inbound(ownerInGroup("halo"))).not.toBeNull()
+  })
+
+  it("on an agent's own bot, /agent offers only that agent and turns the chat on", async () => {
+    const h = await world()
+    updateAgent(h.db, h.chef.id, { telegramConnectorId: "tgbot-chef" })
+    const inBot = (text: string) => ownerInGroup(text, { connectorId: "tgbot-chef" })
+    await h.engine.inbound(guestMsg("@chef halo", { connectorId: "tgbot-chef" }))
+    await h.engine.inbound(inBot("/agent"))
+    await h.engine.idle()
+    expect(outboxRows(h.db).at(-1)!.payload.text).toBe("Orang lain di grup ini belum dijawab. Pilih siapa yang jawab:\n• /agent chef: Chef")
+    await h.engine.inbound(inBot("/agent off"))
+    await h.engine.idle()
+    expect(outboxRows(h.db).at(-1)!.payload.text).toBe("Chat ini masuk lewat bot milik Chef, jadi agent-nya tetap.")
+    await h.engine.inbound(inBot("/agent chef"))
+    await h.engine.idle()
+    expect(h.db.select().from(chats).where(eq(chats.connectorId, "tgbot-chef")).get()).toMatchObject({ allowed: true, agentId: h.chef.id })
+  })
+
+  it("doesn't open a group that's off, whatever its reply mode", async () => {
+    const h = await world()
+    expect(await h.engine.inbound(guestMsg("@bot halo"))).toBeNull()
+    setReplyMode(h.db, groupChat(h.db).id, "all")
+    expect(await h.engine.inbound(guestMsg("halo", { addressed: false }))).toBeNull()
+  })
+
+  it("/reply in a DM says it's only for groups", async () => {
+    const h = await world()
+    await h.engine.inbound(tgMessage("/reply all"))
+    await h.engine.idle()
+    expect(outboxRows(h.db).at(-1)!.payload.text).toBe("Di chat pribadi semua pesan selalu dijawab. /reply cuma buat grup.")
   })
 })
 

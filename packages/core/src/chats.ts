@@ -1,7 +1,7 @@
 // Chats and sessions (PLAN 9). A chat is one conversation on one channel; its
 // current session holds the summary and the messages in context.
 import { and, desc, eq, gte, inArray, like, lt, or, sql, type SQL } from "drizzle-orm"
-import { chats, messages, newId, sessions, type Channel, type DB } from "@palui/db"
+import { chats, messages, newId, sessions, type Channel, type DB, type ReplyMode } from "@palui/db"
 
 export type ChatRow = typeof chats.$inferSelect
 export type SessionRow = typeof sessions.$inferSelect
@@ -20,6 +20,11 @@ export function findChat(db: DB, channel: Channel, externalId: string, connector
     .from(chats)
     .where(and(eq(chats.channel, channel), eq(chats.connectorId, connectorId), eq(chats.externalId, externalId)))
     .get()
+}
+
+// Groups only (PLAN 19.2): answer @mentions and replies, or every message.
+export function setReplyMode(db: DB, chatId: string, mode: ReplyMode): ChatRow | undefined {
+  return db.update(chats).set({ replyMode: mode }).where(eq(chats.id, chatId)).returning().get()
 }
 
 // Find or create the chat and make sure it has an open session. `allowed` and

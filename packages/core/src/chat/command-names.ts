@@ -6,6 +6,7 @@ export const COMMANDS = {
   "/status": "status",
   "/connectors": "connectors",
   "/agent": "agent",
+  "/reply": "reply",
   "/help": "help",
   "/models": "models",
   "/model": "model",

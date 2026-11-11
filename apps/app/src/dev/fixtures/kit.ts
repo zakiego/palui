@@ -106,8 +106,9 @@ export function createKit(db: DB, now = Date.now()) {
       return ensureWebChat(db, now)
     },
 
-    chat(channel: Channel, externalId: string, title: string, opts: { kind?: "dm" | "group"; allowed?: boolean; createdAt?: number } = {}): ChatRow {
+    chat(channel: Channel, externalId: string, title: string, opts: { kind?: "dm" | "group"; allowed?: boolean; createdAt?: number; replyMode?: "mention" | "all" } = {}): ChatRow {
       const row = ensureChat(db, { channel, externalId, title, kind: opts.kind, allowed: opts.allowed }, opts.createdAt ?? now)
+      if (opts.replyMode) db.update(chats).set({ replyMode: opts.replyMode }).where(eq(chats.id, row.id)).run()
       // ensureChat skips an empty title on update and never sets these two.
       if (opts.createdAt !== undefined) db.update(chats).set({ createdAt: opts.createdAt }).where(eq(chats.id, row.id)).run()
       return row
