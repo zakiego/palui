@@ -1,5 +1,5 @@
 // Palui's mark: the mascot's head on an ink tile, the same drawing as the
-// favicon. apps/site/scripts/favicon.mjs writes that file, so the mark here
+// favicon. apps/site/scripts/brand-icons.mjs writes that file, so the mark here
 // can't drift from the tab icon or the site. It carries its own tile and
 // colors, so it looks the same in light and dark and needs no backdrop.
 import favicon from "../../public/app/favicon.svg?raw"
