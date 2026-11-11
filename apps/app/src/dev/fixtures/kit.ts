@@ -7,6 +7,8 @@ import { saveAttachment } from "@palui/core/attachments/service"
 import { setConnectorStatus, upsertConnector } from "@palui/core/connectors/store"
 import { getSetting, type Settings, setSetting } from "@palui/core/settings"
 import { addUsage, usageKeys } from "@palui/core/budget/index"
+import { localToUtc, utcToLocal } from "@palui/core/reminders/time"
+import { createRoutine, setPaused, type RoutineInput } from "@palui/core/routines/service"
 import {
   agents,
   chats,
@@ -19,6 +21,8 @@ import {
   pendingApprovals,
   preferences,
   reminders,
+  routineOccurrences,
+  routines,
   runs,
   schema,
   toolCalls,
@@ -26,6 +30,8 @@ import {
   type ConnectorStatus,
   type DB,
   type EventLevel,
+  type RoutineOccurrenceStatus,
+  type RoutineSourceState,
   type Trust,
 } from "@palui/db"
 import { encrypt } from "@palui/db/crypto"
@@ -214,6 +220,49 @@ export function createKit(db: DB, now = Date.now()) {
       bytes.write(newId("fx"), magic.length)
       const mimeType = values.kind === "pdf" ? "application/pdf" : "image/jpeg"
       saveAttachment(db, { chatId: values.chatId, title: values.title, description: values.description, mimeType, filename: values.filename, bytes }, key, values.createdAt ?? now)
+    },
+
+    // Through the service, so the stored config and schedule are what the agent
+    // would have made. `paused`: true for open-ended, a time to pause until.
+    routine(chatId: string, input: RoutineInput, opts: { state?: RoutineSourceState; paused?: true | number; lastError?: string; createdAt?: number } = {}) {
+      const at = opts.createdAt ?? now
+      const r = createRoutine(db, chatId, input, at, opts.state ? { state: opts.state, nextRefreshAt: now + 12 * H } : undefined)
+      if (opts.paused) setPaused(db, r.id, true, opts.paused === true ? null : opts.paused, now)
+      // Raw: a fixture may store a config the service would refuse today.
+      if (opts.lastError) db.update(routines).set({ lastError: opts.lastError }).where(eq(routines.id, r.id)).run()
+      return r.id
+    },
+
+    // A tool source's cached times for today and tomorrow, as a read would leave them.
+    toolState(tz: string, times: { key: string; label: string; time: string }[], days = 2): RoutineSourceState {
+      const today = utcToLocal(now, tz).slice(0, 10)
+      const dates = Array.from({ length: days }, (_, i) => utcToLocal(localToUtc(`${today}T12:00`, tz) + i * D, tz).slice(0, 10))
+      return { entries: dates.flatMap((date) => times.map((t) => ({ date, key: t.key, label: t.label, at: localToUtc(`${date}T${t.time}`, tz) }))), fetched: dates, failures: 0, lastOkAt: now }
+    },
+
+    routineOccurrence(routineId: string, chatId: string, values: { label: string; at: number; status: RoutineOccurrenceStatus; answer?: string; note?: string; followUps?: number; nextFollowUpAt?: number | null; deadlineAt?: number | null; fallback?: boolean }) {
+      const answeredAt = values.answer ? values.at + 7 * MIN : null
+      db.insert(routineOccurrences)
+        .values({
+          id: newId("rocc"),
+          routineId,
+          chatId,
+          key: `${values.at}:${values.label}`,
+          label: values.label,
+          scheduledAt: values.at,
+          firedAt: values.at,
+          status: values.status,
+          answer: values.answer ?? null,
+          answeredAt,
+          answers: values.answer ? [{ answer: values.answer, ...(values.note ? { text: values.note } : {}), at: answeredAt! }] : [],
+          followUps: values.followUps ?? 0,
+          nextFollowUpAt: values.nextFollowUpAt ?? null,
+          deadlineAt: values.deadlineAt ?? null,
+          fallback: values.fallback ?? false,
+          createdAt: values.at,
+          updatedAt: answeredAt ?? values.at,
+        })
+        .run()
     },
 
     setting<K extends keyof Settings>(settingKey: K, value: Settings[K]) {

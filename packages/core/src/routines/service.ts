@@ -2,7 +2,7 @@
 // recaps. The engine (engine.ts) fires them; this module owns the rows. Every
 // write that moves a due time calls notifyScheduleChanged() so the scheduler
 // re-arms at once.
-import { and, desc, eq, gte, inArray } from "drizzle-orm"
+import { and, desc, eq, gte, inArray, lt } from "drizzle-orm"
 import { newId, routineOccurrences, routines, type DB, type RoutineCursor, type RoutineSourceState } from "@palui/db"
 import { notifyScheduleChanged } from "../reminders/signal"
 import { assertZone, formatClock, formatDate, localToUtc, TimeError } from "../reminders/time"
@@ -357,8 +357,10 @@ export function checkinsPrompt(db: DB, chatId: string, now: number): string | nu
 
 // --- History and recap ----------------------------------------------------------------
 
-export function occurrencesSince(db: DB, input: { chatId?: string; routineId?: string; since: number; limit?: number }): OccurrenceRow[] {
+// `until` (exclusive) bounds a date range, for the dashboard's log filter.
+export function occurrencesSince(db: DB, input: { chatId?: string; routineId?: string; since: number; until?: number; limit?: number }): OccurrenceRow[] {
   const conds = [gte(routineOccurrences.scheduledAt, input.since)]
+  if (input.until !== undefined) conds.push(lt(routineOccurrences.scheduledAt, input.until))
   if (input.chatId) conds.push(eq(routineOccurrences.chatId, input.chatId))
   if (input.routineId) conds.push(eq(routineOccurrences.routineId, input.routineId))
   return db

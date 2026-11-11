@@ -8,6 +8,7 @@
 // way real data mixes them, instead of stacked into one row.
 import { DEFAULT_PERSONA } from "@palui/core/settings"
 import { D, H, MIN, gradientAvatar, type Kit } from "./kit"
+import { worstRoutines } from "./routines"
 
 // Limits the dashboard enforces (the zod schemas in src/lib/fns). A value that
 // claims to be "at the limit" is checked against it, so the fixture can't
@@ -435,4 +436,6 @@ export function worst(k: Kit) {
   k.attachment({ chatId: arabic.id, title: "بطاقة الهوية", description: "", kind: "jpeg", size: 1, createdAt: now - 3 * 365 * D })
   k.attachment({ chatId: "chat_0mhremoved0000000000", title: "J", kind: "jpeg", filename: null, size: 999_999, createdAt: now + 2 * H })
   k.attachment({ chatId: cjk.id, title: "身份证 王秀英 正反面", description: "身份证正反面照片，有效期至2036年。", kind: "jpeg", filename: "身份证_王秀英.jpg", size: 1536, createdAt: now - 12 * D })
+
+  worstRoutines(k, { family: family.id, vietnamese: vietnamese.id, gone: "chat_0mhremoved0000000000" })
 }

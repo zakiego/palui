@@ -1,6 +1,7 @@
-// Static guards over the dashboard server functions: every POST checks the
-// origin, and reminder and job writes go through the bridges that poke the
-// runtime's scheduler.
+// Static guards over the dashboard server functions: every one checks the
+// session (except the ones the login and invite pages need), every POST checks
+// the origin, and reminder, job and routine writes go through the bridges that
+// poke the runtime's scheduler.
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
@@ -10,7 +11,22 @@ const sources = readdirSync(dir)
   .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
   .map((f) => ({ file: f, text: readFileSync(join(dir, f), "utf8") }))
 
+// Called before anyone is signed in.
+const PUBLIC = new Set(["session.ts: getSession", "session.ts: getInvite", "session.ts: acceptInvite"])
+
 describe("dashboard server functions", () => {
+  it("check the session", () => {
+    const missing: string[] = []
+    for (const { file, text } of sources) {
+      for (const chunk of text.split(/export const /).slice(1)) {
+        if (!/createServerFn\(/.test(chunk)) continue
+        const name = `${file}: ${chunk.split(" ")[0]}`
+        if (!/require(User|Writer)\(\)/.test(chunk) && !PUBLIC.has(name)) missing.push(name)
+      }
+    }
+    expect(missing).toEqual([])
+  })
+
   it("check the origin on every POST", () => {
     const missing: string[] = []
     for (const { file, text } of sources) {
@@ -22,9 +38,9 @@ describe("dashboard server functions", () => {
     expect(missing).toEqual([])
   })
 
-  it("write reminders and jobs only through the bridges", () => {
+  it("write reminders, jobs and routines only through the bridges", () => {
     for (const { file, text } of sources) {
-      expect(text, file).not.toMatch(/@palui\/core\/(reminders|jobs)\/service/)
+      expect(text, file).not.toMatch(/@palui\/core\/(reminders|jobs|routines)\/service/)
     }
   })
 })
