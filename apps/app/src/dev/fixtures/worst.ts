@@ -124,6 +124,12 @@ export function worst(k: Kit) {
   k.connector("mcp-keuangan", "mcp", { label: "Keuangan", status: "paused", config: { url: "https://keuangan.example.com/mcp" } })
   k.connector("mcp-todomap", "mcp", { label: "Todo Map", status: "on", config: { url: "https://todo.example.com/api/mcp" } })
   k.connector("gcal", "gcal", { status: "not_set_up" })
+  k.connector("t3code", "t3code", {
+    status: "error",
+    detail: "T3 Code rejected Palui's token (it lasts 30 days). On the Mac, run t3 auth pairing create --ttl 10m and paste the new code in this connector.",
+    secrets: { pairingCode: "0123456789abcdefghijklmnopqrstuv" },
+    config: { url: "http://host.docker.internal:3773", baseRef: "release/2026-11-northwind-industries-holdings-hotfix", model: "claudeAgent/claude-opus-5-5" },
+  })
   k.connector("reminders", "reminders", { status: "on" })
   k.connector("jobs", "jobs", { status: "on" })
   k.connector("webfetch", "webfetch", { status: "on" })
