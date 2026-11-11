@@ -21,9 +21,13 @@ const NAME = /^[a-z][a-z0-9_]{0,47}$/
 const PLACEHOLDER = /\{([a-z][a-z0-9_]*)\}/g
 const SPREAD = /^\{\.\.\.([a-z][a-z0-9_]*)\}$/
 
+// Strict objects: a typo like "timeout" or "allowdash" is an error naming the
+// key, not a setting that silently does nothing. `note` is free text, since JSON
+// has no comments.
 const paramSchema = z
-  .object({
+  .strictObject({
     description: z.string().optional(),
+    note: z.string().optional(),
     // Exactly one of enum or pattern. A pattern is anchored: it must match the whole value.
     enum: z.array(z.string().min(1)).min(1).optional(),
     pattern: z.string().min(1).optional(),
@@ -48,9 +52,13 @@ const paramSchema = z
 export type ParamSpec = z.infer<typeof paramSchema>
 
 const commandSchema = z
-  .object({
+  .strictObject({
     name: z.string().regex(NAME, "lowercase letters, digits and _, starting with a letter"),
+    // Shown in Palui's tool table, chat transcript and approval prompts. Say what
+    // it does and where, e.g. "Restart nginx on the Mac mini". Default: "Host: <name>".
+    title: z.string().min(1).max(80).optional(),
     description: z.string().min(1),
+    note: z.string().optional(),
     // read: no side effects. write: changes something, undoable. destructive: anything else.
     // Palui prefills the tool class from this; the dashboard still has the last word.
     class: z.enum(["read", "write", "destructive"]),
@@ -61,7 +69,10 @@ const commandSchema = z
     cwd: z.string().transform(expandHome).optional(),
     env: z.record(z.string(), z.string()).default({}),
     timeoutMs: z.number().int().min(100).max(600_000).default(30_000),
-    maxOutputBytes: z.number().int().min(1024).max(1_048_576).default(65_536),
+    // Per stream. Longer output keeps its start and its end (where errors usually are).
+    maxOutputBytes: z.number().int().min(1024).max(1_048_576).default(16_384),
+    // Exit codes that count as success. grep exits 1 on "no match", for example.
+    okExitCodes: z.array(z.number().int().min(0).max(255)).min(1).default([0]),
   })
   .superRefine((c, ctx) => {
     const used = new Set<string>()
@@ -89,7 +100,8 @@ const commandSchema = z
 export type CommandSpec = z.infer<typeof commandSchema>
 
 export const configSchema = z
-  .object({
+  .strictObject({
+    note: z.string().optional(),
     // 127.0.0.1 is enough: Docker Desktop and OrbStack route host.docker.internal
     // to the Mac's loopback. 0.0.0.0 would expose the bridge to the LAN.
     host: z.string().default("127.0.0.1"),
@@ -110,18 +122,32 @@ export type BridgeConfig = z.infer<typeof configSchema>
 export function parseConfig(raw: unknown): BridgeConfig {
   const r = configSchema.safeParse(raw)
   if (!r.success) {
-    const lines = r.error.issues.map((i) => `  ${i.path.join(".") || "(root)"}: ${i.message}`)
+    const lines = r.error.issues.map((i) => `  ${issuePath(raw, i.path)}: ${i.message}`)
     throw new Error(`invalid host bridge config:\n${lines.join("\n")}`)
   }
   return r.data
 }
+
+// "commands.3.params.repo" becomes "git_log.params.repo", so nobody counts entries by hand.
+function issuePath(raw: unknown, path: PropertyKey[]): string {
+  if (path[0] === "commands" && typeof path[1] === "number") {
+    const entry = (raw as { commands?: unknown[] } | null)?.commands?.[path[1]]
+    const name = entry && typeof entry === "object" && "name" in entry && typeof entry.name === "string" ? entry.name : null
+    const head = name ? `command "${name}"` : `commands[${path[1]}]`
+    return [head, ...path.slice(2).map(String)].join(".")
+  }
+  return path.map(String).join(".") || "(root)"
+}
+
+export class MissingConfigError extends Error {}
 
 export function loadConfig(path: string): BridgeConfig {
   let text: string
   try {
     text = readFileSync(path, "utf8")
   } catch (err) {
-    throw new Error(`can't read ${path}: ${(err as Error).message}. Run \`init\` to create one.`)
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") throw new MissingConfigError(`no config at ${path}`)
+    throw new Error(`can't read ${path}: ${(err as Error).message}`)
   }
   let json: unknown
   try {

@@ -7,14 +7,17 @@ export type RunResult = {
   exitCode: number | null
   signal: string | null
   timedOut: boolean
+  timeoutMs: number
+  // Whether the exit code is in the command's okExitCodes.
+  ok: boolean
   stdout: string
   stderr: string
-  truncated: boolean
   durationMs: number
 }
 
 export function runCommand(spec: CommandSpec, argv: string[], now: () => number = Date.now): Promise<RunResult> {
   const started = now()
+  const base = { timeoutMs: spec.timeoutMs }
   return new Promise((resolve) => {
     let child: ReturnType<typeof spawn>
     try {
@@ -27,12 +30,12 @@ export function runCommand(spec: CommandSpec, argv: string[], now: () => number 
         shell: false,
       })
     } catch (err) {
-      resolve({ exitCode: null, signal: null, timedOut: false, stdout: "", stderr: (err as Error).message, truncated: false, durationMs: 0 })
+      resolve({ ...base, exitCode: null, signal: null, timedOut: false, ok: false, stdout: "", stderr: (err as Error).message, durationMs: 0 })
       return
     }
 
-    const out = new Capped(spec.maxOutputBytes)
-    const err = new Capped(spec.maxOutputBytes)
+    const out = new HeadTail(spec.maxOutputBytes)
+    const err = new HeadTail(spec.maxOutputBytes)
     child.stdout!.on("data", (b: Buffer) => out.push(b))
     child.stderr!.on("data", (b: Buffer) => err.push(b))
 
@@ -48,14 +51,15 @@ export function runCommand(spec: CommandSpec, argv: string[], now: () => number 
     })
     child.on("close", (code, signal) => {
       clearTimeout(timer)
-      const stderr = spawnError ? `${err.text()}${spawnError.message}` : err.text()
+      const stderr = spawnError ? `${err.text("stderr")}${spawnError.message}` : err.text("stderr")
       resolve({
+        ...base,
         exitCode: code,
         signal,
         timedOut,
-        stdout: out.text(),
+        ok: !timedOut && code !== null && spec.okExitCodes.includes(code),
+        stdout: out.text("stdout"),
         stderr,
-        truncated: out.truncated || err.truncated,
         durationMs: now() - started,
       })
     })
@@ -75,33 +79,74 @@ function killGroup(pid: number | undefined): void {
   }
 }
 
-class Capped {
-  private chunks: Buffer[] = []
-  private size = 0
-  truncated = false
-  constructor(private readonly max: number) {}
+// Keeps the first and last max/2 bytes of a stream. Logs and build output put
+// the useful part (the error) at the end, so dropping the tail would hide it.
+export class HeadTail {
+  private head: Buffer[] = []
+  private headSize = 0
+  private tail: Buffer[] = []
+  private tailSize = 0
+  private total = 0
+  private readonly half: number
+  constructor(max: number) {
+    this.half = Math.floor(max / 2)
+  }
   push(b: Buffer): void {
-    const room = this.max - this.size
-    if (room <= 0) {
-      this.truncated = true
-      return
+    this.total += b.length
+    let rest = b
+    if (this.headSize < this.half) {
+      const take = rest.subarray(0, this.half - this.headSize)
+      this.head.push(take)
+      this.headSize += take.length
+      rest = rest.subarray(take.length)
     }
-    const part = b.length > room ? b.subarray(0, room) : b
-    if (part !== b) this.truncated = true
-    this.chunks.push(part)
-    this.size += part.length
+    if (!rest.length) return
+    this.tail.push(rest)
+    this.tailSize += rest.length
+    while (this.tailSize > this.half) {
+      const first = this.tail[0]!
+      const extra = this.tailSize - this.half
+      if (first.length <= extra) {
+        this.tail.shift()
+        this.tailSize -= first.length
+      } else {
+        this.tail[0] = first.subarray(extra)
+        this.tailSize -= extra
+      }
+    }
   }
-  text(): string {
-    return Buffer.concat(this.chunks).toString("utf8")
+  get truncated(): boolean {
+    return this.total > this.headSize + this.tailSize
   }
+  text(stream: string): string {
+    const head = Buffer.concat(this.head).toString("utf8")
+    const tail = Buffer.concat(this.tail).toString("utf8")
+    if (!this.truncated) return head + tail
+    const kept = this.headSize + this.tailSize
+    return `${head}\n[... ${stream} cut: showing the first and last ${bytes(kept / 2)} of ${bytes(this.total)} ...]\n${tail}`
+  }
+}
+
+export function bytes(n: number): string {
+  if (n < 1024) return `${Math.round(n)} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
 // What the model sees: exit status first, then each non-empty stream.
 export function formatResult(r: RunResult): string {
-  const status = r.timedOut ? "timed out (killed)" : r.exitCode !== null ? `exit ${r.exitCode}` : `killed by ${r.signal ?? "unknown"}`
+  const status = r.timedOut
+    ? `timed out after ${seconds(r.timeoutMs)} (killed)`
+    : r.exitCode !== null
+      ? `exit ${r.exitCode}`
+      : `killed by ${r.signal ?? "unknown"}`
   const parts = [status]
   if (r.stdout) parts.push(`--- stdout ---\n${r.stdout}`)
   if (r.stderr) parts.push(`--- stderr ---\n${r.stderr}`)
-  if (r.truncated) parts.push("(output truncated)")
+  if (!r.stdout && !r.stderr) parts.push("(no output)")
   return parts.join("\n")
+}
+
+function seconds(ms: number): string {
+  return ms < 1000 ? `${ms} ms` : `${Math.round(ms / 100) / 10} s`
 }

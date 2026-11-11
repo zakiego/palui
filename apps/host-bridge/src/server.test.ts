@@ -10,10 +10,11 @@ const config = parseConfig({
   token: TOKEN,
   port: 1, // replaced below
   commands: [
-    { name: "say", description: "Echo a word", class: "read", command: "/bin/echo", args: ["hi", "{word}"], params: { word: { pattern: "[a-z]+" } } },
+    { name: "say", title: "Say hi on the host", description: "Echo a word", class: "read", command: "/bin/echo", args: ["hi", "{word}"], params: { word: { pattern: "[a-z]+" } } },
     { name: "fail", description: "Exit 3", class: "write", command: "/bin/sh", args: ["-c", "echo nope >&2; exit 3"] },
     { name: "slow", description: "Sleep", class: "destructive", command: "/bin/sleep", args: ["5"], timeoutMs: 200 },
-    { name: "flood", description: "Lots of output", class: "read", command: "/usr/bin/yes", timeoutMs: 2000, maxOutputBytes: 1024 },
+    { name: "flood", description: "Lots of output", class: "read", command: "/bin/sh", args: ["-c", "seq 1 20000"], maxOutputBytes: 1024 },
+    { name: "nomatch", description: "grep with no match", class: "read", command: "/usr/bin/grep", args: ["zzz", "/dev/null"], okExitCodes: [0, 1] },
   ],
 })
 
@@ -52,7 +53,9 @@ describe("host bridge", () => {
     const client = await connect()
     const { tools } = await client.listTools()
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]))
-    expect(Object.keys(byName).sort()).toEqual(["fail", "flood", "say", "slow"])
+    expect(Object.keys(byName).sort()).toEqual(["fail", "flood", "nomatch", "say", "slow"])
+    expect(byName.say!.title).toBe("Say hi on the host")
+    expect(byName.fail!.title).toBe("Host: fail")
     expect(byName.say!.annotations).toMatchObject({ readOnlyHint: true })
     expect(byName.fail!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false })
     expect(byName.slow!.annotations).toMatchObject({ destructiveHint: true })
@@ -85,13 +88,22 @@ describe("host bridge", () => {
     const client = await connect()
     const r = await client.callTool({ name: "slow", arguments: {} })
     expect(r.isError).toBe(true)
-    expect(text(r)).toMatch(/^timed out/)
+    expect(text(r)).toMatch(/^timed out after 200 ms \(killed\)/)
   })
 
-  it("caps output", async () => {
+  it("keeps the start and the end of long output", async () => {
     const client = await connect()
-    const r = await client.callTool({ name: "flood", arguments: {} })
-    expect(text(r)).toMatch(/\(output truncated\)$/)
-    expect(text(r).length).toBeLessThan(1200)
+    const t = text(await client.callTool({ name: "flood", arguments: {} }))
+    expect(t).toMatch(/^exit 0\n--- stdout ---\n1\n2\n/)
+    expect(t).toMatch(/\[\.\.\. stdout cut: showing the first and last 512 B of 106 KB \.\.\.\]/)
+    expect(t).toMatch(/19999\n20000\n$/)
+    expect(t.length).toBeLessThan(1200)
+  })
+
+  it("treats okExitCodes as success", async () => {
+    const client = await connect()
+    const r = await client.callTool({ name: "nomatch", arguments: {} })
+    expect(r.isError).toBe(false)
+    expect(text(r)).toBe("exit 1\n(no output)")
   })
 })

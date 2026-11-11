@@ -78,6 +78,7 @@ export function buildMcp(config: BridgeConfig, log: Logger): McpServer {
     mcp.registerTool(
       spec.name,
       {
+        title: spec.title ?? `Host: ${spec.name}`,
         description: spec.description,
         inputSchema: inputShape(spec),
         annotations: annotationsFor(spec.class),
@@ -92,7 +93,7 @@ export function buildMcp(config: BridgeConfig, log: Logger): McpServer {
         }
         const r = await runCommand(spec, argv)
         log(`${stamp()} ${spec.name} ${JSON.stringify(argv)} ${r.timedOut ? "timeout" : `exit=${r.exitCode}`} ${r.durationMs}ms`)
-        return { content: [{ type: "text" as const, text: formatResult(r) }], isError: r.timedOut || r.exitCode !== 0 }
+        return { content: [{ type: "text" as const, text: formatResult(r) }], isError: !r.ok }
       },
     )
   }

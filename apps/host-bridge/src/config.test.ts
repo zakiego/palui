@@ -39,6 +39,21 @@ describe("parseConfig", () => {
     expect(() => command({ args: ["{...x}"], params: { x: { pattern: "\\w+" } } })).toThrow(/needs a list param/)
   })
 
+  it("names the bad key instead of ignoring a typo", () => {
+    expect(() => command({ timeout: 5000 })).toThrow(/command "t": Unrecognized key: "timeout"/)
+    expect(() => command({ args: ["{x}"], params: { x: { pattern: "\\w+", allowdash: true } } })).toThrow(/command "t"\.params\.x: Unrecognized key: "allowdash"/)
+    expect(() => parseConfig({ token: TOKEN, prot: 1 })).toThrow(/Unrecognized key: "prot"/)
+  })
+
+  it("accepts notes and a title", () => {
+    const c = command({ title: "Echo on the host", note: "kept for testing" })
+    expect(c.title).toBe("Echo on the host")
+  })
+
+  it("points at a nameless command by index", () => {
+    expect(() => parseConfig({ token: TOKEN, commands: [{ description: "x", class: "read", command: "/bin/echo" }] })).toThrow(/commands\[0\]\.name/)
+  })
+
   it("expands ~ in command and cwd", () => {
     const c = command({ command: "~/bin/tool", cwd: "~/work" })
     expect(c.command).not.toContain("~")
