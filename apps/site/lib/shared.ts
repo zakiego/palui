@@ -5,9 +5,9 @@ export const shortName = "Palui"
 export const siteUrl = "https://palui.zakiego.com"
 export const homeTitle = `${appName}: an agent friend you host yourself`
 export const siteDescription =
-  "A personal AI agent you host yourself. It remembers what you tell it, reminds you on time, and talks to you on WhatsApp, Telegram or the web."
+  "A simple, friendly AI agent that keeps you company. You host it yourself."
 export const siteImage = {
-  url: "/og.png?v=2",
+  url: "/og.png?v=3",
   width: 1200,
   height: 630,
   alt: "Palui Agent: an agent friend you host yourself",
