@@ -276,7 +276,8 @@ export const toolCalls = sqliteTable(
   (t) => [index("tool_calls_run").on(t.runId), index("tool_calls_created").on(t.createdAt)],
 )
 
-export type ApprovalStatus = "pending" | "approved" | "denied" | "expired" | "resumed"
+// `superseded`: the same call was made again before the owner answered this request.
+export type ApprovalStatus = "pending" | "approved" | "denied" | "expired" | "superseded" | "resumed"
 
 export const pendingApprovals = sqliteTable(
   "pending_approvals",

@@ -3,7 +3,7 @@
 import { and, eq, inArray, like } from "drizzle-orm"
 import { isStepCount, streamText, type ModelMessage, type ToolApprovalResponse } from "ai"
 import { events, jobs, messages, newId, pendingApprovals, runs, toolCalls, type DB, type RunStatus, type RunTrigger } from "@palui/db"
-import { approvalsForRun, createApproval, preview, type ApprovalRow, type ResumeContext } from "../approvals/store"
+import { approvalsForRun, createApproval, preview, supersedeSameCall, type ApprovalRow, type ResumeContext } from "../approvals/store"
 import { checkGlobalBudget, jobOverCap, pausedNotice, recordRunStart, recordRunTokens } from "../budget"
 import { getChat, getSession, type ChatRow } from "../chats"
 import { logEvent } from "../events"
@@ -16,7 +16,7 @@ import type { Supervisor } from "../connectors/supervisor"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
-import { buildSystem, hasImages, loadHistory, toModelMessages, type StoredContent } from "./context"
+import { buildSystem, hasImages, loadHistory, loadToolCalls, toModelMessages, type StoredContent } from "./context"
 import type { EngineDeps } from "./deps"
 
 export const MODEL_OFF_TEXT = "Model lagi off. Nyalakan: `/connectors on cliproxy`"
@@ -25,6 +25,13 @@ export const REPLY_TTL_MS = 24 * 3600_000
 // start recovers it the same way as a crash (recoverInterruptedRuns).
 export const INTERRUPTED_ERROR = "interrupted by a restart"
 export const INTERRUPTED_TEXT = "Turn tadi kepotong restart di tengah jalan, dan sempat jalanin aksi yang mengubah data. Cek dulu hasilnya ya, terus kirim ulang kalau masih perlu."
+
+// What the model is told about each request when a run resumes.
+const APPROVAL_REASON: Partial<Record<ApprovalRow["status"], string>> = {
+  approved: "Approved by the owner",
+  expired: "No answer from the owner within 10 minutes",
+  superseded: "Dropped: the same call was made again later, so this older request no longer counts",
+}
 
 export type EngineHost = Pick<Supervisor, "running" | "get" | "channel" | "status" | "reconcile" | "release">
 
@@ -40,6 +47,8 @@ export type EngineCtx = {
   active: Map<string, ActiveTurn>
   draining: boolean
   approvalTtlMs: number
+  // Queue the resume of a run whose approval requests are all decided.
+  resumeRun: (runId: string) => void
 }
 
 export type TurnOptions = {
@@ -183,7 +192,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         type: "tool-approval-response",
         approvalId: a.approvalId,
         approved: a.status === "approved",
-        reason: a.status === "approved" ? "Approved by the owner" : a.status === "expired" ? "No answer from the owner within 10 minutes" : "Denied by the owner",
+        reason: APPROVAL_REASON[a.status] ?? "Denied by the owner",
       }))
       modelMessages = [...input.resume.messages, { role: "tool", content: responses }]
     } else {
@@ -202,7 +211,9 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         summary: input.trigger === "message" ? session?.summary : null,
         trigger: origin,
       })
-      modelMessages = input.trigger === "message" ? toModelMessages(history, batch) : [{ role: "user", content: input.prompt ?? "" }]
+      // Past tool calls are replayed only next to a tool list: a request with tool parts and no tools is rejected by some providers.
+      const pastCalls = Object.keys(tools.tools).length ? loadToolCalls(db, history) : []
+      modelMessages = input.trigger === "message" ? toModelMessages(history, batch, pastCalls) : [{ role: "user", content: input.prompt ?? "" }]
     }
 
     model = failoverModel(chain, (from, e) => rlog.warn("model failed, trying the next one in the chain", { connector_id: from.connectorId, model: from.model, error: (e as Error)?.message }))
@@ -234,6 +245,13 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
       },
       onError: () => {},
     })
+
+    // A call made again replaces an older request for the same call that still waits.
+    const supersede = (toolName: string, args: unknown) => {
+      const r = supersedeSameCall(db, { chatId: chat.id, runId, tool: toolName, args }, ctx.clock())
+      for (const a of r.superseded) logEvent(db, { kind: "approval.superseded", message: `${a.tool} was called again; the older request was dropped`, data: { approvalId: a.id, runId: a.runId } }, ctx.clock())
+      for (const id of r.resume) ctx.resumeRun(id)
+    }
 
     let stepText = ""
     for await (const p of result.fullStream) {
@@ -277,9 +295,11 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
           break
         case "tool-result":
           if ((p as { preliminary?: boolean }).preliminary) break
+          supersede(p.toolName, p.input)
           finishToolCall(ctx, chat.id, runId, input.resume?.previousRunId, p.toolCallId, p.toolName, "ok", redact(preview(p.output, 500)), toolStarts)
           break
         case "tool-error":
+          supersede(p.toolName, p.input)
           finishToolCall(ctx, chat.id, runId, input.resume?.previousRunId, p.toolCallId, p.toolName, "error", redact(preview((p.error as Error)?.message ?? p.error, 500)), toolStarts)
           break
         case "tool-output-denied":
@@ -327,6 +347,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
       if (text && deliver && !silent) deliverReply(ctx, chat, runId, text)
       for (const r of approvalRequests) {
         const meta = tools.meta[r.toolName]
+        supersede(r.toolName, r.input)
         const row = createApproval(
           db,
           {

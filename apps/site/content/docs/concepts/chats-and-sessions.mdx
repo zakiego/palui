@@ -23,7 +23,7 @@ A session is the current stretch of a chat that the model sees. Each chat has on
 
 ## What the model sees
 
-The session part of the context is a summary plus the last 30 messages.
+The session part of the context is a summary plus the last 30 messages. The tool calls those turns made come with them, each with a short preview of its result, so Palui knows what it really did earlier and doesn't re-check it on every message.
 
 Past about 40 messages, compaction runs: the `fast` model role writes a summary, and older messages leave the context. They stay in the database and on the Chats page. If [recall auto-save](/docs/concepts/memory) is on, it runs at this point too.
 
