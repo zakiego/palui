@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { SkeletonText } from "@/components/page-pending"
 import { useT } from "@/lib/i18n"
 import { manifestFor } from "@/lib/manifests"
 import { CONNECTOR_GROUPS, ConnectorSwitch } from "../shared"
@@ -74,13 +75,40 @@ function ConnectorCard({ item, live, onOpen }: { item: ConnectorItem; live: Conn
   )
 }
 
+// The grid while it loads: the same sections and Card composition as
+// ConnectorCard, so the cards land where their placeholders were.
+const SKELETON_GROUPS = [
+  { heading: "w-20", cards: ["w-24", "w-28", "w-20"] },
+  { heading: "w-16", cards: ["w-28", "w-24"] },
+]
+
 export function ConnectorGridSkeleton() {
-  return [0, 1].map((g) => (
-    <div key={g} className="flex flex-col gap-3">
-      <Skeleton className="h-5 w-24" />
+  return SKELETON_GROUPS.map((g, gi) => (
+    <div key={gi} className="flex flex-col gap-3">
+      <SkeletonText className="text-heading" width={g.heading} />
       <div className="grid gap-3 @2xl/main:grid-cols-2 @5xl/main:grid-cols-3">
-        {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-36 rounded-xl" />
+        {g.cards.map((name, i) => (
+          <Card key={i} size="sm" className="justify-between">
+            <CardHeader>
+              <div className="flex min-w-0 items-start gap-3">
+                <Skeleton className="size-9 shrink-0 rounded-lg" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <SkeletonText className="text-sm" width={name} />
+                  <SkeletonText className="text-sm" width="w-11/12" />
+                  <SkeletonText className="text-sm" width="w-1/2" />
+                </div>
+              </div>
+              <CardAction className="-me-1.5 -mt-1.5">
+                <span className="flex size-11 items-center justify-center">
+                  <Skeleton className="h-[18.4px] w-8 rounded-full" />
+                </span>
+              </CardAction>
+            </CardHeader>
+            <CardFooter className="flex-wrap gap-2 border-t pt-(--card-spacing) pb-(--card-spacing)">
+              <Skeleton className="h-5 w-12 rounded-full" />
+              <Skeleton className="ms-auto h-7 w-14 pointer-coarse:h-9" />
+            </CardFooter>
+          </Card>
         ))}
       </div>
     </div>

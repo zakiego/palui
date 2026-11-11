@@ -9,6 +9,7 @@ import { z } from "zod"
 import { AppError } from "@/components/app-error"
 import { CopyButton } from "@/components/copy-button"
 import { PageHeader } from "@/components/page-header"
+import { PageHeaderSkeleton, PagePending, SkeletonButton, SkeletonText, TabsSkeleton } from "@/components/page-pending"
 import { SimpleSelect } from "@/components/simple-select"
 import {
   AlertDialog,
@@ -744,15 +745,51 @@ function HooksCard({ data }: { data: Data }) {
   )
 }
 
+// The General tab's card, the one most visits land on: a persona box, then
+// four fields in two columns, and Save in the footer. Other tabs get a card
+// of plain fields.
 function SettingsSkeleton() {
+  const { tab = "general" } = Route.useSearch()
   return (
-    <>
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-8 w-28" />
-        <Skeleton className="h-4 w-80 max-w-full" />
+    <PagePending page="nav.settings">
+      <PageHeaderSkeleton title="w-28" description="w-80" />
+      <div className="flex flex-col gap-4">
+        <TabsSkeleton className="w-80" />
+        <Card>
+          <CardHeader>
+            <SkeletonText className="font-heading text-heading" width="w-36" />
+            <SkeletonText className="text-sm" width="w-64" />
+          </CardHeader>
+          <CardContent>
+            <FieldGroup>
+              {tab === "general" && (
+                <Field>
+                  <SkeletonText className="text-sm" width="w-16" />
+                  <Skeleton className="h-24 w-full rounded-lg" />
+                  <SkeletonText className="text-sm" width="w-40" />
+                </Field>
+              )}
+              <div className="grid grid-cols-1 gap-4 @2xl/main:grid-cols-2">
+                {[
+                  { label: "w-20", help: "w-56" },
+                  { label: "w-24" },
+                  { label: "w-32" },
+                  { label: "w-28", help: "w-52" },
+                ].map((f, i) => (
+                  <Field key={i}>
+                    <SkeletonText className="text-sm" width={f.label} />
+                    <Skeleton className="h-8 w-full rounded-lg pointer-coarse:h-10" />
+                    {f.help && <SkeletonText className="text-sm" width={f.help} />}
+                  </Field>
+                ))}
+              </div>
+            </FieldGroup>
+          </CardContent>
+          <CardFooter className="justify-end border-t">
+            <SkeletonButton className="w-14" />
+          </CardFooter>
+        </Card>
       </div>
-      <Skeleton className="h-8 w-80 max-w-full" />
-      <Skeleton className="h-96 rounded-xl" />
-    </>
+    </PagePending>
   )
 }

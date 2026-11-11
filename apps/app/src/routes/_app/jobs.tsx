@@ -7,6 +7,7 @@ import { toast } from "sonner"
 
 import { AppError } from "@/components/app-error"
 import { PageHeader } from "@/components/page-header"
+import { PageHeaderSkeleton, PagePending, TableSkeleton } from "@/components/page-pending"
 import { ResponsiveSheet } from "@/components/responsive-sheet"
 import { SimpleSelect } from "@/components/simple-select"
 import {
@@ -27,7 +28,6 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -399,19 +399,18 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
 
 function JobsSkeleton() {
   return (
-    <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-24" />
-          <Skeleton className="h-4 w-96 max-w-full" />
-        </div>
-        <Skeleton className="h-8 w-28" />
-      </div>
-      <div className="flex flex-col gap-2 rounded-xl p-2 shadow-(--shadow-border)">
-        {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-14" />
-        ))}
-      </div>
-    </>
+    <PagePending page="nav.jobs">
+      <PageHeaderSkeleton title="w-20" description="w-96" action="w-24" />
+      <TableSkeleton
+        rows={3}
+        columns={[
+          { head: "w-8", sub: ["", "lg:hidden"] },
+          { className: "w-40 max-lg:hidden", head: "w-14", text: "font-mono text-caption", short: "w-28" },
+          { className: "w-48 max-md:hidden", head: "w-16", badge: true, sub: true },
+          { className: "w-36 max-xl:hidden", head: "w-14", text: "font-mono text-caption", short: "w-20", sub: true },
+          { className: "w-44", controls: ["h-7 w-24 pointer-coarse:h-9 max-sm:w-8", "mx-1.5 h-[18.4px] w-8 rounded-full", "size-7 pointer-coarse:size-9"] },
+        ]}
+      />
+    </PagePending>
   )
 }

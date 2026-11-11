@@ -11,6 +11,7 @@ import { z } from "zod"
 import { AppError } from "@/components/app-error"
 import { Markdown } from "@/components/markdown"
 import { PageHeader } from "@/components/page-header"
+import { PageHeaderSkeleton, PagePending, SkeletonText } from "@/components/page-pending"
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
@@ -516,18 +517,67 @@ function Composer({ busy, onSend, onStop }: { busy: boolean; onSend: (text: stri
   )
 }
 
+// The two cards the page renders: the chat list (desktop only, a Drawer on a
+// phone) and the open transcript with its composer.
+const CHAT_ROWS = [
+  ["w-3/4", "w-5/6"],
+  ["w-1/2", "w-2/3"],
+  ["w-2/3", "w-3/4"],
+  ["w-3/5", "w-1/2"],
+  ["w-4/5", "w-2/3"],
+  ["w-1/2", "w-3/5"],
+]
+
 function ChatsSkeleton() {
   return (
-    <>
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-8 w-28" />
-        <Skeleton className="h-4 w-64 max-w-full" />
+    <PagePending page="nav.chats">
+      <PageHeaderSkeleton title="w-20" description="w-64" wraps={false} action="w-28 md:hidden" />
+      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[minmax(14rem,18rem)_1fr]">
+        <Card className="min-h-0 gap-0 py-0 max-md:hidden md:h-[calc(100svh-15rem)]">
+          <div className="border-b px-4 py-3">
+            <SkeletonText className="text-heading" width="w-28" />
+          </div>
+          <ItemGroup className="gap-0 p-2">
+            {CHAT_ROWS.map(([title, preview], i) => (
+              <Item key={i} size="sm" className="rounded-lg">
+                <ItemMedia variant="icon">
+                  <Skeleton className="size-4 rounded-sm" />
+                </ItemMedia>
+                <ItemContent className="min-w-0">
+                  <span className="flex items-center gap-2">
+                    <SkeletonText className="min-w-0 flex-1 text-sm" width={title} />
+                    <SkeletonText className="text-caption" width="w-12" />
+                  </span>
+                  <SkeletonText className="text-sm" width={preview} />
+                </ItemContent>
+              </Item>
+            ))}
+          </ItemGroup>
+        </Card>
+        <Card className="min-h-[60svh] gap-0 py-0 md:h-[calc(100svh-15rem)]">
+          <div className="flex items-center gap-2 border-b px-4 py-3">
+            <SkeletonText className="text-heading" width="w-24" />
+            <Skeleton className="h-5 w-10 rounded-full" />
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col justify-end gap-4 overflow-hidden p-4">
+            <Skeleton className="ms-auto h-9 w-2/5 rounded-xl" />
+            <div className="flex w-4/5 flex-col">
+              <SkeletonText className="text-sm" width="w-full" />
+              <SkeletonText className="text-sm" width="w-11/12" />
+              <SkeletonText className="text-sm" width="w-1/2" />
+            </div>
+            <Skeleton className="ms-auto h-9 w-1/3 rounded-xl" />
+            <div className="flex w-3/4 flex-col">
+              <SkeletonText className="text-sm" width="w-full" />
+              <SkeletonText className="text-sm" width="w-2/3" />
+            </div>
+          </div>
+          <div className="border-t p-3">
+            <Skeleton className="h-20 rounded-lg" />
+          </div>
+        </Card>
       </div>
-      <div className="grid gap-4 md:grid-cols-[minmax(14rem,18rem)_1fr]">
-        <Skeleton className="hidden h-[calc(100svh-15rem)] rounded-xl md:block" />
-        <Skeleton className="h-[60svh] rounded-xl md:h-[calc(100svh-15rem)]" />
-      </div>
-    </>
+    </PagePending>
   )
 }
 

@@ -48,6 +48,7 @@ export const id: Record<Key, string> = {
   "common.copy": "Salin",
   "common.copied": "Tersalin",
   "common.loading": "Memuat",
+  "common.loadingPage": "Memuat {page}…",
   "common.never": "Belum pernah",
   "common.all": "Semua",
   "common.search": "Cari",
