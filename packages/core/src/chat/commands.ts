@@ -107,15 +107,21 @@ async function cmdAgent(ctx: EngineCtx, chat: ChatRow, args: string[]): Promise<
   return { text: `Oke, sekarang ${target.name} yang jawab di sini. Mulai sesi baru.${who}` }
 }
 
+const REPORT_NOTE_TIP = "Lain kali tulis juga apa yang salah, biar lebih gampang dilacak: /report <apa yang salah>"
+
 // Plain, so the channel sends exactly what `reports` holds. From a shared chat
 // the snapshot goes to the owner's DM, like every other admin detail (PLAN 19.4).
+// Without a note the agent has to guess what went wrong, so the reply asks for
+// one next time. In a DM that's a second message, after the report.
 function cmdReport(ctx: EngineCtx, chat: ChatRow, args: string[]): CommandReply {
-  const report = createReport(ctx.db, chat, args.join(" "), ctx.clock())
-  if (!isSharedChat(ctx.db, chat)) return { text: report.text, format: "plain" }
+  const note = args.join(" ").trim()
+  const report = createReport(ctx.db, chat, note, ctx.clock())
+  const tip = note ? "" : `\n\n${REPORT_NOTE_TIP}`
+  if (!isSharedChat(ctx.db, chat)) return { text: report.text, format: "plain", ...(note ? {} : { later: { run: async () => REPORT_NOTE_TIP } }) }
   const dm = ownerChat(ctx.db, chat.channel) ?? ownerChat(ctx.db, "web")
-  if (!dm) return { text: `Report ${report.id} udah aku simpan.` }
+  if (!dm) return { text: `Report ${report.id} udah aku simpan.${tip}` }
   sendToChat(ctx, dm, report.text, "system", { format: "plain" })
-  return { text: `Report ${report.id} udah aku kirim ke chat pribadi kamu.` }
+  return { text: `Report ${report.id} udah aku kirim ke chat pribadi kamu.${tip}` }
 }
 
 async function cmdNew(ctx: EngineCtx, chat: ChatRow): Promise<CommandReply> {

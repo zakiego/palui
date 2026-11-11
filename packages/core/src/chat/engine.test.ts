@@ -235,6 +235,18 @@ describe("commands", () => {
     expect(h.db.select().from(runs).all()).toHaveLength(1)
   })
 
+  it("/report without a note asks for one next time, after the report", async () => {
+    const h = await basic([])
+    await h.engine.inbound(tgMessage("/report"))
+    await h.engine.idle()
+    const saved = h.db.select().from(reports).get()!
+    expect(saved.note).toBe("")
+    expect(saved.text).not.toContain("Owner says:")
+    const [report, tip] = h.db.select().from(outbox).orderBy(sql`rowid`).all().map((o) => o.payload.text)
+    expect(report).toBe(saved.text)
+    expect(tip).toBe("Lain kali tulis juga apa yang salah, biar lebih gampang dilacak: /report <apa yang salah>")
+  })
+
   it("/connectors off telegram is allowed when WhatsApp is reachable, and says how to undo", async () => {
     const wa = fakeChannel("whatsapp")
     const h = await basic([], { registry: { whatsapp: channelRuntime("whatsapp", wa) }, rows: { whatsapp: "channel" } })

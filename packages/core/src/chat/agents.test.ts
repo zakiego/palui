@@ -94,6 +94,15 @@ describe("agents: who gets answered", () => {
     expect(toGroup!.payload.text).toBe(`Report ${saved.id} udah aku kirim ke chat pribadi kamu.`)
   })
 
+  it("/report in a group without a note asks for one next time in the group reply", async () => {
+    const h = await world([])
+    await h.engine.inbound(ownerInGroup("/report"))
+    await h.engine.idle()
+    const saved = h.db.select().from(reports).get()!
+    const toGroup = outboxRows(h.db).at(-1)!
+    expect(toGroup.payload.text).toBe(`Report ${saved.id} udah aku kirim ke chat pribadi kamu.\n\nLain kali tulis juga apa yang salah, biar lebih gampang dilacak: /report <apa yang salah>`)
+  })
+
   it("treats a guest's ya, /new and button presses as plain text, never as owner actions", async () => {
     const h = await world([say("a"), say("b")])
     await h.engine.inbound(ownerInGroup("/agent chef"))
