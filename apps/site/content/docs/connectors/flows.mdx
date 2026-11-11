@@ -86,6 +86,7 @@ These are only offered in your own DMs and the web chat, never in a group or som
 Your routines move to flows in two steps, and nothing fires twice or gets skipped:
 
 1. After the upgrade, each routine gets a flow that runs in shadow: it reads the same sources and computes the same times, but sends nothing. The routine engine keeps sending, and differences are logged. The Flows page shows the count.
+   While in shadow, the agent's flow tools don't show these flows. A flow you make with the same name as one moves it aside to `<name> (rutinitas)`. To move one routine early, ask the agent to turn it into a flow (`jadikan_flow`): the flow keeps its schedule, open check-ins and log, and the routine goes.
 2. After a clean week, hand over with `docker compose exec app palui flows mode flows`. The flows take over where the routines were, open check-ins included, and old routine buttons keep working. `palui flows status` shows the shadow comparison, and `palui flows mode legacy` goes back to the routine engine alone.
 
 The routine tools keep working for one more release as wrappers around flows. The Routines page links each routine to its flow; after the handover, pausing or deleting a routine there acts on its flow, and its next times and open check-ins come from the flow.

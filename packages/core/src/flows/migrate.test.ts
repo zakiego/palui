@@ -1,15 +1,16 @@
 import { eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
-import { flowRuns, flows, outbox, routineOccurrences } from "@palui/db"
+import { flowRuns, flows, outbox, routineOccurrences, routines } from "@palui/db"
 import { silentLogger } from "../log"
 import { MIN } from "../reminders/test-helpers"
 import { routineActions } from "../routines/actions"
 import { createRoutineEngine } from "../routines/engine"
-import { createRoutine, deleteRoutine, setPaused, updateRoutine } from "../routines/service"
+import { configOf, createRoutine, deleteRoutine, setPaused, updateRoutine } from "../routines/service"
 import { fakePrayerTool, MEDICINE_ROUTINE, PRAYER_ROUTINE } from "../routines/test-helpers"
 import { getSetting } from "../settings"
-import { flowForRoutine, followRoutine, runForLegacyOccurrence, setRoutineMode, shadowCompare, shadowReport, syncRoutineFlows } from "./migrate"
-import { listVersions, triggersOf } from "./service"
+import { flowForRoutine, followRoutine, promoteRoutine, runForLegacyOccurrence, setRoutineMode, shadowCompare, shadowReport, syncRoutineFlows } from "./migrate"
+import { createFlow, getFlow, listVersions, triggersOf } from "./service"
+import { routineToFlow } from "./convert"
 import { at, exampleConnectors, flowHarness, NOW, runsOf, sentTexts } from "./test-harness"
 
 function both() {
@@ -63,6 +64,18 @@ describe("routine data migration (RFC 3.6)", () => {
     deleteRoutine(h.db, med.id)
     followRoutine(h.db, med.id, NOW + 4 * MIN)
     expect(flowForRoutine(h.db, med.id)).toBeUndefined()
+  })
+
+  it("a flow the owner makes with the routine's name moves the shadow flow aside, and the sync keeps it there", () => {
+    const h = both()
+    const med = createRoutine(h.db, h.chatId, MEDICINE_ROUTINE, NOW)
+    syncRoutineFlows(h.db, NOW)
+    const shadow = flowForRoutine(h.db, med.id)!
+    const own = createFlow(h.db, { chatId: h.chatId, definition: { ...routineToFlow(configOf(med)), name: "Minum obat" }, createdBy: "agent:run_1" }, NOW + MIN).flow
+    expect(own).toMatchObject({ name: "Minum obat", shadow: false })
+    expect(getFlow(h.db, shadow.id)).toMatchObject({ name: "Minum obat (rutinitas)", shadow: true })
+    expect(syncRoutineFlows(h.db, NOW + 2 * MIN)).toMatchObject({ created: 0, updated: 0, removed: 0 })
+    expect(getFlow(h.db, shadow.id)!.name).toBe("Minum obat (rutinitas)")
   })
 
   it("legacy mode migrates nothing", () => {
@@ -149,5 +162,43 @@ describe("handover to flows", () => {
     await h.tick(at("2026-11-10T22:05"))
     const run = runsOf(h.db, flowForRoutine(h.db, med.id)!.id).find((r) => r.legacyOccurrenceId)!
     expect(run).toMatchObject({ status: "done", vars: { steps: { ask: { missed: true } } } })
+  })
+})
+
+describe("one routine becomes a flow (promoteRoutine)", () => {
+  it("in shadow mode, keeps the open check-in, the log and the schedule, and the sync leaves it alone", async () => {
+    const h = both()
+    const med = createRoutine(h.db, h.chatId, MEDICINE_ROUTINE, NOW)
+    syncRoutineFlows(h.db, NOW)
+    const shadow = flowForRoutine(h.db, med.id)!
+    await h.tick(at("2026-11-10T20:00"))
+    const [occ] = h.db.select().from(routineOccurrences).all()
+    expect(occ).toMatchObject({ status: "open", key: "2026-11-10:20:00" })
+    const before = sentTexts(h.db).length
+
+    const flow = promoteRoutine(h.db, med.id, at("2026-11-10T20:05"))
+    expect(flow).toMatchObject({ id: shadow.id, name: "Minum obat", shadow: false })
+    expect(h.db.select().from(routines).all()).toEqual([])
+    expect(runForLegacyOccurrence(h.db, occ!.id)).toMatchObject({ status: "waiting", runKey: "2026-11-10:20:00" })
+    expect(syncRoutineFlows(h.db, at("2026-11-10T20:06"))).toMatchObject({ removed: 0 })
+    expect(getFlow(h.db, flow.id)).toMatchObject({ shadow: false })
+
+    // The re-ask comes from the flow, nothing is sent twice, and 08:00 fires once.
+    await h.tick(at("2026-11-10T20:15"))
+    expect(sentTexts(h.db).slice(before).map((o) => o.source)).toEqual([`flow:${runForLegacyOccurrence(h.db, occ!.id)!.id}`])
+    await h.tick(at("2026-11-11T08:00"))
+    expect(runsOf(h.db, flow.id).filter((r) => !r.skipReason).map((r) => r.runKey)).toEqual(["2026-11-10:20:00", "2026-11-11:08:00"])
+  })
+
+  it("in legacy mode, makes a new flow with the log", async () => {
+    const h = both()
+    setRoutineMode(h.db, "legacy", NOW)
+    const med = createRoutine(h.db, h.chatId, MEDICINE_ROUTINE, NOW)
+    await h.tick(at("2026-11-10T20:00"))
+    await h.tick(at("2026-11-10T22:00"))
+    const flow = promoteRoutine(h.db, med.id, at("2026-11-10T22:05"))
+    expect(flow).toMatchObject({ name: "Minum obat", shadow: false, legacyRoutineId: med.id })
+    expect(runsOf(h.db, flow.id).find((r) => r.legacyOccurrenceId)).toMatchObject({ status: "done", vars: { steps: { ask: { missed: true } } } })
+    expect(() => promoteRoutine(h.db, med.id, at("2026-11-10T22:06"))).toThrow(/No routine/)
   })
 })

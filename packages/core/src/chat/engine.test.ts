@@ -24,6 +24,7 @@ import {
   toolsRuntime,
 } from "./testing"
 import { MODEL_OFF_TEXT } from "./turn"
+import { STALE_READ_NOTE } from "./context"
 import { silentLogger } from "../log"
 import { routineActions } from "../routines/actions"
 import { createRoutineEngine } from "../routines/engine"
@@ -519,6 +520,57 @@ describe("approvals", () => {
     await h.engine.idle()
     expect(executed).toEqual(["a"])
     expect(outboxTexts(h.db).at(-1)).toBe("skip b")
+  })
+
+  // The AI SDK runs the read at once and the delete only after the owner says yes,
+  // so on resume the read's list still shows what the delete removed.
+  function listAndNuke(executed: string[]) {
+    const items = ["temp", "keep"]
+    return {
+      alpha: toolsRuntime("alpha", () => ({
+        list: { tool: fnTool("list", () => ({ items: [...items] })), class: "read" as const },
+        nuke: {
+          tool: fnTool("delete", (i) => {
+            executed.push(String(i.what))
+            items.splice(items.indexOf(String(i.what)), 1)
+            return { deleted: true }
+          }),
+          class: "destructive" as const,
+        },
+      })),
+    }
+  }
+  const listAndNukeStep = callTools([
+    { toolName: "alpha__list", input: {}, toolCallId: "l1" },
+    { toolName: "alpha__nuke", input: { what: "temp" }, toolCallId: "c1" },
+  ])
+
+  it("marks reads from the approved call's step as taken before it ran", async () => {
+    const executed: string[] = []
+    const h = await basic([listAndNukeStep, say("udah aku hapus")], { registry: listAndNuke(executed), rows: { alpha: "tools" } })
+    await h.engine.inbound(tgMessage("hapus temp"))
+    await h.engine.idle()
+    const a = h.db.select().from(pendingApprovals).get()!
+    await h.engine.decideApproval(a.id, true, "dashboard")
+    await h.engine.idle()
+    expect(executed).toEqual(["temp"])
+    const resumed = promptText(h.m.prompts[1])
+    expect(resumed).toContain(STALE_READ_NOTE)
+    expect(resumed).toContain('"deleted":true')
+  })
+
+  it("leaves the reads alone when the owner denies the call", async () => {
+    const executed: string[] = []
+    const h = await basic([listAndNukeStep, say("oke, gak jadi")], { registry: listAndNuke(executed), rows: { alpha: "tools" } })
+    await h.engine.inbound(tgMessage("hapus temp"))
+    await h.engine.idle()
+    const a = h.db.select().from(pendingApprovals).get()!
+    await h.engine.decideApproval(a.id, false, "dashboard")
+    await h.engine.idle()
+    expect(executed).toEqual([])
+    const resumed = promptText(h.m.prompts[1])
+    expect(resumed).not.toContain(STALE_READ_NOTE)
+    expect(resumed).toContain('"keep"')
   })
 })
 

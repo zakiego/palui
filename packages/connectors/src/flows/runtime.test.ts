@@ -3,12 +3,14 @@ import { memoryDb, outbox } from "@palui/db"
 import { ensureChat, ensureWebChat } from "@palui/core/chats"
 import type { PaluiTool, TurnInfo } from "@palui/core/connectors/define"
 import { connectorFlowCaller } from "@palui/core/flows/call"
-import { getFlow, listFlows, listVersions } from "@palui/core/flows/service"
+import { createFlow, getFlow, listFlows, listVersions } from "@palui/core/flows/service"
 import { fakeEntries } from "@palui/core/flows/test-entries"
 import { exampleConnectors } from "@palui/core/flows/test-harness"
 import { BRIEFING } from "@palui/core/flows/test-helpers"
 import manifest from "./manifest"
-import { flowTools, offerFlowTools } from "./runtime"
+import runtime, { flowTools, offerFlowTools } from "./runtime"
+import { fakeCtx } from "../mcp/test-helpers"
+import type { RunningEntry } from "@palui/core/connectors/supervisor"
 
 // Tuesday 2026-11-10 10:00 WITA.
 const NOW = Date.parse("2026-11-10T02:00:00Z")
@@ -91,6 +93,34 @@ describe("flow tools", () => {
     expect(dup.error).toMatch(/already exists/)
   })
 
+  it("finds flows__ringkasan for a draft's tool step", async () => {
+    const ctx = fakeCtx({}, {}, { id: "flows" })
+    const chat = ensureWebChat(ctx.db, NOW)
+    const turn: TurnInfo = { runId: "run_1", chatId: chat.id, channel: "web", trigger: "message", tz: WITA, now: NOW }
+    const running = await runtime.start(ctx as never)
+    const entries: RunningEntry[] = [{ id: "flows", row: { id: "flows", type: "flows", kind: "skill", label: "flows", trust: "own" } as RunningEntry["row"], handle: running }]
+    const tools = flowTools(ctx.db, turn, { clock: () => NOW, tools: connectorFlowCaller(() => entries) })
+    const recap = {
+      name: "Rekap",
+      triggers: [{ id: "main", kind: "schedule", start: "recap", source: { kind: "times", times: [{ time: "20:00" }] } }],
+      steps: [
+        { id: "recap", kind: "tool", tool: "flows__ringkasan", args: { flow: "self", days: 7 } },
+        { id: "send", kind: "message", text: "{{steps.recap.data.text}}" },
+      ],
+    }
+    expect(await call(tools.cek_flow, { definition: recap })).toMatchObject({ ok: true, problems: [], tools: { recap: { tool: "flows__ringkasan", class: "read" } } })
+    await running.stop()
+  })
+
+  it("points {{n}} in a re-ask to run.followUps", async () => {
+    const { tools } = setup()
+    const ask = { id: "ask", kind: "checkin", text: "Udah?", deadline: { kind: "after", minutes: 60 }, followUp: { everyMin: 20, max: 2, text: "Pengingat ke-{{n}}" } }
+    const bad = await call(tools.cek_flow, { definition: { name: "Air", triggers: [{ id: "main", kind: "schedule", start: "ask", source: { kind: "times", times: [{ time: "11:00" }] } }], steps: [ask] } })
+    expect(bad.problems[0].message).toContain("run.followUps")
+    const good = await call(tools.cek_flow, { definition: { name: "Air", triggers: [{ id: "main", kind: "schedule", start: "ask", source: { kind: "times", times: [{ time: "11:00" }] } }], steps: [{ ...ask, followUp: { ...ask.followUp, text: "Pengingat ke-{{run.followUps}}" } }] } })
+    expect(good).toMatchObject({ ok: true, problems: [] })
+  })
+
   it("refuses a destructive tool with the problem and its path", async () => {
     const { tools } = setup()
     const r = await call(tools.buat_flow, { definition: { name: "Hapus", steps: [{ id: "x", kind: "tool", tool: "reminders__batal_pengingat" }] } })
@@ -132,6 +162,25 @@ describe("flow tools", () => {
     expect(await call(tools.jalankan_flow, { id: made.id })).toMatchObject({ ok: false, error: 'Flow "Briefing pagi" lagi dijeda.' })
     expect(await call(tools.hapus_flow, { id: made.id })).toMatchObject({ ok: true })
     expect(listFlows(db)).toEqual([])
+  })
+
+  it("hide a routine's shadow flow everywhere, and its name doesn't block a new flow", async () => {
+    const { db, chat, tools } = setup()
+    const shadow = createFlow(db, { chatId: chat.id, definition: { ...BRIEFING, name: "Sholat 5 waktu" }, createdBy: "migration", legacyRoutineId: "rtn_1", shadow: true }, NOW).flow
+    expect(await call(tools.daftar_flow, {})).toMatchObject({ count: 0 })
+    for (const ref of [shadow.id, "Sholat 5 waktu"]) {
+      const shown = await call(tools.lihat_flow, { id: ref })
+      expect(shown).toMatchObject({ ok: false })
+      expect(shown.error).toContain("routines__jadikan_flow")
+    }
+    expect(await call(tools.cek_flow, { id: shadow.id })).toMatchObject({ ok: false })
+    expect(await call(tools.hapus_flow, { id: shadow.id })).toMatchObject({ ok: false })
+
+    const made = await call(tools.buat_flow, { definition: { ...BRIEFING, name: "Sholat 5 waktu" } })
+    expect(made).toMatchObject({ ok: true })
+    expect(getFlow(db, shadow.id)).toMatchObject({ name: "Sholat 5 waktu (rutinitas)", shadow: true })
+    expect((await call(tools.lihat_flow, { id: "Sholat 5 waktu" })).flow).toMatchObject({ id: made.id })
+    expect(await call(tools.daftar_flow, {})).toMatchObject({ count: 1, flows: [{ name: "Sholat 5 waktu" }] })
   })
 })
 

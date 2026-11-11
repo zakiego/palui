@@ -44,6 +44,7 @@ describe("routine tools", () => {
       ubah_rutinitas: "write",
       jeda_rutinitas: "write",
       hapus_rutinitas: "destructive",
+      jadikan_flow: "write",
       pratinjau_rutinitas: "read",
       jawab_checkin: "write",
       riwayat_rutinitas: "read",
@@ -95,8 +96,22 @@ describe("routine tools", () => {
 
     const otherTools = routineTools(db, { ...turn, chatId: other.id }, { clock: () => NOW })
     expect((await call(otherTools.hapus_rutinitas, { id: made.id })).ok).toBe(false)
-    expect((await call(tools.hapus_rutinitas, { id: made.id })).message).toBe('Rutinitas "Minum obat" dihapus.')
+    expect((await call(tools.hapus_rutinitas, { id: made.id })).message).toBe('Rutinitas "Minum obat" dihapus, riwayatnya juga.')
     expect((await call(tools.daftar_rutinitas, {})).message).toBe("Belum ada rutinitas.")
+  })
+
+  it("turns a routine into a flow, keeping it, and the flow tools see it", async () => {
+    const { flowForRoutine, syncRoutineFlows } = await import("@palui/core/flows/migrate")
+    const { db, tools, turn } = setup()
+    const made = await call(tools.buat_rutinitas, MEDICINE_ROUTINE)
+    syncRoutineFlows(db, NOW)
+    const shadow = flowForRoutine(db, made.id)!
+    const res = await call(tools.jadikan_flow, { id: made.id })
+    expect(res).toMatchObject({ ok: true, flowId: shadow.id, flow: "Minum obat", message: 'Rutinitas "Minum obat" sekarang jadi flow "Minum obat". Jadwal dan riwayatnya ikut pindah.' })
+    expect(getRoutine(db, made.id)).toBeUndefined()
+    const { flowTools } = await import("../flows/runtime")
+    expect(await call(flowTools(db, turn, { clock: () => NOW }).daftar_flow, {})).toMatchObject({ count: 1, flows: [{ name: "Minum obat", active: true }] })
+    expect(await call(tools.jadikan_flow, { id: made.id })).toMatchObject({ ok: false })
   })
 
   it("previews a draft source, reporting fields that don't parse", async () => {

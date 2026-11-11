@@ -16,10 +16,17 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - Palui can read its own setup and change its settings from chat. Ask "timezone kamu apa?" or "ganti model fast ke claude-haiku-4-5" and the new builtin Settings connector looks up or changes the timezone, language, model roles, budgets and fallback channel. Every change asks you first, only Palui (not other agents) can make one, and secrets are never shown.
 - `/report` in any chat replies with a debug snapshot of that chat: chat and session ids, recent runs with their errors and tool calls that didn't finish, the last 10 messages, unsent outbox rows, recent warnings and a dashboard link. Add a note after it (`/report it answered twice`) and paste the reply into a coding agent. Each report gets an id (`rpt_...`) and is saved in the database, so the id alone is enough later. In a group the report goes to your own chat and the group only sees the id. A flow can no longer use `/report` as its chat trigger. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 - Eight new chat commands. `/help` lists the commands, including the ones your flows answer to. `/usage` shows today's tokens and runs by model and agent. `/models` lists what each model connector offers, and `/model <name>` puts a model first for a role (the same setting as the dashboard's Settings page). `/tools` shows the tools a turn in this chat would get. `/btw <question>` answers a side question without adding it to the session. `/compact` folds the older messages into the session summary now. `/id` shows the chat, session and message ids, and the ids of a message you quote.
+- Ask Palui to turn a routine into a flow and it keeps the routine's schedule, pause state, open check-ins and whole log (the new `jadikan_flow` routine tool). Before, replacing a routine meant deleting it, and its history and shadow flow went with it. Deleting a routine now says plainly that its log goes too.
 
 ### Changed
 
 - `/help`, `/models`, `/model`, `/usage`, `/btw`, `/compact`, `/tools` and `/id` are now built-in commands, so a flow can't use them as its chat command. A flow that already does stops answering to it: give it another command.
+
+### Fixed
+
+- After you approve a tool, Palui no longer trusts lists it read in the same step before your answer. It used to say a delete hadn't worked because a list taken a second earlier still showed the item.
+- A routine's shadow flow no longer blocks a flow you create with the same name. Shadow flows are now hidden from every flow tool, not only the list, and the shadow one moves aside to `<name> (rutinitas)`.
+- Checking a draft flow now finds the recap tool (`flows__ringkasan`) for a recap step, and a re-ask that uses the routine-style `{{n}}` points to `{{run.followUps}}`.
 
 ## 0.5.0 (2026-11-12)
 

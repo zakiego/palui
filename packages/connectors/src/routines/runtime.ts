@@ -29,14 +29,15 @@ import {
 } from "@palui/core/routines/service"
 import { nextLocalTime, refreshToolSource, upcoming, type Occurrence, type ToolCaller } from "@palui/core/routines/sources"
 import { getSetting } from "@palui/core/settings"
-import { routineMode } from "@palui/core/flows/migrate"
+import { promoteRoutine, routineMode } from "@palui/core/flows/migrate"
+import { FlowError } from "@palui/core/flows/service"
 import { flowBackedRoutineTools } from "./flows"
 import manifest from "./manifest"
 
 type Fail = { ok: false; error: string }
 
 function fail(e: unknown): Fail {
-  if (e instanceof RoutineError || e instanceof TimeError) return { ok: false, error: e.message }
+  if (e instanceof RoutineError || e instanceof TimeError || e instanceof FlowError) return { ok: false, error: e.message }
   throw e
 }
 
@@ -230,13 +231,34 @@ export function routineTools(db: DB, turn: TurnInfo, deps: RoutineToolDeps = {})
       class: "destructive",
       title: "Delete a routine",
       tool: tool({
-        description: "Delete a routine and its whole log. To stop it for a while, use jeda_rutinitas instead.",
+        description:
+          "Delete a routine for good, with its whole log: every past check-in and answer is gone and can't be recovered. To stop it for a while, use jeda_rutinitas. To replace it with a flow, use jadikan_flow instead, which keeps the schedule and the log.",
         inputSchema: z.object({ id: z.string().describe("Routine id from daftar_rutinitas.") }),
         execute: async ({ id }) => {
           const own = ownRoutine(db, id, chatId)
           if ("ok" in own) return own
           deleteRoutine(db, id)
-          return { ok: true as const, message: `Rutinitas "${own.name}" dihapus.` }
+          return { ok: true as const, message: `Rutinitas "${own.name}" dihapus, riwayatnya juga.` }
+        },
+      }),
+    },
+
+    jadikan_flow: {
+      class: "write",
+      title: "Turn a routine into a flow",
+      tool: tool({
+        description:
+          "Turn a routine into a flow: the flow keeps the routine's schedule, pause state, open check-ins and whole log, and the routine is removed. Use it whenever the owner wants to replace a routine with a flow or change it with the flow tools; never delete the routine and create a new flow for that, which loses the log. Afterwards manage it with the flow tools (lihat_flow, ubah_flow) under the returned name.",
+        inputSchema: z.object({ id: z.string().describe("Routine id from daftar_rutinitas.") }),
+        execute: async ({ id }) => {
+          const own = ownRoutine(db, id, chatId)
+          if ("ok" in own) return own
+          try {
+            const flow = promoteRoutine(db, id, clock())
+            return { ok: true as const, flowId: flow.id, flow: flow.name, message: `Rutinitas "${own.name}" sekarang jadi flow "${flow.name}". Jadwal dan riwayatnya ikut pindah.` }
+          } catch (e) {
+            return fail(e)
+          }
         },
       }),
     },

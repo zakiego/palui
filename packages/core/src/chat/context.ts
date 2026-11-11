@@ -349,3 +349,35 @@ export function quotesOutsider(rows: HistoryRow[], ids: Set<string>): boolean {
 export function hasImages(rows: HistoryRow[], ids: Set<string>): boolean {
   return rows.some((r) => ids.has(r.id) && ((r.content as StoredContent)?.media ?? []).some((m) => m.kind === "image"))
 }
+
+export const STALE_READ_NOTE = "[Taken before the owner approved the other call in this step. It may be out of date now: call this tool again for the current state.]"
+
+// The AI SDK runs every call of a step that needs no approval right away, and
+// the approved ones only when the owner answers. On resume, the results of the
+// calls made next to an approved one are older than what it changed (a list
+// still showing the routine that was just deleted), so they say so.
+export function markStaleReads(msgs: ModelMessage[], approvedCallIds: Set<string>): ModelMessage[] {
+  if (!approvedCallIds.size) return msgs
+  const at = msgs.findLastIndex((m) => m.role === "assistant" && Array.isArray(m.content) && m.content.some((p) => p.type === "tool-call" && approvedCallIds.has(p.toolCallId)))
+  if (at < 0) return msgs
+  const asked = msgs[at]!.content as Exclude<ModelMessage["content"], string>
+  const siblings = new Set(asked.flatMap((p) => (p.type === "tool-call" && !approvedCallIds.has(p.toolCallId) ? [p.toolCallId] : [])))
+  if (!siblings.size) return msgs
+  return msgs.map((m, i) => {
+    if (i <= at || m.role !== "tool") return m
+    return { ...m, content: m.content.map((p) => (p.type === "tool-result" && siblings.has(p.toolCallId) ? { ...p, output: staleOutput(p.output) } : p)) }
+  })
+}
+
+function staleOutput(o: ToolResultPart["output"]): ToolResultPart["output"] {
+  switch (o.type) {
+    case "text":
+      return o.value.startsWith(STALE_READ_NOTE) ? o : { ...o, value: `${STALE_READ_NOTE}\n${o.value}` }
+    case "json":
+      return { type: "text", value: `${STALE_READ_NOTE}\n${JSON.stringify(o.value)}` }
+    case "content":
+      return { ...o, value: [{ type: "text", text: STALE_READ_NOTE }, ...o.value] }
+    default:
+      return o
+  }
+}

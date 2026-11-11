@@ -289,7 +289,8 @@ export function parseExpr(src: string): Node {
   function path(): PathNode {
     const t = next()
     if (!(ROOTS as readonly string[]).includes(t.v)) {
-      throw new ExprError(`"${t.v}" isn't a known value. Paths start with ${ROOTS.join(", ")}.`, t.s)
+      // Routines had {{n}} for the re-ask number.
+      throw new ExprError(`"${t.v}" isn't a known value. Paths start with ${ROOTS.join(", ")}.${t.v === "n" ? " For the re-ask number use run.followUps." : ""}`, t.s)
     }
     const segs: (Segment | Node)[] = []
     for (;;) {

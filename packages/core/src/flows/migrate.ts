@@ -23,7 +23,7 @@ import { configOf, type OccurrenceRow, type RoutineRow } from "../routines/servi
 import { getSetting, setSetting } from "../settings"
 import { MAIN_TRIGGER, RECAP_TRIGGER, routineToFlow } from "./convert"
 import type { FlowDefinition } from "./schema"
-import { createFlow, currentVersion, definitionOf, deleteFlow, findFlowByName, getFlow, hashDefinition, nextScheduled, setFlowPaused, triggersOf, updateFlow, type FlowRow, type RunRow } from "./service"
+import { createFlow, currentVersion, definitionOf, deleteFlow, findFlowByName, FlowError, getFlow, hashDefinition, nextScheduled, setFlowPaused, triggersOf, updateFlow, type FlowRow, type RunRow } from "./service"
 import { parseDefinition } from "./validate"
 
 export type RoutineMode = "legacy" | "shadow" | "flows"
@@ -264,6 +264,40 @@ function syncRoutineFlowsForHandover(db: DB, now: number) {
     const def = definitionFor(r, name)
     if (def) createFlow(db, { chatId: r.chatId, definition: def, createdBy: "migration", legacyRoutineId: r.id, shadow: true }, now)
   }
+}
+
+// --- One routine, on the owner's word -----------------------------------------------------
+
+// The owner replaces a routine with a flow before the handover (legacy or shadow
+// mode). Its flow (the shadow one, or a new one in legacy mode) takes the
+// routine's schedule state and occurrence log exactly like the handover does,
+// stops being a shadow, and the routine goes. Deleting the routine and making a
+// new flow instead would lose both, and the sync would delete the shadow flow.
+export function promoteRoutine(db: DB, routineId: string, now = Date.now()): FlowRow {
+  if (routineMode(db) === "flows") throw new FlowError("Routines already run as flows; change it with the flow tools.")
+  const r = db.select().from(routines).where(eq(routines.id, routineId)).get()
+  if (!r) throw new FlowError(`No routine ${routineId}.`)
+  let flow = flowForRoutine(db, r.id)
+  if (flow && !flow.shadow) throw new FlowError(`Routine "${r.name}" is already the flow "${flow.name}".`)
+  if (!flow) {
+    const def = definitionFor(r, uniqueName(db, r.chatId, r.name))
+    if (!def) throw new FlowError(`Routine "${r.name}" couldn't become a flow.`)
+    flow = createFlow(db, { chatId: r.chatId, definition: def, createdBy: "migration", note: "routine became a flow", legacyRoutineId: r.id, shadow: true }, now).flow
+  } else {
+    const def = definitionFor(r, flow.name)
+    if (def && hashDefinition(def) !== currentVersion(db, flow).hash) flow = updateFlow(db, flow.id, { definition: def, createdBy: "migration", note: "routine changed" }, now).flow
+  }
+  const f = flow
+  db.transaction(() => {
+    copyState(db, f, r, now)
+    migrateOccurrences(db, f, r, now)
+    db.update(flows).set({ shadow: false, updatedAt: now }).where(eq(flows.id, f.id)).run()
+    db.delete(routineOccurrences).where(eq(routineOccurrences.routineId, r.id)).run()
+    db.delete(routines).where(eq(routines.id, r.id)).run()
+  })
+  logEvent(db, { kind: "flow.routine_promoted", message: `Routine "${r.name}" became the flow "${f.name}", with its schedule and log.`, data: { routineId: r.id, flowId: f.id } }, now)
+  notifyScheduleChanged()
+  return getFlow(db, f.id)!
 }
 
 // --- Shadow compare -----------------------------------------------------------------------

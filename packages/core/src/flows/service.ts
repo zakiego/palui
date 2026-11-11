@@ -245,10 +245,11 @@ export function createFlow(db: DB, input: SaveInput, now = Date.now()): SaveResu
   const r = check(db, input.chatId, input.definition, input.validate)
   const def = r.definition!
   if (!getChat(db, input.chatId)) throw new FlowError(`No chat ${input.chatId}.`)
-  if (listFlows(db, input.chatId).length >= MAX_FLOWS_PER_CHAT) throw new FlowError(`This chat already has ${MAX_FLOWS_PER_CHAT} flows. Delete one first.`)
-  if (findFlowByName(db, input.chatId, def.name)) throw new FlowError(`A flow named "${def.name}" already exists in this chat. Pick another name or change that one with ubah_flow.`)
+  if (listFlows(db, input.chatId).filter((f) => !f.shadow).length >= MAX_FLOWS_PER_CHAT) throw new FlowError(`This chat already has ${MAX_FLOWS_PER_CHAT} flows. Delete one first.`)
   const tz = def.tz ?? getSetting(db, "timezone")
   if (!isValidZone(tz)) throw new FlowError(`Unknown time zone "${tz}".`)
+  if (!input.shadow) moveShadowAside(db, input.chatId, def.name, now)
+  if (findFlowByName(db, input.chatId, def.name)) throw new FlowError(`A flow named "${def.name}" already exists in this chat. Pick another name or change that one with ubah_flow.`)
   const flowId = newId("flw")
   const versionId = newId("flv")
   const needsApproval = r.writeCalls.length > 0
@@ -294,6 +295,20 @@ export function createFlow(db: DB, input: SaveInput, now = Date.now()): SaveResu
   logEvent(db, { kind: "flow.created", message: `Flow "${flow.name}" created (version 1${needsApproval ? ", waiting for approval" : ""}).`, data: { flowId, versionId } }, now)
   notifyScheduleChanged()
   return { flow, version, changed: true, needsApproval, writeCalls: r.writeCalls, diff: [] }
+}
+
+// A shadow flow (a routine's flow in its shadow week) is hidden from the agent's
+// flow tools, so its name mustn't block a flow the owner makes: it moves aside to
+// "<name> (rutinitas)". The routine sync keeps whatever name the flow has.
+function moveShadowAside(db: DB, chatId: string, name: string, now: number) {
+  const f = findFlowByName(db, chatId, name)
+  if (!f?.shadow) return
+  let next = ""
+  for (let i = 1; i < 50 && !next; i++) {
+    const n = `${f.name} (rutinitas${i > 1 ? ` ${i}` : ""})`.slice(0, 80)
+    if (!findFlowByName(db, chatId, n)) next = n
+  }
+  updateFlow(db, f.id, { patch: { name: next || `${f.name.slice(0, 60)} ${newId("r").slice(-6)}` }, createdBy: "migration", note: "renamed for a flow the owner made with the same name" }, now)
 }
 
 function webhookIds(def: FlowDefinition): string[] {

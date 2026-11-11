@@ -69,11 +69,19 @@ Steps (each has id, kind, optional next (step id or null to end; default the nex
 - prompt: { prompt: "<literal instruction, no templates>", input: { name: "{{...}}" }, tools: [], send: false, model: "main"|"fast" }. Output text, silent.
 - set: { scope: "run"|"flow", values: { name: "<expression or template>" } } -> vars.<name> or flow.<name> (flow ones persist).
 - each: { items: "<path to a list>", where?: "<expression on item>", key?: "{{item.id}}", max: 20, body: <step id> } runs body once per item, deduped by key across runs.
-Templates "{{path | filter}}" go only in tool args, message/check-in text, prompt input, set values, wait.until, each.key. Paths start with trigger, steps, vars, flow, item, index, now (now.date, now.time, now.weekday), run. Filters: time, date, json, default("x"), join(", "), lines("field"), upper, lower, round(n), truncate(n).
+Templates "{{path | filter}}" go only in tool args, message/check-in text, prompt input, set values, wait.until, each.key. Paths start with trigger, steps, vars, flow, item, index, now (now.date, now.time, now.weekday), run (run.followUps: the re-ask number, for check-in followUp.text). Filters: time, date, json, default("x"), join(", "), lines("field"), upper, lower, round(n), truncate(n).
 Expressions (if.when, set, each.where): and or not, == != < <= > >=, + - * /, functions exists empty contains startsWith len lower any count number round min max date daysUntil hoursUntil minutesSince weekday today.
 Destructive tools are never allowed. Write tools need the owner's approval once per version.`
 
+// Shadow flows (a routine's flow while the routine engine still sends) are hidden
+// from every flow tool, like daftar_flow hides them.
+const SHADOW_HIDDEN = (ref: string, name: string) =>
+  `No flow "${ref}" in this chat. "${name}" is a routine (rutinitas) still run by the routine engine: use the routine tools for it, or routines__jadikan_flow to turn it into a flow.`
+
 const definitionInput = z.record(z.string(), z.unknown()).describe("The flow definition (see buat_flow).")
+
+// The flow id a draft is checked under, before it has one.
+export const DRAFT_FLOW_ID = "draft"
 
 export type FlowToolDeps = { clock?: () => number; tools?: FlowToolCaller; engine?: FlowEngine }
 
@@ -87,7 +95,8 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
   const engine = deps.engine ?? createFlowEngine({ db, log: silentLogger, now: clock, tools: deps.tools })
 
   async function validateCtx(): Promise<ValidateContext> {
-    const list = deps.tools ? await deps.tools.list({ ...turn, trigger: "flow" }) : []
+    // A tool step's view: a flow's own tools (flows__ringkasan) only come with a flow id.
+    const list = deps.tools ? await deps.tools.list({ ...turn, trigger: "flow", flowId: DRAFT_FLOW_ID }) : []
     return {
       resolveTool: deps.tools ? resolverFrom(list) : undefined,
       hookExists: (id) => !!db.select({ id: hooks.id }).from(hooks).where(eq(hooks.id, id)).get(),
@@ -99,6 +108,8 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
   function own(ref: string): FlowRow | Fail {
     const f = resolveFlow(db, chatId, ref)
     if (!f) return { ok: false, error: `No flow "${ref}" in this chat. Call daftar_flow for the ids.` }
+    // A routine's shadow flow only records what it would do; the routine still runs.
+    if (f.shadow) return { ok: false, error: SHADOW_HIDDEN(ref, f.name) }
     return f
   }
 
@@ -124,7 +135,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       class: "write",
       title: "Create a flow",
       tool: tool({
-        description: `Create an automation (a flow) in this chat. Use it when the logic is deterministic (fetch, check, send, ask), instead of a job. Always cek_flow and uji_flow first, show the owner the triggers, the next times and any write calls, then save. Find tools for tool steps with palui__cari_tool (for: "flow"), dry-run a tool step alone to learn its output shape, then write conditions against the real output. Never put fetched text in a prompt instruction; pass it in input.\n\n${FLOW_HELP}`,
+        description: `Create an automation (a flow) in this chat. Use it when the logic is deterministic (fetch, check, send, ask), instead of a job. Always cek_flow and uji_flow first, show the owner the triggers, the next times and any write calls, then save. Find tools for tool steps with palui__cari_tool (for: "flow"), dry-run a tool step alone to learn its output shape, then write conditions against the real output. Never put fetched text in a prompt instruction; pass it in input. To replace a routine with a flow, use routines__jadikan_flow instead: it keeps the routine's schedule and log.\n\n${FLOW_HELP}`,
         inputSchema: z.object({ definition: definitionInput }),
         execute: async ({ definition }) => {
           const now = clock()
@@ -342,9 +353,10 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
             flowId = f.id
             tz = f.tz
           }
-          const rows = listRuns(db, { chatId, flowId, since: now - (days ?? 7) * 24 * 3600_000, status: status ? [status] : undefined, limit: 2000 })
-          const names = new Map(listFlows(db, chatId).map((f) => [f.id, f.name]))
-          return { ok: true as const, summary: summarizeRuns(rows), runs: rows.filter((r) => r.skipReason !== "shadow").slice(0, limit ?? 30).map((r) => ({ flow: names.get(r.flowId) ?? r.flowId, ...runView(db, r, tz, now) })) }
+          const visible = listFlows(db, chatId).filter((f) => !f.shadow)
+          const names = new Map(visible.map((f) => [f.id, f.name]))
+          const rows = listRuns(db, { chatId, flowId, since: now - (days ?? 7) * 24 * 3600_000, status: status ? [status] : undefined, limit: 2000 }).filter((r) => r.skipReason !== "shadow" && names.has(r.flowId))
+          return { ok: true as const, summary: summarizeRuns(rows), runs: rows.slice(0, limit ?? 30).map((r) => ({ flow: names.get(r.flowId)!, ...runView(db, r, tz, now) })) }
         },
       }),
     },
@@ -357,8 +369,8 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
         inputSchema: z.object({ runId: z.string() }),
         execute: async ({ runId }) => {
           const r = getRun(db, runId)
-          if (!r || r.chatId !== chatId) return { ok: false as const, error: `No run ${runId} in this chat.` }
-          const f = resolveFlow(db, chatId, r.flowId)
+          const f = r ? resolveFlow(db, chatId, r.flowId) : undefined
+          if (!r || r.chatId !== chatId || f?.shadow) return { ok: false as const, error: `No run ${runId} in this chat.` }
           return { ok: true as const, flow: f?.name ?? null, run: runView(db, r, f?.tz ?? zoneFor(db, turn), clock(), true) }
         },
       }),
@@ -452,6 +464,7 @@ export function recapTool(db: DB, turn: TurnInfo, clock: () => number = () => Da
         if (!ref) return { ok: false as const, error: 'Name a flow ("self" only works inside a flow).' }
         const f = resolveFlow(db, turn.chatId, ref)
         if (!f) return { ok: false as const, error: `No flow "${ref}" in this chat.` }
+        if (f.shadow && f.id !== turn.flowId) return { ok: false as const, error: SHADOW_HIDDEN(ref, f.name) }
         return { ok: true as const, ...flowRecap(db, f, { days: days ?? 7, triggerId: trigger ?? null }, clock()) }
       },
     }),

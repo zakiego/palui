@@ -21,7 +21,7 @@ import { checkinsPrompt } from "../routines/service"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, emptyTools, SEARCH_TOOL, STICKY_MAX, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
-import { buildSystem, buildTurnContext, hasImages, loadHistory, loadToolCalls, quotesOutsider, systemBlocks, toModelMessages, withTurnContext, type StoredContent } from "./context"
+import { buildSystem, buildTurnContext, hasImages, loadHistory, loadToolCalls, markStaleReads, quotesOutsider, systemBlocks, toModelMessages, withTurnContext, type StoredContent } from "./context"
 import type { EngineDeps } from "./deps"
 
 export const MODEL_OFF_TEXT = "Model lagi off. Nyalakan: `/connectors on cliproxy`"
@@ -254,7 +254,9 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         approved: a.status === "approved",
         reason: APPROVAL_REASON[a.status] ?? "Denied by the owner",
       }))
-      modelMessages = [...input.resume.messages, { role: "tool", content: responses }]
+      // Reads that ran next to an approved call are older than what it changed.
+      const approved = new Set(input.resume.approvals.flatMap((a) => (a.status === "approved" && a.toolCallId ? [a.toolCallId] : [])))
+      modelMessages = [...markStaleReads(input.resume.messages, approved), { role: "tool", content: responses }]
     } else {
       const batchText = history
         .filter((h) => batch.has(h.id))
