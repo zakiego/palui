@@ -95,10 +95,10 @@ Only with fakes:
    Say hi in Chats.
 5. Telegram: in Telegram, @BotFather, `/newbot`, copy the token. Dashboard, Saklar, Telegram, paste, Connect, open the claim link, press Start. (Or `docker compose exec -T app palui saklar connect telegram --secret-stdin botToken < token.txt`, then get the claim link in the sheet.)
 6. WhatsApp (utusan's number, as a new linked device): first remove your DM's binding from `~/.utusan/utusan.json`. Dashboard, Saklar, WhatsApp: save your phone as owner, tick "This chat isn't bound in utusan", press Start pairing, then type utusan's number under "Number to link" and press Get code. On utusan's phone: WhatsApp, Linked devices, Link with phone number, enter the 8-character code.
-7. Done 2026-11-10: landing and docs are live at https://palui.zakiego.com (Pages project `palui-site`, a Direct Upload, plus the `palui-edge` Worker on `palui.zakiego.com/*`). Until steps 2 and 3 run, `/app`, `/api` and `/health` fall through to the `*.zakiego.com` wildcard and answer 404. To redeploy the site after a docs change:
+7. Done 2026-11-10: landing and docs are live at https://palui.zakiego.com (the `palui-edge` Worker on `palui.zakiego.com/*`, sending site paths to Pages). Until steps 2 and 3 run, `/app`, `/api` and `/health` fall through to the `*.zakiego.com` wildcard and answer 404. Since 2026-11-11 the site is the git-connected Pages project `palui-web`, which builds `apps/site` on every push to `main`, so there's nothing to deploy by hand. Build logs:
    ```bash
-   cd ~/Code/JS/Node/2026/palui && pnpm --filter @palui/site build
-   XDG_CONFIG_HOME="$HOME/.wrangler-accounts/personal" npx wrangler pages deploy apps/site/out --project-name palui-site --branch main
+   CF="$HOME/.agents/skills/cf-zakiego-lab/scripts/cf-zakiego-lab"
+   "$CF" pages deployments list --project-name palui-web
    ```
 8. Auto-deploy: add `"zakiego/palui": "palui"` to `~/.agents/skills/zaki-selfhost/webhook/apps.json`, `launchctl kickstart -k gui/$(id -u)/id.zakiego.selfhost-webhook`, then create the GitHub hook with the command in the zaki-selfhost skill ("Add a repo", step 3).
 9. Monitoring: add `https://palui.zakiego.com/health` to the `http` list in `~/.agents/skills/m4-alerts/config.default.json`.

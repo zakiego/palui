@@ -11,9 +11,8 @@
   "workers_dev": false,
   "routes": [{ "pattern": "palui.zakiego.com/*", "zone_name": "zakiego.com" }],
   "vars": {
-    // Placeholder until the Pages project exists. Check the real *.pages.dev
-    // hostname after creating it (Pages may add a suffix if the name is taken).
-    "SITE_ORIGIN": "https://palui-site.pages.dev"
+    // The git-connected Pages project (palui-web), built on every push to main.
+    "SITE_ORIGIN": "https://palui-web.pages.dev"
   },
   "observability": { "enabled": true },
   "env": {
@@ -26,7 +25,7 @@
       "workers_dev": true,
       "routes": [],
       "vars": {
-        "SITE_ORIGIN": "https://palui-site.pages.dev",
+        "SITE_ORIGIN": "https://palui-web.pages.dev",
         "APP_ORIGIN": "https://palui.zakiego.com"
       }
     }
