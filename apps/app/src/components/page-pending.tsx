@@ -72,6 +72,16 @@ export function SkeletonText({ className, width }: { className: string; width: s
   )
 }
 
+/** A StatusText (a colored word with its icon, no pill): an icon dot and a short word at text-xs. */
+export function StatusTextSkeleton({ className, width = "w-10" }: { className?: string; width?: string }) {
+  return (
+    <span className={cn("flex h-lh shrink-0 items-center gap-1 text-xs", className)}>
+      <Skeleton className="size-3.5 rounded-full" />
+      <Skeleton className={cn("h-[0.8em]", width)} />
+    </span>
+  )
+}
+
 /** A Button-sized block (default size, 40 px on touch, like the real one). */
 export function SkeletonButton({ className }: { className?: string }) {
   return <Skeleton className={cn("h-8 shrink-0 pointer-coarse:h-10", className)} />
@@ -127,8 +137,10 @@ export type SkeletonColumn = {
    * for one line; class strings for lines that only show at some widths.
    */
   sub?: true | string | string[]
-  /** A pill instead of a line (a status badge). */
+  /** A pill instead of a line (a Badge: a kind, a channel, a mode). */
   badge?: boolean
+  /** A StatusText instead of a line (a state that changes: on, failed, overdue). */
+  status?: boolean
   /** Controls at the end of the row: one block per entry (its size classes), right-aligned. */
   controls?: string[]
   align?: "end"
@@ -163,14 +175,16 @@ export function TableSkeleton({ columns, rows = 6 }: { columns: SkeletonColumn[]
               {columns.map((c, i) => (
                 <TableCell key={i} className={c.className}>
                   {c.controls ? (
-                    <span className="flex items-center justify-end gap-2">
+                    <span className="ms-auto flex w-max items-center justify-end gap-1">
                       {c.controls.map((size, k) => (
                         <Skeleton key={k} className={cn("shrink-0", size)} />
                       ))}
                     </span>
                   ) : (
                     <span className={cn("flex flex-col gap-1", c.align === "end" && "items-end")}>
-                      {c.badge ? (
+                      {c.status ? (
+                        <StatusTextSkeleton width={c.short} />
+                      ) : c.badge ? (
                         <Skeleton className={cn("h-5 rounded-full", c.short ?? "w-14")} />
                       ) : (
                         <SkeletonText className={c.text ?? "text-sm"} width={c.short ?? LINE_WIDTHS[(r + i) % LINE_WIDTHS.length]} />

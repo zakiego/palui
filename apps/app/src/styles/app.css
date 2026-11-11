@@ -112,9 +112,8 @@
    read these; the semantic tier below points at them, so dark mode is a
    second set of ramps rather than an audit of every usage.
 
-   One neutral, zinc, plus Palui's single accent: Banjar sasirangan indigo
-   (provisional, see DESIGN.md). It can't be mistaken for a status: green is
-   on, zinc is paused, red is broken. Red, green and amber stay, because they carry status,
+   One neutral, zinc, which also fills the primary button, the same mono
+   palette as the site. Red, green and amber stay, because they carry status,
    not brand. Every text pair was measured, not eyeballed: zinc-11 on white is
    6.0:1 in light and 7.1:1 on the dark card; zinc-8, the input outline,
    clears 3:1 against every surface it sits on. */
@@ -147,12 +146,6 @@
     --amber-6: oklch(0.87 0.09 70);
     --amber-9: oklch(0.75 0.15 70);
     --amber-11: oklch(0.5 0.11 70);
-    /* Sasirangan indigo, the one accent. White on 9 is 8.1:1. */
-    --indigo-3: oklch(0.955 0.025 270);
-    --indigo-4: oklch(0.925 0.04 270);
-    --indigo-9: oklch(0.45 0.15 270);
-    --indigo-10: oklch(0.4 0.15 270);
-    --indigo-11: oklch(0.45 0.15 270);
 }
 
 .dark {
@@ -185,12 +178,6 @@
     --amber-6: oklch(0.42 0.09 70);
     --amber-9: oklch(0.78 0.14 70);
     --amber-11: oklch(0.84 0.12 70);
-    /* At night the solid lifts to 0.7 and its label flips to ink (6.4:1). */
-    --indigo-3: oklch(0.27 0.06 270);
-    --indigo-4: oklch(0.31 0.08 270);
-    --indigo-9: oklch(0.7 0.13 270);
-    --indigo-10: oklch(0.76 0.11 270);
-    --indigo-11: oklch(0.8 0.1 270);
 }
 
 /* -------------------------------------------------------------- semantics
@@ -208,11 +195,11 @@
     --popover-foreground: var(--zinc-12);
     --code: var(--zinc-2);
 
-    --primary: var(--indigo-9);
-    --primary-hover: var(--indigo-10);
+    --primary: var(--zinc-9);
+    --primary-hover: var(--zinc-10);
     --primary-foreground: oklch(1 0 0);
-    --primary-subtle: var(--indigo-3);
-    --primary-fg: var(--indigo-11);
+    --primary-subtle: var(--zinc-5);
+    --primary-fg: var(--zinc-12);
 
     --secondary: var(--zinc-3);
     --secondary-foreground: var(--zinc-12);
@@ -246,13 +233,15 @@
        an offset, so it only ever crosses the surface behind it. */
     --focus-ring: var(--zinc-9);
 
-    --chart-1: var(--indigo-9);
-    --chart-3: var(--zinc-data);
+    /* Tokens in and out: two zinc steps far enough apart in lightness to
+       tell apart without a hue. */
+    --chart-1: var(--zinc-data);
+    --chart-3: var(--zinc-8);
     --chart-2: var(--red-9);
 
     --sidebar: var(--zinc-2);
     --sidebar-foreground: var(--zinc-11);
-    --sidebar-primary: var(--indigo-9);
+    --sidebar-primary: var(--zinc-9);
     --sidebar-primary-foreground: oklch(1 0 0);
     --sidebar-accent: var(--zinc-4);
     --sidebar-accent-foreground: var(--zinc-12);
@@ -283,7 +272,7 @@
     --card: var(--zinc-card);
     --popover: var(--zinc-3);
     --code: var(--zinc-1);
-    /* The solid flips to near white at night, so its label flips to ink. */
+    /* Primary is near white at night, so its label flips to ink. */
     --primary-foreground: var(--zinc-card);
     --sidebar-primary-foreground: var(--zinc-card);
     --secondary: var(--zinc-4);

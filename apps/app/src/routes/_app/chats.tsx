@@ -4,7 +4,7 @@
 // calls sit inline and collapsible; pending approvals show Approve/Deny.
 import * as React from "react"
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
-import { ArrowUpIcon, CircleAlertIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SendIcon, ShieldAlertIcon, SquareIcon, MessageCircleIcon, WebhookIcon, WrenchIcon } from "lucide-react"
+import { ArrowUpIcon, CircleAlertIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SearchIcon, SendIcon, ShieldAlertIcon, SquareIcon, MessageCircleIcon, WebhookIcon, WrenchIcon } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -14,12 +14,13 @@ import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending, SkeletonText } from "@/components/page-pending"
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import { StatusText } from "@/components/ui/status-text"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group"
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, InputGroupTextarea } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { Message, MessageContent, MessageFooter } from "@/components/ui/message"
 import { MessageScroller, MessageScrollerProvider, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerViewport } from "@/components/ui/message-scroller"
@@ -28,11 +29,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import { RuntimeAlert } from "@/components/runtime-alert"
-import { useIsMobile } from "@/hooks/use-mobile"
 import { decideApproval, getChats, getTranscript, sendWebMessage, stopTurn } from "@/lib/fns/chats"
 import { ago, duration, errorMessage } from "@/lib/format"
 import { markdownToPlain } from "@/lib/markdown"
-import { useT } from "@/lib/i18n"
+import { useLabel, useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_app/chats")({
@@ -56,10 +56,17 @@ type Transcript = Awaited<ReturnType<typeof getTranscript>>
 
 const CHANNEL_ICON = { telegram: SendIcon, whatsapp: MessageCircleIcon, web: MonitorIcon } as const
 
+// Both panes are a fixed height at every width, so the transcript scrolls
+// inside its card and opens at the newest message. Without a height on a phone
+// the card grew with the conversation and the composer ended up screens away.
+const PANE_HEIGHT = "h-[calc(100svh-16rem)] min-h-96 md:h-[calc(100svh-15rem)]"
+
+// Rows the chat list renders at once. Past this, search narrows it down.
+const LIST_LIMIT = 100
+
 function ChatsPage() {
   const data = Route.useLoaderData() as Data
   const t = useT()
-  const mobile = useIsMobile()
   const [listOpen, setListOpen] = React.useState(false)
   const current = data.chats.find((c) => c.id === data.chatId)
 
@@ -71,21 +78,20 @@ function ChatsPage() {
         title={t("chats.title")}
         description={t("chats.description")}
         actions={
-          mobile ? (
-            <Button variant="outline" onClick={() => setListOpen(true)}>
-              <ListIcon data-icon="inline-start" />
-              {t("chats.openList")}
-            </Button>
-          ) : undefined
+          // The list sits beside the transcript only when the page itself is
+          // wide enough (a container query, so an open sidebar counts). Below
+          // that it's a drawer behind this button.
+          <Button variant="outline" className="@3xl/main:hidden" onClick={() => setListOpen(true)}>
+            <ListIcon data-icon="inline-start" />
+            {t("chats.openList")}
+          </Button>
         }
       />
-      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[minmax(14rem,18rem)_1fr]">
-        {!mobile && (
-          <Card className="min-h-0 gap-0 py-0 md:h-[calc(100svh-15rem)]">
-            <h2 className="border-b px-4 py-3 text-heading">{t("chats.list")}</h2>
-            <ScrollArea className="min-h-0 flex-1">{list}</ScrollArea>
-          </Card>
-        )}
+      <div className="grid min-h-0 flex-1 gap-4 @3xl/main:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
+        <Card className={cn("hidden min-h-0 gap-0 py-0 @3xl/main:flex", PANE_HEIGHT)}>
+          <h2 className="border-b px-4 py-3 text-heading">{t("chats.list")}</h2>
+          <ScrollArea className="min-h-0 flex-1">{list}</ScrollArea>
+        </Card>
         {"error" in data.transcript ? (
           <Alert variant="destructive" className="self-start">
             <CircleAlertIcon aria-hidden="true" />
@@ -104,22 +110,31 @@ function ChatsPage() {
           <TranscriptPane key={data.chatId} transcript={data.transcript} isWeb={current?.channel === "web" || data.chatId === data.webChatId} />
         )}
       </div>
-      {mobile && (
-        <Drawer open={listOpen} onOpenChange={setListOpen} showSwipeHandle>
-          <DrawerContent>
-            <DrawerHeader className="group-data-[swipe-axis=y]/drawer-popup:text-start">
-              <DrawerTitle>{t("chats.list")}</DrawerTitle>
-            </DrawerHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">{list}</div>
-          </DrawerContent>
-        </Drawer>
-      )}
+      <Drawer open={listOpen} onOpenChange={setListOpen} showSwipeHandle>
+        <DrawerContent>
+          <DrawerHeader className="group-data-[swipe-axis=y]/drawer-popup:text-start">
+            <DrawerTitle>{t("chats.list")}</DrawerTitle>
+          </DrawerHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">{list}</div>
+        </DrawerContent>
+      </Drawer>
     </>
   )
 }
 
 function ChatList({ chats, activeId, onPick }: { chats: ChatRow[]; activeId: string; onPick: () => void }) {
   const t = useT()
+  const [query, setQuery] = React.useState("")
+  const matches = React.useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return q ? chats.filter((c) => c.title.toLowerCase().includes(q) || c.preview.toLowerCase().includes(q)) : chats
+  }, [chats, query])
+  // The open chat stays in the list even when it's past the cap.
+  const rows = React.useMemo(() => {
+    const head = matches.slice(0, LIST_LIMIT)
+    const active = matches.find((c) => c.id === activeId)
+    return active && !head.includes(active) ? [...head, active] : head
+  }, [matches, activeId])
   if (chats.length === 0) {
     return (
       <Empty className="p-4">
@@ -137,7 +152,17 @@ function ChatList({ chats, activeId, onPick }: { chats: ChatRow[]; activeId: str
   }
   return (
     <ItemGroup className="gap-0 p-2">
-      {chats.map((c) => {
+      {/* Only once the list is long enough to need it. */}
+      {chats.length > 8 && (
+        <InputGroup className="mb-1">
+          <InputGroupAddon>
+            <SearchIcon aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput type="search" aria-label={t("chats.search")} placeholder={t("chats.search")} value={query} onChange={(e) => setQuery(e.target.value)} />
+        </InputGroup>
+      )}
+      {matches.length === 0 && <p className="px-2 py-6 text-center text-sm text-muted-foreground">{t("chats.searchEmpty")}</p>}
+      {rows.map((c) => {
         const Icon = CHANNEL_ICON[c.channel]
         const active = c.id === activeId
         return (
@@ -152,7 +177,9 @@ function ChatList({ chats, activeId, onPick }: { chats: ChatRow[]; activeId: str
             </ItemMedia>
             <ItemContent className="min-w-0">
               <ItemTitle className="w-full min-w-0">
-                <span dir="auto" className="line-clamp-2 min-w-0 flex-1 text-left break-words">{c.title}</span>
+                <span dir="auto" className="line-clamp-2 min-w-0 flex-1 text-left break-words" title={c.title}>
+                  {c.title}
+                </span>
                 <span className="shrink-0 text-caption font-normal text-muted-foreground tabular-nums">{ago(c.lastAt)}</span>
               </ItemTitle>
               <ItemDescription className="line-clamp-1 break-all">
@@ -163,6 +190,11 @@ function ChatList({ chats, activeId, onPick }: { chats: ChatRow[]; activeId: str
           </Item>
         )
       })}
+      {matches.length > rows.length && (
+        <p className="px-2 py-3 text-center text-caption text-muted-foreground tabular-nums">
+          {t("chats.listCapped", { shown: rows.length.toLocaleString("en"), total: matches.length.toLocaleString("en") })}
+        </p>
+      )}
     </ItemGroup>
   )
 }
@@ -241,9 +273,11 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
   const empty = transcript.messages.length === 0 && optimistic.length === 0 && !turn
 
   return (
-    <Card className="min-h-[60svh] gap-0 py-0 md:h-[calc(100svh-15rem)]">
+    <Card className={cn("min-w-0 gap-0 py-0", PANE_HEIGHT)}>
       <header className="flex min-w-0 items-center gap-2 border-b px-4 py-3">
-        <h2 dir="auto" className="line-clamp-2 min-w-0 text-heading break-words">{transcript.chat.title}</h2>
+        <h2 dir="auto" className="line-clamp-2 min-w-0 text-heading break-words" title={transcript.chat.title}>
+          {transcript.chat.title}
+        </h2>
         <Badge variant="outline">{transcript.chat.channel}</Badge>
       </header>
       {isWeb && down && <RuntimeAlert className="m-3 w-auto" />}
@@ -390,33 +424,54 @@ function ChatMessage({
 
 const CLASS_TONE: Record<string, "secondary" | "warning" | "destructive"> = { read: "secondary", write: "warning", destructive: "destructive" }
 
+// Tool calls shown before the rest fold behind a button. A turn can make
+// dozens, and thirty lines above a reply bury it.
+const TRACE_LIMIT = 5
+
 function ToolTrace({ tools }: { tools: (LiveTool & { args?: string })[] }) {
   const t = useT()
+  const label = useLabel()
+  const [showAll, setShowAll] = React.useState(false)
+  const shown = showAll || tools.length <= TRACE_LIMIT + 1 ? tools : tools.slice(0, TRACE_LIMIT)
+  const hidden = tools.length - shown.length
+  const hiddenFailed = tools.slice(shown.length).filter((x) => x.status === "error").length
   return (
     <Trace className="mb-2">
-      {tools.map((x) => (
+      {shown.map((x) => (
         <TraceCollapsible key={x.id}>
           <TraceCollapsibleTrigger>
             <TraceLine status={x.status === "running" ? "running" : x.status === "error" ? "error" : undefined}>
               <TraceIcon>{x.status === "running" ? <Spinner /> : <WrenchIcon />}</TraceIcon>
-              <TraceTitle className="font-mono text-caption">{x.tool}</TraceTitle>
-              <Badge variant={CLASS_TONE[x.class] ?? "destructive"}>{x.class}</Badge>
-              {x.status === "denied" && <Badge variant="outline">denied</Badge>}
+              <TraceTitle className="font-mono text-caption" title={x.tool}>
+                {x.tool}
+              </TraceTitle>
+              <StatusText tone={CLASS_TONE[x.class] ?? "destructive"} icon={null}>{label("tool.class", x.class)}</StatusText>
+              {/* A word next to the color, so a failed call doesn't rely on red alone. */}
+              {x.status === "error" && <StatusText tone="destructive">{t("tool.failed")}</StatusText>}
+              {x.status === "denied" && <StatusText tone="outline">{t("tool.denied")}</StatusText>}
               {x.ms != null && <TraceDescription>{duration(x.ms)}</TraceDescription>}
             </TraceLine>
           </TraceCollapsibleTrigger>
           <TraceCollapsibleContent className="flex flex-col gap-2">
+            {/* The trigger truncates the name; here it's whole. */}
+            <span className="font-mono text-caption break-all">{x.tool}</span>
             {x.args && <pre className="max-h-48 overflow-auto rounded-md bg-code p-2 font-mono text-xs break-all whitespace-pre-wrap">{x.args}</pre>}
             {x.preview ? <pre className="max-h-48 overflow-auto rounded-md bg-code p-2 font-mono text-xs break-all whitespace-pre-wrap">{x.preview}</pre> : <span className="text-caption">{t("chats.noResult")}</span>}
           </TraceCollapsibleContent>
         </TraceCollapsible>
       ))}
+      {hidden > 0 && (
+        <Button variant="ghost" size="sm" className="self-start" onClick={() => setShowAll(true)}>
+          {hiddenFailed > 0 ? t("chats.moreToolsFailed", { n: hidden, failed: hiddenFailed }) : t("chats.moreTools", { n: hidden })}
+        </Button>
+      )}
     </Trace>
   )
 }
 
 function ApprovalCard({ approval, onDone }: { approval: { id: string; tool: string; class: string; argsPreview: string }; onDone: () => void }) {
   const t = useT()
+  const label = useLabel()
   const [busy, setBusy] = React.useState<null | boolean>(null)
   const decide = async (approved: boolean) => {
     setBusy(approved)
@@ -432,11 +487,12 @@ function ApprovalCard({ approval, onDone }: { approval: { id: string; tool: stri
   }
   return (
     <Card size="sm">
-      <CardHeader className="grid-cols-[auto_1fr] gap-x-2">
+      {/* minmax(0, 1fr) lets the title column shrink, and the tool name may break anywhere: it has to be readable in full before you approve it. */}
+      <CardHeader className="grid-cols-[auto_minmax(0,1fr)] gap-x-2">
         <ShieldAlertIcon className="mt-0.5 shrink-0 text-warning-fg" aria-hidden="true" />
-        <CardTitle className="text-sm font-medium break-words">{t("chats.approvalTitle", { tool: approval.tool })}</CardTitle>
+        <CardTitle className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">{t("chats.approvalTitle", { tool: approval.tool })}</CardTitle>
         <CardDescription className="col-start-2">
-          <Badge variant={CLASS_TONE[approval.class] ?? "destructive"}>{approval.class}</Badge>
+          <StatusText tone={CLASS_TONE[approval.class] ?? "destructive"} icon={null}>{label("tool.class", approval.class)}</StatusText>
         </CardDescription>
       </CardHeader>
       {approval.argsPreview && (
@@ -444,7 +500,7 @@ function ApprovalCard({ approval, onDone }: { approval: { id: string; tool: stri
           <pre className="max-h-40 overflow-auto rounded-md bg-code p-2 font-mono text-xs break-all whitespace-pre-wrap">{approval.argsPreview}</pre>
         </CardContent>
       )}
-      <CardFooter className="gap-2">
+      <CardFooter className="flex-wrap gap-2">
         {/* A destructive tool gets the red confirm, so approving a delete never looks routine. */}
         <Button size="sm" variant={approval.class === "destructive" ? "danger" : "default"} disabled={busy !== null} onClick={() => void decide(true)}>
           {busy === true && <Spinner data-icon="inline-start" />}
@@ -517,8 +573,8 @@ function Composer({ busy, onSend, onStop }: { busy: boolean; onSend: (text: stri
   )
 }
 
-// The two cards the page renders: the chat list (desktop only, a Drawer on a
-// phone) and the open transcript with its composer.
+// The two cards the page renders: the chat list (wide layouts only, a Drawer
+// otherwise) and the open transcript with its composer.
 const CHAT_ROWS = [
   ["w-3/4", "w-5/6"],
   ["w-1/2", "w-2/3"],
@@ -531,9 +587,9 @@ const CHAT_ROWS = [
 function ChatsSkeleton() {
   return (
     <PagePending page="nav.chats">
-      <PageHeaderSkeleton title="w-20" description="w-64" wraps={false} action="w-28 md:hidden" />
-      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[minmax(14rem,18rem)_1fr]">
-        <Card className="min-h-0 gap-0 py-0 max-md:hidden md:h-[calc(100svh-15rem)]">
+      <PageHeaderSkeleton title="w-20" description="w-64" wraps={false} action="w-28 @3xl/main:hidden" />
+      <div className="grid min-h-0 flex-1 gap-4 @3xl/main:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
+        <Card className={cn("hidden min-h-0 gap-0 py-0 @3xl/main:flex", PANE_HEIGHT)}>
           <div className="border-b px-4 py-3">
             <SkeletonText className="text-heading" width="w-28" />
           </div>
@@ -554,7 +610,7 @@ function ChatsSkeleton() {
             ))}
           </ItemGroup>
         </Card>
-        <Card className="min-h-[60svh] gap-0 py-0 md:h-[calc(100svh-15rem)]">
+        <Card className={cn("min-w-0 gap-0 py-0", PANE_HEIGHT)}>
           <div className="flex items-center gap-2 border-b px-4 py-3">
             <SkeletonText className="text-heading" width="w-24" />
             <Skeleton className="h-5 w-10 rounded-full" />

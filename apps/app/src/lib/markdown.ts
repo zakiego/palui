@@ -1,8 +1,9 @@
 // A small, safe Markdown subset for model text in the chat transcript: bold,
-// italic, inline code, fenced code blocks, bullet and numbered lists, links and
-// bare URLs. It parses to a plain tree that `components/markdown.tsx` renders
-// as React elements, so model text never reaches the DOM as HTML. Anything
-// outside the subset (raw HTML, images, tables) stays literal text.
+// italic, inline code, fenced code blocks, bullet and numbered lists, pipe
+// tables, links and bare URLs. It parses to a plain tree that
+// `components/markdown.tsx` renders as React elements, so model text never
+// reaches the DOM as HTML. Anything outside the subset (raw HTML, images)
+// stays literal text.
 
 export type Inline =
   | { type: "text"; text: string }
@@ -17,11 +18,21 @@ export type Block =
   | { type: "heading"; children: Inline[] }
   | { type: "code"; lang: string | null; text: string }
   | { type: "list"; ordered: boolean; start: number; items: Inline[][] }
+  | { type: "table"; head: Inline[][]; rows: Inline[][][] }
 
 const FENCE = /^ {0,3}(`{3,}|~{3,})\s*([\w+-]*)\s*$/
 const BULLET = /^ {0,3}[-*+]\s+(.*)$/
 const ORDERED = /^ {0,3}(\d{1,9})[.)]\s+(.*)$/
 const HEADING = /^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$/
+// The line under a table's header: dashes between pipes, with optional colons.
+const TABLE_RULE = /^ {0,3}\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/
+
+// The cells of one table row. A pipe at either end is a border, not a cell,
+// and `\|` is a literal pipe inside one.
+function tableCells(line: string): string[] {
+  const inner = line.trim().replace(/^\|/, "").replace(/(?<!\\)\|$/, "")
+  return inner.split(/(?<!\\)\|/).map((cell) => cell.trim())
+}
 
 // Only these schemes become links. Everything else (javascript:, data:, a
 // relative path) stays text.
@@ -63,6 +74,23 @@ export function parseMarkdown(src: string): Block[] {
     if (heading) {
       flush()
       blocks.push({ type: "heading", children: parseInline(heading[1]) })
+      continue
+    }
+    // A table needs its rule line, so a header that is still streaming in
+    // stays a paragraph until the next line arrives.
+    if (line.includes("|") && i + 1 < lines.length && lines[i + 1].includes("|") && TABLE_RULE.test(lines[i + 1])) {
+      flush()
+      const head = tableCells(line)
+      const rows: string[][] = []
+      i += 2
+      while (i < lines.length && lines[i].trim() !== "" && lines[i].includes("|")) {
+        const cells = tableCells(lines[i])
+        // Every row has the header's width: missing cells are empty, extras drop.
+        rows.push(head.map((_, col) => cells[col] ?? ""))
+        i++
+      }
+      i--
+      blocks.push({ type: "table", head: head.map((c) => parseInline(c)), rows: rows.map((r) => r.map((c) => parseInline(c))) })
       continue
     }
     const bullet = BULLET.exec(line)
@@ -197,7 +225,12 @@ function findClose(src: string, from: number, marker: string): number {
 export function markdownToPlain(src: string): string {
   const flat = (nodes: Inline[]): string => nodes.map((n) => (n.type === "text" || n.type === "code" ? n.text : n.type === "br" ? " " : flat(n.children))).join("")
   return parseMarkdown(src)
-    .map((b) => (b.type === "code" ? b.text : b.type === "list" ? b.items.map(flat).join(", ") : flat(b.children)))
+    .map((b) => {
+      if (b.type === "code") return b.text
+      if (b.type === "list") return b.items.map(flat).join(", ")
+      if (b.type === "table") return [b.head, ...b.rows].map((row) => row.map(flat).join(" ")).join(", ")
+      return flat(b.children)
+    })
     .join(" ")
     .replace(/\s+/g, " ")
     .trim()

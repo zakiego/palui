@@ -6,7 +6,7 @@ import { createFileRoute, Outlet, redirect, useNavigate, useRouter } from "@tans
 import { AppError } from "@/components/app-error"
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandMenu } from "@/components/command-menu"
-import { PAGE_STATUS_ID, PageHeaderSkeleton, PagePending, SkeletonText } from "@/components/page-pending"
+import { PAGE_STATUS_ID, PageHeaderSkeleton, PagePending, SkeletonText, StatusTextSkeleton } from "@/components/page-pending"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -16,6 +16,10 @@ import { getShell } from "@/lib/fns/home"
 import { getSession } from "@/lib/fns/session"
 import { LocaleProvider, useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+
+// Dev only: the fixture toggle (break-ui). The import is behind the dev check,
+// so a production build never loads or ships it.
+const FixtureToggle = import.meta.env.DEV ? React.lazy(() => import("@/components/dev/fixture-toggle")) : null
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
@@ -75,7 +79,7 @@ function ShellSkeleton() {
         <div className="flex h-14 shrink-0 items-center gap-3 border-b px-4 md:px-6">
           <Skeleton className="size-7 rounded-md" />
           <Skeleton className="h-3 w-16" />
-          <Skeleton className="ms-auto h-5 w-24 rounded-full" />
+          <StatusTextSkeleton className="ms-auto" width="w-24" />
           <Skeleton className="h-8 w-24 max-sm:size-8" />
         </div>
         <div className="mx-auto flex w-full max-w-[90rem] flex-col gap-6 px-4 pt-6 md:px-6 lg:px-8 lg:pt-8">
@@ -132,6 +136,11 @@ function Shell() {
         </main>
       </SidebarInset>
       <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} connectors={shell.connectors} />
+      {FixtureToggle && (
+        <React.Suspense fallback={null}>
+          <FixtureToggle />
+        </React.Suspense>
+      )}
     </SidebarProvider>
   )
 }

@@ -7,7 +7,6 @@ import { CircleAlertIcon, PlugIcon, PlugZapIcon } from "lucide-react"
 
 import { connectorIcon } from "@/components/connector-icon"
 import { ConnectorStatusBadge } from "@/components/connector-status"
-import { IconTile } from "@/components/icon-tile"
 import { PaluiMark } from "@/components/palui-mark"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -29,14 +28,12 @@ export function ConnectorBoard({ items, live, onOpen }: ConnectorLayoutProps) {
   const inputs = CONNECTOR_GROUPS.filter((g) => g.kind === "channel")
   const outputs = CONNECTOR_GROUPS.filter((g) => g.kind !== "channel")
   return (
-    <div className="grid gap-y-0 @5xl/main:grid-cols-[minmax(0,1fr)_15rem_minmax(0,1fr)] @5xl/main:items-center">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-y-0 @5xl/main:grid-cols-[minmax(0,1fr)_15rem_minmax(0,1fr)] @5xl/main:items-center">
       <div className="order-first @5xl/main:order-none @5xl/main:col-start-2 @5xl/main:row-start-1 @5xl/main:flex @5xl/main:items-center">
         <span aria-hidden="true" className="hidden h-px flex-1 bg-border-strong @5xl/main:block" />
         <Card size="sm" className="w-full max-w-[16rem] shrink-0 @5xl/main:w-auto @5xl/main:max-w-none @5xl/main:min-w-0 @5xl/main:flex-[0_1_12rem]">
           <CardHeader className="grid-cols-[auto_1fr] items-center gap-x-3">
-            <IconTile size="lg" tone="brand" className="row-span-2">
-              <PaluiMark />
-            </IconTile>
+            <PaluiMark className="row-span-2 size-10" />
             <CardTitle>{t("app.name")}</CardTitle>
             <CardDescription className="tabular-nums">{t("home.map.on", { n: on, total: setUp })}</CardDescription>
           </CardHeader>
@@ -56,7 +53,7 @@ function BoardSide({ side, groups, items, live, onOpen, className }: { side: Sid
   const present = groups.filter((g) => items.some((i) => i.kind === g.kind))
   if (!present.length) return null
   return (
-    <div className={cn("ms-8 flex flex-col gap-5 border-s border-border-strong pt-5 @5xl/main:ms-0 @5xl/main:py-2", side === "in" ? "@5xl/main:border-s-0 @5xl/main:border-e" : "", className)}>
+    <div className={cn("ms-8 flex min-w-0 flex-col gap-5 border-s border-border-strong pt-5 @5xl/main:ms-0 @5xl/main:py-2", side === "in" ? "@5xl/main:border-s-0 @5xl/main:border-e" : "", className)}>
       {present.map(({ kind, label }) => {
         const rows = items.filter((i) => i.kind === kind)
         return (

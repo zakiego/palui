@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { SkeletonText } from "@/components/page-pending"
+import { SkeletonText, StatusTextSkeleton } from "@/components/page-pending"
 import { useT } from "@/lib/i18n"
 import { manifestFor } from "@/lib/manifests"
 import { CONNECTOR_GROUPS, ConnectorSwitch } from "../shared"
@@ -105,7 +105,7 @@ export function ConnectorGridSkeleton() {
               </CardAction>
             </CardHeader>
             <CardFooter className="flex-wrap gap-2 border-t pt-(--card-spacing) pb-(--card-spacing)">
-              <Skeleton className="h-5 w-12 rounded-full" />
+              <StatusTextSkeleton width="w-8" />
               <Skeleton className="ms-auto h-7 w-14 pointer-coarse:h-9" />
             </CardFooter>
           </Card>

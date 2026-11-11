@@ -2,10 +2,11 @@
 // cap, with a create/edit Sheet (a Drawer on a phone).
 import * as React from "react"
 import { createFileRoute, useRouter } from "@tanstack/react-router"
-import { CalendarClockIcon, PencilIcon, PlayIcon, PlusIcon } from "lucide-react"
+import { CalendarClockIcon, ClockAlertIcon, PencilIcon, PlayIcon, PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppError } from "@/components/app-error"
+import { ClampText } from "@/components/clamp-text"
 import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending, TableSkeleton } from "@/components/page-pending"
 import { ResponsiveSheet } from "@/components/responsive-sheet"
@@ -22,6 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
+import { StatusText } from "@/components/ui/status-text"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -34,8 +36,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { useLiveRefresh } from "@/hooks/use-live-events"
 import { deleteJobFn, getJobPreset, getJobs, runJobNow, saveJob, setJobEnabledFn } from "@/lib/fns/jobs"
-import { compact, errorMessage, inZone } from "@/lib/format"
-import { useT } from "@/lib/i18n"
+import { compact, errorMessage, inOtherZone, inZone } from "@/lib/format"
+import { useLabel, useT } from "@/lib/i18n"
 
 export const Route = createFileRoute("/_app/jobs")({
   loader: () => getJobs(),
@@ -92,18 +94,20 @@ function JobsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                {/* Columns appear by the room the page has (container queries on <main>), not by the
+                    viewport: with the sidebar open, a 768 px window leaves this table about 530 px. */}
                 <TableHead>{t("table.job")}</TableHead>
-                <TableHead className="w-40 max-lg:hidden">{t("table.nextRun")}</TableHead>
-                <TableHead className="w-48 max-md:hidden">{t("table.lastResult")}</TableHead>
-                <TableHead className="w-36 max-xl:hidden">{t("table.dailyCap")}</TableHead>
-                <TableHead className="w-44 text-end">
-                  <span className="sr-only">Actions</span>
+                <TableHead className="hidden w-44 @5xl/main:table-cell">{t("table.nextRun")}</TableHead>
+                <TableHead className="hidden w-56 @3xl/main:table-cell">{t("table.lastResult")}</TableHead>
+                <TableHead className="hidden w-36 @6xl/main:table-cell">{t("table.dailyCap")}</TableHead>
+                <TableHead className="w-px text-end">
+                  <span className="sr-only">{t("table.actions")}</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.jobs.map((j) => (
-                <JobRow key={j.id} job={j} onEdit={() => setEditing(j)} />
+                <JobRow key={j.id} job={j} timezone={data.timezone} onEdit={() => setEditing(j)} />
               ))}
             </TableBody>
           </Table>
@@ -122,33 +126,54 @@ const STATUS_TONE: Record<string, "success" | "destructive" | "secondary" | "war
   awaiting_approval: "warning",
 }
 
-function JobRow({ job, onEdit }: { job: Job; onEdit: () => void }) {
+// An enabled job this far past its next run means the scheduler isn't running it.
+const OVERDUE_AFTER_MS = 2 * 60_000
+
+function JobRow({ job, timezone, onEdit }: { job: Job; timezone: string; onEdit: () => void }) {
   const t = useT()
+  const label = useLabel()
   const router = useRouter()
   const [enabled, setEnabled] = React.useState(job.enabled)
   React.useEffect(() => setEnabled(job.enabled), [job.enabled])
   const pct = Math.min(100, Math.round((job.tokensToday / Math.max(1, job.dailyTokenCap)) * 100))
+  const chat = job.chatTitle ?? t("runs.deletedChat")
+  // The owner's zone, like every other time in the dashboard; a job scheduled in
+  // another zone adds its own clock so "07:00" in the RRULE still makes sense.
+  const next = job.nextRunAt ? inZone(job.nextRunAt, timezone) : null
+  const nextElsewhere = job.nextRunAt ? inOtherZone(job.nextRunAt, job.tz, timezone) : null
+  const overdue = job.enabled && job.status !== "running" && job.nextRunAt != null && job.nextRunAt < Date.now() - OVERDUE_AFTER_MS
+  const ran = job.lastRunAt != null
+  const status = (
+    <StatusText tone={STATUS_TONE[job.lastStatus ?? ""] ?? "outline"} className="max-w-full" title={job.lastStatus ?? undefined}>
+      <span className="truncate">{label("run.status", job.lastStatus ?? "unknown")}</span>
+    </StatusText>
+  )
+  const overdueBadge = overdue && (
+    <StatusText tone="warning" icon={<ClockAlertIcon aria-hidden="true" />}>
+      {t("reminders.overdue")}
+    </StatusText>
+  )
 
   const runNow = () => {
     const p = runJobNow({ data: { id: job.id } })
     toast.promise(p, {
-      loading: `Starting ${job.name}`,
-      success: `${job.name} is running. The result lands in ${job.chatTitle}.`,
+      loading: t("jobs.starting", { name: job.name }),
+      success: t("jobs.started", { name: job.name, chat }),
       error: (err) => errorMessage(err),
     })
     void p.then(() => router.invalidate()).catch(() => {})
   }
 
-  const toggle = async (next: boolean) => {
-    setEnabled(next)
+  const toggle = async (nextEnabled: boolean) => {
+    setEnabled(nextEnabled)
     try {
-      await setJobEnabledFn({ data: { id: job.id, enabled: next } })
-      toast.success(next ? `${job.name} resumed` : `${job.name} paused`, {
-        action: { label: t("common.undo"), onClick: () => void setJobEnabledFn({ data: { id: job.id, enabled: !next } }).then(() => router.invalidate()) },
+      await setJobEnabledFn({ data: { id: job.id, enabled: nextEnabled } })
+      toast.success(t(nextEnabled ? "connectors.resumed" : "connectors.paused", { name: job.name }), {
+        action: { label: t("common.undo"), onClick: () => void setJobEnabledFn({ data: { id: job.id, enabled: !nextEnabled } }).then(() => router.invalidate()) },
       })
       void router.invalidate()
     } catch (err) {
-      setEnabled(!next)
+      setEnabled(!nextEnabled)
       toast.error(errorMessage(err))
     }
   }
@@ -157,42 +182,57 @@ function JobRow({ job, onEdit }: { job: Job; onEdit: () => void }) {
     <TableRow>
       <TableCell className="max-w-0 whitespace-normal">
         <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="min-w-0 font-medium break-words">{job.name}</span>
-          {job.kind !== "job" && <Badge variant="outline">{job.kind}</Badge>}
-          {!job.enabled && <Badge variant="secondary">paused</Badge>}
+          <span dir="auto" className="min-w-0 text-left font-medium break-words">
+            {job.name}
+          </span>
+          {job.kind !== "job" && <Badge variant="outline">{label("job.kind", job.kind)}</Badge>}
+          {!job.enabled && <StatusText tone="secondary">{t("job.paused")}</StatusText>}
+          {/* The result column is hidden on a narrow page; a failed job still has to say so. */}
+          {ran && <span className="inline-flex max-w-full min-w-0 @3xl/main:hidden">{status}</span>}
         </span>
-        <span className="block truncate font-mono text-caption text-muted-foreground" title={job.rrule}>
+        <span className="block truncate font-mono text-caption text-muted-foreground" title={`${job.rrule} · ${job.tz}`}>
           {job.rrule} · {job.tz}
         </span>
-        <span className="block truncate text-caption text-muted-foreground lg:hidden">Next {job.nextRunAt ? inZone(job.nextRunAt, job.tz) : "not scheduled yet"}</span>
+        <span className="flex flex-wrap items-center gap-x-1.5 text-caption text-muted-foreground @5xl/main:hidden">
+          <span className="tabular-nums">
+            {next ? t("jobs.next", { time: next }) : t("jobs.notScheduled")}
+            {nextElsewhere ? ` (${nextElsewhere})` : ""}
+          </span>
+          {overdueBadge}
+        </span>
       </TableCell>
-      <TableCell className="font-mono text-caption tabular-nums max-lg:hidden">{job.nextRunAt ? inZone(job.nextRunAt, job.tz) : <span className="text-muted-foreground">Not scheduled yet</span>}</TableCell>
-      <TableCell className="max-w-0 whitespace-normal max-md:hidden">
-        {job.lastRunAt ? (
+      <TableCell className="hidden font-mono text-caption whitespace-normal tabular-nums @5xl/main:table-cell">
+        {next ?? <span className="text-muted-foreground">{t("jobs.notScheduled")}</span>}
+        {nextElsewhere && <span className="block break-words text-muted-foreground">{nextElsewhere}</span>}
+        {overdueBadge && <span className="mt-1 block">{overdueBadge}</span>}
+      </TableCell>
+      <TableCell className="hidden max-w-0 whitespace-normal @3xl/main:table-cell">
+        {ran ? (
           <>
-            <Badge variant={STATUS_TONE[job.lastStatus ?? ""] ?? "outline"}>{job.lastStatus ?? "unknown"}</Badge>
-            {job.lastResult && <span className="mt-1 line-clamp-2 text-caption break-words text-muted-foreground">{job.lastResult}</span>}
+            {status}
+            {job.lastResult && <ClampText text={job.lastResult} lines={2} className="mt-1 text-caption text-muted-foreground" />}
           </>
         ) : (
           <span className="text-caption text-muted-foreground">{t("common.never")}</span>
         )}
       </TableCell>
-      <TableCell className="max-xl:hidden">
+      <TableCell className="hidden @6xl/main:table-cell">
         <span className="font-mono text-caption tabular-nums">
           {compact(job.tokensToday)} / {compact(job.dailyTokenCap)}
         </span>
-        <Progress value={pct} aria-label={`${pct}% of today's cap used`} className="mt-1" />
+        <Progress value={pct} aria-label={t("jobs.capUsed", { pct })} className="mt-1" />
       </TableCell>
       <TableCell>
-        <span className="flex items-center justify-end gap-1">
+        {/* w-max: the column is as wide as the controls, so they never spill over the column beside them. */}
+        <span className="ms-auto flex w-max items-center justify-end gap-1">
           <Button variant="outline" size="sm" onClick={runNow} disabled={job.status === "running"}>
             {job.status === "running" ? <Spinner data-icon="inline-start" /> : <PlayIcon data-icon="inline-start" />}
-            <span className="max-sm:sr-only">{t("jobs.runNow")}</span>
+            <span className="sr-only @2xl/main:not-sr-only @2xl/main:whitespace-nowrap">{t("jobs.runNow")}</span>
           </Button>
           <span className="flex size-11 items-center justify-center">
-            <Switch checked={enabled} onCheckedChange={(v) => void toggle(v)} aria-label={enabled ? `Pause ${job.name}` : `Resume ${job.name}`} className="after:-inset-x-1.5 after:-inset-y-[13px]" />
+            <Switch checked={enabled} onCheckedChange={(v) => void toggle(v)} aria-label={t(enabled ? "connectors.pause" : "connectors.resume", { name: job.name })} className="after:-inset-x-1.5 after:-inset-y-[13px]" />
           </span>
-          <Button variant="ghost" size="icon-sm" onClick={onEdit} aria-label={`Edit ${job.name}`}>
+          <Button variant="ghost" size="icon-sm" onClick={onEdit} aria-label={t("jobs.edit", { name: job.name })}>
             <PencilIcon aria-hidden="true" />
           </Button>
         </span>
@@ -277,7 +317,7 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
     setBusy("delete")
     try {
       await deleteJobFn({ data: { id: job.id } })
-      toast.success(`${job.name} deleted`)
+      toast.success(t("jobs.deleted", { name: job.name }))
       onClose()
       void router.invalidate()
     } catch (err) {
@@ -308,10 +348,10 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
       {isNew && (
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void applyPreset("dailyBriefing")}>
-            Daily briefing preset
+            {t("jobs.presetBriefing")}
           </Button>
           <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void applyPreset("heartbeat")}>
-            Heartbeat preset
+            {t("jobs.presetHeartbeat")}
           </Button>
         </div>
       )}
@@ -322,9 +362,9 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
           {errors.name && <FieldError>{errors.name}</FieldError>}
         </Field>
         <Field data-invalid={!!errors.rrule}>
-          <FieldLabel htmlFor="job-rrule">Schedule (RRULE)</FieldLabel>
-          <Input id="job-rrule" className="font-mono" spellCheck={false} autoCapitalize="characters" value={form.rrule} aria-invalid={!!errors.rrule} onChange={(e) => set("rrule", e.target.value)} />
-          <FieldDescription>Wall-clock time in the zone below, so 07:00 stays 07:00 across DST.</FieldDescription>
+          <FieldLabel htmlFor="job-rrule">{t("jobs.field.rrule")}</FieldLabel>
+          <Input id="job-rrule" className="font-mono" spellCheck={false} autoCapitalize="characters" value={form.rrule} maxLength={300} aria-invalid={!!errors.rrule} onChange={(e) => set("rrule", e.target.value)} />
+          <FieldDescription>{t("jobs.field.rruleHelp")}</FieldDescription>
           {errors.rrule && <FieldError>{errors.rrule}</FieldError>}
         </Field>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -377,11 +417,11 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
         <AlertDialog>
           <AlertDialogTrigger render={<Button variant="destructive" className="self-start" disabled={busy !== null} />}>
             {busy === "delete" && <Spinner data-icon="inline-start" />}
-            Delete job
+            {t("jobs.delete")}
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete {job.name}?</AlertDialogTitle>
+              <AlertDialogTitle className="[overflow-wrap:anywhere]">{t("jobs.deleteTitle", { name: job.name })}</AlertDialogTitle>
               <AlertDialogDescription>{t("jobs.deleteBody")}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -404,11 +444,11 @@ function JobsSkeleton() {
       <TableSkeleton
         rows={3}
         columns={[
-          { head: "w-8", sub: ["", "lg:hidden"] },
-          { className: "w-40 max-lg:hidden", head: "w-14", text: "font-mono text-caption", short: "w-28" },
-          { className: "w-48 max-md:hidden", head: "w-16", badge: true, sub: true },
-          { className: "w-36 max-xl:hidden", head: "w-14", text: "font-mono text-caption", short: "w-20", sub: true },
-          { className: "w-44", controls: ["h-7 w-24 pointer-coarse:h-9 max-sm:w-8", "mx-1.5 h-[18.4px] w-8 rounded-full", "size-7 pointer-coarse:size-9"] },
+          { head: "w-8", sub: ["", "@5xl/main:hidden"] },
+          { className: "hidden w-44 @5xl/main:table-cell", head: "w-14", text: "font-mono text-caption", short: "w-28" },
+          { className: "hidden w-56 @3xl/main:table-cell", head: "w-16", status: true, sub: true },
+          { className: "hidden w-36 @6xl/main:table-cell", head: "w-14", text: "font-mono text-caption", short: "w-20", sub: true },
+          { className: "w-px text-end", controls: ["h-7 w-8 pointer-coarse:h-9 @2xl/main:w-24", "mx-1.5 h-[18.4px] w-8 rounded-full", "size-7 pointer-coarse:size-9"] },
         ]}
       />
     </PagePending>

@@ -78,6 +78,42 @@ describe("parseMarkdown", () => {
   })
 })
 
+describe("tables", () => {
+  const table = "| Kabupaten | Deal |\n| --- | ---: |\n| Banjarbaru | **1,284** |\n| Hulu Sungai | 0 |"
+
+  it("reads a pipe table with its rule line", () => {
+    const [block] = parseMarkdown(table)
+    expect(block).toMatchObject({ type: "table" })
+    if (block.type !== "table") throw new Error("not a table")
+    expect(block.head).toEqual([[{ type: "text", text: "Kabupaten" }], [{ type: "text", text: "Deal" }]])
+    expect(block.rows).toHaveLength(2)
+    expect(block.rows[0][1]).toEqual([{ type: "strong", children: [{ type: "text", text: "1,284" }] }])
+  })
+
+  it("pads a short row and drops extra cells", () => {
+    const [block] = parseMarkdown("| a | b |\n|---|---|\n| 1 |\n| 1 | 2 | 3 |")
+    if (block.type !== "table") throw new Error("not a table")
+    expect(block.rows.map((r) => r.length)).toEqual([2, 2])
+    expect(block.rows[0][1]).toEqual([])
+  })
+
+  it("keeps a header without its rule line as text, for a reply still streaming", () => {
+    expect(parseMarkdown("| Kabupaten | Deal |")).toEqual([{ type: "p", children: [{ type: "text", text: "| Kabupaten | Deal |" }] }])
+  })
+
+  it("leaves a sentence with a pipe alone", () => {
+    expect(parseMarkdown("a | b\nstill text")[0].type).toBe("p")
+  })
+
+  it("ends the table at a blank line", () => {
+    expect(parseMarkdown(`${table}\n\nafter`).map((b) => b.type)).toEqual(["table", "p"])
+  })
+
+  it("flattens to words for the list preview", () => {
+    expect(markdownToPlain(table)).toBe("Kabupaten Deal, Banjarbaru 1,284, Hulu Sungai 0")
+  })
+})
+
 describe("safeHref", () => {
   it("accepts web and mail links only", () => {
     expect(safeHref("https://a.b")).toBe("https://a.b")

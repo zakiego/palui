@@ -58,9 +58,7 @@ export function ConnectorMap({ connectors }: { connectors: MapConnector[] }) {
             {i === last && i !== 0 && <span className="map-trunk absolute start-[17.5px] top-0 h-1/2 w-px" />}
             {row.type === "conn" && <span className="map-branch absolute start-[18px] -end-3 top-1/2 h-px" />}
             {row.type === "hub" && (
-              <IconTile tone="brand" className="relative m-auto">
-                <PaluiMark className="size-5" />
-              </IconTile>
+              <PaluiMark className="relative m-auto size-9" />
             )}
           </span>
           {row.type === "hub" && <span className="text-sm font-medium">{t("app.name")}</span>}
