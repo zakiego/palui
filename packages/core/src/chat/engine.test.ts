@@ -1,10 +1,7 @@
-import { mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
 import { and, eq, sql } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { chats, events, memoryDb, messages, outbox, passkey, pendingApprovals, runs, toolCalls, user, type DB } from "@palui/db"
-import { getChat } from "../chats"
+import { ensureChat, getChat } from "../chats"
 import { listEvents } from "../events"
 import { claimOwner, createClaim, getOwner, setWhatsAppOwner } from "../owner"
 import { getConnector, pauseConnector, resumeConnector } from "../connectors/store"
@@ -27,13 +24,6 @@ import {
   toolsRuntime,
 } from "./testing"
 import { MODEL_OFF_TEXT } from "./turn"
-
-// A utusan.json with these WhatsApp bindings (peer jid per binding).
-function utusanFile(bindings: Record<string, string>): string {
-  const p = join(mkdtempSync(join(tmpdir(), "palui-utusan-")), "utusan.json")
-  writeFileSync(p, JSON.stringify({ bindings: Object.entries(bindings).map(([id, jid]) => ({ id, channel: "whatsapp", peer: { kind: "direct", id: jid } })) }))
-  return p
-}
 
 function ownTelegram(db: DB) {
   const { nonce } = createClaim(db, "telegram", 1)
@@ -80,7 +70,7 @@ describe("router: ownership", () => {
     setWhatsAppOwner(db, "08123456789")
     const wa = fakeChannel("whatsapp")
     const m = scriptedModel([say("hai"), say("hai lagi")])
-    const h = await harness({ db, registry: { cliproxy: modelRuntime("cliproxy", () => m.model), whatsapp: channelRuntime("whatsapp", wa) }, rows: { cliproxy: "model", whatsapp: "channel" }, utusanFile: utusanFile({}) })
+    const h = await harness({ db, registry: { cliproxy: modelRuntime("cliproxy", () => m.model), whatsapp: channelRuntime("whatsapp", wa) }, rows: { cliproxy: "model", whatsapp: "channel" } })
     const base = { channel: "whatsapp" as const, connectorId: "whatsapp", chatKind: "dm" as const, text: "halo", at: 0 }
     expect(await h.engine.inbound({ ...base, chatExternalId: "777@lid", senderExternalId: "777@lid" })).toBeNull()
     expect(await h.engine.inbound({ ...base, chatExternalId: "555@lid", senderExternalId: "555@lid", senderAltId: "628123456789@s.whatsapp.net" })).not.toBeNull()
@@ -88,6 +78,18 @@ describe("router: ownership", () => {
     expect(await h.engine.inbound({ ...base, chatExternalId: "555@lid", senderExternalId: "555@lid" })).not.toBeNull()
     await h.engine.idle()
     expect(m.prompts.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("reopens a WhatsApp DM that was left out of the allowlist", async () => {
+    const db = memoryDb()
+    modelChain(db, ["cliproxy"])
+    setWhatsAppOwner(db, "08123456789")
+    ensureChat(db, { channel: "whatsapp", externalId: "628123456789@s.whatsapp.net", kind: "dm", allowed: false })
+    const m = scriptedModel([say("halo")])
+    const h = await harness({ db, registry: { cliproxy: modelRuntime("cliproxy", () => m.model), whatsapp: channelRuntime("whatsapp", fakeChannel("whatsapp")) }, rows: { cliproxy: "model", whatsapp: "channel" } })
+    const r = await h.engine.inbound({ channel: "whatsapp", connectorId: "whatsapp", chatKind: "dm", chatExternalId: "628123456789@s.whatsapp.net", senderExternalId: "628123456789@s.whatsapp.net", text: "halo", at: 0 })
+    await h.engine.idle()
+    expect(db.select().from(messages).where(eq(messages.id, r!.messageId)).get()!.status).toBe("handled")
   })
 
   it("drops messages in a WhatsApp chat outside the allowlist", async () => {
@@ -987,63 +989,5 @@ describe("approval answers by text", () => {
     await h.engine.idle()
     expect(executed).toEqual(["a"])
     expect(h.db.select().from(pendingApprovals).where(eq(pendingApprovals.id, b.id)).get()!.status).toBe("pending")
-  })
-})
-
-describe("whatsapp chat split", () => {
-  const OWNER = "628123456789@s.whatsapp.net"
-  async function wa(file: string, config: Record<string, unknown> = {}) {
-    const db = memoryDb()
-    modelChain(db, ["cliproxy"])
-    setWhatsAppOwner(db, "08123456789")
-    const m = scriptedModel([])
-    const h = await harness({ db, registry: { cliproxy: modelRuntime("cliproxy", () => m.model), whatsapp: channelRuntime("whatsapp", fakeChannel("whatsapp")) }, rows: { cliproxy: "model" }, utusanFile: file })
-    const { seedConnector } = await import("./testing")
-    seedConnector(db, "whatsapp", "channel", { config })
-    await h.sup.reconcile()
-    const send = async (extra: Partial<import("../connectors/define").InboundMessage> = {}) => {
-      const r = await h.engine.inbound({ channel: "whatsapp", connectorId: "whatsapp", chatKind: "dm", chatExternalId: "555@lid", senderExternalId: "555@lid", senderAltId: OWNER, text: "halo", at: 0, ...extra })
-      await h.engine.idle()
-      return db.select().from(messages).where(eq(messages.id, r!.messageId)).get()!
-    }
-    const events = () => listEvents(db).filter((e) => e.kind === "whatsapp.allowlist")
-    return { ...h, m, send, events }
-  }
-
-  it("won't answer a LID chat whose phone JID utusan binds, and picks up the removed binding on the next message", async () => {
-    const file = utusanFile({ dm: OWNER })
-    const h = await wa(file)
-    h.m.steps.push(say("halo dari palui"))
-    const first = await h.send()
-    expect(first.status).toBe("ignored")
-    expect(h.events()).toHaveLength(1)
-    expect(h.events()[0]!.message).toContain('still bound in utusan (binding "dm")')
-    expect(h.events()[0]!.level).toBe("warn")
-    await h.send()
-    expect(h.events()).toHaveLength(1)
-    writeFileSync(file, JSON.stringify({ bindings: [] }))
-    const third = await h.send()
-    expect(third.status).toBe("handled")
-    expect(h.m.prompts).toHaveLength(1)
-    expect(h.events()[0]!.message).toContain("no longer bound")
-  })
-
-  it("stops answering an allowed chat once utusan binds it again", async () => {
-    const file = utusanFile({})
-    const h = await wa(file)
-    h.m.steps.push(say("oke"))
-    expect((await h.send()).status).toBe("handled")
-    writeFileSync(file, JSON.stringify({ bindings: [{ id: "back", channel: "whatsapp", peer: { kind: "direct", id: "555@lid" } }] }))
-    expect((await h.send()).status).toBe("ignored")
-  })
-
-  it("needs the utusanCleared box when utusan.json can't be read", async () => {
-    const missing = join(tmpdir(), "palui-no-such-dir", "utusan.json")
-    const blocked = await wa(missing)
-    expect((await blocked.send()).status).toBe("ignored")
-    expect(blocked.events()[0]!.message).toContain("can't read utusan's config")
-    const cleared = await wa(missing, { utusanCleared: true })
-    cleared.m.steps.push(say("halo"))
-    expect((await cleared.send()).status).toBe("handled")
   })
 })

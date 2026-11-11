@@ -54,8 +54,7 @@ Only with fakes:
 - Prod port 4802 (what `free-port.sh` returns). The control port 4891 is never published.
 - Reminder defaults: pagi 08:00, siang 12:00, sore 16:00, malam 20:00. A bare hour from 1 to 6 means PM. A one-off earlier today rolls to tomorrow, and the echo says "Besok" so a wrong guess shows.
 - Heartbeat: every 30 min from 08:00 to 22:00, `fast` model, 100k tokens a day. Briefing: 07:00, `default` model, 50k a day.
-- WhatsApp pairing code goes to the number being linked (utusan's), entered in the wizard under "Number to link", not your own number. Leave it empty to pair with the QR instead. Otherwise your own messages would all be `fromMe` and dropped.
-- New WhatsApp DMs are only answered when utusan doesn't bind that chat: Palui reads utusan's config if mounted, otherwise you tick "This chat isn't bound in utusan" in the wizard. The mount line in `compose.yaml` is commented out on purpose (it would expose nothing else, but it's your call).
+- WhatsApp pairing code goes to the number being linked (Palui's own), entered in the wizard under "Number to link", not your own number. Leave it empty to pair with the QR instead. Otherwise your own messages would all be `fromMe` and dropped.
 - Non-owner messages are dropped before they're stored. New WhatsApp groups start not allowed (v1 is DM only).
 - MCP tools you haven't reviewed count as destructive, so they always ask first.
 - Calendar results and external MCP servers taint the turn (invite titles come from anyone).
@@ -94,7 +93,7 @@ Only with fakes:
    ```
    Say hi in Chats.
 5. Telegram: in Telegram, @BotFather, `/newbot`, copy the token. Dashboard, Connectors, Telegram, paste, Connect, open the claim link, press Start. (Or `docker compose exec -T app palui connectors connect telegram --secret-stdin botToken < token.txt`, then get the claim link in the sheet.)
-6. WhatsApp (utusan's number, as a new linked device): first remove your DM's binding from `~/.utusan/utusan.json`. Dashboard, Connectors, WhatsApp: save your phone as owner, tick "This chat isn't bound in utusan", press Start pairing, then type utusan's number under "Number to link" and press Get code. On utusan's phone: WhatsApp, Linked devices, Link with phone number, enter the 8-character code.
+6. WhatsApp (Palui's own number): Dashboard, Connectors, WhatsApp: save your phone as owner, press Start pairing, then type Palui's number under "Number to link" and press Get code. On Palui's phone: WhatsApp, Linked devices, Link with phone number, enter the 8-character code.
 7. Done 2026-11-10: landing and docs are live at https://palui.zakiego.com (the `palui-edge` Worker on `palui.zakiego.com/*`, sending site paths to Pages). Until steps 2 and 3 run, `/app`, `/api` and `/health` fall through to the `*.zakiego.com` wildcard and answer 404. Since 2026-11-11 the site is the git-connected Pages project `palui-web`, which builds `apps/site` on every push to `main`, so there's nothing to deploy by hand. Build logs:
    ```bash
    CF="$HOME/.agents/skills/cf-zakiego-lab/scripts/cf-zakiego-lab"

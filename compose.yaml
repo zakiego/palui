@@ -49,9 +49,6 @@ services:
       - "host.docker.internal:host-gateway"   # CLIProxyAPI :8317, ai-gateway :8793, recall :4800
     volumes:
       - data:/data
-      # Optional: lets the WhatsApp wizard check which chats utusan still binds
-      # (PLAN 5.1). Without it the wizard asks you to tick a box instead.
-      # - ${HOME}/.utusan/utusan.json:/utusan/utusan.json:ro
     depends_on:
       app:
         condition: service_healthy   # the app runs migrations; the runtime refuses an unknown schema

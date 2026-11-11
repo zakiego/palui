@@ -4,11 +4,8 @@
 // never holds up the channel.
 import { eq } from "drizzle-orm"
 import { chats, messages, newId, type DB } from "@palui/db"
-import { ensureChat, findChat, type ChatRow } from "../chats"
-import { logEvent } from "../events"
+import { ensureChat, type ChatRow } from "../chats"
 import type { Logger } from "../log"
-import { getConnector } from "../connectors/store"
-import { checkUtusan, UTUSAN_CONFIG_PATH } from "../utusan"
 import type { InboundMedia, InboundMessage } from "../connectors/define"
 import type { RunningEntry } from "../connectors/supervisor"
 import type { StoredContent, StoredMedia } from "./context"
@@ -19,47 +16,17 @@ export const MAX_INLINE_DOC_BYTES = 64 * 1024
 const TEXT_MIME = /^(text\/|application\/(json|xml|x-yaml|yaml|csv|x-ndjson|javascript|typescript|x-sh|sql))/i
 const TEXT_EXT = /\.(txt|md|markdown|csv|tsv|json|ya?ml|xml|log|ini|toml|ts|js|py|sql|sh|html?)$/i
 
-export type InboxOptions = {
-  // utusan's config, read to keep WhatsApp chats split (default: the compose mount).
-  utusanFile?: string
-}
-
-// Whether Palui may answer a WhatsApp DM (PLAN 5.1: chats are split, never
-// shared). Checked on every message, since the file read is cheap: removing the
-// utusan binding takes effect on the next message, without a restart.
-//  bound:   utusan still answers it, so Palui doesn't (both would reply).
-//  free:    allowed.
-//  unknown: utusan.json isn't readable; allowed only when the owner ticked
-//           utusanCleared, otherwise a chat keeps what it had (new ones start out).
-function whatsAppDecision(db: DB, msg: InboundMessage, existing: ChatRow | undefined, file: string): { allowed: boolean; state: "bound" | "free" | "unknown"; bindingId?: string } {
-  const verdict = checkUtusan([msg.chatExternalId, msg.senderAltId], file)
-  if (verdict.state === "bound") return { allowed: false, state: "bound", bindingId: verdict.bindingId }
-  if (verdict.state === "free") return { allowed: true, state: "free" }
-  const cleared = (getConnector(db, msg.connectorId)?.config as { utusanCleared?: unknown } | undefined)?.utusanCleared === true
-  return { allowed: cleared || (existing?.allowed ?? false), state: "unknown" }
-}
-
-export function writeInbound(db: DB, msg: InboundMessage, now = Date.now(), opts: InboxOptions = {}): { chat: ChatRow; row: MessageRow } {
+export function writeInbound(db: DB, msg: InboundMessage, now = Date.now()): { chat: ChatRow; row: MessageRow } {
+  // WhatsApp is DM only (PLAN 5.1): a new group chat starts outside the allowlist.
+  // DMs are always in it, since the router already drops anyone but the owner.
   const waDm = msg.channel === "whatsapp" && msg.chatKind === "dm"
-  const existing = waDm ? findChat(db, msg.channel, msg.chatExternalId) : undefined
-  const decision = waDm ? whatsAppDecision(db, msg, existing, opts.utusanFile ?? UTUSAN_CONFIG_PATH) : undefined
   let chat = ensureChat(
     db,
-    {
-      channel: msg.channel,
-      externalId: msg.chatExternalId,
-      title: msg.chatTitle,
-      kind: msg.chatKind,
-      // WhatsApp is DM only (PLAN 5.1): a new group chat starts outside the allowlist.
-      allowed: msg.channel === "whatsapp" ? (decision?.allowed ?? false) : true,
-    },
+    { channel: msg.channel, externalId: msg.chatExternalId, title: msg.chatTitle, kind: msg.chatKind, allowed: msg.channel === "whatsapp" ? waDm : true },
     now,
   )
-  if (decision) {
-    const changed = existing && existing.allowed !== decision.allowed
-    if (changed) chat = db.update(chats).set({ allowed: decision.allowed }).where(eq(chats.id, chat.id)).returning().get()
-    if (changed || (!existing && !decision.allowed)) logAllowance(db, msg, decision, now)
-  }
+  // A DM left out by the old utusan chat split opens again on its next message.
+  if (waDm && !chat.allowed) chat = db.update(chats).set({ allowed: true }).where(eq(chats.id, chat.id)).returning().get()
   const media: StoredMedia[] | undefined = msg.media?.length
     ? msg.media.map((m) => (m.kind === "image" ? { kind: "image", mimeType: m.mimeType, data: m.data } : { kind: m.kind, mimeType: m.mimeType, data: m.data, filename: m.filename }))
     : undefined
@@ -83,16 +50,6 @@ export function writeInbound(db: DB, msg: InboundMessage, now = Date.now(), opts
     .get()
   db.update(chats).set({ lastMessageAt: now }).where(eq(chats.id, chat.id)).run()
   return { chat, row }
-}
-
-function logAllowance(db: DB, msg: InboundMessage, d: { allowed: boolean; state: string; bindingId?: string }, now: number) {
-  const jid = msg.chatExternalId
-  const message = d.allowed
-    ? `WhatsApp chat ${jid} is no longer bound in utusan; Palui answers it now.`
-    : d.state === "bound"
-      ? `WhatsApp chat ${jid} is still bound in utusan${d.bindingId ? ` (binding "${d.bindingId}")` : ""}, so Palui won't answer it: both would reply. Remove that binding from ~/.utusan/utusan.json (PLAN 18); Palui picks it up on the next message.`
-      : `Palui can't read utusan's config to check WhatsApp chat ${jid}, so it won't answer it yet. Mount ~/.utusan/utusan.json read-only at /utusan/utusan.json, or remove the chat's utusan binding and tick "This chat isn't bound in utusan" on the WhatsApp connector.`
-  logEvent(db, { connectorId: msg.connectorId, kind: "whatsapp.allowlist", level: d.allowed ? "info" : "warn", message, data: { chat: jid, state: d.state } }, now)
 }
 
 function decodedSize(b64: string): number {
