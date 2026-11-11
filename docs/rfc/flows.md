@@ -219,7 +219,7 @@ Every trigger has `id`, `kind`, `start` (the first step id) and optional `lateGr
 
 Notes:
 
-- `chat` triggers are matched by the router before the model, the way approvals and check-in answers are. A matched message never reaches a turn. Only the owner's messages in the flow's chat match. Commands that collide with built-in ones (`/new`, `/stop`, `/status`, `/connectors`) are rejected at save.
+- `chat` triggers are matched by the router before the model, the way approvals and check-in answers are. A matched message never reaches a turn. Only the owner's messages in the flow's chat match. Commands that collide with built-in ones (`/new`, `/stop`, `/status`, `/connectors`, `/agent`, `/report`) are rejected at save.
 - `webhook`: an existing hook gets a third mode, `flow`. The hook still does all the verification it does today. Its body becomes `trigger.payload`, always tainted.
 - `poll` reuses the source refresh machinery (lease, backoff, failure notice). The first poll only stores the hash and does not fire, so creating a "notify me when this changes" flow doesn't fire on the current value.
 - `event`: a run started by an event carries `trigger.depth`. Depth over 3 is skipped with `chain_depth`, and a flow can't subscribe to its own `run.failed`.

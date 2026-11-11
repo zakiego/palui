@@ -144,7 +144,7 @@ export function createEngine(opts: EngineOptions) {
         case "command": {
           handled(row.id)
           const reply = await runCommand(ctx, chat, r.name, r.args)
-          const out = sendToChat(ctx, chat, reply.text, "system", reply.actions ? { actions: reply.actions } : {})
+          const out = sendToChat(ctx, chat, reply.text, "system", { ...(reply.actions ? { actions: reply.actions } : {}), ...(reply.format ? { format: reply.format } : {}) })
           if (reply.after) {
             await waitSent(out.id, opts.sendWaitMs ?? 5_000)
             await reply.after()

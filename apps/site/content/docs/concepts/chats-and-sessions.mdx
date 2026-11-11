@@ -14,7 +14,7 @@ A session is the current stretch of a chat that the model sees. Each chat has on
 </MessageFlowDiagram>
 
 1. Inbox. Every inbound message is written to the database with status `pending` before the channel handler returns. Pending rows are replayed on start, so a message sent in the middle of a deploy still gets an answer.
-2. Router. It identifies the channel and sender. Non-owners are dropped. Commands (`/new`, `/stop`, `/status`, `/connectors`) and approval answers are handled here and never reach the model.
+2. Router. It identifies the channel and sender. Non-owners are dropped. Commands (`/new`, `/stop`, `/status`, `/connectors`, `/report`, `/agent`) and approval answers are handled here and never reach the model.
 3. Per-chat queue. One turn at a time per chat. Messages that arrive mid-turn are batched into the next turn.
 4. Context. The chat's [agent](/docs/concepts/agents) persona, the current date and time (WITA by default), the list of enabled capabilities, your recall profile, and the session.
 5. Model loop. The model runs with tools from every enabled connector, within the [turn budget](/docs/concepts/tool-classes#budgets). A tool that needs approval ends the turn and saves it (see [Approvals](/docs/concepts/approvals)).

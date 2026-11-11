@@ -335,7 +335,7 @@ Automations the agent builds from chat out of triggers and steps (`packages/core
 ## 8. The agent turn
 
 1. Inbox: every inbound message is written to `messages` with `status=pending` before the channel handler returns. Pending rows are replayed on start. grammY confirms updates when it fetches the next batch, and Baileys delivers once, so this is what keeps a message sent mid-deploy.
-2. Router: identify the channel and sender. Non-owners are dropped, with the reason logged as a sentence, unless the chat is allowed and has an agent (section 19). A message that answers a pending approval ("ya"/"batal", or a button callback) is matched here, before the model sees it. Commands (`/new`, `/stop`, `/status`, `/connectors`) never reach the model.
+2. Router: identify the channel and sender. Non-owners are dropped, with the reason logged as a sentence, unless the chat is allowed and has an agent (section 19). A message that answers a pending approval ("ya"/"batal", or a button callback) is matched here, before the model sees it. Commands (`/new`, `/stop`, `/status`, `/connectors`, `/report`, `/agent`) never reach the model. `/report [note]` builds a plain-text debug snapshot of the chat for a coding agent (ids, recent runs and their errors, the last 10 messages, unsent outbox rows, warnings that name them), saves it in `reports` under an `rpt_` id and sends it. From a shared chat it goes to the owner's DM and the chat only gets the id (19.4).
 3. Per-chat queue: one turn at a time per chat. Messages that arrive mid-turn are batched into the next turn.
 4. Context: persona, now (date and WITA), the list of enabled capabilities, recall profile, and the session (summary plus the last 30 messages). The tool calls those turns made are replayed with them as real tool-call and tool-result parts (the result is the stored 500-character preview), so the model can tell what it ran from what it only said. Without that it distrusts its own replies and re-checks old work on every turn. A message that replies to another carries the quoted message in a `[Replying to ...]` block with `> ` lines, taken from the stored row or outbox when there is one, otherwise from the channel (WhatsApp `contextInfo.quotedMessage`). It is context only, never instructions. A quote of someone other than the owner or Palui taints the turn.
 5. Loop: AI SDK with tools from enabled connectors, within the section 5.2 budget.
@@ -371,6 +371,7 @@ Delivery is at least once. Outbox rows stuck in `sending` for more than 5 minute
 | `flow_step_runs` | id, run_id, seq, step_id, kind, attempt, status, input, output, tainted, branch, tool_call_id, turn_run_id, error, started_at, ms |
 | `outbox` | id, chat_id, connector_id, payload, status, attempts, next_attempt_at, claimed_at, channel_msg_id, source |
 | `events` | id, at, level, connector_id, kind, message |
+| `reports` | id, chat_id, session_id, note, text, created_at (one row per `/report`, kept until deleted) |
 | `settings` | key, value |
 
 All writes go through transactions, with no JSON state files. Retention: `tool_calls` args and results for 30 days, media for 14 days, `events` for 90 days.
@@ -471,7 +472,7 @@ Follows the TASTE.md lines.
   - Getting started: install, first owner, first connector, first message.
   - Concepts: connector states, channels, chats and sessions, memory, reminders, jobs, tool classes, approvals, the taint rule.
   - One page per connector. Its skeleton is generated from the manifest.
-  - Chat commands reference (`/connectors`, `/new`, `/stop`, `/status`).
+  - Chat commands reference (`/connectors`, `/new`, `/stop`, `/status`, `/report`, `/agent`).
   - REST API.
   - Self-hosting: compose, volumes, backups and restore, upgrades, tunnel.
   - Security model.

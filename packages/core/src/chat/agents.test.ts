@@ -2,7 +2,7 @@
 // approvals in the owner's DM, per-agent memory and caps.
 import { eq, sql } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
-import { chats, memoryDb, messages, outbox, pendingApprovals, runs, type DB } from "@palui/db"
+import { chats, memoryDb, messages, outbox, pendingApprovals, reports, runs, type DB } from "@palui/db"
 import { createAgent, getDefaultAgent, updateAgent } from "../agents"
 import { listEvents } from "../events"
 import { createInstruction, notesPrompt, setPreference } from "../notes/service"
@@ -72,6 +72,26 @@ describe("agents: who gets answered", () => {
     expect(p).toContain("[Budi]: @bot resep sop?")
     expect(outboxRows(h.db).at(-1)!.payload.text).toBe("halo Budi")
     expect(h.db.select().from(runs).get()!.agentId).toBe(h.chef.id)
+  })
+
+  it("/report in a group sends the snapshot to the owner's DM and only the id to the group", async () => {
+    const h = await world([say("halo Budi")])
+    await h.engine.inbound(ownerInGroup("/agent chef"))
+    await h.engine.idle()
+    await h.engine.inbound(guestMsg("@bot halo"))
+    await h.engine.idle()
+    const group = h.db.select().from(chats).where(eq(chats.externalId, GROUP)).get()!
+    await h.engine.inbound(ownerInGroup("/report@palui_bot Chef salah jawab"))
+    await h.engine.idle()
+    const saved = h.db.select().from(reports).get()!
+    const [toDm, toGroup] = outboxRows(h.db).slice(-2)
+    const dm = h.db.select().from(chats).where(eq(chats.id, toDm!.chatId)).get()!
+    expect(dm).toMatchObject({ kind: "dm", externalId: "42" })
+    expect(toDm!.payload).toMatchObject({ text: saved.text, format: "plain" })
+    expect(saved.text).toContain(`chat: ${group.id} (telegram, group)`)
+    expect(saved.text).toContain('guest "Budi"')
+    expect(toGroup).toMatchObject({ chatId: group.id })
+    expect(toGroup!.payload.text).toBe(`Report ${saved.id} udah aku kirim ke chat pribadi kamu.`)
   })
 
   it("treats a guest's ya, /new and button presses as plain text, never as owner actions", async () => {

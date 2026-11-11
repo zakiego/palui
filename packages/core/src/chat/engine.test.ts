@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm"
 import { describe, expect, it, onTestFinished, vi } from "vitest"
-import { chats, events, memoryDb, messages, outbox, passkey, pendingApprovals, runs, toolCalls, user, type DB } from "@palui/db"
+import { chats, events, memoryDb, messages, outbox, passkey, pendingApprovals, reports, runs, toolCalls, user, type DB } from "@palui/db"
 import { ensureChat, getChat } from "../chats"
 import { listEvents } from "../events"
 import { claimOwner, createClaim, getOwner, setWhatsAppOwner } from "../owner"
@@ -204,6 +204,34 @@ describe("commands", () => {
     await h.engine.idle()
     expect(outboxTexts(h.db).at(-1)).toContain("telegram dimatikan. Buat nyalain lagi: nyalakan lagi dari dashboard")
     expect(getConnector(h.db, "telegram")!.enabled).toBe(false)
+  })
+
+  it("/report sends a paste-ready snapshot of the chat without reaching the model", async () => {
+    const h = await basic([say("halo juga")])
+    await h.engine.inbound(tgMessage("halo palui"))
+    await h.engine.idle()
+    const chat = h.db.select().from(chats).get()!
+    const run = h.db.select().from(runs).get()!
+    await h.engine.inbound(tgMessage("/report reminder gak kekirim"))
+    await h.engine.idle()
+    const sent = h.db.select().from(outbox).orderBy(sql`rowid`).all().at(-1)!
+    // Plain: the channel must not run markdown conversion over ids and errors.
+    expect(sent.payload.format).toBe("plain")
+    const report = sent.payload.text
+    const saved = h.db.select().from(reports).get()!
+    expect(saved).toMatchObject({ chatId: chat.id, sessionId: chat.sessionId, note: "reminder gak kekirim", text: report })
+    expect(report.startsWith(`Palui debug report ${saved.id}.`)).toBe(true)
+    expect(saved.id).toMatch(/^rpt_/)
+    expect(report).toContain("Owner says: reminder gak kekirim")
+    expect(report).toContain(`chat: ${chat.id} (telegram, dm`)
+    expect(report).toContain(`session: ${chat.sessionId}`)
+    expect(report).toContain(`/app/chats?chat=${chat.id}`)
+    expect(report).toContain(`• ${run.id} ok `)
+    expect(report).toContain("owner run=")
+    expect(report).toContain(": halo palui")
+    expect(report).toContain("bot run=")
+    expect(report).not.toContain(": /report")
+    expect(h.db.select().from(runs).all()).toHaveLength(1)
   })
 
   it("/connectors off telegram is allowed when WhatsApp is reachable, and says how to undo", async () => {

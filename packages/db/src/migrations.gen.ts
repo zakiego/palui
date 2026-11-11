@@ -31,5 +31,9 @@ export const migrations: { name: string; sql: string }[] = [
   {
     "name": "0007_shallow_butterfly",
     "sql": "ALTER TABLE `runs` ADD `tokens_cache_write` integer DEFAULT 0 NOT NULL;"
+  },
+  {
+    "name": "0008_special_mac_gargan",
+    "sql": "CREATE TABLE `reports` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`chat_id` text NOT NULL,\n\t`session_id` text,\n\t`note` text DEFAULT '' NOT NULL,\n\t`text` text NOT NULL,\n\t`created_at` integer NOT NULL\n);\n--> statement-breakpoint\nCREATE INDEX `reports_chat` ON `reports` (`chat_id`,`created_at`);"
   }
 ]

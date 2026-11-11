@@ -57,6 +57,13 @@
       "when": 1794413087655,
       "tag": "0007_shallow_butterfly",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1794414796894,
+      "tag": "0008_special_mac_gargan",
+      "breakpoints": true
     }
   ]
 }

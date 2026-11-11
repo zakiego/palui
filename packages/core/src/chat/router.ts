@@ -11,7 +11,7 @@ import type { InboundMessage } from "../connectors/define"
 import type { StoredContent } from "./context"
 import type { FlowActions, ReminderActions } from "./deps"
 
-export type CommandName = "new" | "stop" | "status" | "connectors" | "agent"
+export type CommandName = "new" | "stop" | "status" | "connectors" | "agent" | "report"
 
 export type Route =
   | { kind: "ignore"; reason: string }
@@ -73,7 +73,7 @@ export function chatCheck(chat: ChatRow): string | null {
   return null
 }
 
-const COMMANDS: Record<string, CommandName> = { "/new": "new", "/stop": "stop", "/status": "status", "/connectors": "connectors", "/agent": "agent" }
+const COMMANDS: Record<string, CommandName> = { "/new": "new", "/stop": "stop", "/status": "status", "/connectors": "connectors", "/agent": "agent", "/report": "report" }
 
 export function parseCommand(text: string): { name: CommandName; args: string[] } | null {
   const t = text.trim()

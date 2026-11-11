@@ -48,6 +48,7 @@ const PRODUCT_TABLES = [
   schema.routineOccurrences,
   schema.outbox,
   schema.events,
+  schema.reports,
   schema.hooks,
   schema.instructions,
   schema.agents,

@@ -717,6 +717,22 @@ export const events = sqliteTable(
   (t) => [index("events_at").on(t.at), index("events_connector").on(t.connectorId, t.at)],
 )
 
+// Debug snapshots the owner asked for with /report. `text` is exactly what was
+// sent to the chat, so the id alone is enough to hand to a coding agent.
+export const reports = sqliteTable(
+  "reports",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id").notNull(),
+    sessionId: text("session_id"),
+    // What the owner typed after /report.
+    note: text("note").notNull().default(""),
+    text: text("text").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("reports_chat").on(t.chatId, t.createdAt)],
+)
+
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: json<unknown>("value").notNull(),

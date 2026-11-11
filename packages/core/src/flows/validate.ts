@@ -62,7 +62,7 @@ export type Validated = {
   writeCalls: WriteCall[]
 }
 
-const BUILTIN_COMMANDS = ["/new", "/stop", "/status", "/connectors", "/agent", "/start", "/help"]
+const BUILTIN_COMMANDS = ["/new", "/stop", "/status", "/connectors", "/agent", "/report", "/start", "/help"]
 
 export function parseDefinition(raw: unknown): { definition: FlowDefinition | null; problems: Problem[] } {
   const up = upgradeDefinition(raw)

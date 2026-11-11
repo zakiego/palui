@@ -7,14 +7,17 @@ import { eq } from "drizzle-orm"
 import { chats } from "@palui/db"
 import { rotateSession, type ChatRow } from "../chats"
 import { autoSave, findMemory } from "../memory"
-import { channelName, selfChannelOffUndo } from "../connectors/rules"
+import { channelName, ownerChat, selfChannelOffUndo } from "../connectors/rules"
 import { getConnector, listConnectors, pauseConnector, resumeConnector } from "../connectors/store"
+import { createReport } from "./report"
 import type { CommandName } from "./router"
-import type { EngineCtx } from "./turn"
+import { sendToChat, type EngineCtx } from "./turn"
 
 export type CommandReply = {
   text: string
   actions?: { id: string; label: string }[]
+  // "plain" skips the channel's markdown conversion (the default for replies).
+  format?: "plain" | "markdown"
   // Runs after the reply was sent (turning off the channel the reply goes through).
   after?: () => Promise<void>
 }
@@ -33,6 +36,8 @@ export async function runCommand(ctx: EngineCtx, chat: ChatRow, name: CommandNam
       return cmdConnectors(ctx, chat, args)
     case "agent":
       return cmdAgent(ctx, chat, args)
+    case "report":
+      return cmdReport(ctx, chat, args)
   }
 }
 
@@ -74,6 +79,17 @@ async function cmdAgent(ctx: EngineCtx, chat: ChatRow, args: string[]): Promise<
   if (target.isDefault) return { text: shared ? "Oke, balik ke Palui. Di sini cuma kamu yang aku jawab." : "Oke, balik ke Palui. Mulai sesi baru." }
   const who = shared ? (chat.kind === "group" ? " Orang lain di grup ini bisa ngobrol sama dia kalau mention atau reply pesannya." : " Orang di chat ini sekarang dijawab sama dia.") : ""
   return { text: `Oke, sekarang ${target.name} yang jawab di sini. Mulai sesi baru.${who}` }
+}
+
+// Plain, so the channel sends exactly what `reports` holds. From a shared chat
+// the snapshot goes to the owner's DM, like every other admin detail (PLAN 19.4).
+function cmdReport(ctx: EngineCtx, chat: ChatRow, args: string[]): CommandReply {
+  const report = createReport(ctx.db, chat, args.join(" "), ctx.clock())
+  if (!isSharedChat(ctx.db, chat)) return { text: report.text, format: "plain" }
+  const dm = ownerChat(ctx.db, chat.channel) ?? ownerChat(ctx.db, "web")
+  if (!dm) return { text: `Report ${report.id} udah aku simpan.` }
+  sendToChat(ctx, dm, report.text, "system", { format: "plain" })
+  return { text: `Report ${report.id} udah aku kirim ke chat pribadi kamu.` }
 }
 
 async function cmdNew(ctx: EngineCtx, chat: ChatRow): Promise<CommandReply> {
