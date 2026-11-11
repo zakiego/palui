@@ -13,7 +13,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { authClient, passkeyCancelled } from "@/lib/auth-client"
-import { errorMessage, fullDate } from "@/lib/format"
+import { clockTime, errorMessage } from "@/lib/format"
 import { acceptInvite, getInvite } from "@/lib/fns/session"
 import { translate } from "@/lib/i18n"
 import { toast } from "sonner"
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/invite/$token")({
   pendingComponent: () => (
     <AuthFrame>
       <Skeleton className="mx-auto h-8 w-40" />
-      <Skeleton className="h-28 rounded-xl" />
+      <Skeleton className="h-10 rounded-lg" />
     </AuthFrame>
   ),
   errorComponent: ({ error }: ErrorComponentProps) => (
@@ -144,22 +144,20 @@ function InvitePage() {
       <div className="flex flex-col gap-1.5 text-center">
         <h1 className="font-heading text-title text-balance">{recovery ? t("invite.recoveryTitle") : t("invite.title")}</h1>
         <p className="text-sm text-pretty text-muted-foreground">
-          {recovery ? t("invite.recoverySubtitle") : t("invite.subtitle", { time: invite.ok ? fullDate(invite.expiresAt) : "" })}
+          {recovery ? t("invite.recoverySubtitle") : t("invite.subtitle", { time: invite.ok ? clockTime(invite.expiresAt) : "" })}
         </p>
       </div>
-      <Card>
-        <CardContent className="flex flex-col gap-3">
-          {error && (
-            <Alert variant="destructive" role="alert" className="enter-in">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <Button size="lg" disabled={busy} onClick={() => void accept()} autoFocus>
-            {busy && <Spinner data-icon="inline-start" />}
-            {t("invite.accept")}
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col gap-3">
+        {error && (
+          <Alert variant="destructive" role="alert" className="enter-in">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        <Button size="lg" disabled={busy} onClick={() => void accept()}>
+          {busy && <Spinner data-icon="inline-start" />}
+          {t("invite.accept")}
+        </Button>
+      </div>
     </AuthFrame>
   )
 }

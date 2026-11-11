@@ -65,7 +65,7 @@ export const en = {
   "login.failed": "That passkey didn't work. Try again, or make a new owner link.",
   "invite.title": "Claim Palui",
   "invite.recoveryTitle": "Recover access",
-  "invite.subtitle": "This link works once, until {time}. Next you'll add a passkey for this device.",
+  "invite.subtitle": "This link works once and expires at {time}. Next you'll add a passkey for this device.",
   "invite.recoverySubtitle": "This removes every old passkey and signs out other sessions, so a lost device can't get back in. Next you'll add a passkey for this device.",
   "invite.accept": "Continue",
   "invite.invalidTitle": "Can't use this link",

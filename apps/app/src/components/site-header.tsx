@@ -54,7 +54,7 @@ export function SiteHeader({ onOpenCommand }: { onOpenCommand: () => void }) {
               <span className="truncate">{status.text}</span>
             </Badge>
           </Link>
-          <Button variant="outline" size="sm" onClick={onOpenCommand} aria-label={t("command.button")} aria-keyshortcuts="Meta+K Control+K" className="max-sm:size-9 max-sm:px-0">
+          <Button variant="outline" size="sm" onClick={onOpenCommand} aria-label={t("command.button")} aria-keyshortcuts="Meta+K Control+K" className="max-sm:size-8 max-sm:pointer-coarse:size-10 max-sm:bg-transparent max-sm:px-0 max-sm:shadow-none">
             <SearchIcon data-icon="inline-start" aria-hidden="true" className="max-sm:m-0" />
             <span className="max-sm:hidden">{t("command.button")}</span>
             <Kbd className="max-sm:hidden">⌘K</Kbd>

@@ -65,7 +65,7 @@ export const id: Record<Key, string> = {
   "login.failed": "Passkey itu gagal. Coba lagi, atau buat tautan pemilik baru.",
   "invite.title": "Klaim Palui",
   "invite.recoveryTitle": "Pulihkan akses",
-  "invite.subtitle": "Tautan ini hanya bisa dipakai sekali, sampai {time}. Setelah ini kamu menambahkan passkey untuk perangkat ini.",
+  "invite.subtitle": "Tautan ini hanya bisa dipakai sekali dan kedaluwarsa pukul {time}. Setelah ini kamu menambahkan passkey untuk perangkat ini.",
   "invite.recoverySubtitle": "Ini menghapus semua passkey lama dan mengeluarkan sesi lain, jadi perangkat yang hilang tidak bisa masuk lagi. Setelah ini kamu menambahkan passkey untuk perangkat ini.",
   "invite.accept": "Lanjut",
   "invite.invalidTitle": "Tautan ini tidak bisa dipakai",

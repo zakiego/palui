@@ -1,8 +1,8 @@
 // Settings (PLAN 11.4): persona, timezone, language, model roles and failover,
 // budgets, passkeys, backup status, and inbound hooks.
 import * as React from "react"
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowDownIcon, ArrowUpIcon, DatabaseBackupIcon, FingerprintIcon, PlusIcon, TrashIcon, WebhookIcon, XIcon } from "lucide-react"
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router"
+import { ArrowDownIcon, ArrowUpIcon, CircleAlertIcon, DatabaseBackupIcon, EllipsisIcon, FingerprintIcon, PlusIcon, TrashIcon, WebhookIcon } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -26,8 +26,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -93,20 +94,20 @@ function SettingsPage() {
             <TabsTrigger value="hooks">Hooks</TabsTrigger>
           </TabsList>
         </div>
-        <TabsContent value="general">
+        <TabsContent value="general" keepMounted>
           <GeneralTab data={data} />
         </TabsContent>
-        <TabsContent value="models">
+        <TabsContent value="models" keepMounted>
           <ModelsTab data={data} />
         </TabsContent>
-        <TabsContent value="limits">
+        <TabsContent value="limits" keepMounted>
           <LimitsTab data={data} />
         </TabsContent>
-        <TabsContent value="security" className="flex flex-col gap-4">
+        <TabsContent value="security" keepMounted className="flex flex-col gap-4">
           <PasskeysCard passkeys={data.passkeys} />
           <BackupCard backup={data.backup} />
         </TabsContent>
-        <TabsContent value="hooks">
+        <TabsContent value="hooks" keepMounted>
           <HooksCard data={data} />
         </TabsContent>
       </Tabs>
@@ -121,7 +122,31 @@ function GeneralTab({ data }: { data: Data }) {
   const [language, setLanguage] = React.useState(s.language)
   const [uiLanguage, setUiLanguage] = React.useState(s.uiLanguage)
   const [fallback, setFallback] = React.useState(s.fallbackChannel)
+  const [timezoneError, setTimezoneError] = React.useState<string>()
+  // Filled after mount so the server and client markup match during hydration.
+  const [zones, setZones] = React.useState<string[]>([])
+  const timezoneRef = React.useRef<HTMLInputElement>(null)
   const { busy, save } = useSave()
+  React.useEffect(() => {
+    try {
+      setZones(Intl.supportedValuesOf("timeZone"))
+    } catch {
+      // Older engines without supportedValuesOf: the field still takes free text.
+    }
+  }, [])
+  const submit = () => {
+    const tz = timezone.trim()
+    // The same check the server runs, so a typo shows up at the field instead of in a toast.
+    try {
+      if (!tz) throw new RangeError("empty time zone")
+      new Intl.DateTimeFormat("en", { timeZone: tz })
+    } catch {
+      setTimezoneError("Use an IANA zone like Asia/Makassar.")
+      timezoneRef.current?.focus()
+      return
+    }
+    void save({ persona, timezone: tz, language, uiLanguage, fallbackChannel: fallback })
+  }
   return (
     <Card>
       <CardHeader>
@@ -137,11 +162,33 @@ function GeneralTab({ data }: { data: Data }) {
               <span className="tabular-nums">{persona.length.toLocaleString()}</span> of 8,000 characters.
             </FieldDescription>
           </Field>
-          <div className="grid gap-4 @2xl/main:grid-cols-2">
-            <Field>
+          <div className="grid grid-cols-1 gap-4 @2xl/main:grid-cols-2">
+            <Field data-invalid={timezoneError ? true : undefined}>
               <FieldLabel htmlFor="timezone">Time zone</FieldLabel>
-              <Input id="timezone" className="font-mono" spellCheck={false} value={timezone} onChange={(e) => setTimezone(e.target.value)} />
-              <FieldDescription>IANA name. New reminders and "today" use it.</FieldDescription>
+              <Input
+                ref={timezoneRef}
+                id="timezone"
+                className="font-mono"
+                spellCheck={false}
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="off"
+                list="timezone-options"
+                aria-invalid={timezoneError ? true : undefined}
+                aria-describedby={timezoneError ? "timezone-error timezone-help" : "timezone-help"}
+                value={timezone}
+                onChange={(e) => {
+                  setTimezone(e.target.value)
+                  setTimezoneError(undefined)
+                }}
+              />
+              <datalist id="timezone-options">
+                {zones.map((z) => (
+                  <option key={z} value={z} />
+                ))}
+              </datalist>
+              {timezoneError && <FieldError id="timezone-error" role={undefined}>{timezoneError}</FieldError>}
+              <FieldDescription id="timezone-help">IANA name. New reminders and "today" use it.</FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor="language">Bot language</FieldLabel>
@@ -189,7 +236,7 @@ function GeneralTab({ data }: { data: Data }) {
         </FieldGroup>
       </CardContent>
       <CardFooter className="justify-end border-t">
-        <Button disabled={busy} onClick={() => void save({ persona, timezone: timezone.trim(), language, uiLanguage, fallbackChannel: fallback })}>
+        <Button disabled={busy} onClick={submit}>
           {busy && <Spinner data-icon="inline-start" />}
           Save
         </Button>
@@ -199,18 +246,39 @@ function GeneralTab({ data }: { data: Data }) {
 }
 
 type Role = "default" | "fast" | "vision"
+const ROLES: Role[] = ["default", "fast", "vision"]
 const ROLE_HELP: Record<Role, string> = {
   default: "Every normal turn.",
   fast: "Titles, summaries, reminder parsing.",
   vision: "Messages with photos.",
 }
 
+type ChainLink = { connectorId: string; model: string }
+// `key` is client only: it lets a row's DOM node, and focus, follow its item on reorder.
+type KeyedLink = ChainLink & { key: string }
+
 function ModelsTab({ data }: { data: Data }) {
-  const [roles, setRoles] = React.useState(data.settings.modelRoles)
+  const keyPrefix = React.useId()
+  const keyCount = React.useRef(0)
+  const newKey = () => `${keyPrefix}link-${keyCount.current++}`
+  const [roles, setRoles] = React.useState(() => {
+    const withKeys = (chain: ChainLink[]): KeyedLink[] => chain.map(({ connectorId, model }) => ({ key: newKey(), connectorId, model }))
+    const r = data.settings.modelRoles
+    return { default: withKeys(r.default), fast: withKeys(r.fast), vision: withKeys(r.vision) }
+  })
   const { busy, save } = useSave()
   const options = data.models.map((m) => ({ value: m.id, label: m.label }))
   const known = new Set(options.map((o) => o.value))
-  const setChain = (role: Role, chain: { connectorId: string; model: string }[]) => setRoles((r) => ({ ...r, [role]: chain }))
+  const setChain = (role: Role, chain: KeyedLink[]) => setRoles((r) => ({ ...r, [role]: chain }))
+  const stripKeys = (chain: KeyedLink[]): ChainLink[] => chain.map(({ connectorId, model }) => ({ connectorId, model }))
+  // Remove unmounts the row that holds the open menu's trigger, so Base UI has nowhere to return focus. Move it by hand, after Base UI's own attempt.
+  const focusAfterRemove = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    const key = focusAfterRemove.current
+    if (!key) return
+    focusAfterRemove.current = null
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-chain-actions="${CSS.escape(key)}"]`)?.focus())
+  }, [roles])
 
   return (
     <Card>
@@ -225,7 +293,7 @@ function ModelsTab({ data }: { data: Data }) {
             <AlertDescription>Add CLIProxyAPI or ai-gateway in Saklar. Chains below keep their ids until then.</AlertDescription>
           </Alert>
         )}
-        {(["default", "fast", "vision"] as Role[]).map((role) => {
+        {ROLES.map((role) => {
           const chain = roles[role]
           return (
             <FieldSet key={role} className="gap-2">
@@ -234,43 +302,83 @@ function ModelsTab({ data }: { data: Data }) {
               </FieldLegend>
               <FieldDescription>{ROLE_HELP[role]}</FieldDescription>
               <ol className="flex flex-col gap-2">
-                {chain.map((link, i) => (
-                  <li key={i} className="flex flex-wrap items-center gap-2">
-                    <span className="w-5 font-mono text-caption text-muted-foreground tabular-nums">{i + 1}.</span>
-                    <SimpleSelect
-                      aria-label={`${role} step ${i + 1} connector`}
-                      className="w-40"
-                      value={link.connectorId}
-                      options={known.has(link.connectorId) ? options : [{ value: link.connectorId, label: `${link.connectorId} (missing)` }, ...options]}
-                      onChange={(v) => setChain(role, chain.map((x, j) => (j === i ? { ...x, connectorId: v } : x)))}
-                    />
-                    <Input
-                      aria-label={`${role} step ${i + 1} model`}
-                      className="min-w-40 flex-1 font-mono"
-                      spellCheck={false}
-                      value={link.model}
-                      onChange={(e) => setChain(role, chain.map((x, j) => (j === i ? { ...x, model: e.target.value } : x)))}
-                    />
-                    <span className="flex gap-1">
-                      <Button variant="ghost" size="icon-sm" aria-label={`Move ${role} step ${i + 1} up`} disabled={i === 0} onClick={() => setChain(role, swap(chain, i, i - 1))}>
-                        <ArrowUpIcon aria-hidden="true" />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" aria-label={`Move ${role} step ${i + 1} down`} disabled={i === chain.length - 1} onClick={() => setChain(role, swap(chain, i, i + 1))}>
-                        <ArrowDownIcon aria-hidden="true" />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" aria-label={`Remove ${role} step ${i + 1}`} disabled={chain.length === 1} onClick={() => setChain(role, chain.filter((_, j) => j !== i))}>
-                        <XIcon aria-hidden="true" />
-                      </Button>
-                    </span>
-                  </li>
-                ))}
+                {chain.map((link, i) => {
+                  const missing = !known.has(link.connectorId)
+                  // With no model connectors at all, the alert above already says so: skip the per-step note.
+                  const showMissing = missing && options.length > 0
+                  const missingId = `${link.key}-missing`
+                  return (
+                    <li key={link.key} className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-2 @2xl/main:grid-cols-[1.25rem_11rem_minmax(0,1fr)_auto]">
+                      <span className="font-mono text-caption text-muted-foreground tabular-nums">{i + 1}.</span>
+                      <SimpleSelect
+                        aria-label={`${role} step ${i + 1} connector`}
+                        aria-invalid={missing}
+                        aria-describedby={showMissing ? missingId : undefined}
+                        className="col-span-2 w-full @2xl/main:col-span-1"
+                        value={link.connectorId}
+                        options={missing ? [{ value: link.connectorId, label: `${link.connectorId} (missing)` }, ...options] : options}
+                        onChange={(v) => setChain(role, chain.map((x, j) => (j === i ? { ...x, connectorId: v } : x)))}
+                      />
+                      <Input
+                        aria-label={`${role} step ${i + 1} model`}
+                        className="col-start-2 font-mono @2xl/main:col-start-auto"
+                        spellCheck={false}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        autoComplete="off"
+                        value={link.model}
+                        onChange={(e) => setChain(role, chain.map((x, j) => (j === i ? { ...x, model: e.target.value } : x)))}
+                      />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger data-chain-actions={link.key} render={<Button variant="ghost" size="icon" aria-label={`Actions for ${role} step ${i + 1}`} />}>
+                          <EllipsisIcon aria-hidden="true" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-auto min-w-40">
+                          <DropdownMenuItem className="pointer-coarse:py-2.5" disabled={i === 0} onClick={() => setChain(role, swap(chain, i, i - 1))}>
+                            <ArrowUpIcon aria-hidden="true" />
+                            Move up
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="pointer-coarse:py-2.5" disabled={i === chain.length - 1} onClick={() => setChain(role, swap(chain, i, i + 1))}>
+                            <ArrowDownIcon aria-hidden="true" />
+                            Move down
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="pointer-coarse:py-2.5"
+                            variant="destructive"
+                            disabled={chain.length === 1}
+                            onClick={() => {
+                              focusAfterRemove.current = (chain[i + 1] ?? chain[i - 1])?.key ?? null
+                              setChain(role, chain.filter((_, j) => j !== i))
+                            }}
+                          >
+                            <TrashIcon aria-hidden="true" />
+                            Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      {showMissing && (
+                        <p id={missingId} className="col-span-2 col-start-2 flex items-start gap-1.5 text-caption text-destructive-fg @2xl/main:col-span-3">
+                          <CircleAlertIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+                          <span className="min-w-0 break-words">
+                            {link.connectorId} isn't set up. Pick another connector, or add it in{" "}
+                            <Link to="/saklar" className="underline underline-offset-2">
+                              Saklar
+                            </Link>
+                            .
+                          </span>
+                        </p>
+                      )}
+                    </li>
+                  )
+                })}
               </ol>
               <Button
                 variant="outline"
                 size="sm"
                 className="self-start"
                 disabled={chain.length >= 6}
-                onClick={() => setChain(role, [...chain, { connectorId: options[0]?.value ?? "ai-gateway", model: chain.at(-1)?.model ?? "" }])}
+                onClick={() => setChain(role, [...chain, { key: newKey(), connectorId: options[0]?.value ?? "ai-gateway", model: chain.at(-1)?.model ?? "" }])}
               >
                 <PlusIcon data-icon="inline-start" />
                 Add fallback
@@ -283,9 +391,9 @@ function ModelsTab({ data }: { data: Data }) {
         <Button
           disabled={busy}
           onClick={() => {
-            const bad = (["default", "fast", "vision"] as Role[]).find((r) => roles[r].some((x) => !x.model.trim()))
+            const bad = ROLES.find((r) => roles[r].some((x) => !x.model.trim()))
             if (bad) return toast.error(`Fill in every model id in the ${bad} chain.`)
-            void save({ modelRoles: roles })
+            void save({ modelRoles: { default: stripKeys(roles.default), fast: stripKeys(roles.fast), vision: stripKeys(roles.vision) } })
           }}
         >
           {busy && <Spinner data-icon="inline-start" />}
@@ -326,7 +434,7 @@ function LimitsTab({ data }: { data: Data }) {
         <CardDescription>Hitting a cap pauses turns and tells you on the channel. Plain reminders and commands keep working.</CardDescription>
       </CardHeader>
       <CardContent>
-        <FieldGroup className="grid gap-4 @2xl/main:grid-cols-2">
+        <FieldGroup className="grid grid-cols-1 gap-4 @2xl/main:grid-cols-2">
           {field("maxSteps", "Steps per turn", "Tool calls and replies in one turn. 1 to 50.", 1, 50)}
           {field("turnTimeoutS", "Turn time limit (seconds)", "10 to 600.", 10, 600)}
           {field("maxTools", "Tools per turn", "The most relevant connectors go first. 1 to 128.", 1, 128)}
