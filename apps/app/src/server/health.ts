@@ -3,7 +3,7 @@
 // database migrated by a newer build (a bad rollback). Runtime and connector
 // state go in the body and never change the code, so a WhatsApp outage can't
 // fail a deploy.
-import { listConnectors } from "@palui/core/saklar/store"
+import { listConnectors } from "@palui/core/connectors/store"
 import { schemaState, type DB } from "@palui/db"
 
 export type RuntimeLive = () => Promise<{ ok: boolean; schema: string }>

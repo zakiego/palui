@@ -1,5 +1,5 @@
 // Every connector runtime, keyed by manifest id. Imported by the runtime only.
-import type { AnyRuntime } from "@palui/core/saklar/define"
+import type { AnyRuntime } from "@palui/core/connectors/define"
 import aiGateway from "./ai-gateway/runtime"
 import cliproxy from "./cliproxy/runtime"
 import gcal from "./gcal/runtime"

@@ -12,7 +12,7 @@ import { CONTROL_HEADER, type RuntimeStatus } from "@palui/core/control"
 import type { Logger } from "@palui/core/log"
 import { failoverModel, resolveChain } from "@palui/core/models/failover"
 import { rerouteChannelRows } from "@palui/core/outbox/worker"
-import type { Supervisor } from "@palui/core/saklar/supervisor"
+import type { Supervisor } from "@palui/core/connectors/supervisor"
 import { getSetting } from "@palui/core/settings"
 
 export const SSE_KEEPALIVE_MS = 15_000

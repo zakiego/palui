@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { afterEach, describe, expect, it } from "vitest"
 import { z } from "zod"
-import type { ConfigOf, PaluiTool, TurnInfo } from "@palui/core/saklar/define"
+import type { ConfigOf, PaluiTool, TurnInfo } from "@palui/core/connectors/define"
 import { suggestClass } from "./client"
 import manifest from "./manifest"
 import runtime from "./runtime"

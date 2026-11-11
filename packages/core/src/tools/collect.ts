@@ -4,8 +4,8 @@
 import type { Tool } from "ai"
 import type { ToolClass } from "@palui/db"
 import type { Logger } from "../log"
-import type { PaluiTool, TurnInfo } from "../saklar/define"
-import type { RunningEntry } from "../saklar/supervisor"
+import type { PaluiTool, TurnInfo } from "../connectors/define"
+import type { RunningEntry } from "../connectors/supervisor"
 
 export const TOOL_SEP = "__"
 

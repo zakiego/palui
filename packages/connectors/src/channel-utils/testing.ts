@@ -3,7 +3,7 @@
 import { memoryDb, type DB } from "@palui/db"
 import { silentLogger } from "@palui/core/log"
 import { claimOwner, isOwner } from "@palui/core/owner"
-import type { ConnectorContext, InboundMessage } from "@palui/core/saklar/define"
+import type { ConnectorContext, InboundMessage } from "@palui/core/connectors/define"
 
 export type TestContext<C, S> = ConnectorContext<C, S> & {
   inbound: InboundMessage[]

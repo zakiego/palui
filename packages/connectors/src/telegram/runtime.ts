@@ -20,7 +20,7 @@ import {
   type RunningConnector,
   type SecretsOf,
   type TestResult,
-} from "@palui/core/saklar/define"
+} from "@palui/core/connectors/define"
 import { markdownToTelegramHtml, splitMessage } from "../channel-utils"
 import manifest from "./manifest"
 

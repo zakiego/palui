@@ -3,7 +3,7 @@
 import { tool } from "ai"
 import { z } from "zod"
 import type { DB } from "@palui/db"
-import { defineRuntime, type PaluiTool, type TurnInfo } from "@palui/core/saklar/define"
+import { defineRuntime, type PaluiTool, type TurnInfo } from "@palui/core/connectors/define"
 import {
   cancelReminder,
   createReminder,

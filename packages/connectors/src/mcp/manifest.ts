@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { defineManifest } from "@palui/core/saklar/define"
+import { defineManifest } from "@palui/core/connectors/define"
 
 const toolClass = z.enum(["read", "write", "destructive"])
 

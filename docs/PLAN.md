@@ -8,7 +8,6 @@ Status: v2, 2026-11-10. Draft v1 had a cold review (25 findings, 6 HIGH), and ev
 - Named after Si Palui, the Banjar folk comic hero from Kalimantan Selatan: simple-looking but sharp. Pronounced PAH-loo-ee.
 - A web search found no AI product or GitHub repo named palui. That isn't a formal trademark check.
 - It doesn't clash with utusan or recall. Tool names may use Indonesian verbs, the way utusan's do (`ingatkan`, `kirim`).
-- The connector on/off feature is called Saklar (Indonesian for "switch"). The Connectors page and the `/saklar` chat command both use that word.
 
 ## 1. What it is
 
@@ -76,7 +75,7 @@ Multi-user, sign-up, billing. Everything marked deferred above. Native app. Repl
   |    approval needed -> pending_approvals, turn ends              |
   |  scheduler (reminders, jobs) -> OUTBOX or a turn                |
   |  outbox worker: claim, send, ack, retry                         |
-  |  saklar supervisor: reconcile desired vs running                |
+  |  connector supervisor: reconcile desired vs running                |
   +-----------------------------------------------------------------+
         |  SQLite WAL on volume  |  control API (compose network only)
   +---------------------- app -------------------------------------+
@@ -130,7 +129,7 @@ Connector code is split so the app never bundles Baileys:
 - Tunnel: one rule to `127.0.0.1:<port>` from `free-port.sh` (likely 4802).
 - Inside OrbStack: CLIProxyAPI is `http://host.docker.internal:8317`, ai-gateway is `:8793`, recall is `:4800`. That skips the tunnel and Cloudflare's 100 s limit.
 
-## 4. Saklar: the connector model
+## 4. Connectors
 
 Everything optional is a connector of kind `channel`, `model`, `memory`, `tools` or `skill`. They all share one manifest shape, one lifecycle and one UI.
 
@@ -182,10 +181,10 @@ not set up --connect--> connecting --ok--> on
 |---|---|
 | Pausing mid-turn | Applies from the next turn. Tool calls already running finish. |
 | Pausing the Reminders skill | Hides its tools only. Reminders already set still fire. The card says so. |
-| The only model connector is paused | The router replies with fixed text: "Model lagi off. Nyalakan: `/saklar on cliproxy`". Plain reminders and commands keep working. |
+| The only model connector is paused | The router replies with fixed text: "Model lagi off. Nyalakan: `/connectors on cliproxy`". Plain reminders and commands keep working. |
 | Channel paused with outbox rows waiting | Rows wait without using up attempts. They send on resume. |
 | Channel removed with rows waiting | Rows go to the fallback channel if one is on. Otherwise they're cancelled, with an event logged. |
-| `/saklar off telegram` sent from Telegram | Allowed only when another channel or the dashboard is reachable. The reply says how to undo it. Otherwise it's refused. |
+| `/connectors off telegram` sent from Telegram | Allowed only when another channel or the dashboard is reachable. The reply says how to undo it. Otherwise it's refused. |
 | recall auto-recall times out | The turn goes on without memory. The card shows the skip rate ("skipped 4 of last 20"). |
 | Connector throws repeatedly | `error` state, restarts with backoff (5 s, 30 s, 2 min, 10 min cap). After 5 min in `error`, I get a message on another channel. |
 
@@ -197,11 +196,11 @@ The desired state is the `connectors` rows (`enabled`, `config_hash`). The runni
 
 Secrets are entered in the dashboard only and encrypted at rest with AES-256-GCM using `MASTER_KEY` from `.env`. They're write-only, shown as `rcl_••••a91f`: they can be replaced but never revealed. Logs redact `rcl_`, `zkg_`, `sk-` and bot-token patterns.
 
-### 4.6 Three ways to flip a Saklar
+### 4.6 Three ways to flip a connector
 
 1. Dashboard: the card Switch (pause/resume) and the sheet (connect, configure, test, remove).
-2. Chat, owner only: `/saklar` lists every connector with its state (Telegram shows inline buttons), plus `/saklar off recall` and `/saklar on recall`. Connect and remove stay in the dashboard.
-3. CLI: `docker compose exec app palui saklar list|on|off <id>`.
+2. Chat, owner only: `/connectors` lists every connector with its state (Telegram shows inline buttons), plus `/connectors off recall` and `/connectors on recall`. Connect and remove stay in the dashboard.
+3. CLI: `docker compose exec app palui connectors list|on|off <id>`.
 
 ## 5. Connectors in v1
 
@@ -211,7 +210,7 @@ Telegram (the first channel built)
 - Connect: paste the token. Test calls `getMe` and shows `@bot_username`. The wizard then shows `t.me/<bot>?start=<nonce>` as a link and a QR. The nonce is single use and expires after 10 minutes. Only a `/start <nonce>` claims owner, and the wizard waits with a live status line until it arrives.
 - Runtime: grammY long polling, typing action during a turn, replies split at 4096 chars and sent as HTML.
 - Media in: photos (vision), voice (transcription skill), small documents (text extracted).
-- Inline keyboards for reminder actions, approvals and `/saklar`.
+- Inline keyboards for reminder actions, approvals and `/connectors`.
 
 WhatsApp
 - Connect: the wizard first asks for the owner's phone number. Then it pairs by phone-number code (8 chars, big Geist Mono, `ABCD-EFGH`, copy button), with QR as a fallback tab. Expiry is driven by Baileys `connection.update`: a new `qr` arrives on each rotation, and the pairing code is requested after the socket opens. A text label ("expires in about 2 min") isn't announced on every tick. Session files live in `/data/wa-auth`.
@@ -296,7 +295,7 @@ The feature most likely to be judged by its failures.
 ## 8. The agent turn
 
 1. Inbox: every inbound message is written to `messages` with `status=pending` before the channel handler returns. Pending rows are replayed on start. grammY confirms updates when it fetches the next batch, and Baileys delivers once, so this is what keeps a message sent mid-deploy.
-2. Router: identify the channel and sender. Non-owners are dropped, with the reason logged as a sentence. A message that answers a pending approval ("ya"/"batal", or a button callback) is matched here, before the model sees it. Commands (`/new`, `/stop`, `/status`, `/saklar`) never reach the model.
+2. Router: identify the channel and sender. Non-owners are dropped, with the reason logged as a sentence. A message that answers a pending approval ("ya"/"batal", or a button callback) is matched here, before the model sees it. Commands (`/new`, `/stop`, `/status`, `/connectors`) never reach the model.
 3. Per-chat queue: one turn at a time per chat. Messages that arrive mid-turn are batched into the next turn.
 4. Context: persona, now (date and WITA), the list of enabled capabilities, recall profile, and the session (summary plus the last 30 messages).
 5. Loop: AI SDK with tools from enabled connectors, within the section 5.2 budget.
@@ -345,7 +344,7 @@ All writes go through transactions, with no JSON state files. Retention: `tool_c
 ### 11.1 Design contract
 
 - Audience: me, one technical owner, often on a phone between other things.
-- Primary task: see that it's alive, and flip a Saklar in seconds.
+- Primary task: see that it's alive, and flip a connector in seconds.
 - Category default: a chatbot SaaS dashboard (KPI cards, big charts, chat in the middle).
 - Predictable opposite: a raw settings list or config editor.
 - What this product shows that neither does: a live picture of what's plugged in. Health and control are the same element. Every connector shows on, paused or broken, and it's one tap from off.
@@ -361,17 +360,17 @@ All writes go through transactions, with no JSON state files. Retention: `tool_c
 
 ### 11.3 Shell
 
-shadcn `sidebar-07` (collapses to icons, becomes a Sheet on a phone). The header has the page title, a global status ("All on" or "2 need attention", as a link) and a Command menu (⌘K) for "saklar off recall", "new reminder", "open chat".
+shadcn `sidebar-07` (collapses to icons, becomes a Sheet on a phone). The header has the page title, a global status ("All on" or "2 need attention", as a link) and a Command menu (⌘K) for "turn off recall", "new reminder", "open chat".
 
 ### 11.4 Pages (7)
 
 | Page | Content | Main components |
 |---|---|---|
-| Home | A first-run checklist until it's done (owner passkey, model, channel, say hi, optional recall and MCP). After that: a Saklar summary (the connector map from the Explore pick), the next 3 reminders, the last 5 runs, tokens today. | Card, Empty, Badge, Switch, Item, Skeleton |
+| Home | A first-run checklist until it's done (owner passkey, model, channel, say hi, optional recall and MCP). After that: a connector summary (the connector map from the Explore pick), the next 3 reminders, the last 5 runs, tokens today. | Card, Empty, Badge, Switch, Item, Skeleton |
 | Chats | One page: the list of every chat across channels on the left (a Drawer on a phone), the transcript on the right. The web chat is the "Palui (web)" chat with an input. Tool calls are inline and collapsible, with a class badge and duration. Pending approvals show Approve/Deny. | Card, Collapsible, InputGroup, Badge, ScrollArea, Item. AI Elements only if `shadcn view` shows it works on base-nova |
 | Reminders | Tabs for Upcoming, Recurring and Done. The New reminder dialog takes natural language and previews the parsed time live. | Tabs, Table, Dialog, Field, InputGroup, Calendar, Popover |
 | Jobs | Schedule, next run, last result, Run now, Pause, daily cap. | Table, Switch, Sheet, Badge |
-| Saklar | Connectors grouped as Channels, Models, Memory, Tools, Skills. Each card shows an icon, name, one line, status, a Switch and an "Open" button. The card itself isn't a button. Open shows a Sheet (a Drawer on a phone) with the setup wizard or config, Test, recent events and the danger area. "Add connector" opens a catalog in a Command. The MCP sheet has a tool table with a Switch and class Select per tool, search, and "enable all read tools". | Card, Switch, Button, Badge, Sheet, Drawer, Field, Alert, AlertDialog, Command, Table, Select |
+| Connectors | Connectors grouped as Channels, Models, Memory, Tools, Skills. Each card shows an icon, name, one line, status, a Switch and an "Open" button. The card itself isn't a button. Open shows a Sheet (a Drawer on a phone) with the setup wizard or config, Test, recent events and the danger area. "Add connector" opens a catalog in a Command. The MCP sheet has a tool table with a Switch and class Select per tool, search, and "enable all read tools". | Card, Switch, Button, Badge, Sheet, Drawer, Field, Alert, AlertDialog, Command, Table, Select |
 | Activity | Tabs: Events (filter by connector and level), Runs, Usage (tokens per day, model, chat and job, with no dollar figures, since CLIProxyAPI has no usage stats and subscriptions have no per-token cost). | Tabs, Table, ToggleGroup, Badge, `chart-*` blocks |
 | Settings | Persona, timezone, language, model roles and failover, budgets, passkeys, API keys, backup status. | Field, Textarea, Select, Tabs |
 
@@ -382,13 +381,13 @@ shadcn `sidebar-07` (collapses to icons, becomes a Sheet on a phone). The header
 - Test, Connect and Run now use `toast.promise` (loading, then success with detail, or an error with the fix).
 - The connect wizard keeps its progress if the sheet closes (a draft row with status `not set up`).
 - Status is live over SSE from `events`. Changes are announced through `aria-live="polite"`, once per change, never per tick.
-- Phone first for Home, Saklar, Reminders and Chats. Sheets become Vaul Drawers on narrow screens.
+- Phone first for Home, Connectors, Reminders and Chats. Sheets become Vaul Drawers on narrow screens.
 
 ### 11.6 Motion (frequency test)
 
 | Element | Frequency | Decision |
 |---|---|---|
-| Saklar Switch | often | shadcn default thumb slide only |
+| Connector Switch | often | shadcn default thumb slide only |
 | Status change | occasional | 150 ms color crossfade, no movement |
 | Sheet / Drawer | often | shadcn default, `drawer` easing, interruptible, drag to dismiss on a phone |
 | Home connector map | first visit only | lines draw once ever (a localStorage flag), then static. A busy connector shows a Spinner badge, with no pulses |
@@ -399,7 +398,7 @@ shadcn `sidebar-07` (collapses to icons, becomes a Sheet on a phone). The header
 
 ### 11.7 Explore (at build time)
 
-Explore runs after M3, when 6 or more real connectors exist. Before that, the Saklar page is a plain shadcn grouped list. The piece is the Saklar page, with three variants behind the `prototype` picker:
+Explore runs after M3, when 6 or more real connectors exist. Before that, the Connectors page is a plain shadcn grouped list. The piece is the Connectors page, with three variants behind the `prototype` picker:
 
 1. A card grid grouped by kind with a Switch per card (closest to TASTE.md and shadcn).
 2. Dense rows, Raycast or macOS settings style, with inline status and expandable details (density axis).
@@ -415,15 +414,15 @@ Follows the TASTE.md lines.
 - Hero visual (Explore at M6, 3 variants):
   - (a) Graph: a message travels from a WhatsApp or Telegram node into Palui, out to recall, reminders, MCP and model nodes, and back.
   - (b) Chat replay: "ingetin bayar listrik besok jam 9", then the reminder firing the next morning.
-  - (c) Saklar board: connectors switching on one by one.
+  - (c) connector board: connectors switching on one by one.
   - Every variant gets an icon on each node, starts from step 1 on load, types its caption at about 55 ms per character with no caret, moves the visual only after the line is written, and keeps the visual and caption in one phone screen with the caption first.
 - Positioning while dev-only: "Personal agent, self-hosted." The landing is indexable (D4), `/app` is not.
 - Ship: OG image, favicon set, `robots.txt`, sitemap, per SHIP.md. Optionally, a small Si Palui-inspired mark (original drawing, not the comic's art).
 - Docs (Fumadocs):
   - Getting started: install, first owner, first connector, first message.
-  - Concepts: Saklar and connector states, channels, chats and sessions, memory, reminders, jobs, tool classes, approvals, the taint rule.
+  - Concepts: connector states, channels, chats and sessions, memory, reminders, jobs, tool classes, approvals, the taint rule.
   - One page per connector. Its skeleton is generated from the manifest.
-  - Chat commands reference (`/saklar`, `/new`, `/stop`, `/status`).
+  - Chat commands reference (`/connectors`, `/new`, `/stop`, `/status`).
   - REST API.
   - Self-hosting: compose, volumes, backups and restore, upgrades, tunnel.
   - Security model.
@@ -448,10 +447,10 @@ Each one ends deployed on the mini and usable.
 | # | Scope | Done when | Estimate |
 |---|---|---|---|
 | M0 | Free disk to >10 GB. Spike: AI SDK tool calling through CLIProxyAPI for a Claude model (anthropic protocol) and a Gemini model, from an OrbStack container, with tokens per turn measured under round-robin vs sticky. Spike: Baileys pairing in a Linux container. Check the compose single build plus `pull_policy: never`. | Each model passes 5 tool-call round trips. Pairing works. Compose builds once. | ~1 day |
-| M1 | Monorepo, DB, CLI owner invite and passkey, Saklar framework (manifest/runtime split) and supervisor, CLIProxyAPI + ai-gateway connectors with failover and budgets, web chat in Chats, plain Saklar list, deploy + tunnel + edge | I chat at `palui.zakiego.com/app`, pause the model and get the fixed reply, and a deploy doesn't lose a message | ~5 days |
-| M2 | Telegram (nonce claim), inbox, outbox, reminders, `/saklar` `/stop` `/status`, scheduler tests, parse eval, encrypted backup + restore drill | A reminder set from Telegram fires after a deploy mid-wait, Snooze works, eval ≥95%, restore drill passes | ~4 days |
+| M1 | Monorepo, DB, CLI owner invite and passkey, connector framework (manifest/runtime split) and supervisor, CLIProxyAPI + ai-gateway connectors with failover and budgets, web chat in Chats, plaon the Connectors page list, deploy + tunnel + edge | I chat at `palui.zakiego.com/app`, pause the model and get the fixed reply, and a deploy doesn't lose a message | ~5 days |
+| M2 | Telegram (nonce claim), inbox, outbox, reminders, `/connectors` `/stop` `/status`, scheduler tests, parse eval, encrypted backup + restore drill | A reminder set from Telegram fires after a deploy mid-wait, Snooze works, eval ≥95%, restore drill passes | ~4 days |
 | M3 | recall (MCP + auto-recall/save), MCP connectors with trust and classes, approvals that survive restarts, taint rule | A fact saved yesterday is recalled, a vorneo tool runs, a destructive tool asks first and still works after a restart | ~3 days |
-| M3.5 | Saklar Explore (3 variants), the pick applied to Saklar and Home | Pick recorded in DESIGN.md | ~1.5 days |
+| M3.5 | Connectors page Explore (3 variants), the pick applied to Connectors and Home | Pick recorded in DESIGN.md | ~1.5 days |
 | M4 | WhatsApp (phone number owner, LID learning, pairing UI) | Pair, chat, a reminder delivered on WhatsApp, pause/resume without re-pairing | ~2.5 days |
 | M5 | Jobs, heartbeat, voice-in, media, Activity page, inbound hooks | The daily briefing arrives at 07:00 for 3 days straight with real content | ~2 days |
 | M6 | Landing + docs on Pages (can start after M1) | Lighthouse SEO 100, OG renders in a debugger, docs cover every v1 connector | ~2.5 days |
@@ -486,7 +485,7 @@ About 21 days in total. Every UI milestone runs the full zaki-design-ui pipeline
 
 ## 17. Testing and observability
 
-- Unit (`node --test` or vitest): scheduler and recurrence (fake clock), outbox state machine, router ownership including JID vs LID, Saklar reconcile and the section 4.3 rules, the taint rule, budget caps.
+- Unit (`node --test` or vitest): scheduler and recurrence (fake clock), outbox state machine, router ownership including JID vs LID, connector reconcile and the section 4.3 rules, the taint rule, budget caps.
 - Integration: grammY with a test transport, Baileys behind a mocked socket, MCP against a local test server, AI SDK with a mock model for approvals and resume.
 - Evals: the reminder parse set (60 phrases), plus a small injection set (a poisoned fetch result tries a write tool and must ask for approval).
 - Post-deploy smoke: a script sends a Telegram message from a test account to the dev bot and expects a reply. On prod, `/health` plus the m4-alerts probe.

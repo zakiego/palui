@@ -1,9 +1,9 @@
-// Saklar actions behind the dashboard and the CLI (PLAN 4.2, 4.6). Each writes
-// the desired state through @palui/core/saklar/store, then pokes the runtime.
+// Connector actions behind the dashboard and the CLI (PLAN 4.2, 4.6). Each writes
+// the desired state through @palui/core/connectors/store, then pokes the runtime.
 // The write is the source of truth, so a down runtime never undoes it: the
 // supervisor reconciles on start and every 30 s.
 import type { ControlClient } from "@palui/core/control"
-import type { ConnectorManifest } from "@palui/core/saklar/define"
+import type { ConnectorManifest } from "@palui/core/connectors/define"
 import {
   connectConnector,
   deleteConnector,
@@ -15,7 +15,7 @@ import {
   resumeConnector,
   upsertConnector,
   type ConnectorRow,
-} from "@palui/core/saklar/store"
+} from "@palui/core/connectors/store"
 import type { DB } from "@palui/db"
 import { z } from "zod"
 import { manifestFor } from "@/lib/manifests"
@@ -24,9 +24,9 @@ import { isRuntimeDown, runtimeErrorMessage } from "./runtime"
 
 export { describeField }
 
-export type SaklarDeps = { db: DB; rt: ControlClient; masterKey: string }
+export type ConnectorDeps = { db: DB; rt: ControlClient; masterKey: string }
 
-export class SaklarError extends Error {
+export class ConnectorError extends Error {
   constructor(
     message: string,
     readonly fields: Record<string, string> = {},
@@ -48,20 +48,20 @@ async function poke(rt: ControlClient): Promise<boolean> {
 
 function mustExist(db: DB, id: string): ConnectorRow {
   const row = getConnector(db, id)
-  if (!row) throw new SaklarError(`No connector "${id}". Run \`palui saklar list\` to see them.`)
+  if (!row) throw new ConnectorError(`No connector "${id}". Run \`palui connectors list\` to see them.`)
   return row
 }
 
-export async function pauseSaklar(deps: SaklarDeps, id: string, by = "dashboard", now = Date.now()): Promise<PokeResult> {
+export async function pauseConnectorAction(deps: ConnectorDeps, id: string, by = "dashboard", now = Date.now()): Promise<PokeResult> {
   const row = mustExist(deps.db, id)
-  if (row.status === "not_set_up") throw new SaklarError(`${row.label} isn't set up yet, so there's nothing to pause.`)
+  if (row.status === "not_set_up") throw new ConnectorError(`${row.label} isn't set up yet, so there's nothing to pause.`)
   pauseConnector(deps.db, id, by, now)
   return { ok: true, runtimeReachable: await poke(deps.rt) }
 }
 
-export async function resumeSaklar(deps: SaklarDeps, id: string, by = "dashboard", now = Date.now()): Promise<PokeResult> {
+export async function resumeConnectorAction(deps: ConnectorDeps, id: string, by = "dashboard", now = Date.now()): Promise<PokeResult> {
   const row = mustExist(deps.db, id)
-  if (row.status === "not_set_up") throw new SaklarError(`${row.label} isn't set up yet. Open it in Saklar and connect it first.`)
+  if (row.status === "not_set_up") throw new ConnectorError(`${row.label} isn't set up yet. Open it on the Connectors page and connect it first.`)
   resumeConnector(deps.db, id, by, now)
   return { ok: true, runtimeReachable: await poke(deps.rt) }
 }
@@ -69,17 +69,17 @@ export async function resumeSaklar(deps: SaklarDeps, id: string, by = "dashboard
 // Remove always goes through the runtime first, which unlinks devices (WhatsApp)
 // and then deletes the row. When the runtime is down the row and its credentials
 // are deleted here instead, and the caller is told the device wasn't unlinked.
-export async function removeSaklar(deps: SaklarDeps, id: string, now = Date.now()): Promise<{ ok: true; runtimeReachable: boolean; detail?: string }> {
+export async function removeConnectorAction(deps: ConnectorDeps, id: string, now = Date.now()): Promise<{ ok: true; runtimeReachable: boolean; detail?: string }> {
   mustExist(deps.db, id)
   try {
     const res = await deps.rt.remove(id)
-    if (!res.ok) throw new SaklarError(res.detail ?? "The runtime couldn't remove it.")
+    if (!res.ok) throw new ConnectorError(res.detail ?? "The runtime couldn't remove it.")
     // The runtime normally deletes the row itself; make sure it's gone.
     if (getConnector(deps.db, id)) deleteConnector(deps.db, id, now)
     return { ok: true, runtimeReachable: true, detail: res.detail }
   } catch (err) {
-    if (err instanceof SaklarError) throw err
-    if (!isRuntimeDown(err)) throw new SaklarError(runtimeErrorMessage(err))
+    if (err instanceof ConnectorError) throw err
+    if (!isRuntimeDown(err)) throw new ConnectorError(runtimeErrorMessage(err))
     deleteConnector(deps.db, id, now)
     return {
       ok: true,
@@ -108,9 +108,9 @@ export type DraftInput = {
 // Saves wizard progress as a `not_set_up` draft (PLAN 11.5), or updates the
 // config of a connector that's already set up. Fields are checked one by one so
 // the form can point at the bad one.
-export function saveDraft(deps: SaklarDeps, input: DraftInput, now = Date.now()): ConnectorRow {
+export function saveDraft(deps: ConnectorDeps, input: DraftInput, now = Date.now()): ConnectorRow {
   const m = manifestFor(input.type)
-  if (!m) throw new SaklarError(`Unknown connector type "${input.type}".`)
+  if (!m) throw new ConnectorError(`Unknown connector type "${input.type}".`)
   const fields: Record<string, string> = {}
   const shape = configShape(m)
   const config: Record<string, unknown> = {}
@@ -138,10 +138,10 @@ export function saveDraft(deps: SaklarDeps, input: DraftInput, now = Date.now())
     if (r.success) secrets[k] = String(r.data)
     else fields[k] = issueText(r.error)
   }
-  if (Object.keys(fields).length) throw new SaklarError("Some fields need a fix.", fields)
-  if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(input.id)) throw new SaklarError("Connector ids use lowercase letters, digits and dashes.")
+  if (Object.keys(fields).length) throw new ConnectorError("Some fields need a fix.", fields)
+  if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(input.id)) throw new ConnectorError("Connector ids use lowercase letters, digits and dashes.")
   const existing = getConnector(deps.db, input.id)
-  if (existing && existing.type !== m.id) throw new SaklarError(`"${input.id}" is already used by another connector.`)
+  if (existing && existing.type !== m.id) throw new ConnectorError(`"${input.id}" is already used by another connector.`)
   return upsertConnector(deps.db, { id: input.id, manifest: m, label: input.label, config, secrets, trust: input.trust }, deps.masterKey, now)
 }
 
@@ -163,18 +163,18 @@ export function missingForConnect(row: ConnectorRow, m: ConnectorManifest, secre
   return missing
 }
 
-export async function connectSaklar(deps: SaklarDeps, id: string, now = Date.now()): Promise<PokeResult> {
+export async function connectConnectorAction(deps: ConnectorDeps, id: string, now = Date.now()): Promise<PokeResult> {
   const row = mustExist(deps.db, id)
   const m = manifestFor(row.type)
-  if (!m) throw new SaklarError(`Unknown connector type "${row.type}".`)
+  if (!m) throw new ConnectorError(`Unknown connector type "${row.type}".`)
   const missing = missingForConnect(row, m, getSecrets(row, deps.masterKey))
-  if (Object.keys(missing).length) throw new SaklarError("Fill in the required fields first.", missing)
+  if (Object.keys(missing).length) throw new ConnectorError("Fill in the required fields first.", missing)
   connectConnector(deps.db, id, now)
   return { ok: true, runtimeReachable: await poke(deps.rt) }
 }
 
-// The list the Saklar page renders. Secrets are masked (PLAN 4.5).
-export function listSaklar(deps: Pick<SaklarDeps, "db" | "masterKey">) {
+// The list the Connectors page renders. Secrets are masked (PLAN 4.5).
+export function listConnectorItems(deps: Pick<ConnectorDeps, "db" | "masterKey">) {
   return listConnectors(deps.db).map((row) => {
     let secrets: Record<string, string> = {}
     let secretsError: string | null = null
@@ -200,4 +200,4 @@ export function listSaklar(deps: Pick<SaklarDeps, "db" | "masterKey">) {
   })
 }
 
-export type SaklarItem = ReturnType<typeof listSaklar>[number]
+export type ConnectorItem = ReturnType<typeof listConnectorItems>[number]

@@ -3,7 +3,7 @@ import { memoryDb } from "@palui/db"
 import { listEvents, logEvent } from "./events"
 import { redact, redactDeep } from "./log"
 import { seedConnector } from "./chat/testing"
-import { getConnector, setConnectorStatus } from "./saklar/store"
+import { getConnector, setConnectorStatus } from "./connectors/store"
 
 const BOT = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawZ"
 

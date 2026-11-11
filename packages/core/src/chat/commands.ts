@@ -4,8 +4,8 @@ import { getSetting } from "../settings"
 import { formatClock, tokensToday, getUsage, usageKeys } from "../budget"
 import { rotateSession, type ChatRow } from "../chats"
 import { autoSave, findMemory } from "../memory"
-import { channelName, selfChannelOffUndo } from "../saklar/rules"
-import { getConnector, listConnectors, pauseConnector, resumeConnector } from "../saklar/store"
+import { channelName, selfChannelOffUndo } from "../connectors/rules"
+import { getConnector, listConnectors, pauseConnector, resumeConnector } from "../connectors/store"
 import type { CommandName } from "./router"
 import type { EngineCtx } from "./turn"
 
@@ -26,8 +26,8 @@ export async function runCommand(ctx: EngineCtx, chat: ChatRow, name: CommandNam
       return cmdStop(ctx, chat)
     case "status":
       return { text: statusText(ctx) }
-    case "saklar":
-      return cmdSaklar(ctx, chat, args)
+    case "connectors":
+      return cmdConnectors(ctx, chat, args)
   }
 }
 
@@ -65,25 +65,25 @@ export function statusText(ctx: EngineCtx): string {
   ]
   const paused = getSetting(db, "turnsPausedUntil")
   if (paused && paused > now) lines.push(`Turn dijeda sampai ${formatClock(paused, tz)}: ${getSetting(db, "turnsPausedReason") ?? ""}`)
-  lines.push("", "Saklar:")
+  lines.push("", "Konektor:")
   for (const c of ctx.host.status()) lines.push(`• ${c.id}: ${STATUS_LABEL[c.status] ?? c.status}${c.detail ? ` (${c.detail})` : ""}`)
   return lines.join("\n")
 }
 
-async function cmdSaklar(ctx: EngineCtx, chat: ChatRow, args: string[]): Promise<CommandReply> {
+async function cmdConnectors(ctx: EngineCtx, chat: ChatRow, args: string[]): Promise<CommandReply> {
   const { db } = ctx
   const [verb, id] = args.map((a) => a.toLowerCase())
   if (!verb) {
     const rows = listConnectors(db).filter((r) => r.status !== "not_set_up")
-    const text = ["Saklar:", ...rows.map((r) => `• ${r.id}: ${STATUS_LABEL[r.status] ?? r.status}`), "", "Pakai /saklar on <id> atau /saklar off <id>."].join("\n")
+    const text = ["Konektor:", ...rows.map((r) => `• ${r.id}: ${STATUS_LABEL[r.status] ?? r.status}`), "", "Pakai /connectors on <id> atau /connectors off <id>."].join("\n")
     const actions = rows
       .filter((r) => r.id !== "web")
-      .map((r) => (r.enabled ? { id: `saklar:off:${r.id}`, label: `Matikan ${r.label}` } : { id: `saklar:on:${r.id}`, label: `Nyalakan ${r.label}` }))
+      .map((r) => (r.enabled ? { id: `connector:off:${r.id}`, label: `Matikan ${r.label}` } : { id: `connector:on:${r.id}`, label: `Nyalakan ${r.label}` }))
     return { text, actions: chat.channel === "telegram" ? actions : undefined }
   }
-  if ((verb !== "on" && verb !== "off") || !id) return { text: "Formatnya: /saklar, /saklar on <id>, atau /saklar off <id>." }
+  if ((verb !== "on" && verb !== "off") || !id) return { text: "Formatnya: /connectors, /connectors on <id>, atau /connectors off <id>." }
   const row = getConnector(db, id)
-  if (!row) return { text: `Gak ada saklar \`${id}\`. Cek daftarnya pakai /saklar.` }
+  if (!row) return { text: `Gak ada konektor \`${id}\`. Cek daftarnya pakai /connectors.` }
   if (row.status === "not_set_up") return { text: `${row.label} belum disetup. Sambungkan dulu dari dashboard.` }
   if (verb === "on") {
     if (row.enabled) return { text: `${row.label} udah nyala.` }
@@ -104,5 +104,5 @@ async function cmdSaklar(ctx: EngineCtx, chat: ChatRow, args: string[]): Promise
     return { text: `${row.label} dimatikan. Buat nyalain lagi: ${way}.`, after: apply }
   }
   await apply()
-  return { text: `${row.label} dimatikan. Buat nyalain lagi: kirim \`/saklar on ${id}\`.` }
+  return { text: `${row.label} dimatikan. Buat nyalain lagi: kirim \`/connectors on ${id}\`.` }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { SafeFetchError, type SafeResponse } from "@palui/core/net/fetch"
-import type { TurnInfo } from "@palui/core/saklar/define"
+import type { TurnInfo } from "@palui/core/connectors/define"
 import { fakeCtx } from "../mcp/test-helpers"
 import runtime, { extractReadable, fetchPage, MAX_TEXT_CHARS, type Fetcher } from "./runtime"
 

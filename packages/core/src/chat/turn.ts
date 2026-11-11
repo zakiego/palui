@@ -11,15 +11,15 @@ import { redact, type Logger } from "../log"
 import { autoRecall, findMemory } from "../memory"
 import { failoverModel, resolveChain } from "../models/failover"
 import { enqueueOutbox, notifyOutbox } from "../outbox/enqueue"
-import type { TurnInfo } from "../saklar/define"
-import type { Supervisor } from "../saklar/supervisor"
+import type { TurnInfo } from "../connectors/define"
+import type { Supervisor } from "../connectors/supervisor"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
 import { buildSystem, hasImages, loadHistory, toModelMessages, type StoredContent } from "./context"
 import type { EngineDeps } from "./deps"
 
-export const MODEL_OFF_TEXT = "Model lagi off. Nyalakan: `/saklar on cliproxy`"
+export const MODEL_OFF_TEXT = "Model lagi off. Nyalakan: `/connectors on cliproxy`"
 export const REPLY_TTL_MS = 24 * 3600_000
 // A run cut short by a shutdown stays `running` with this error, so the next
 // start recovers it the same way as a crash (recoverInterruptedRuns).

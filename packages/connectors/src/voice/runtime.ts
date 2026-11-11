@@ -1,7 +1,7 @@
 // Voice-in (PLAN 5.5): ElevenLabs Speech to Text (Scribe). The Gemini fallback
 // through CLIProxyAPI isn't built: CLIProxyAPI serves no Gemini models today.
-import type { InboundMedia } from "@palui/core/saklar/define"
-import { defineRuntime, type ConfigOf } from "@palui/core/saklar/define"
+import type { InboundMedia } from "@palui/core/connectors/define"
+import { defineRuntime, type ConfigOf } from "@palui/core/connectors/define"
 import manifest from "./manifest"
 
 type Config = ConfigOf<typeof manifest>

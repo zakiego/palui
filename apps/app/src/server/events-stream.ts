@@ -1,7 +1,7 @@
 // Live status for the dashboard (PLAN 11.5): new `events` rows streamed over SSE.
 // The runtime writes events from another process, so this polls by id every
 // second instead of listening in-process.
-import { listConnectors } from "@palui/core/saklar/store"
+import { listConnectors } from "@palui/core/connectors/store"
 import { events, type DB } from "@palui/db"
 import { asc, desc, gt } from "drizzle-orm"
 

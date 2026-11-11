@@ -127,8 +127,8 @@ function ChatList({ chats, activeId, onPick }: { chats: ChatRow[]; activeId: str
           <EmptyDescription>{t("chats.emptyBody")}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button size="sm" variant="outline" render={<Link to="/saklar" />}>
-            {t("nav.saklar")}
+          <Button size="sm" variant="outline" render={<Link to="/connectors" />}>
+            {t("nav.connectors")}
           </Button>
         </EmptyContent>
       </Empty>

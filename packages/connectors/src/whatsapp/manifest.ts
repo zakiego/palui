@@ -1,7 +1,7 @@
 // WhatsApp channel manifest (PLAN 4.1, 5.1). Imported by the app and the runtime,
-// so it only imports zod and the Saklar contract.
+// so it only imports zod and the connector contract.
 import { z } from "zod"
-import { defineManifest } from "@palui/core/saklar/define"
+import { defineManifest } from "@palui/core/connectors/define"
 
 const phone = z.string().regex(/^\+?[\d\s().-]{8,24}$/, "Enter a phone number like 0812 3456 789 or +62 812 3456 789")
 

@@ -4,7 +4,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { generateText, type LanguageModel } from "ai"
-import { defineRuntime, type ConnectorManifest, type ConnectorRuntime } from "@palui/core/saklar/define"
+import { defineRuntime, type ConnectorManifest, type ConnectorRuntime } from "@palui/core/connectors/define"
 import { getSetting, type ModelRole } from "@palui/core/settings"
 
 export const PROTOCOLS = ["anthropic", "openai"] as const

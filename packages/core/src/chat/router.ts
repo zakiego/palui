@@ -6,11 +6,11 @@ import { outbox, pendingApprovals, type DB } from "@palui/db"
 import { pendingForChat } from "../approvals/store"
 import type { ChatRow } from "../chats"
 import { isOwner } from "../owner"
-import type { InboundMessage } from "../saklar/define"
+import type { InboundMessage } from "../connectors/define"
 import type { StoredContent } from "./context"
 import type { ReminderActions } from "./deps"
 
-export type CommandName = "new" | "stop" | "status" | "saklar"
+export type CommandName = "new" | "stop" | "status" | "connectors"
 
 export type Route =
   | { kind: "ignore"; reason: string }
@@ -38,7 +38,7 @@ export function chatCheck(chat: ChatRow): string | null {
   return null
 }
 
-const COMMANDS: Record<string, CommandName> = { "/new": "new", "/stop": "stop", "/status": "status", "/saklar": "saklar" }
+const COMMANDS: Record<string, CommandName> = { "/new": "new", "/stop": "stop", "/status": "status", "/connectors": "connectors" }
 
 export function parseCommand(text: string): { name: CommandName; args: string[] } | null {
   const t = text.trim()
@@ -95,8 +95,8 @@ export async function route(i: RouteInput): Promise<Route> {
   if (cb) {
     const m = /^(approve|deny):(.+)$/.exec(cb)
     if (m) return { kind: "approval", approvalId: m[2]!, approved: m[1] === "approve" }
-    const s = /^saklar:(on|off):(.+)$/.exec(cb)
-    if (s) return { kind: "command", name: "saklar", args: [s[1]!, s[2]!] }
+    const s = /^connector:(on|off):(.+)$/.exec(cb)
+    if (s) return { kind: "command", name: "connectors", args: [s[1]!, s[2]!] }
     if (cb.startsWith("rem:") && i.reminderActions) {
       const reply = await i.reminderActions.fromCallback(i.db, cb, i.chat.id, i.now)
       if (reply !== null) return { kind: "reminder", reply }

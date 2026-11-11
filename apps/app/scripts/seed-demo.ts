@@ -6,7 +6,7 @@
 import { ensureChat, ensureWebChat } from "@palui/core/chats"
 import { config, masterKey } from "@palui/core/config"
 import { logEvent } from "@palui/core/events"
-import { setConnectorStatus, upsertConnector } from "@palui/core/saklar/store"
+import { setConnectorStatus, upsertConnector } from "@palui/core/connectors/store"
 import { dbPath, jobs, messages, newId, openDb, pendingApprovals, reminders, runs, toolCalls } from "@palui/db"
 import { manifestFor } from "../src/lib/manifests"
 
@@ -71,7 +71,7 @@ db.insert(messages).values({
   sessionId: web.sessionId,
   role: "assistant",
   content: { text: "" },
-  text: "**Rekap minggu ini** (W46):\n\n1. *3 deal* masuk di Vorneo, 1 survei dijadwalkan\n2. Pengingat `bayar listrik` besok jam 09.00\n3. Detail di https://vorneo.id/deals?week=2026-W46\n\n- Telegram: on\n- WhatsApp: **error 440**, perlu pairing ulang\n\n```\npalui saklar on whatsapp\n```\n\nLihat [dashboard Palui](https://palui.zakiego.com/app/saklar) untuk detail.",
+  text: "**Rekap minggu ini** (W46):\n\n1. *3 deal* masuk di Vorneo, 1 survei dijadwalkan\n2. Pengingat `bayar listrik` besok jam 09.00\n3. Detail di https://vorneo.id/deals?week=2026-W46\n\n- Telegram: on\n- WhatsApp: **error 440**, perlu pairing ulang\n\n```\npalui connectors on whatsapp\n```\n\nLihat [dashboard Palui](https://palui.zakiego.com/app/connectors) untuk detail.",
   createdAt: now - 29 * 60_000,
 }).run()
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { InboundMedia } from "@palui/core/saklar/define"
+import type { InboundMedia } from "@palui/core/connectors/define"
 import manifest from "./manifest"
 import { checkElevenLabsKey, transcribeWithElevenLabs } from "./runtime"
 

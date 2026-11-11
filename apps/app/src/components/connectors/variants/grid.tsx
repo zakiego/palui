@@ -1,4 +1,4 @@
-// Saklar layout 1, "Cards": a card grid grouped by kind, a Switch per card
+// Connectors page layout 1, "Cards": a card grid grouped by kind, a Switch per card
 // (PLAN 11.7 variant 1, the closest to TASTE.md and shadcn). The card isn't a
 // button; the Switch and "Open" are its two controls.
 import { connectorIcon } from "@/components/connector-icon"
@@ -10,12 +10,12 @@ import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } 
 import { Skeleton } from "@/components/ui/skeleton"
 import { useT } from "@/lib/i18n"
 import { manifestFor } from "@/lib/manifests"
-import { SAKLAR_GROUPS, SaklarSwitch } from "../shared"
-import { detailFor, type SaklarItem, type SaklarLayoutProps, type SaklarLive } from "./types"
+import { CONNECTOR_GROUPS, ConnectorSwitch } from "../shared"
+import { detailFor, type ConnectorItem, type ConnectorLayoutProps, type ConnectorLiveMap } from "./types"
 
-export function SaklarGrid({ items, live, onOpen }: SaklarLayoutProps) {
+export function ConnectorGrid({ items, live, onOpen }: ConnectorLayoutProps) {
   const t = useT()
-  return SAKLAR_GROUPS.map(({ kind, label }) => {
+  return CONNECTOR_GROUPS.map(({ kind, label }) => {
     const rows = items.filter((i) => i.kind === kind)
     if (!rows.length) return null
     return (
@@ -33,7 +33,7 @@ export function SaklarGrid({ items, live, onOpen }: SaklarLayoutProps) {
   })
 }
 
-function ConnectorCard({ item, live, onOpen }: { item: SaklarItem; live: SaklarLive; onOpen: () => void }) {
+function ConnectorCard({ item, live, onOpen }: { item: ConnectorItem; live: ConnectorLiveMap; onOpen: () => void }) {
   const t = useT()
   const m = manifestFor(item.type)
   const Icon = connectorIcon(m?.icon)
@@ -53,28 +53,28 @@ function ConnectorCard({ item, live, onOpen }: { item: SaklarItem; live: SaklarL
         </div>
         {setUp && (
           <CardAction className="-me-1.5 -mt-1.5">
-            <SaklarSwitch item={item} />
+            <ConnectorSwitch item={item} />
           </CardAction>
         )}
       </CardHeader>
       <CardFooter className="flex-wrap gap-2 border-t pt-(--card-spacing) pb-(--card-spacing)">
         <ConnectorStatusBadge status={item.status} />
-        {item.trust === "external" && <Badge variant="outline">{t("saklar.external")}</Badge>}
+        {item.trust === "external" && <Badge variant="outline">{t("connectors.external")}</Badge>}
         {detail && (
           <span className="min-w-0 flex-1 basis-32 truncate text-caption text-muted-foreground" title={detail}>
             {detail}
           </span>
         )}
         {item.status === "paused" && m?.pauseNote && <span className="w-full text-caption text-pretty text-muted-foreground">{m.pauseNote}</span>}
-        <Button variant="outline" size="sm" className="ms-auto" onClick={onOpen} aria-label={`${setUp ? t("common.open") : t("saklar.continueSetup")} ${item.label}`}>
-          {setUp ? t("common.open") : t("saklar.continueSetup")}
+        <Button variant="outline" size="sm" className="ms-auto" onClick={onOpen} aria-label={`${setUp ? t("common.open") : t("connectors.continueSetup")} ${item.label}`}>
+          {setUp ? t("common.open") : t("connectors.continueSetup")}
         </Button>
       </CardFooter>
     </Card>
   )
 }
 
-export function SaklarGridSkeleton() {
+export function ConnectorGridSkeleton() {
   return [0, 1].map((g) => (
     <div key={g} className="flex flex-col gap-3">
       <Skeleton className="h-5 w-24" />

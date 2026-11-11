@@ -1,6 +1,6 @@
 ---
 title: Chat commands
-description: Reference for /saklar, /new, /stop and /status, plus the approval and reminder replies Palui understands on every channel.
+description: Reference for /connectors, /new, /stop and /status, plus the approval and reminder replies Palui understands on every channel.
 ---
 
 Commands start with a slash. The router handles them before anything else, so they never reach the model and work even when every model connector is paused. Only the owner can use them. From anyone else they're dropped like any other message.
@@ -9,34 +9,34 @@ Commands start with a slash. The router handles them before anything else, so th
 
 | Command | What it does |
 |---|---|
-| `/saklar` | Lists every connector with its state. On Telegram each one has an inline button to flip it. |
-| `/saklar on <id>` | Turns a connector on (resumes it). |
-| `/saklar off <id>` | Pauses a connector. Credentials are kept. |
+| `/connectors` | Lists every connector with its state. On Telegram each one has an inline button to flip it. |
+| `/connectors on <id>` | Turns a connector on (resumes it). |
+| `/connectors off <id>` | Pauses a connector. Credentials are kept. |
 | `/new` | Starts a new session in this chat. recall auto-save runs for the one you just closed. |
 | `/stop` | Aborts the turn that's running in this chat. |
 | `/status` | Shows the model in use, tokens used today and connector states. |
 
-`<id>` is the connector id shown by `/saklar`, for example `telegram`, `cliproxy` or `recall`.
+`<id>` is the connector id shown by `/connectors`, for example `telegram`, `cliproxy` or `recall`.
 
-### /saklar
+### /connectors
 
 ```text
-/saklar off recall
-/saklar on recall
+/connectors off recall
+/connectors on recall
 ```
 
-Connecting a new connector and removing one stay in the dashboard. Chat only pauses and resumes. Pausing applies from the next turn. See [Saklar](/docs/concepts/saklar).
+Connecting a new connector and removing one stay in the dashboard. Chat only pauses and resumes. Pausing applies from the next turn. See [Connectors](/docs/concepts/connectors).
 
 ### Switching off the channel you're on
 
-`/saklar off telegram` sent from Telegram is allowed only when another channel or the dashboard is reachable. The reply tells you how to turn it back on. If nothing else is reachable, the command is refused, so you can't lock yourself out. The same rule applies to WhatsApp.
+`/connectors off telegram` sent from Telegram is allowed only when another channel or the dashboard is reachable. The reply tells you how to turn it back on. If nothing else is reachable, the command is refused, so you can't lock yourself out. The same rule applies to WhatsApp.
 
 ### When the model is off
 
 If the only model connector is paused, any normal message gets this fixed reply:
 
 ```text
-Model lagi off. Nyalakan: /saklar on cliproxy
+Model lagi off. Nyalakan: /connectors on cliproxy
 ```
 
 (The model is off. Turn it on with this command.) Commands and plain reminders keep working.

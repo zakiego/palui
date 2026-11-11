@@ -24,7 +24,7 @@ import {
   type RunningConnector,
   type SecretsOf,
   type TestResult,
-} from "@palui/core/saklar/define"
+} from "@palui/core/connectors/define"
 import { actionsHint, markdownToWhatsApp, splitMessage } from "../channel-utils"
 import { acquireAuthLock, AuthLockedError, type AuthLock, type LockOptions } from "./lock"
 import manifest from "./manifest"

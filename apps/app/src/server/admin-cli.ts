@@ -4,25 +4,25 @@
 // be piped.
 import type { ControlClient } from "@palui/core/control"
 import { getChat } from "@palui/core/chats"
-import { getSecrets, listConnectors } from "@palui/core/saklar/store"
+import { getSecrets, listConnectors } from "@palui/core/connectors/store"
 import type { DB } from "@palui/db"
 import { decrypt } from "@palui/db/crypto"
 import { hooks } from "@palui/db"
 import { backupDb } from "./backup"
 import { createHook } from "./hooks-bridge"
 import { createOwnerInvite, INVITE_TTL_MS, ownerExists } from "./owner-invite"
-import { connectSaklar, pauseSaklar, resumeSaklar, SaklarError, saveDraft } from "./saklar"
+import { connectConnectorAction, pauseConnectorAction, resumeConnectorAction, ConnectorError, saveDraft } from "./connectors"
 
 export const USAGE = `usage: palui <command> [--json]
   owner invite                  print a single-use owner link (15 min). Also the
                                 recovery path for a lost passkey
-  saklar list                   every connector with its state
-  saklar on <id>                resume a connector
-  saklar off <id>               pause a connector (keeps its credentials)
-  saklar connect <type> [--id <id>] [--set key=value ...] [--secret-stdin <field>]
+  connectors list               every connector with its state
+  connectors on <id>            resume a connector
+  connectors off <id>           pause a connector (keeps its credentials)
+  connectors connect <type> [--id <id>] [--set key=value ...] [--secret-stdin <field>]
                                 save and switch on a connector without the dashboard.
                                 The secret is read from stdin so it stays out of shell history:
-                                palui saklar connect telegram --secret-stdin botToken < token.txt
+                                palui connectors connect telegram --secret-stdin botToken < token.txt
   backup <dest-path>            gzipped online snapshot of the database, safe while running
   secrets-check [--require-some]
                                 decrypt every stored secret with MASTER_KEY, print counts only.
@@ -100,23 +100,23 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
       return 0
     }
 
-    if (cmd === "saklar") {
+    if (cmd === "connectors") {
       const db = io.db()
       if (sub === "list") {
         const rows = listConnectors(db)
         if (json) io.out(JSON.stringify(rows.map((r) => ({ id: r.id, type: r.type, kind: r.kind, enabled: r.enabled, status: r.status, detail: r.statusDetail }))))
-        else if (!rows.length) io.out("no connectors yet: add one in the dashboard (Saklar)")
+        else if (!rows.length) io.out("no connectors yet: add one in the dashboard (Connectors)")
         else for (const r of rows) io.out(`${r.id.padEnd(20)} ${r.kind.padEnd(8)} ${r.status}${r.statusDetail ? ` (${r.statusDetail})` : ""}`)
         return 0
       }
       if (sub === "on" || sub === "off") {
         const id = rest[0]
         if (!id) {
-          io.err(`usage: palui saklar ${sub} <id>`)
+          io.err(`usage: palui connectors ${sub} <id>`)
           return 1
         }
         const deps = { db, rt: io.rt(), masterKey: "" }
-        const res = sub === "on" ? await resumeSaklar(deps, id, "cli", now()) : await pauseSaklar(deps, id, "cli", now())
+        const res = sub === "on" ? await resumeConnectorAction(deps, id, "cli", now()) : await pauseConnectorAction(deps, id, "cli", now())
         if (json) io.out(JSON.stringify({ id, state: sub === "on" ? "resumed" : "paused", runtimeReachable: res.runtimeReachable }))
         else io.out(`${id} ${sub === "on" ? "resumed" : "paused"}`)
         if (!res.runtimeReachable) io.err("The runtime isn't reachable, so it picks this up when it starts. Check docker compose logs runtime.")
@@ -125,7 +125,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
       if (sub === "connect") {
         const type = rest[0]
         if (!type) {
-          io.err("usage: palui saklar connect <type> [--id <id>] [--set key=value ...] [--secret-stdin <field>]")
+          io.err("usage: palui connectors connect <type> [--id <id>] [--set key=value ...] [--secret-stdin <field>]")
           return 1
         }
         const config: Record<string, unknown> = {}
@@ -140,7 +140,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
         const secrets: Record<string, string> = {}
         const field = values["--secret-stdin"]
         if (field) {
-          if (!io.readStdin) throw new SaklarError("This build can't read stdin.")
+          if (!io.readStdin) throw new ConnectorError("This build can't read stdin.")
           const secret = (await io.readStdin()).trim()
           if (!secret) {
             io.err(`nothing on stdin for ${field}`)
@@ -151,7 +151,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
         const id = values["--id"] ?? type
         const deps = { db, rt: io.rt(), masterKey: io.masterKey() }
         saveDraft(deps, { id, type, config, secrets }, now())
-        const res = await connectSaklar(deps, id, now())
+        const res = await connectConnectorAction(deps, id, now())
         if (json) io.out(JSON.stringify({ id, type, state: "connecting", runtimeReachable: res.runtimeReachable }))
         else io.out(`${id} saved and switched on`)
         if (!res.runtimeReachable) io.err("The runtime isn't reachable, so it picks this up when it starts. Check docker compose logs runtime.")
@@ -240,7 +240,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     io.err(`unknown command: ${[cmd, sub].filter(Boolean).join(" ")}\n${USAGE}`)
     return 1
   } catch (err) {
-    if (err instanceof SaklarError) {
+    if (err instanceof ConnectorError) {
       const fields = Object.entries(err.fields ?? {}).map(([k, v]) => `${k}: ${v}`)
       io.err(fields.length ? `${err.message} ${fields.join("; ")}` : err.message)
       return 1

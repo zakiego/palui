@@ -4,7 +4,7 @@ import { createTurnBus } from "@palui/core/chat/bus"
 import { getControlToken, loadConfig } from "@palui/core/config"
 import { CONTROL_HEADER, type TurnEvent } from "@palui/core/control"
 import { silentLogger } from "@palui/core/log"
-import { getConnector } from "@palui/core/saklar/store"
+import { getConnector } from "@palui/core/connectors/store"
 import { authorized, controlHost } from "./control"
 import { SchemaMismatchError, startRuntime, type Runtime } from "./main"
 

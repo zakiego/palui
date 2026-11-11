@@ -12,9 +12,9 @@ import { createEngine, type Engine } from "@palui/core/chat/engine"
 import { config as loadConfig, getControlToken, masterKey, type Config } from "@palui/core/config"
 import { createLogger, type Logger } from "@palui/core/log"
 import { createOutboxWorker } from "@palui/core/outbox/worker"
-import type { AnyRuntime, ConnectorManifest, ConnectorServices } from "@palui/core/saklar/define"
-import type { ConnectorRow } from "@palui/core/saklar/store"
-import { createSupervisor, type Supervisor } from "@palui/core/saklar/supervisor"
+import type { AnyRuntime, ConnectorManifest, ConnectorServices } from "@palui/core/connectors/define"
+import type { ConnectorRow } from "@palui/core/connectors/store"
+import { createSupervisor, type Supervisor } from "@palui/core/connectors/supervisor"
 import { createControlServer } from "./control"
 
 // Deps that need the engine (the job runner calls runTurn) are built by a factory

@@ -1,7 +1,7 @@
 // GET /api/oauth/google/callback: the Google Calendar connector's OAuth redirect.
 // The signed `state` names the connector and expires after 10 minutes, so this
 // route needs no session. On success the refresh token is stored encrypted and
-// the browser goes back to the Saklar page.
+// the browser goes back to the Connectors page.
 import { createFileRoute } from "@tanstack/react-router"
 import { config, masterKey } from "@palui/core/config"
 import { handleGoogleCallback } from "@palui/connectors/gcal/oauth"

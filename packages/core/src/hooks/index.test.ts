@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { hooks, memoryDb } from "@palui/db"
 import { ensureChat } from "../chats"
-import { upsertConnector } from "../saklar/store"
+import { upsertConnector } from "../connectors/store"
 import {
   createHook,
   deleteHook,

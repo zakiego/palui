@@ -1,5 +1,5 @@
 import { logEvent } from "@palui/core/events"
-import { setConnectorStatus, upsertConnector } from "@palui/core/saklar/store"
+import { setConnectorStatus, upsertConnector } from "@palui/core/connectors/store"
 import { memoryDb } from "@palui/db"
 import { describe, expect, it } from "vitest"
 import { eventStream, latestEventId, nextEvents, statusSummary } from "./events-stream"

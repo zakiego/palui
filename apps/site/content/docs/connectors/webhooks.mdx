@@ -7,7 +7,7 @@ Kind: `skill`. Inbound webhooks let another service (a CI pipeline, a monitor, a
 
 ## Connect
 
-1. On the Saklar page, add Inbound webhooks and create a hook.
+1. On the Connectors page, add Inbound webhooks and create a hook.
 2. Give it a name and a slug. Its URL is `https://<your-domain>/api/hooks/<slug>`.
 3. Pick a mode (forward or summarize) and the chat it posts into.
 4. Palui generates the hook's secret and shows it once. Copy it into the sending service right away: after that it's write-only, like every other secret, and can only be rotated.

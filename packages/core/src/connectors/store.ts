@@ -1,4 +1,4 @@
-// Desired state for Saklar (PLAN 4.2, 4.4): the `connectors` rows. The app writes
+// Desired connector state (PLAN 4.2, 4.4): the `connectors` rows. The app writes
 // here (connect, pause, resume, remove, configure) and pokes the runtime; the
 // supervisor reconciles running handles against these rows.
 import { createHash } from "node:crypto"

@@ -46,7 +46,7 @@ export function SiteHeader({ onOpenCommand }: { onOpenCommand: () => void }) {
         <Separator orientation="vertical" className="mx-1 h-4 data-vertical:self-auto" />
         <span className="min-w-0 truncate text-sm font-medium">{page ? t(page.label) : t("app.name")}</span>
         <div className="ms-auto flex min-w-0 items-center gap-1.5">
-          <Link to="/saklar" className="flex min-h-10 min-w-0 items-center rounded-full" aria-label={`${status.text}. ${t("nav.saklar")}`}>
+          <Link to="/connectors" className="flex min-h-10 min-w-0 items-center rounded-full" aria-label={`${status.text}. ${t("nav.connectors")}`}>
             <Badge variant={status.tone === "ok" ? "success" : status.tone === "attention" ? "destructive" : "outline"} className="status-tone max-w-[11rem]">
               {status.tone === "ok" && <CircleCheckIcon aria-hidden="true" />}
               {status.tone === "attention" && <CircleAlertIcon aria-hidden="true" />}

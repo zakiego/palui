@@ -1,4 +1,4 @@
-// Palui's mark: a switch, for Saklar. Drawn in currentColor.
+// Palui's mark: a switch. Drawn in currentColor.
 export function PaluiMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden="true">

@@ -6,7 +6,7 @@ describe("isAppPath", () => {
     for (const p of [
       "/app",
       "/app/",
-      "/app/saklar",
+      "/app/connectors",
       "/app/chats/cht_1",
       "/app/assets/app-abc.css",
       "/app/_serverFn/abc",

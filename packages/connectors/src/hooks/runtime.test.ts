@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { ensureChat } from "@palui/core/chats"
 import { createHook, ingestHook, getHookBySlug } from "@palui/core/hooks/index"
-import type { TurnInfo } from "@palui/core/saklar/define"
+import type { TurnInfo } from "@palui/core/connectors/define"
 import { fakeCtx } from "../mcp/test-helpers"
 import manifest from "./manifest"
 import runtime from "./runtime"

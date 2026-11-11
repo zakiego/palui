@@ -1,22 +1,22 @@
-// Pieces every Saklar layout shares (PLAN 11.5), so the three Explore variants
+// Pieces every Connectors page layout shares (PLAN 11.5), so the three Explore variants
 // and the Home map differ in arrangement only, never in behavior:
-// - SaklarSwitch: pause never asks, the Switch moves at once, a toast offers
+// - ConnectorSwitch: pause never asks, the Switch moves at once, a toast offers
 //   Undo, aria-label "Pause <name>" / "Resume <name>", a 44 px target.
 // - useStatusAnnouncer: one polite announcement per status change, never on load.
 import * as React from "react"
-import type { ConnectorManifest } from "@palui/core/saklar/define"
+import type { ConnectorManifest } from "@palui/core/connectors/define"
 
 import { Switch } from "@/components/ui/switch"
-import { useSaklarToggle } from "@/hooks/use-saklar-toggle"
+import { useConnectorToggle } from "@/hooks/use-connector-toggle"
 import { useT, type Key } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-export const SAKLAR_GROUPS: { kind: ConnectorManifest["kind"]; label: Key }[] = [
-  { kind: "channel", label: "saklar.group.channel" },
-  { kind: "model", label: "saklar.group.model" },
-  { kind: "memory", label: "saklar.group.memory" },
-  { kind: "tools", label: "saklar.group.tools" },
-  { kind: "skill", label: "saklar.group.skill" },
+export const CONNECTOR_GROUPS: { kind: ConnectorManifest["kind"]; label: Key }[] = [
+  { kind: "channel", label: "connectors.group.channel" },
+  { kind: "model", label: "connectors.group.model" },
+  { kind: "memory", label: "connectors.group.memory" },
+  { kind: "tools", label: "connectors.group.tools" },
+  { kind: "skill", label: "connectors.group.skill" },
 ]
 
 export const STATUS_LABEL: Record<string, Key> = {
@@ -27,7 +27,7 @@ export const STATUS_LABEL: Record<string, Key> = {
   not_set_up: "status.notSetUp",
 }
 
-export type SaklarToggleTarget = { id: string; label: string; enabled: boolean; status: string }
+export type ConnectorToggleTarget = { id: string; label: string; enabled: boolean; status: string }
 
 // Connectors the owner just flipped here, with the status the flip leads to.
 // The toast already says that, so the announcer skips that one status (and only
@@ -38,9 +38,9 @@ const FLIP_QUIET_MS = 5000
 
 // The Switch with the house rules baked in. The wrapper is the 44 px box; the
 // Switch's own ::after grows its hit area to the same 44 px.
-export function SaklarSwitch({ item, className }: { item: SaklarToggleTarget; className?: string }) {
+export function ConnectorSwitch({ item, className }: { item: ConnectorToggleTarget; className?: string }) {
   const t = useT()
-  const toggle = useSaklarToggle()
+  const toggle = useConnectorToggle()
   // Optimistic: the Switch moves at once, the toast confirms or rolls back.
   const [pending, setPending] = React.useState<boolean | null>(null)
   React.useEffect(() => setPending(null), [item.enabled, item.status])
@@ -49,7 +49,7 @@ export function SaklarSwitch({ item, className }: { item: SaklarToggleTarget; cl
     <span className={cn("flex size-11 shrink-0 items-center justify-center", className)}>
       <Switch
         checked={checked}
-        aria-label={checked ? t("saklar.pause", { name: item.label }) : t("saklar.resume", { name: item.label })}
+        aria-label={checked ? t("connectors.pause", { name: item.label }) : t("connectors.resume", { name: item.label })}
         className="after:-inset-x-1.5 after:-inset-y-[13px]"
         onCheckedChange={(next) => {
           flippedHere.set(item.id, { at: Date.now(), expect: next ? "connecting" : "paused" })

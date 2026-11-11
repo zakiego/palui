@@ -1,4 +1,4 @@
-// The Saklar connector contract (PLAN 4.1). A connector is one folder in
+// The connector contract (PLAN 4.1). A connector is one folder in
 // packages/connectors/src/<type>/ with:
 //   manifest.ts  zod schemas + UI metadata. Imported by the app AND the runtime,
 //                so it must only import zod and this file.
@@ -73,7 +73,7 @@ export type TurnInfo = {
   jobId?: string
 }
 
-// A tool plus its Saklar metadata. `class` drives approvals (PLAN 10); `untrusted`
+// A tool plus its connector metadata. `class` drives approvals (PLAN 10); `untrusted`
 // marks results that taint the turn (web fetch, hooks, external MCP).
 export type PaluiTool = {
   tool: Tool

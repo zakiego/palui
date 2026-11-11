@@ -317,7 +317,7 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
       )}
       <FieldGroup>
         <Field data-invalid={!!errors.name}>
-          <FieldLabel htmlFor="job-name">{t("saklar.field.name")}</FieldLabel>
+          <FieldLabel htmlFor="job-name">{t("connectors.field.name")}</FieldLabel>
           <Input id="job-name" value={form.name} maxLength={80} aria-invalid={!!errors.name} onChange={(e) => set("name", e.target.value)} />
           {errors.name && <FieldError>{errors.name}</FieldError>}
         </Field>

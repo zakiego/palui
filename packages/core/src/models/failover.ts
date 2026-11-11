@@ -6,7 +6,7 @@
 import { APICallError, type LanguageModel } from "ai"
 import type { DB } from "@palui/db"
 import { getSetting, type ModelRole } from "../settings"
-import type { RunningConnector } from "../saklar/define"
+import type { RunningConnector } from "../connectors/define"
 
 export type ModelV4 = Extract<LanguageModel, { specificationVersion: "v4" }>
 

@@ -11,10 +11,10 @@ describe("OAuth callback redirect", () => {
     expect(cleanDetail("\u{1F600}".repeat(300))).toBe("\u{1F600}".repeat(DETAIL_MAX))
   })
 
-  it("always points at APP_URL's Saklar page", () => {
+  it("always points at APP_URL's Connectors page", () => {
     const url = new URL(oauthReturnUrl("https://palui.example.com", { ok: false, detail: "Google said: //evil.example\n" }))
     expect(url.origin).toBe("https://palui.example.com")
-    expect(url.pathname).toBe("/app/saklar")
+    expect(url.pathname).toBe("/app/connectors")
     expect(url.searchParams.get("oauth")).toBe("error")
     expect(url.searchParams.get("detail")).toBe("Google said: //evil.example")
   })

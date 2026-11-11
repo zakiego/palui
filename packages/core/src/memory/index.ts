@@ -3,9 +3,9 @@
 import { and, asc, eq, gt, inArray, isNotNull, or } from "drizzle-orm"
 import { messages, runs, sessions, type DB } from "@palui/db"
 import type { Logger } from "../log"
-import type { MemoryHandle } from "../saklar/define"
-import { getConnector, patchConnectorConfig } from "../saklar/store"
-import type { RunningEntry } from "../saklar/supervisor"
+import type { MemoryHandle } from "../connectors/define"
+import { getConnector, patchConnectorConfig } from "../connectors/store"
+import type { RunningEntry } from "../connectors/supervisor"
 
 export const RECALL_TIMEOUT_MS = 1_500
 export const RECALL_MIN_WORDS = 4

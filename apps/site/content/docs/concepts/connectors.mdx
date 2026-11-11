@@ -1,9 +1,9 @@
 ---
-title: Saklar
-description: Every capability in Palui is a connector with one lifecycle that you can switch on, pause or remove without a restart.
+title: Connectors
+description: How connectors work in Palui, from kinds and states to pausing versus removing.
 ---
 
-Saklar is Indonesian for "switch". It's the name for Palui's connector model. Everything optional is a connector, and every connector shares one manifest shape, one lifecycle and one UI. The Saklar page in the dashboard and the `/saklar` chat command both use the word.
+Everything optional is a connector, and every connector shares one manifest shape, one lifecycle and one UI. You manage them on the Connectors page in the dashboard or with the `/connectors` chat command.
 
 ## Connector kinds
 
@@ -19,9 +19,9 @@ See the [connector list](/docs/connectors) for every v1 connector.
 
 ## States
 
-<SaklarStatesDiagram>
+<ConnectorStatesDiagram>
   A connector starts as not set up. Connecting it moves it to connecting, and a successful start moves it to on. From on, pausing moves it to paused, which keeps its credentials. Resuming a paused connector moves it back to connecting. A connector that fails while connecting or running goes to error and restarts with backoff. From any state, remove (after a confirmation) returns it to not set up and deletes its credentials.
-</SaklarStatesDiagram>
+</ConnectorStatesDiagram>
 
 | State | Meaning |
 |---|---|
@@ -43,27 +43,27 @@ Remove sits in the danger area of the connector sheet. It always asks first, and
 |---|---|
 | Pausing mid-turn | Applies from the next turn. Tool calls already running finish. |
 | Pausing the Reminders skill | Hides its tools only. Reminders already set still fire. The card says so. |
-| The only model connector is paused | The router replies with fixed text: "Model lagi off. Nyalakan: `/saklar on cliproxy`" (the model is off, turn it on with this command). Plain reminders and commands keep working. |
+| The only model connector is paused | The router replies with fixed text: "Model lagi off. Nyalakan: `/connectors on cliproxy`" (the model is off, turn it on with this command). Plain reminders and commands keep working. |
 | Channel paused with outbox rows waiting | Rows wait without using up attempts. They send on resume. |
 | Channel removed with rows waiting | Rows go to the fallback channel if one is on. Otherwise they're cancelled, with an event logged. |
-| `/saklar off telegram` sent from Telegram | Allowed only when another channel or the dashboard is reachable. The reply says how to undo it. Otherwise it's refused. |
+| `/connectors off telegram` sent from Telegram | Allowed only when another channel or the dashboard is reachable. The reply says how to undo it. Otherwise it's refused. |
 | recall auto-recall times out | The turn goes on without memory. The card shows the skip rate ("skipped 4 of last 20"). |
 | Connector throws repeatedly | `error` state, restarts with backoff (5 s, 30 s, 2 min, 10 min cap). After 5 min in `error`, you get a message on another channel. |
 
 ## The supervisor
 
-The runtime's Saklar supervisor compares what you asked for (the stored connector rows) with what's actually running. It reconciles every 30 s, and right away when the dashboard pokes it. Each connector runs isolated, so one that throws never takes the process down. Every status change is written as an event, so the dashboard, `/health` and chat all show the same state.
+The runtime's connector supervisor compares what you asked for (the stored connector rows) with what's actually running. It reconciles every 30 s, and right away when the dashboard pokes it. Each connector runs isolated, so one that throws never takes the process down. Every status change is written as an event, so the dashboard, `/health` and chat all show the same state.
 
-## Three ways to flip a Saklar
+## Three ways to flip a connector
 
 1. Dashboard: the card Switch pauses and resumes. The sheet connects, configures, tests and removes.
-2. Chat, owner only: `/saklar` lists every connector with its state, and `/saklar off <id>` or `/saklar on <id>` flips one. Connect and remove stay in the dashboard. See [Chat commands](/docs/chat-commands).
+2. Chat, owner only: `/connectors` lists every connector with its state, and `/connectors off <id>` or `/connectors on <id>` flips one. Connect and remove stay in the dashboard. See [Chat commands](/docs/chat-commands).
 3. CLI on the Docker host:
 
 ```bash
-docker compose exec app palui saklar list
-docker compose exec app palui saklar on <id>
-docker compose exec app palui saklar off <id>
+docker compose exec app palui connectors list
+docker compose exec app palui connectors on <id>
+docker compose exec app palui connectors off <id>
 ```
 
 ## Secrets

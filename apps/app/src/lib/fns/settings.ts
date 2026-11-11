@@ -1,7 +1,7 @@
 // Settings page.
 import { config, masterKey } from "@palui/core/config"
 import { getAllSettings, setSetting, type Settings } from "@palui/core/settings"
-import { listConnectors } from "@palui/core/saklar/store"
+import { listConnectors } from "@palui/core/connectors/store"
 import { createServerFn } from "@tanstack/react-start"
 import { z } from "zod"
 import { createHook, listHooks } from "@/server/hooks-bridge"

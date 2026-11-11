@@ -1,7 +1,7 @@
 import { tool, type Tool } from "ai"
 import { z } from "zod"
 import type { ToolClass } from "@palui/db"
-import { defineRuntime, type ConfigOf, type MemoryHandle, type PaluiTool } from "@palui/core/saklar/define"
+import { defineRuntime, type ConfigOf, type MemoryHandle, type PaluiTool } from "@palui/core/connectors/define"
 import { McpConnection } from "../mcp/client"
 import { profileText, RecallApi, RecallError } from "./api"
 import manifest from "./manifest"

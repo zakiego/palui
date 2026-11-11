@@ -290,7 +290,7 @@ function ModelsTab({ data }: { data: Data }) {
         {options.length === 0 && (
           <Alert>
             <AlertTitle>No model connectors yet</AlertTitle>
-            <AlertDescription>Add CLIProxyAPI or ai-gateway in Saklar. Chains below keep their ids until then.</AlertDescription>
+            <AlertDescription>Add CLIProxyAPI or ai-gateway on the Connectors page. Chains below keep their ids until then.</AlertDescription>
           </Alert>
         )}
         {ROLES.map((role) => {
@@ -362,8 +362,8 @@ function ModelsTab({ data }: { data: Data }) {
                           <CircleAlertIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
                           <span className="min-w-0 break-words">
                             {link.connectorId} isn't set up. Pick another connector, or add it in{" "}
-                            <Link to="/saklar" className="underline underline-offset-2">
-                              Saklar
+                            <Link to="/connectors" className="underline underline-offset-2">
+                              Connectors
                             </Link>
                             .
                           </span>

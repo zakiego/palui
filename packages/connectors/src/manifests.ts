@@ -1,6 +1,6 @@
 // Every connector manifest, keyed by manifest id. The app and the runtime both
 // import this, so it must stay free of runtime-only code.
-import type { ConnectorManifest } from "@palui/core/saklar/define"
+import type { ConnectorManifest } from "@palui/core/connectors/define"
 import aiGateway from "./ai-gateway/manifest"
 import cliproxy from "./cliproxy/manifest"
 import gcal from "./gcal/manifest"
@@ -15,7 +15,7 @@ import web from "./web/manifest"
 import webfetch from "./webfetch/manifest"
 import whatsapp from "./whatsapp/manifest"
 
-// Order is the catalog and Saklar page order within each kind.
+// Order is the catalog and Connectors page order within each kind.
 export const manifests: Record<string, ConnectorManifest> = {
   telegram,
   whatsapp,

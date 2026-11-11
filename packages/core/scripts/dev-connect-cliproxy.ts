@@ -11,7 +11,7 @@ import os from "node:os"
 import path from "node:path"
 import { dbPath, openDb } from "@palui/db"
 import { config, masterKey } from "@palui/core/config"
-import { connectConnector, upsertConnector } from "@palui/core/saklar/store"
+import { connectConnector, upsertConnector } from "@palui/core/connectors/store"
 
 const keyFile = process.argv[2] ?? path.join(os.homedir(), ".config/palui/cliproxy-key")
 const baseUrl = process.argv[3] ?? "http://127.0.0.1:8317"

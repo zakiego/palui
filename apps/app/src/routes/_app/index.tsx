@@ -1,4 +1,4 @@
-// Home (PLAN 11.4): a first-run checklist until it's done, then a Saklar
+// Home (PLAN 11.4): a first-run checklist until it's done, then a connector
 // summary, the next 3 reminders, the last 5 runs and tokens today.
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
 import { BellIcon, CircleCheckIcon, CircleIcon, HistoryIcon, ToggleRightIcon } from "lucide-react"
@@ -7,8 +7,8 @@ import { toast } from "sonner"
 import { AppError } from "@/components/app-error"
 import { PageHeader } from "@/components/page-header"
 import { RuntimeAlert } from "@/components/runtime-alert"
-import { ConnectorMap } from "@/components/saklar/connector-map"
-import { StatusAnnouncer } from "@/components/saklar/shared"
+import { ConnectorMap } from "@/components/connectors/connector-map"
+import { StatusAnnouncer } from "@/components/connectors/shared"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -46,7 +46,7 @@ function HomePage() {
       {!data.runtimeUp && <RuntimeAlert />}
       {showChecklist && <Checklist checklist={c} />}
       <div className="grid gap-4 @3xl/main:grid-cols-2">
-        <SaklarSummary connectors={data.connectors} />
+        <ConnectorSummary connectors={data.connectors} />
         <StatusAnnouncer items={data.connectors} />
         <div className="grid content-start gap-4">
           <TokensCard tokens={data.tokens} />
@@ -61,13 +61,13 @@ function HomePage() {
 function Checklist({ checklist }: { checklist: HomeData["checklist"] }) {
   const t = useT()
   const router = useRouter()
-  const steps: { done: boolean; label: Key; to: "/settings" | "/saklar" | "/chats"; optional?: boolean }[] = [
+  const steps: { done: boolean; label: Key; to: "/settings" | "/connectors" | "/chats"; optional?: boolean }[] = [
     { done: checklist.passkey, label: "home.check.passkey", to: "/settings" },
-    { done: checklist.model, label: "home.check.model", to: "/saklar" },
-    { done: checklist.channel, label: "home.check.channel", to: "/saklar" },
+    { done: checklist.model, label: "home.check.model", to: "/connectors" },
+    { done: checklist.channel, label: "home.check.channel", to: "/connectors" },
     { done: checklist.hi, label: "home.check.hi", to: "/chats" },
-    { done: checklist.recall, label: "home.check.recall", to: "/saklar", optional: true },
-    { done: checklist.mcp, label: "home.check.mcp", to: "/saklar", optional: true },
+    { done: checklist.recall, label: "home.check.recall", to: "/connectors", optional: true },
+    { done: checklist.mcp, label: "home.check.mcp", to: "/connectors", optional: true },
   ]
   const done = steps.filter((s) => !s.optional && s.done).length
   return (
@@ -117,17 +117,17 @@ function Checklist({ checklist }: { checklist: HomeData["checklist"] }) {
 
 type HomeConnector = HomeData["connectors"][number]
 
-function SaklarSummary({ connectors }: { connectors: HomeConnector[] }) {
+function ConnectorSummary({ connectors }: { connectors: HomeConnector[] }) {
   const t = useT()
   const shown = connectors.filter((c) => c.status !== "not_set_up")
   const on = shown.filter((c) => c.status === "on").length
   return (
     <Card className="@3xl/main:row-span-2">
       <CardHeader>
-        <CardTitle>{t("home.saklar")}</CardTitle>
+        <CardTitle>{t("home.connectors")}</CardTitle>
         {shown.length > 0 && <CardDescription className="tabular-nums">{t("home.map.on", { n: on, total: shown.length })}</CardDescription>}
         <CardAction>
-          <Button variant="outline" size="sm" render={<Link to="/saklar" />}>
+          <Button variant="outline" size="sm" render={<Link to="/connectors" />}>
             {t("common.open")}
           </Button>
         </CardAction>
@@ -139,12 +139,12 @@ function SaklarSummary({ connectors }: { connectors: HomeConnector[] }) {
               <EmptyMedia variant="icon">
                 <ToggleRightIcon />
               </EmptyMedia>
-              <EmptyTitle>{t("saklar.empty")}</EmptyTitle>
-              <EmptyDescription>{t("saklar.emptyBody")}</EmptyDescription>
+              <EmptyTitle>{t("connectors.empty")}</EmptyTitle>
+              <EmptyDescription>{t("connectors.emptyBody")}</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Button size="sm" render={<Link to="/saklar" />}>
-                {t("saklar.add")}
+              <Button size="sm" render={<Link to="/connectors" />}>
+                {t("connectors.add")}
               </Button>
             </EmptyContent>
           </Empty>

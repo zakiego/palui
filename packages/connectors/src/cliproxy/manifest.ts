@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { defineManifest } from "@palui/core/saklar/define"
+import { defineManifest } from "@palui/core/connectors/define"
 
 const proto = z.enum(["anthropic", "openai"]).default("anthropic")
 
@@ -19,5 +19,5 @@ export default defineManifest({
     { field: "baseUrl", label: "Base URL", placeholder: "http://host.docker.internal:8317", optional: true },
     { field: "apiKey", label: "API key", secret: true, help: "One of the api-keys in CLIProxyAPI's config.yaml" },
   ],
-  docs: { commands: ["/saklar on cliproxy", "/saklar off cliproxy"] },
+  docs: { commands: ["/connectors on cliproxy", "/connectors off cliproxy"] },
 })

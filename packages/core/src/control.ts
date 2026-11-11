@@ -1,7 +1,7 @@
 // The control API contract between the app and the runtime (PLAN 3.1). The
 // runtime serves it on the compose network only (never published). Every call
 // carries the derived control token in `x-palui-control`.
-import type { TestResult } from "./saklar/define"
+import type { TestResult } from "./connectors/define"
 
 export const CONTROL_HEADER = "x-palui-control"
 

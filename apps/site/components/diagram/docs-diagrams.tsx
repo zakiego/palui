@@ -62,7 +62,7 @@ export function ArchitectureDiagram({ children }: Props) {
         ]}
       </Join>
       <Group icon={Server} label="The Docker host (one image, two services)">
-        <Node icon={Container} title="runtime" detail="router, turns, scheduler, outbox, Saklar" />
+        <Node icon={Container} title="runtime" detail="router, turns, scheduler, outbox, Connectors" />
         <Arrow label="control API, compose network only" />
         <Node icon={Container} title="app" detail="dashboard /app, REST /api, /health, migrations" />
         <Arrow />
@@ -97,7 +97,7 @@ export function MessageFlowDiagram({ children }: Props) {
   )
 }
 
-export function SaklarStatesDiagram({ children }: Props) {
+export function ConnectorStatesDiagram({ children }: Props) {
   return (
     <Diagram description={children}>
       <Node icon={CircleDashedIcon} title="Not set up" />

@@ -3,7 +3,7 @@
 import { newId } from "@palui/db"
 import { turnBus, type TurnBus } from "@palui/core/chat/bus"
 import { findChat } from "@palui/core/chats"
-import { defineRuntime } from "@palui/core/saklar/define"
+import { defineRuntime } from "@palui/core/connectors/define"
 import manifest from "./manifest"
 
 export function webRuntime(bus: TurnBus = turnBus) {
