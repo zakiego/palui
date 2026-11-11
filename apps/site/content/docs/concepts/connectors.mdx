@@ -25,7 +25,7 @@ See the [connector list](/docs/connectors) for every v1 connector.
 
 | State | Meaning |
 |---|---|
-| not set up | No credentials, or a wizard draft that hasn't finished. The wizard keeps its progress if you close the sheet. |
+| not set up | No credentials, or a wizard draft that hasn't finished. The wizard keeps its progress if you leave the page. |
 | connecting | Starting up or reconnecting. |
 | on | Running. Its tools and messages are live. |
 | paused | Stopped on purpose. Credentials are kept. |
@@ -35,7 +35,7 @@ See the [connector list](/docs/connectors) for every v1 connector.
 
 Pause is the Switch on the card. It's instant, reversible and never asks for confirmation. A toast offers Undo. Resume goes back through connecting to on, with no re-pairing or re-entering keys.
 
-Remove sits in the danger area of the connector sheet. It always asks first, and the dialog names what you lose ("This unlinks the WhatsApp device. You'll need to pair again."). It deletes the credentials and returns the connector to not set up.
+Remove sits in the danger area of the connector page. It always asks first, and the dialog names what you lose ("This unlinks the WhatsApp device. You'll need to pair again."). It deletes the credentials and returns the connector to not set up.
 
 ## Edge cases
 
@@ -56,7 +56,7 @@ The runtime's connector supervisor compares what you asked for (the stored conne
 
 ## Three ways to flip a connector
 
-1. Dashboard: the card Switch pauses and resumes. The sheet connects, configures, tests and removes.
+1. Dashboard: the card Switch pauses and resumes. The connector page connects, configures, tests and removes.
 2. Chat, owner only: `/connectors` lists every connector with its state, and `/connectors off <id>` or `/connectors on <id>` flips one. Connect and remove stay in the dashboard. See [Chat commands](/docs/chat-commands).
 3. CLI on the Docker host:
 

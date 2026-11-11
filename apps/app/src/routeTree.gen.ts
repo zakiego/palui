@@ -20,6 +20,7 @@ import { Route as AppJobsRouteImport } from './routes/_app/jobs'
 import { Route as AppRemindersRouteImport } from './routes/_app/reminders'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
+import { Route as AppConnectorsIdRouteImport } from './routes/_app/connectors_.$id'
 import { Route as AppConnectorsNewRouteImport } from './routes/_app/connectors_.new'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiChatStreamRouteImport } from './routes/api/chat/stream'
@@ -81,6 +82,11 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppConnectorsIdRoute = AppConnectorsIdRouteImport.update({
+  id: '/connectors_/$id',
+  path: '/connectors/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppConnectorsNewRoute = AppConnectorsNewRouteImport.update({
   id: '/connectors_/new',
   path: '/connectors/new',
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/reminders': typeof AppRemindersRoute
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/connectors/$id': typeof AppConnectorsIdRoute
   '/connectors/new': typeof AppConnectorsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/': typeof AppIndexRoute
+  '/connectors/$id': typeof AppConnectorsIdRoute
   '/connectors/new': typeof AppConnectorsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/connectors_/$id': typeof AppConnectorsIdRoute
   '/_app/connectors_/new': typeof AppConnectorsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/reminders'
     | '/settings'
     | '/invite/$token'
+    | '/connectors/$id'
     | '/connectors/new'
     | '/api/auth/$'
     | '/api/chat/stream'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/invite/$token'
     | '/'
+    | '/connectors/$id'
     | '/connectors/new'
     | '/api/auth/$'
     | '/api/chat/stream'
@@ -218,6 +229,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/invite/$token'
     | '/_app/'
+    | '/_app/connectors_/$id'
     | '/_app/connectors_/new'
     | '/api/auth/$'
     | '/api/chat/stream'
@@ -317,6 +329,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/connectors_/$id': {
+      id: '/_app/connectors_/$id'
+      path: '/connectors/$id'
+      fullPath: '/connectors/$id'
+      preLoaderRoute: typeof AppConnectorsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/connectors_/new': {
       id: '/_app/connectors_/new'
       path: '/connectors/new'
@@ -370,6 +389,7 @@ interface AppRouteChildren {
   AppRemindersRoute: typeof AppRemindersRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppConnectorsIdRoute: typeof AppConnectorsIdRoute
   AppConnectorsNewRoute: typeof AppConnectorsNewRoute
 }
 
@@ -381,6 +401,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppRemindersRoute: AppRemindersRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppConnectorsIdRoute: AppConnectorsIdRoute,
   AppConnectorsNewRoute: AppConnectorsNewRoute,
 }
 
