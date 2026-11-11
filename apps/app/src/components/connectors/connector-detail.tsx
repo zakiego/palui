@@ -12,6 +12,7 @@ import { SimpleSelect } from "@/components/simple-select"
 import { CircleAlertIcon } from "lucide-react"
 import { RuntimeAlert } from "@/components/runtime-alert"
 import { WizardAction } from "@/components/connectors/wizard-actions"
+import { CopyButton } from "@/components/copy-button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -432,7 +433,19 @@ function WizardField({
           {info.secret && stored ? `${step.help ? " " : ""}Saved as ${stored}. Leave empty to keep it.` : ""}
         </FieldDescription>
       )}
+      {step.command && <CommandBlock command={step.command} />}
       {error && <FieldError id={`${id}-error`}>{error}</FieldError>}
     </Field>
+  )
+}
+
+// A command the field's help asks you to run, with a copy button so nobody has
+// to select it out of a sentence.
+function CommandBlock({ command }: { command: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-muted py-1.5 ps-3 pe-1.5">
+      <code className="min-w-0 flex-1 font-mono text-sm break-all">{command}</code>
+      <CopyButton text={command} label="Copy" variant="ghost" className="shrink-0" />
+    </div>
   )
 }
