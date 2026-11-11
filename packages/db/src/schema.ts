@@ -1,6 +1,6 @@
 // Palui's SQLite schema (PLAN.md section 9). Timestamps are unix milliseconds.
 // JSON columns are stored as text and typed with $type<>().
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
+import { blob, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 
 const ms = (name: string) => integer(name, { mode: "timestamp_ms" })
 const bool = (name: string) => integer(name, { mode: "boolean" })
@@ -301,6 +301,36 @@ export const pendingApprovals = sqliteTable(
     createdAt: integer("created_at").notNull(),
   },
   (t) => [index("approvals_chat_status").on(t.chatId, t.status), index("approvals_status_expires").on(t.status, t.expiresAt)],
+)
+
+// --- Saved attachments ------------------------------------------------------------
+
+export type AttachmentKind = "image" | "document"
+
+// Files the agent chose to keep from a chat (KTP, receipts, tickets). The bytes
+// live in `data`, AES-256-GCM encrypted with MASTER_KEY (encryptBytes), so they
+// ride along in the SQLite backups and never sit on disk in the clear.
+export const savedAttachments = sqliteTable(
+  "saved_attachments",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id").notNull(),
+    // The inbound message the file came with.
+    messageId: text("message_id"),
+    runId: text("run_id"),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    kind: text("kind").$type<AttachmentKind>().notNull(),
+    mimeType: text("mime_type").notNull(),
+    filename: text("filename"),
+    // Plaintext size in bytes.
+    size: integer("size").notNull(),
+    // sha256 of the plaintext, hex. Saving the same file twice in a chat returns the first row.
+    sha256: text("sha256").notNull(),
+    data: blob("data", { mode: "buffer" }).$type<Buffer>().notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("saved_attachments_chat_created").on(t.chatId, t.createdAt), index("saved_attachments_chat_sha").on(t.chatId, t.sha256)],
 )
 
 // --- Reminders and jobs -----------------------------------------------------------

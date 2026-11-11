@@ -11,6 +11,7 @@ import {
   MicIcon,
   MonitorIcon,
   NetworkIcon,
+  PaperclipIcon,
   PlugIcon,
   SendIcon,
   SquareTerminalIcon,
@@ -33,6 +34,7 @@ const ICONS: Record<string, LucideIcon> = {
   globe: GlobeIcon,
   webhook: WebhookIcon,
   "square-terminal": SquareTerminalIcon,
+  paperclip: PaperclipIcon,
 }
 
 export function connectorIcon(name: string | undefined): LucideIcon {

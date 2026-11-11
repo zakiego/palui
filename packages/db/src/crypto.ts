@@ -26,6 +26,21 @@ export function decrypt(blob: string, masterKey: string): string {
   return Buffer.concat([decipher.update(Buffer.from(ct, "base64url")), decipher.final()]).toString("utf8")
 }
 
+// Binary variant for file bodies (saved attachments): iv (12) | tag (16) | ciphertext.
+export function encryptBytes(plain: Buffer, masterKey: string): Buffer {
+  const iv = randomBytes(12)
+  const cipher = createCipheriv("aes-256-gcm", deriveKey(masterKey), iv)
+  const ct = Buffer.concat([cipher.update(plain), cipher.final()])
+  return Buffer.concat([iv, cipher.getAuthTag(), ct])
+}
+
+export function decryptBytes(blob: Buffer, masterKey: string): Buffer {
+  if (blob.length < 28) throw new Error("Unknown blob format")
+  const decipher = createDecipheriv("aes-256-gcm", deriveKey(masterKey), blob.subarray(0, 12))
+  decipher.setAuthTag(blob.subarray(12, 28))
+  return Buffer.concat([decipher.update(blob.subarray(28)), decipher.final()])
+}
+
 export function encryptJson(value: Record<string, string>, masterKey: string): string {
   return encrypt(JSON.stringify(value), masterKey)
 }

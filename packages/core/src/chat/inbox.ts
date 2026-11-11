@@ -91,15 +91,17 @@ export async function prepareMedia(db: DB, row: MessageRow, running: RunningEntr
       }
       continue
     }
-    // Documents: small text files are inlined, the rest is named only.
+    // Documents: small text files are inlined, the rest is named only. The bytes
+    // stay on the row so the attachments tools can save the file in this turn.
     const name = m.filename ?? "dokumen"
+    const data = m.data ? { data: m.data } : {}
     if (m.data && isTextDoc(m) && decodedSize(m.data) <= MAX_INLINE_DOC_BYTES) {
       const body = Buffer.from(m.data, "base64").toString("utf8")
       texts.push(`[file: ${name}]\n${body}`)
-      kept.push({ kind: "document", mimeType: m.mimeType, filename: name, note: "inlined" })
+      kept.push({ kind: "document", mimeType: m.mimeType, filename: name, note: "inlined", ...data })
     } else {
       texts.push(`[file: ${name} (${m.mimeType}), gak bisa dibaca langsung]`)
-      kept.push({ kind: "document", mimeType: m.mimeType, filename: name, note: "not readable" })
+      kept.push({ kind: "document", mimeType: m.mimeType, filename: name, note: "not readable", ...data })
     }
   }
   const text = texts.join("\n\n")

@@ -3,6 +3,7 @@
 // components, never a mocked shape.
 import { ensureChat, ensureWebChat, type ChatRow } from "@palui/core/chats"
 import { masterKey } from "@palui/core/config"
+import { saveAttachment } from "@palui/core/attachments/service"
 import { setConnectorStatus, upsertConnector } from "@palui/core/connectors/store"
 import { type Settings, setSetting } from "@palui/core/settings"
 import {
@@ -149,6 +150,16 @@ export function createKit(db: DB, now = Date.now()) {
           createdAt: values.createdAt === null ? null : new Date(values.createdAt ?? now),
         })
         .run()
+    },
+
+    // Fake bytes behind the right magic number, so the type check passes.
+    attachment(values: { chatId: string; title: string; description?: string; kind: "pdf" | "jpeg"; filename?: string | null; size?: number; createdAt?: number }) {
+      const magic = values.kind === "pdf" ? Buffer.from("%PDF-1.7\n") : Buffer.from([0xff, 0xd8, 0xff, 0xe0])
+      const bytes = Buffer.alloc(Math.max(values.size ?? 2048, magic.length + 8))
+      magic.copy(bytes)
+      bytes.write(newId("fx"), magic.length)
+      const mimeType = values.kind === "pdf" ? "application/pdf" : "image/jpeg"
+      saveAttachment(db, { chatId: values.chatId, title: values.title, description: values.description, mimeType, filename: values.filename, bytes }, key, values.createdAt ?? now)
     },
 
     setting<K extends keyof Settings>(settingKey: K, value: Settings[K]) {

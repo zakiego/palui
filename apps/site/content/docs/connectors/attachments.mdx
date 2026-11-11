@@ -1,0 +1,35 @@
+---
+title: Attachments
+description: The built-in Attachments skill lets Palui keep the important files you send in chat, like an ID card, a receipt or a ticket.
+---
+
+Kind: `skill`. Built in. When you send a photo or a document that's worth keeping, Palui saves it with a title and a short note so you can find it later. Nothing is saved automatically: the model only keeps files that matter (identity documents, receipts, tickets, contracts) or files you ask it to keep.
+
+## Connect
+
+Nothing to set up. Attachments is a built-in skill and is created on first boot. It needs a model connector, since the model decides what to keep and how to name it.
+
+## Tools
+
+| Tool | Class | What it does |
+|---|---|---|
+| `simpan_lampiran` | `write` | Save a file from the message being answered, with a title and a description. With several files, `nomor` picks one (1-based). |
+| `daftar_lampiran` | `read` | List saved files in this chat, with an optional search over titles, descriptions and file names |
+| `ambil_lampiran` | `read` | One file's details and its dashboard link |
+| `hapus_lampiran` | `destructive` | Delete a saved file. Always asks first. |
+
+Each tool's class decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
+
+## Limits and safety
+
+- Only files from the message being answered can be saved. An older message or a URL can't be.
+- Allowed types: JPEG, PNG, WebP, GIF, HEIC, PDF, plain text, CSV, Word, Excel and PowerPoint. The first bytes must match the type, so a renamed file is refused.
+- Up to 10 MB per file. The channel's own limits apply first: WhatsApp and Telegram documents are capped at 1 MB today.
+- Files are encrypted with `MASTER_KEY` (AES-256-GCM) inside the SQLite database, so they're included in backups. Losing `MASTER_KEY` means losing the files, the same as connector secrets.
+- Saving the same file twice in a chat keeps one copy.
+- Files are listed on the Attachments page of the dashboard. Downloads need a signed-in session and are always served as a download, never rendered inline.
+- Palui can't send a saved file back into the chat yet. It shares the dashboard link instead.
+
+## Pause and remove
+
+Pausing hides the tools. Files already saved stay on the Attachments page and can be downloaded or deleted there.

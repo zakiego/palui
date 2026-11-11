@@ -87,6 +87,10 @@ export type TurnInfo = {
   tz: string
   now: number
   jobId?: string
+  // The run whose owner messages this turn answers. Differs from runId when an
+  // approval resumed the turn in a new run; tools that read the current
+  // message (saving an attachment) look it up by this id.
+  batchRunId?: string
 }
 
 // A tool plus its connector metadata. `class` drives approvals (PLAN 10); `untrusted`

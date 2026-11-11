@@ -12,6 +12,7 @@
     "t3-code",
     "reminders",
     "jobs",
+    "attachments",
     "voice-in",
     "web-fetch",
     "webhooks",

@@ -22,6 +22,8 @@ export type ResumeContext = {
   tainted: boolean
   sessionId: string | null
   system: string
+  // The run that took the owner's messages (TurnInfo.batchRunId), kept across resumes.
+  batchRunId?: string
   // Set by markResumed once the run is claimed for resuming.
   resumedAt?: number
 }

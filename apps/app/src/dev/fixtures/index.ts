@@ -47,6 +47,7 @@ const PRODUCT_TABLES = [
   schema.outbox,
   schema.events,
   schema.hooks,
+  schema.savedAttachments,
   schema.usage,
   schema.settings,
 ] as const

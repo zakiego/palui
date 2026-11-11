@@ -164,7 +164,8 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   let interrupted = false
 
   try {
-    const turnInfo: TurnInfo = { runId, chatId: chat.id, channel: chat.channel, trigger: input.trigger, tz: settings.timezone, now: startedAt, jobId }
+    const batchRunId = input.resume ? (input.resume.context.batchRunId ?? input.resume.previousRunId) : runId
+    const turnInfo: TurnInfo = { runId, chatId: chat.id, channel: chat.channel, trigger: input.trigger, tz: settings.timezone, now: startedAt, jobId, batchRunId }
     const noTools = input.noTools || origin === "hook"
     const scope = input.resume ? input.resume.context.toolScope : input.toolScope
     const tools: CollectedTools = noTools
@@ -343,6 +344,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         tainted: state.tainted,
         sessionId: chat.sessionId,
         system,
+        batchRunId: turnInfo.batchRunId,
       }
       if (text && deliver && !silent) deliverReply(ctx, chat, runId, text)
       for (const r of approvalRequests) {

@@ -24,6 +24,8 @@ import {
   toolsRuntime,
 } from "./testing"
 import { MODEL_OFF_TEXT } from "./turn"
+import { turnCandidates } from "../attachments/service"
+import type { TurnInfo } from "../connectors/define"
 
 function ownTelegram(db: DB) {
   const { nonce } = createClaim(db, "telegram", 1)
@@ -609,6 +611,43 @@ describe("inbox", () => {
     await h.engine.inbound(tgMessage("baca ini", { media: [{ kind: "document", mimeType: "text/plain", filename: "a.txt", data: Buffer.from("isi file").toString("base64") }] }))
     await h.engine.idle()
     expect(promptText(def.prompts[0])).toContain("[file: a.txt]\\nisi file")
+  })
+})
+
+describe("attachments", () => {
+  const PDF = Buffer.from("%PDF-1.7 tiket").toString("base64")
+
+  it("keeps document bytes after prepareMedia and finds them through batchRunId after an approval resume", async () => {
+    const db = memoryDb()
+    ownTelegram(db)
+    modelChain(db, ["cliproxy"])
+    const seen: { runId: string; batchRunId?: string; files: string[] }[] = []
+    const files = toolsRuntime("files", () => ({}), "skill", {
+      tools: async (turn: TurnInfo) => ({
+        keep: {
+          class: "destructive" as const,
+          tool: fnTool("keep the file", () => {
+            const c = turnCandidates(db, turn.chatId, turn.batchRunId ?? turn.runId)
+            seen.push({ runId: turn.runId, batchRunId: turn.batchRunId, files: c.map((f) => `${f.mimeType}:${f.filename}`) })
+            return { saved: c.length }
+          }),
+        },
+      }),
+    })
+    const m = scriptedModel([callTool("files__keep", {}, "c1"), say("disimpan")])
+    const h = await harness({ db, registry: { cliproxy: modelRuntime("cliproxy", () => m.model), telegram: channelRuntime("telegram", fakeChannel("telegram")), files }, rows: { cliproxy: "model", telegram: "channel", files: "skill" } })
+    await h.engine.inbound(tgMessage("simpan tiket ini", { media: [{ kind: "document", mimeType: "application/pdf", filename: "tiket.pdf", data: PDF }] }))
+    await h.engine.idle()
+    const row = db.select().from(messages).where(eq(messages.role, "user")).get()!
+    expect(row.text).toContain("[file: tiket.pdf (application/pdf), gak bisa dibaca langsung]")
+    expect((row.content as { media: { data?: string }[] }).media[0]!.data).toBe(PDF)
+    expect(seen).toEqual([])
+    await h.engine.inbound(tgMessage("ya"))
+    await h.engine.idle()
+    expect(seen).toHaveLength(1)
+    expect(seen[0]!.runId).not.toBe(row.runId)
+    expect(seen[0]).toMatchObject({ batchRunId: row.runId, files: ["application/pdf:tiket.pdf"] })
+    await h.engine.stop(100)
   })
 })
 

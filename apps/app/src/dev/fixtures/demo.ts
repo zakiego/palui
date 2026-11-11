@@ -1,7 +1,7 @@
 // Dev only: the data the dashboard was designed against. Every connector
 // state, a few long names, a Markdown reply, a pending approval. It reads well
 // on purpose; `worst.ts` is the one that goes looking for trouble.
-import { H, MIN, type Kit } from "./kit"
+import { D, H, MIN, type Kit } from "./kit"
 
 export function demo(k: Kit) {
   const { now } = k
@@ -17,6 +17,7 @@ export function demo(k: Kit) {
   k.connector("reminders", "reminders", { status: "on" })
   k.connector("jobs", "jobs", { status: "paused" })
   k.connector("webfetch", "webfetch", { status: "on" })
+  k.connector("attachments", "attachments", { status: "on" })
   k.connector("voice", "voice", { status: "not_set_up" })
 
   const web = k.webChat()
@@ -90,4 +91,8 @@ export function demo(k: Kit) {
       message: i === 1 ? "error: 401 Unauthorized from api.telegram.org (the bot token was revoked in @BotFather)" : `status change ${i}`,
     })
   }
+
+  k.attachment({ chatId: wa.id, title: "Tiket pesawat BDJ-CGK 12 Des", description: "Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.", kind: "pdf", filename: "e-ticket-XKQ9PL.pdf", size: 184_320, createdAt: now - 3 * H })
+  k.attachment({ chatId: tg.id, title: "KTP Zaki", description: "Foto KTP, berlaku seumur hidup.", kind: "jpeg", size: 412_000, createdAt: now - 26 * H })
+  k.attachment({ chatId: tg.id, title: "Struk servis motor", description: "Bengkel resmi Banjarbaru, ganti oli dan kampas rem, Rp 385.000.", kind: "pdf", filename: "struk_servis_2026-11-01.pdf", size: 96_000, createdAt: now - 9 * D })
 }

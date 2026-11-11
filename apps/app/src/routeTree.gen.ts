@@ -14,6 +14,7 @@ import { Route as HealthRouteImport } from './routes/health'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppActivityRouteImport } from './routes/_app/activity'
+import { Route as AppAttachmentsRouteImport } from './routes/_app/attachments'
 import { Route as AppChatsRouteImport } from './routes/_app/chats'
 import { Route as AppConnectorsRouteImport } from './routes/_app/connectors'
 import { Route as AppJobsRouteImport } from './routes/_app/jobs'
@@ -22,6 +23,7 @@ import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AppConnectorsIdRouteImport } from './routes/_app/connectors_.$id'
 import { Route as AppConnectorsNewRouteImport } from './routes/_app/connectors_.new'
+import { Route as ApiAttachmentsIdRouteImport } from './routes/api/attachments/$id'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiChatStreamRouteImport } from './routes/api/chat/stream'
 import { Route as ApiEventsStreamRouteImport } from './routes/api/events/stream'
@@ -50,6 +52,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppActivityRoute = AppActivityRouteImport.update({
   id: '/activity',
   path: '/activity',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAttachmentsRoute = AppAttachmentsRouteImport.update({
+  id: '/attachments',
+  path: '/attachments',
   getParentRoute: () => AppRoute,
 } as any)
 const AppChatsRoute = AppChatsRouteImport.update({
@@ -92,6 +99,11 @@ const AppConnectorsNewRoute = AppConnectorsNewRouteImport.update({
   path: '/connectors/new',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiAttachmentsIdRoute = ApiAttachmentsIdRouteImport.update({
+  id: '/api/attachments/$id',
+  path: '/api/attachments/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -123,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/activity': typeof AppActivityRoute
+  '/attachments': typeof AppAttachmentsRoute
   '/chats': typeof AppChatsRoute
   '/connectors': typeof AppConnectorsRoute
   '/jobs': typeof AppJobsRoute
@@ -131,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/invite/$token': typeof InviteTokenRoute
   '/connectors/$id': typeof AppConnectorsIdRoute
   '/connectors/new': typeof AppConnectorsNewRoute
+  '/api/attachments/$id': typeof ApiAttachmentsIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/events/stream': typeof ApiEventsStreamRoute
@@ -141,6 +155,7 @@ export interface FileRoutesByTo {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/activity': typeof AppActivityRoute
+  '/attachments': typeof AppAttachmentsRoute
   '/chats': typeof AppChatsRoute
   '/connectors': typeof AppConnectorsRoute
   '/jobs': typeof AppJobsRoute
@@ -150,6 +165,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/connectors/$id': typeof AppConnectorsIdRoute
   '/connectors/new': typeof AppConnectorsNewRoute
+  '/api/attachments/$id': typeof ApiAttachmentsIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/events/stream': typeof ApiEventsStreamRoute
@@ -162,6 +178,7 @@ export interface FileRoutesById {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/_app/activity': typeof AppActivityRoute
+  '/_app/attachments': typeof AppAttachmentsRoute
   '/_app/chats': typeof AppChatsRoute
   '/_app/connectors': typeof AppConnectorsRoute
   '/_app/jobs': typeof AppJobsRoute
@@ -171,6 +188,7 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/connectors_/$id': typeof AppConnectorsIdRoute
   '/_app/connectors_/new': typeof AppConnectorsNewRoute
+  '/api/attachments/$id': typeof ApiAttachmentsIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/events/stream': typeof ApiEventsStreamRoute
@@ -184,6 +202,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/activity'
+    | '/attachments'
     | '/chats'
     | '/connectors'
     | '/jobs'
@@ -192,6 +211,7 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/connectors/$id'
     | '/connectors/new'
+    | '/api/attachments/$id'
     | '/api/auth/$'
     | '/api/chat/stream'
     | '/api/events/stream'
@@ -202,6 +222,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/activity'
+    | '/attachments'
     | '/chats'
     | '/connectors'
     | '/jobs'
@@ -211,6 +232,7 @@ export interface FileRouteTypes {
     | '/'
     | '/connectors/$id'
     | '/connectors/new'
+    | '/api/attachments/$id'
     | '/api/auth/$'
     | '/api/chat/stream'
     | '/api/events/stream'
@@ -222,6 +244,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/_app/activity'
+    | '/_app/attachments'
     | '/_app/chats'
     | '/_app/connectors'
     | '/_app/jobs'
@@ -231,6 +254,7 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/connectors_/$id'
     | '/_app/connectors_/new'
+    | '/api/attachments/$id'
     | '/api/auth/$'
     | '/api/chat/stream'
     | '/api/events/stream'
@@ -243,6 +267,7 @@ export interface RootRouteChildren {
   HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
   InviteTokenRoute: typeof InviteTokenRoute
+  ApiAttachmentsIdRoute: typeof ApiAttachmentsIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiChatStreamRoute: typeof ApiChatStreamRoute
   ApiEventsStreamRoute: typeof ApiEventsStreamRoute
@@ -285,6 +310,13 @@ declare module '@tanstack/react-router' {
       path: '/activity'
       fullPath: '/activity'
       preLoaderRoute: typeof AppActivityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/attachments': {
+      id: '/_app/attachments'
+      path: '/attachments'
+      fullPath: '/attachments'
+      preLoaderRoute: typeof AppAttachmentsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/chats': {
@@ -343,6 +375,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppConnectorsNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/attachments/$id': {
+      id: '/api/attachments/$id'
+      path: '/api/attachments/$id'
+      fullPath: '/api/attachments/$id'
+      preLoaderRoute: typeof ApiAttachmentsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -383,6 +422,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppActivityRoute: typeof AppActivityRoute
+  AppAttachmentsRoute: typeof AppAttachmentsRoute
   AppChatsRoute: typeof AppChatsRoute
   AppConnectorsRoute: typeof AppConnectorsRoute
   AppJobsRoute: typeof AppJobsRoute
@@ -395,6 +435,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppActivityRoute: AppActivityRoute,
+  AppAttachmentsRoute: AppAttachmentsRoute,
   AppChatsRoute: AppChatsRoute,
   AppConnectorsRoute: AppConnectorsRoute,
   AppJobsRoute: AppJobsRoute,
@@ -412,6 +453,7 @@ const rootRouteChildren: RootRouteChildren = {
   HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
   InviteTokenRoute: InviteTokenRoute,
+  ApiAttachmentsIdRoute: ApiAttachmentsIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiChatStreamRoute: ApiChatStreamRoute,
   ApiEventsStreamRoute: ApiEventsStreamRoute,

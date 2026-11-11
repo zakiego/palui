@@ -12,7 +12,7 @@ import { D, H, MIN, type Kit } from "./kit"
 // Limits the dashboard enforces (the zod schemas in src/lib/fns). A value that
 // claims to be "at the limit" is checked against it, so the fixture can't
 // drift past what the forms accept.
-const LIMITS = { connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500 }
+const LIMITS = { attachmentTitle: 200, attachmentDescription: 1000, attachmentFilename: 200, connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500 }
 
 function within(value: string, limit: number): string {
   if (value.length > limit) throw new Error(`fixture value is ${value.length} characters, over the limit of ${limit}: ${value.slice(0, 40)}`)
@@ -133,6 +133,7 @@ export function worst(k: Kit) {
   k.connector("reminders", "reminders", { status: "on" })
   k.connector("jobs", "jobs", { status: "on" })
   k.connector("webfetch", "webfetch", { status: "on" })
+  k.connector("attachments", "attachments", { status: "on" })
   k.connector("voice", "voice", { status: "not_set_up" })
   k.connector("hooks", "hooks", { status: "on" })
 
@@ -366,4 +367,18 @@ export function worst(k: Kit) {
   k.hook({ name: "Sentry alerts for the Vorneo production project (payments)", chatId: "chat_0mhremoved0000000000", mode: "summarize", enabled: false, lastAt: 0 })
   k.hook({ name: "<b>Stripe</b> &amp; friends", chatId: noTitleGroup.id, lastAt: now + 2 * H })
   k.hook({ name: "Uptime", chatId: aleksandra.id, lastAt: now - 12 * D })
+
+  // --- saved attachments: the longest title, description and file name the tools allow ---
+  k.attachment({
+    chatId: aleksandra.id,
+    title: within(fill("Umowa najmu mieszkania Wiśniewska-Kowalczyk, aneks nr 3 z podpisami obu stron i pieczęcią notariusza ", LIMITS.attachmentTitle), LIMITS.attachmentTitle),
+    description: within(fill(PARAGRAPH, LIMITS.attachmentDescription), LIMITS.attachmentDescription),
+    kind: "pdf",
+    filename: within(`${"umowa_najmu_aneks_nr_3_podpisana_0123456789abcdefghijklmnopqrstuvwxyz_".repeat(3).slice(0, LIMITS.attachmentFilename - 4)}.pdf`, LIMITS.attachmentFilename),
+    size: 10 * 1024 * 1024,
+    createdAt: now - 20_000,
+  })
+  k.attachment({ chatId: arabic.id, title: "بطاقة الهوية", description: "", kind: "jpeg", size: 1, createdAt: now - 3 * 365 * D })
+  k.attachment({ chatId: "chat_0mhremoved0000000000", title: "J", kind: "jpeg", filename: null, size: 999_999, createdAt: now + 2 * H })
+  k.attachment({ chatId: cjk.id, title: "身份证 王秀英 正反面", description: "身份证正反面照片，有效期至2036年。", kind: "jpeg", filename: "身份证_王秀英.jpg", size: 1536, createdAt: now - 12 * D })
 }
