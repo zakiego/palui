@@ -83,7 +83,7 @@ Only with fakes:
    umask 077 && nano .env
    ```
    Put in three keys: `MASTER_KEY=` (from `openssl rand -base64 32`, also save it in your password manager), `BETTER_AUTH_SECRET=` (another `openssl rand -base64 32`), `APP_URL=https://palui.zakiego.com`.
-   deploy.sh runs `git pull --ff-only` on whatever branch is checked out, so this works on `feat/v1`. Switch the checkout to `main` once you merge.
+   deploy.sh runs `git pull --ff-only` on whatever branch is checked out. Done 2026-11-11: `~/selfhost/palui` is on `main`.
 2. Port and deploy: `~/.agents/skills/zaki-selfhost/scripts/free-port.sh` (should print 4802, else edit `compose.yaml`), then `~/.agents/skills/zaki-selfhost/scripts/deploy.sh palui`.
 3. Hostname: `~/.agents/skills/zaki-selfhost/scripts/add-host.sh palui.zakiego.com 4802 "Palui Agent"`, then restart the tunnel in Terminal: `sudo launchctl kickstart -k system/com.cloudflare.cloudflared`.
 4. Owner and model:
@@ -100,8 +100,8 @@ Only with fakes:
    CF="$HOME/.agents/skills/cf-zakiego-lab/scripts/cf-zakiego-lab"
    "$CF" pages deployments list --project-name palui-web
    ```
-8. Auto-deploy: add `"zakiego/palui": "palui"` to `~/.agents/skills/zaki-selfhost/webhook/apps.json`, `launchctl kickstart -k gui/$(id -u)/id.zakiego.selfhost-webhook`, then create the GitHub hook with the command in the zaki-selfhost skill ("Add a repo", step 3).
+8. Done 2026-11-11 (hook id `710181508`). Auto-deploy: add `"zakiego/palui": "palui"` to `~/.agents/skills/zaki-selfhost/webhook/apps.json`, `launchctl kickstart -k gui/$(id -u)/id.zakiego.selfhost-webhook`, then create the GitHub hook with the command in the zaki-selfhost skill ("Add a repo", step 3).
 9. Monitoring: add `https://palui.zakiego.com/health` to the `http` list in `~/.agents/skills/m4-alerts/config.default.json`.
-10. Backups: `brew install age`, `age-keygen -o /tmp/palui.key`, put the public key in `~/.config/palui/age-recipient`, store the private key in the Keychain as `palui-backup-age-identity` (`security add-generic-password -s palui-backup-age-identity -a palui -w "$(cat /tmp/palui.key)"`), `rm /tmp/palui.key`, create the R2 bucket `palui-backups`, then `ops/install-backup.sh`. Test with `scripts/restore-drill.sh`.
+10. Done 2026-11-11, and the restore drill passed. Backups: `brew install age`, `age-keygen -o /tmp/palui.key`, put the public key in `~/.config/palui/age-recipient` (`age-keygen -y /tmp/palui.key`), store only the `AGE-SECRET-KEY-` line in the Keychain as `palui-backup-age-identity` (`security add-generic-password -s palui-backup-age-identity -a palui -w "$(grep AGE-SECRET-KEY /tmp/palui.key)"`), `rm /tmp/palui.key`, create the R2 bucket `palui-backups`, then `ops/install-backup.sh`. Test with `scripts/restore-drill.sh`. Don't store the whole key file: the Keychain returns a multi-line value as hex, and age can't read that back. Copy the secret key into your password manager too, since the Keychain is its only copy.
 11. Optional: recall memory (make a `rcl_` key in recall for Palui, then Connectors, recall) and MCP presets (vorneo, keuangan, todomap, linear: token only).
 12. Optional: fix the D8 log cap in `/opt/homebrew/etc/cliproxyapi.conf` (gap 10).
