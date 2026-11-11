@@ -71,7 +71,8 @@ const patch = z.object({
       maxSteps: z.number().int().min(1).max(50),
       turnTimeoutMs: z.number().int().min(10_000).max(600_000),
       maxTools: z.number().int().min(1).max(128),
-      dailyTokenCap: z.number().int().min(10_000).max(100_000_000),
+      // 0 turns the global cap off, the same as an agent's or a job's cap.
+      dailyTokenCap: z.union([z.literal(0), z.number().int().min(10_000).max(100_000_000)]),
       maxRunsPerHour: z.number().int().min(1).max(1000),
     })
     .optional(),

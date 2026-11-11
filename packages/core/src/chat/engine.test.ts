@@ -126,6 +126,21 @@ describe("commands", () => {
     expect(texts.find((t) => t.startsWith("Model:"))).toContain("cliproxy/m (off)")
   })
 
+  it("/status shows the daily token cap, or tanpa batas when it is 0", async () => {
+    const db = memoryDb()
+    ownTelegram(db)
+    const tg = fakeChannel("telegram")
+    const h = await harness({ db, registry: { telegram: channelRuntime("telegram", tg) }, rows: { telegram: "channel" } })
+    const tokenLine = () => outboxTexts(db).at(-1)!.split("\n").find((l) => l.startsWith("Token hari ini:"))
+    await h.engine.inbound(tgMessage("/status"))
+    await h.engine.idle()
+    expect(tokenLine()).toBe(`Token hari ini: 0 / ${(2_000_000).toLocaleString("id-ID")}`)
+    setSetting(db, "budgets", { ...getSetting(db, "budgets"), dailyTokenCap: 0 })
+    await h.engine.inbound(tgMessage("/status"))
+    await h.engine.idle()
+    expect(tokenLine()).toBe("Token hari ini: 0 / tanpa batas")
+  })
+
   it("/new auto-saves then rotates the session", async () => {
     const saved: { sourceId: string; content: string }[] = []
     const mem = { autoRecall: false, autoSave: true, recall: async () => null, save: async (i: { sourceId: string; content: string }) => void saved.push(i) }

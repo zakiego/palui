@@ -391,7 +391,7 @@ export const id: Record<Key, string> = {
   "settings.limits.maxTools": "Tool per giliran",
   "settings.limits.maxToolsHelp": "1 sampai 128. Lebih dari ini, sisanya dimuat lewat pencarian tool.",
   "settings.limits.dailyTokenCap": "Batas token harian",
-  "settings.limits.dailyTokenCapHelp": "Untuk semua obrolan dan tugas.",
+  "settings.limits.dailyTokenCapHelp": "Untuk semua obrolan dan tugas. 10.000 sampai 100.000.000, atau 0 untuk tanpa batas.",
   "settings.limits.maxRunsPerHour": "Run per jam",
   "settings.limits.maxRunsPerHourHelp": "1 sampai 1.000.",
   "settings.passkeys.failed": "Passkey itu gagal disimpan.",

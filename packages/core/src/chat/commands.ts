@@ -105,7 +105,7 @@ export function statusText(ctx: EngineCtx): string {
   const chain = (roles.default ?? []).map((l) => `${l.connectorId}/${l.model}${running.has(l.connectorId) ? "" : " (off)"}`).join(" → ")
   const lines = [
     `Model: ${chain || "belum diatur"}`,
-    `Token hari ini: ${tokensToday(db, now).toLocaleString("id-ID")} / ${budgets.dailyTokenCap.toLocaleString("id-ID")}`,
+    `Token hari ini: ${tokensToday(db, now).toLocaleString("id-ID")} / ${budgets.dailyTokenCap > 0 ? budgets.dailyTokenCap.toLocaleString("id-ID") : "tanpa batas"}`,
     `Run jam ini: ${getUsage(db, usageKeys.runs(now, tz))} / ${budgets.maxRunsPerHour}`,
   ]
   const paused = getSetting(db, "turnsPausedUntil")

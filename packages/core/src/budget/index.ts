@@ -53,6 +53,7 @@ export function formatClock(ms: number, tz: string): string {
 
 // Whether a new turn may start. A hit cap pauses turns (settings) until the
 // window rolls over; `fresh` is true the first time, so the caller tells the owner once.
+// A daily token cap of 0 (or less) means no cap, the same as agents and jobs.
 export function checkGlobalBudget(db: DB, now = Date.now()): BudgetCheck {
   const tz = getSetting(db, "timezone")
   const until = getSetting(db, "turnsPausedUntil")
@@ -65,7 +66,7 @@ export function checkGlobalBudget(db: DB, now = Date.now()): BudgetCheck {
   if (getUsage(db, usageKeys.runs(now, tz)) >= b.maxRunsPerHour) {
     return pauseTurns(db, nextHour(now, tz), `batas ${b.maxRunsPerHour} run per jam kena`, now)
   }
-  if (getUsage(db, usageKeys.tokens(now, tz)) >= b.dailyTokenCap) {
+  if (b.dailyTokenCap > 0 && getUsage(db, usageKeys.tokens(now, tz)) >= b.dailyTokenCap) {
     return pauseTurns(db, nextDay(now, tz), `batas ${b.dailyTokenCap.toLocaleString("id-ID")} token per hari kena`, now)
   }
   return { ok: true }

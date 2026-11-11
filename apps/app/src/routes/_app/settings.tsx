@@ -470,7 +470,7 @@ function LimitsTab({ data }: { data: Data }) {
           {field("maxSteps", t("settings.limits.maxSteps"), t("settings.limits.maxStepsHelp"), 1, 50)}
           {field("turnTimeoutS", t("settings.limits.turnTimeoutS"), t("settings.limits.turnTimeoutSHelp"), 10, 600)}
           {field("maxTools", t("settings.limits.maxTools"), t("settings.limits.maxToolsHelp"), 1, 128)}
-          {field("dailyTokenCap", t("settings.limits.dailyTokenCap"), t("settings.limits.dailyTokenCapHelp"), 10_000, 100_000_000)}
+          {field("dailyTokenCap", t("settings.limits.dailyTokenCap"), t("settings.limits.dailyTokenCapHelp"), 0, 100_000_000)}
           {field("maxRunsPerHour", t("settings.limits.maxRunsPerHour"), t("settings.limits.maxRunsPerHourHelp"), 1, 1000)}
         </FieldGroup>
       </CardContent>

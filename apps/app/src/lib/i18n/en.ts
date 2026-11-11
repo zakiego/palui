@@ -392,7 +392,7 @@ export const en = {
   "settings.limits.maxTools": "Tools per turn",
   "settings.limits.maxToolsHelp": "1 to 128. Past this, Palui loads the rest through tool search.",
   "settings.limits.dailyTokenCap": "Daily token cap",
-  "settings.limits.dailyTokenCapHelp": "Across every chat and job.",
+  "settings.limits.dailyTokenCapHelp": "Across every chat and job. 10,000 to 100,000,000, or 0 for no limit.",
   "settings.limits.maxRunsPerHour": "Runs per hour",
   "settings.limits.maxRunsPerHourHelp": "1 to 1,000.",
   "settings.passkeys.failed": "That passkey couldn't be saved.",

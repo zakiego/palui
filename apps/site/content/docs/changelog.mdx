@@ -15,6 +15,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 - Each agent now has its own page (`/app/agents/<slug>`), opened from its row on the Agents page. It holds the profile, the shared-chat rules, the daily cap with today's usage, the recall container, its standing instructions (add, edit, switch off and delete them right there) and the chats it answers in, each with its Answer here switch. New agent asks only for a name, slug and persona, then opens that page.
 
+### Changed
+
+- The global daily token cap (Settings, Limits) can now be set to 0 to turn it off, the same as an agent's or a job's cap, so turns never pause on token use. `/status` shows `tanpa batas` when it's off.
+
 ## 0.4.0 (2026-11-11)
 
 ### Added
