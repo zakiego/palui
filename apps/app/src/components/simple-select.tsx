@@ -7,6 +7,8 @@
  * how one of them ends up showing a project id instead of its slug.
  */
 
+import type * as React from "react"
+
 import {
   Select,
   SelectContent,
@@ -20,6 +22,8 @@ import { picked } from "@/lib/utils"
 export interface Option {
   value: string
   label: string
+  // Shown before the label, in the list and in the trigger.
+  icon?: React.ReactNode
 }
 
 export function SimpleSelect({
@@ -56,13 +60,23 @@ export function SimpleSelect({
         aria-describedby={ariaDescribedBy}
       >
         <SelectValue>
-          {(v: string) => options.find((o) => o.value === v)?.label ?? v}
+          {(v: string) => {
+            const o = options.find((x) => x.value === v)
+            if (!o?.icon) return o?.label ?? v
+            return (
+              <span className="flex min-w-0 items-center gap-2">
+                {o.icon}
+                <span className="truncate">{o.label}</span>
+              </span>
+            )
+          }}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
         <SelectGroup>
           {options.map((o) => (
             <SelectItem key={o.value} value={o.value}>
+              {o.icon}
               {o.label}
             </SelectItem>
           ))}
