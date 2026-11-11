@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
-import { bumpVersion, checkChangelog, compareVersions, cutRelease, parseChangelog } from "./changelog"
+import { bumpVersion, checkChangelog, compareVersions, cutRelease, parseChangelog, suggestBump } from "./changelog"
 
 const CHANGELOG = readFileSync(new URL("../content/docs/changelog.mdx", import.meta.url), "utf8")
 const ROOT_PKG = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8")) as { version: string }
@@ -61,5 +61,26 @@ describe("versions", () => {
     expect(bumpVersion("0.1.9", "minor")).toBe("0.2.0")
     expect(bumpVersion("0.9.3", "major")).toBe("1.0.0")
     expect(compareVersions("0.10.0", "0.9.0")).toBeGreaterThan(0)
+  })
+})
+
+describe("suggestBump", () => {
+  const with_ = (body: string) => sample(body)
+  it("has nothing to suggest when Unreleased is empty", () => {
+    expect(suggestBump(with_("Nothing yet."), "0.1.0").bump).toBeNull()
+  })
+  it("picks patch for fixes only", () => {
+    expect(suggestBump(with_("### Fixed\n\n- A fix."), "0.1.0").bump).toBe("patch")
+  })
+  it("picks minor for anything added or changed", () => {
+    expect(suggestBump(with_("### Added\n\n- A thing.\n\n### Fixed\n\n- A fix."), "0.1.0")).toEqual({ bump: "minor", reason: "has Added" })
+    expect(suggestBump(with_("### Changed\n\n- A change."), "1.2.0").bump).toBe("minor")
+  })
+  it("keeps breaking changes on minor before 1.0 and major after", () => {
+    expect(suggestBump(with_("### Breaking\n\n- Add FOO."), "0.4.0").bump).toBe("minor")
+    expect(suggestBump(with_("### Breaking\n\n- Add FOO."), "1.4.0").bump).toBe("major")
+  })
+  it("treats unsorted bullets as a minor", () => {
+    expect(suggestBump(with_("- Something."), "0.1.0").bump).toBe("minor")
   })
 })
