@@ -149,6 +149,22 @@ export function setConnectorStatus(db: DB, id: string, status: ConnectorStatus, 
   )
 }
 
+// Runtime-learned secrets (a token swapped for a one-time code). Merged like
+// upsertConnector, but the hash stays put so the running handle isn't restarted.
+export function patchConnectorSecrets(db: DB, id: string, patch: Record<string, string>, masterKey: string, now = Date.now()) {
+  const row = getConnector(db, id)
+  if (!row) return
+  const merged = getSecrets(row, masterKey)
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === "") delete merged[k]
+    else merged[k] = v
+  }
+  db.update(connectors)
+    .set({ secrets: Object.keys(merged).length ? encryptJson(merged, masterKey) : null, updatedAt: now })
+    .where(eq(connectors.id, id))
+    .run()
+}
+
 export function patchConnectorConfig(db: DB, id: string, patch: Record<string, unknown>, now = Date.now()) {
   const row = getConnector(db, id)
   if (!row) return
