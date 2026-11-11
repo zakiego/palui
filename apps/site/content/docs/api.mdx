@@ -20,12 +20,14 @@ Public and unauthenticated. Use it for uptime checks.
 GET /health
 ```
 
-The response is JSON with the schema version and connector state. This example is illustrative, not an exact schema:
+The response is JSON with the Palui version, the schema version, the runtime's own answer and connector state. This example is illustrative, not an exact schema:
 
 ```json
 {
   "ok": true,
-  "schema": { "db": 4, "code": 4 },
+  "version": "0.1.0",
+  "schema": "0000_past_adam_warlock",
+  "runtime": { "ok": true, "schema": "0000_past_adam_warlock", "version": "0.1.0" },
   "connectors": [
     { "id": "telegram", "status": "on" },
     { "id": "whatsapp", "status": "error", "detail": "unlinked" },
@@ -34,6 +36,8 @@ The response is JSON with the schema version and connector state. This example i
 }
 ```
 
+- `version` is the release the app was built from (see the [Changelog](/docs/changelog)). `runtime.version` should match it after a deploy. If it doesn't, the runtime container is still on the old image.
+- `runtime` is `"unreachable"` when the runtime doesn't answer.
 - It fails when the database schema is newer than the code. That's what makes a bad rollback show up as failed. See [Upgrades](/docs/self-hosting/upgrades).
 - Runtime connector state is reported in the body, not in the status code. A WhatsApp outage shows as `error` in the JSON while `/health` itself stays healthy, so a channel problem never fails a deploy.
 

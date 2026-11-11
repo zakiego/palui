@@ -175,6 +175,10 @@ export type ConnectorContext<C = Record<string, unknown>, S = Record<string, str
   event(kind: string, message: string, level?: "debug" | "info" | "warn" | "error", data?: Record<string, unknown>): void
   // Persist non-secret config learned at runtime (bot username, owner LID...).
   patchConfig(patch: Record<string, unknown>): void
+  // Persist a secret learned at runtime (a token swapped for a one-time pairing
+  // code), encrypted like the wizard's secrets. An empty string deletes the key.
+  // No restart. Optional so test contexts can leave it out.
+  patchSecrets?(patch: Record<string, string>): void
 }
 
 export type TestResult = { ok: boolean; detail: string; data?: Record<string, unknown> }

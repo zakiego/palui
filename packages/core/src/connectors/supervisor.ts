@@ -17,6 +17,7 @@ import {
   getSecrets,
   listConnectors,
   patchConnectorConfig,
+  patchConnectorSecrets,
   setConnectorStatus,
   upsertConnector,
   type ConnectorRow,
@@ -171,6 +172,13 @@ export function createSupervisor(opts: SupervisorOptions) {
           patchConnectorConfig(db, row.id, patch, clock())
         } catch (e) {
           clog.error("patchConfig failed", { error: e })
+        }
+      },
+      patchSecrets(patch) {
+        try {
+          patchConnectorSecrets(db, row.id, patch, opts.masterKey, clock())
+        } catch (e) {
+          clog.error("patchSecrets failed", { error: e })
         }
       },
     }

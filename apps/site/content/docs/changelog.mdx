@@ -1,20 +1,37 @@
 ---
 title: Changelog
-description: What ships in Palui Agent v1, which is still in development, and what is planned for later.
+description: Every Palui Agent release, newest first, and what is planned after v1.
 ---
 
-## v1 (in development)
+Palui Agent uses [semantic versioning](https://semver.org). Each release is a git tag `vX.Y.Z` on `main`, and a running install reports its version as `version` in `GET /health`.
 
-2026-11. Not released yet. This list is what v1 is built to ship.
+- While the version starts with `0.`, the v1 scope below is still being built. A minor bump (`0.2.0`) adds features or changes behavior. A patch bump (`0.1.1`) only fixes things.
+- `1.0.0` is the release where the v1 scope is done. From then on, a major bump means you have to do something when you upgrade, and the release notes say what.
+- Changes that need action from you on upgrade sit under "Breaking" in that release.
+
+## Unreleased
+
+Nothing yet.
+
+## 0.2.0 (2026-11-11)
+
+### Added
+
+- T3 Code connector: ask Palui in chat to work on one of your projects and it starts a T3 Code thread in its own worktree, then messages the same chat with the agent's reply and the link when the thread finishes. Set it up with a pairing code from `t3 auth pairing create`.
+
+## 0.1.0 (2026-11-11)
+
+The first tagged release. It covers everything built so far toward v1.
 
 ### Chat
 
-- Telegram and WhatsApp DMs, plus the web chat in the dashboard, in Indonesian or English.
+- Telegram and WhatsApp DMs, plus the web chat in the dashboard, in Indonesian or English. WhatsApp runs on Palui's own number.
 - One owner, claimed with a Telegram nonce link and a WhatsApp phone number.
 - Durable inbox and outbox with at-least-once delivery, so a deploy doesn't drop a message.
 - Sessions with compaction past about 40 messages.
 - Chat commands: `/connectors`, `/new`, `/stop`, `/status`.
 - Voice messages transcribed with ElevenLabs Scribe (Voice-in). Photos and small documents on Telegram.
+- Pipe tables in replies render as tables in the web chat.
 
 ### Connectors
 
@@ -25,9 +42,11 @@ description: What ships in Palui Agent v1, which is still in development, and wh
 ### Agent
 
 - CLIProxyAPI and ai-gateway as model providers, with per-role failover.
+- Pick each role's model from the list your gateway serves, or type any id it doesn't list, and set a reasoning effort per step in the chain.
 - recall as long-term memory: tools, auto-recall, auto-save.
 - Any Streamable HTTP MCP server as a tool source, with per-tool switches, classes and trust flags.
 - Tool classes that fail closed, approvals that survive restarts, and the taint rule.
+- A persona in Settings that shapes how Palui talks.
 - Turn budgets (12 steps, 120 s, about 30 tools) and global caps.
 
 ### Skills
@@ -38,12 +57,25 @@ description: What ships in Palui Agent v1, which is still in development, and wh
 - Inbound webhooks with HMAC signatures, in forward and summarize modes.
 - Google Calendar, read-only.
 
-### Dashboard and operations
+### Dashboard
 
 - Dashboard at `/app` with passkeys: Home, Chats, Reminders, Jobs, Connectors, Activity, Settings.
+- No sign-up. The owner gets in with a single-use link from `palui owner invite` (15 minutes), which is also how you recover a lost passkey.
+- Mono palette and the mascot head as the mark, matching the site.
+- Page skeletons shaped like the real pages, and a progress bar while a page switch waits.
+- Every page holds up on a phone and with very long names, big numbers and empty lists.
+
+### Operations
+
 - Docker Compose with two services from one image and one SQLite volume.
+- `GET /health` reports the app version, and the runtime's version next to it.
 - Pre-deploy snapshots, nightly age-encrypted backups to R2, and a restore drill.
 - Landing page and these docs on Cloudflare Pages.
+
+### Site
+
+- A [brand page](/brand) with profile pictures for the bot's WhatsApp or Telegram account, in seven designs, dark and light, as PNG and SVG.
+- The landing page describes Palui as a simple, friendly agent that keeps you company.
 
 ## Not in v1
 

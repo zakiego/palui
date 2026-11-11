@@ -65,8 +65,18 @@ export function gatewayRuntime<M extends ConnectorManifest>(manifest: M, opts: {
     },
     async start(ctx) {
       const cfg = parse(ctx.config)
-      const model = buildModels(ctx.id, cfg, (ctx.secrets as { apiKey?: string }).apiKey, opts.fetch)
-      return { stop: async () => {}, model, live: () => ({ baseUrl: cfg.baseUrl, protocols: cfg.protocols }) }
+      const key = (ctx.secrets as { apiKey?: string }).apiKey
+      const model = buildModels(ctx.id, cfg, key, opts.fetch)
+      return {
+        stop: async () => {},
+        model,
+        live: () => ({ baseUrl: cfg.baseUrl, protocols: cfg.protocols }),
+        // The settings page lists these in the model picker.
+        async action(name) {
+          if (name !== "listModels") throw Object.assign(new Error(`Unknown action ${name}`), { status: 404 })
+          return { models: await listModels(cfg, key, AbortSignal.timeout(10_000), opts.fetch) }
+        },
+      }
     },
   })
 }

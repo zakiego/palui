@@ -259,6 +259,13 @@ Budget
 - Tools are namespaced `server__tool`.
 - Presets for servers I already run (vorneo, keuangan, todomap, linear) ask only for the token.
 
+### 5.4.1 Tools: T3 Code
+
+- Connects to the T3 Code server on the Mac (`http://host.docker.internal:3773` from Docker) over its `/mcp` endpoint.
+- Setup takes a pairing code (`t3 auth pairing create`). The runtime trades it through T3 Code's OAuth endpoints (register, pairing-code decision, token) for a 30-day full-access token and stores it encrypted with `patchSecrets`. T3 Code has no refresh grant, so an expired token is a connector `error` and a new code fixes it.
+- Tools: `daftar_proyek`, `daftar_thread`, `lihat_thread` (read), `mulai_thread`, `kirim_ke_thread` (write), `hentikan_thread` (destructive). New threads get their own worktree off a default base branch.
+- A watcher polls the runs Palui started every 20 s and messages the chat they came from when one finishes (the agent's reply, clipped, plus the link), or once when it waits for an answer. Watches live in the connector's config and expire after 24 h.
+
 ### 5.5 Skills (built-in connectors)
 
 - Reminders (section 6) and Jobs (section 7).

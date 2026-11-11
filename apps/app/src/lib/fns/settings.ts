@@ -1,10 +1,12 @@
 // Settings page.
 import { config, masterKey } from "@palui/core/config"
-import { getAllSettings, setSetting, type Settings } from "@palui/core/settings"
+import { getAllSettings, REASONING_EFFORTS, setSetting, type Settings } from "@palui/core/settings"
 import { listConnectors } from "@palui/core/connectors/store"
 import { createServerFn } from "@tanstack/react-start"
 import { z } from "zod"
+import { manifestFor } from "@/lib/manifests"
 import { createHook, listHooks } from "@/server/hooks-bridge"
+import { callRuntime } from "@/server/runtime"
 import { chatOptions, latestBackup, passkeyList } from "@/server/queries"
 import { requireUser, requireWriter } from "@/server/session"
 
@@ -23,7 +25,7 @@ export const getSettingsPage = createServerFn({ method: "GET" }).handler(async (
     },
     models: listConnectors(db)
       .filter((c) => c.kind === "model")
-      .map((c) => ({ id: c.id, label: c.label, status: c.status })),
+      .map((c) => ({ id: c.id, label: c.label, status: c.status, icon: manifestFor(c.type)?.icon })),
     passkeys: passkeyList(db, viewer.user.id),
     backup: latestBackup(config().dataDir),
     hooks: listHooks(db),
@@ -32,7 +34,21 @@ export const getSettingsPage = createServerFn({ method: "GET" }).handler(async (
   }
 })
 
-const chain = z.array(z.object({ connectorId: z.string().min(1).max(64), model: z.string().trim().min(1).max(120) })).min(1).max(6)
+const chain = z
+  .array(z.object({ connectorId: z.string().min(1).max(64), model: z.string().trim().min(1).max(120), effort: z.enum(REASONING_EFFORTS).optional() }))
+  .min(1)
+  .max(6)
+
+// The model ids a running model connector offers, for the model picker. A
+// paused connector or a down runtime answers with an error the picker shows.
+export const listConnectorModels = createServerFn({ method: "GET" })
+  .validator(z.object({ id: z.string().min(1).max(64) }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const res = await callRuntime((rt) => rt.action(data.id, "listModels", {}))
+    const models = Array.isArray(res.models) ? res.models.filter((m): m is string => typeof m === "string") : []
+    return { models: [...new Set(models)].sort((a, b) => a.localeCompare(b)) }
+  })
 
 const patch = z.object({
   persona: z.string().trim().min(1).max(8000).optional(),

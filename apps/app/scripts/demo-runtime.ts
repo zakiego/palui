@@ -45,6 +45,21 @@ function listTools(id: string) {
   }
 }
 
+const DEMO_MODELS = [
+  "claude-sonnet-5-5",
+  "claude-opus-5-5",
+  "claude-haiku-5-5",
+  "claude-fable-5-2",
+  "gpt-5.2",
+  "gpt-5.2-codex",
+  "o4-mini",
+  "gemini-3-pro-preview",
+  "gemini-3-flash-preview",
+  "llama-4-maverick",
+  "deepseek-v3.2",
+  "qwen3-coder-480b-a35b-instruct-with-a-long-model-id",
+]
+
 function status() {
   return {
     ok: true,
@@ -78,11 +93,15 @@ const server = createServer((req, res) => {
   if (url.startsWith("/control/test/")) return json({ ok: true, detail: "Reachable (demo runtime)" })
   if (url.startsWith("/control/action/")) {
     const id = decodeURIComponent(url.slice("/control/action/".length))
-    const chunks: Buffer[] = []
-    req.on("data", (c: Buffer) => chunks.push(c))
+    let raw = ""
+    req.on("data", (chunk: Buffer) => (raw += chunk))
     req.on("end", () => {
-      const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}") as { name?: string }
-      json(body.name === "listTools" ? listTools(id) : {})
+      const name = (JSON.parse(raw || "{}") as { name?: string }).name
+      // The settings model picker lists these.
+      if (name === "listModels") return json({ models: DEMO_MODELS })
+      // The MCP tool table lists these.
+      if (name === "listTools") return json(listTools(id))
+      json({})
     })
     return
   }

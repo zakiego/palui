@@ -13,6 +13,7 @@ import {
   NetworkIcon,
   PlugIcon,
   SendIcon,
+  SquareTerminalIcon,
   WebhookIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -31,6 +32,7 @@ const ICONS: Record<string, LucideIcon> = {
   mic: MicIcon,
   globe: GlobeIcon,
   webhook: WebhookIcon,
+  "square-terminal": SquareTerminalIcon,
 }
 
 export function connectorIcon(name: string | undefined): LucideIcon {

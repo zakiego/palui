@@ -77,8 +77,8 @@ export function worst(k: Kit) {
   k.setting("fallbackChannel", "none")
   k.setting("budgets", { maxSteps: 50, turnTimeoutMs: 600_000, maxTools: 128, dailyTokenCap: 100_000_000, maxRunsPerHour: 1000 })
   const sixSteps = [
-    { connectorId: "cliproxy", model: within(MODEL_LONG, LIMITS.model) },
-    { connectorId: "ai-gateway", model: "claude-sonnet-4-6" },
+    { connectorId: "cliproxy", model: within(MODEL_LONG, LIMITS.model), effort: "xhigh" as const },
+    { connectorId: "ai-gateway", model: "claude-sonnet-4-6", effort: "none" as const },
     // A connector that was removed after the chain was saved.
     { connectorId: "openrouter", model: "anthropic/claude-opus-4.1:thinking" },
     { connectorId: "cliproxy", model: "gemini-2.5-flash-preview-with-a-long-model-id" },
@@ -124,6 +124,12 @@ export function worst(k: Kit) {
   k.connector("mcp-keuangan", "mcp", { label: "Keuangan", status: "paused", config: { url: "https://keuangan.example.com/mcp" } })
   k.connector("mcp-todomap", "mcp", { label: "Todo Map", status: "on", config: { url: "https://todo.example.com/api/mcp" } })
   k.connector("gcal", "gcal", { status: "not_set_up" })
+  k.connector("t3code", "t3code", {
+    status: "error",
+    detail: "T3 Code rejected Palui's token (it lasts 30 days). On the Mac, run t3 auth pairing create --ttl 10m and paste the new code in this connector.",
+    secrets: { pairingCode: "0123456789abcdefghijklmnopqrstuv" },
+    config: { url: "http://host.docker.internal:3773", baseRef: "release/2026-11-northwind-industries-holdings-hotfix", model: "claudeAgent/claude-opus-5-5" },
+  })
   k.connector("reminders", "reminders", { status: "on" })
   k.connector("jobs", "jobs", { status: "on" })
   k.connector("webfetch", "webfetch", { status: "on" })

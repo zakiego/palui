@@ -11,6 +11,7 @@ export function demo(k: Kit) {
   k.connector("cliproxy", "cliproxy", { status: "on", secrets: { apiKey: "sk-cliproxy-0123456789abcdef" } })
   k.connector("ai-gateway", "ai-gateway", { status: "paused", secrets: { apiKey: "zkg_0123456789abcdef" } })
   k.connector("recall", "recall", { status: "connecting", secrets: { apiKey: "rcl_0123456789a91f" } })
+  k.connector("t3code", "t3code", { status: "on", secrets: { pairingCode: "0123456789abcdef" }, config: { url: "http://host.docker.internal:3773" } })
   k.connector("mcp-vorneo", "mcp", { label: "Vorneo pipeline and property listings for every kabupaten in Kalimantan Selatan", status: "on", config: { url: "https://vorneo.id/mcp" } })
   k.connector("mcp-linear", "mcp", { label: "Linear 🚀", status: "on", trust: "external", config: { url: "https://mcp.linear.app/mcp" } })
   k.connector("reminders", "reminders", { status: "on" })

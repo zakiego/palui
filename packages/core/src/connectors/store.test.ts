@@ -9,6 +9,7 @@ import {
   getConnector,
   getSecrets,
   maskedSecrets,
+  patchConnectorSecrets,
   pauseConnector,
   resumeConnector,
   setConnectorStatus,
@@ -31,6 +32,18 @@ describe("connector store", () => {
     const c = upsertConnector(db, { id: "telegram", manifest, secrets: { botToken: "" } }, KEY)
     expect(c.secrets).toBeNull()
     expect(maskedSecrets(c, KEY)).toEqual({})
+  })
+
+  it("patches runtime-learned secrets without changing the hash", () => {
+    const db = memoryDb()
+    const a = upsertConnector(db, { id: "telegram", manifest, secrets: { botToken: "123:abc" } }, KEY)
+    patchConnectorSecrets(db, "telegram", { token: "t3-token" }, KEY)
+    const b = getConnector(db, "telegram")!
+    expect(getSecrets(b, KEY)).toEqual({ botToken: "123:abc", token: "t3-token" })
+    expect(b.secrets).not.toContain("t3-token")
+    expect(b.configHash).toBe(a.configHash)
+    patchConnectorSecrets(db, "telegram", { token: "" }, KEY)
+    expect(getSecrets(getConnector(db, "telegram")!, KEY)).toEqual({ botToken: "123:abc" })
   })
 
   it("moves through connect, pause, resume, remove with events", () => {

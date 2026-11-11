@@ -3,13 +3,17 @@ title: Upgrades
 description: Deploy a new version with a pre-deploy snapshot and one compose command, and roll back safely if the schema moved.
 ---
 
-A deploy is three steps:
+Before you upgrade, read the [Changelog](/docs/changelog) for every release since yours. Anything under "Breaking" tells you what to do first. Your current version is `version` in `GET /health`.
+
+A deploy is three steps. To follow `main`:
 
 ```bash
 git pull
 scripts/pre-deploy.sh
 docker compose up -d --build --wait
 ```
+
+To pin a release instead, check out its tag in place of `git pull`, for example `git fetch --tags && git checkout v0.1.0`.
 
 `scripts/pre-deploy.sh` snapshots the database to `/data/backups/pre-deploy-<UTC>.db.gz` and keeps the newest 3. `--wait` makes Compose wait until every service is healthy, so the command fails if the new version doesn't come up.
 
@@ -32,9 +36,11 @@ Docs-only changes don't touch the image (the site isn't part of it), so they don
 Go back to the previous version and run the same command:
 
 ```bash
-git checkout <previous-commit>
+git checkout v0.1.0   # the release you were on, or a commit
 docker compose up -d --build --wait
 ```
+
+A release whose changelog entry says it adds a migration can't be rolled back without the snapshot below.
 
 If the new version had already migrated the database, the old code finds a schema newer than itself. `/health` fails on purpose in that case, so a bad rollback shows as failed instead of half-working. To fix it, restore the pre-deploy snapshot taken just before the upgrade (see [Restore](/docs/self-hosting/backups#restore)), then start the old version again.
 
