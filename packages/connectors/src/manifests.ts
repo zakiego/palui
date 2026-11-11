@@ -1,0 +1,39 @@
+// Every connector manifest, keyed by manifest id. The app and the runtime both
+// import this, so it must stay free of runtime-only code.
+import type { ConnectorManifest } from "@palui/core/saklar/define"
+import aiGateway from "./ai-gateway/manifest"
+import cliproxy from "./cliproxy/manifest"
+import gcal from "./gcal/manifest"
+import hooks from "./hooks/manifest"
+import jobs from "./jobs/manifest"
+import mcp from "./mcp/manifest"
+import recall from "./recall/manifest"
+import reminders from "./reminders/manifest"
+import telegram from "./telegram/manifest"
+import voice from "./voice/manifest"
+import web from "./web/manifest"
+import webfetch from "./webfetch/manifest"
+import whatsapp from "./whatsapp/manifest"
+
+// Order is the catalog and Saklar page order within each kind.
+export const manifests: Record<string, ConnectorManifest> = {
+  telegram,
+  whatsapp,
+  web,
+  cliproxy,
+  "ai-gateway": aiGateway,
+  recall,
+  mcp,
+  gcal,
+  reminders,
+  jobs,
+  voice,
+  webfetch,
+  hooks,
+}
+
+export const manifestList: ConnectorManifest[] = Object.values(manifests)
+
+export function getManifest(id: string): ConnectorManifest | undefined {
+  return manifests[id]
+}

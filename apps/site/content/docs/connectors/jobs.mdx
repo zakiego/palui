@@ -1,0 +1,46 @@
+---
+title: Jobs
+description: The built-in Jobs skill runs agent prompts on a schedule, including the daily briefing and the heartbeat preset.
+---
+
+Kind: `skill`. Built in. Jobs run a prompt on a schedule as an agent turn and send the result to a chat. The rules (schedules, tool restrictions, caps) are on the [Jobs concept page](/docs/concepts/jobs).
+
+## Connect
+
+Nothing to set up. Create jobs on the Jobs page. A job needs a model connector that's on.
+
+## Job settings
+
+| Field | Notes |
+|---|---|
+| Name | Shown on the Jobs page |
+| Schedule | RRULE, plus an IANA zone (default `Asia/Makassar`, WITA) |
+| Prompt | What the agent should do each run |
+| Target chat | Where the result goes |
+| Tool scope | Which connectors' tools it may use. Never `destructive` tools. `write` tools need approval. |
+| Model role | Which model role runs it |
+| Daily token cap | Per job, on top of the global caps |
+
+The Jobs page lists every job with its next run and last result, plus Run now and Pause. Every run is recorded on the Activity page.
+
+## Daily briefing
+
+The daily briefing is a job that runs every morning, for example at 07:00. In v1 it reads:
+
+- Your reminders for today.
+- Your recall profile.
+- Tasks and pipelines from MCP servers you connect.
+- The weather, through [web fetch](/docs/connectors/web-fetch).
+- Today's events, if the [Google Calendar](/docs/connectors/google-calendar) connector is on.
+
+## Heartbeat preset
+
+The heartbeat is a job that runs every 30 minutes from 08:00 to 22:00. It reads your reminders and MCP inboxes and decides whether anything needs your attention. Its prompt tells it to answer `NOTHING` when nothing matters, and when it does, the runtime sends nothing. You only hear from it when something's worth hearing.
+
+## Tools
+
+Jobs don't add tools for the model. A job uses the tools of the connectors in its tool scope.
+
+## Pause and remove
+
+Pause a single job with its Pause button on the Jobs page. A job's runs count toward the global caps (a daily token cap and 60 runs per hour). Hitting a cap pauses turns and tells you on your channel.

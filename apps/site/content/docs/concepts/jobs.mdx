@@ -1,0 +1,39 @@
+---
+title: Jobs
+description: Scheduled agent jobs run a prompt on a recurring schedule, with restricted tools and their own token cap.
+---
+
+A job is a prompt that runs on a schedule, like "every day at 07:00, brief me". Each job is:
+
+| Field | Meaning |
+|---|---|
+| Schedule | An RRULE, the same grammar reminders use |
+| Zone | An IANA time zone (default `Asia/Makassar`, WITA) |
+| Prompt | What the agent should do |
+| Target chat | Where the result is sent |
+| Tool scope | Which connectors' tools the job may use |
+| Model role | Which model role runs it (see [CLIProxyAPI](/docs/connectors/cliproxy#roles)) |
+| Daily token cap | A per-job cap on tokens per day |
+
+## How a job runs
+
+At its scheduled time a job runs as a normal agent turn with the trigger `schedule`. The result goes to the target chat through the outbox, the same way a reply does. Every run is recorded, and the Jobs page shows the next run, the last result, and the Run now and Pause buttons.
+
+## Tool restrictions
+
+Nobody's watching a job when it runs, so it gets fewer tools:
+
+- `destructive` tools are never available to a job.
+- Every `write` tool needs your approval. The job's turn ends and waits for your answer, the same as any [approval](/docs/concepts/approvals).
+- `read` tools run freely.
+
+## Budgets
+
+Jobs count toward the global caps (a daily token cap and at most 60 runs per hour), and each job has its own daily token cap. Hitting a cap pauses turns and tells you on your channel. See [Budgets](/docs/concepts/tool-classes#budgets).
+
+## Presets
+
+- Daily briefing: reads today's reminders, your recall profile, tasks from MCP servers you connect, and the weather through web fetch. Google Calendar events are included when that connector is on.
+- Heartbeat: runs every 30 minutes from 08:00 to 22:00, reads reminders and MCP inboxes, and answers `NOTHING` when nothing matters. When it answers `NOTHING`, the runtime sends nothing.
+
+See the [Jobs connector](/docs/connectors/jobs) for setup.

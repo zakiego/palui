@@ -1,0 +1,139 @@
+import type { ToolClass } from "@palui/db"
+import { defineRuntime, type ConfigOf, type PaluiTool, type SecretsOf } from "@palui/core/saklar/define"
+import { authHeaders, McpConnection, suggestClass, type McpEndpoint, type McpToolDef } from "./client"
+import manifest from "./manifest"
+
+type Config = ConfigOf<typeof manifest>
+type Secrets = SecretsOf<typeof manifest>
+type ToolPrefs = Config["toolPrefs"]
+
+// One row of the listTools wizard step / action.
+export type McpToolListing = {
+  name: string
+  title?: string
+  description: string
+  // From annotations: readOnlyHint -> read, destructiveHint: false -> write, else destructive.
+  suggestedClass: ToolClass
+  // Saved pref, or the prefill (enabled, suggestedClass) when nothing is saved yet.
+  enabled: boolean
+  class: ToolClass
+  // Whether a pref is saved. Until it is, the runtime offers the tool as destructive.
+  saved: boolean
+}
+
+export function endpointFor(config: Config, secrets: Secrets, fetchImpl?: typeof fetch): McpEndpoint {
+  if (config.authMode !== "none" && !secrets.token) throw new Error("This server needs a token")
+  if (config.authMode === "header" && !config.headerName) throw new Error("Set the header name for the custom header auth mode")
+  return { url: config.url, headers: authHeaders({ authMode: config.authMode, headerName: config.headerName, token: secrets.token }), fetch: fetchImpl }
+}
+
+export function listingFor(defs: McpToolDef[], prefs: ToolPrefs = {}): McpToolListing[] {
+  return defs.map((d) => {
+    const suggested = suggestClass(d.annotations)
+    const pref = prefs[d.name]
+    return {
+      name: d.name,
+      ...(d.title || d.annotations?.title ? { title: d.title ?? d.annotations?.title } : {}),
+      description: d.description ?? "",
+      suggestedClass: suggested,
+      enabled: pref?.enabled ?? true,
+      class: pref?.class ?? suggested,
+      saved: Boolean(pref),
+    }
+  })
+}
+
+// The tools a turn may see: enabled ones only, with their saved class. A tool the
+// owner hasn't classified yet is destructive (fail closed, PLAN 10).
+export function selectTools(defs: McpToolDef[], prefs: ToolPrefs = {}): { def: McpToolDef; class: ToolClass }[] {
+  const out: { def: McpToolDef; class: ToolClass }[] = []
+  for (const def of defs) {
+    const pref = prefs[def.name]
+    if (pref && !pref.enabled) continue
+    out.push({ def, class: pref?.class ?? "destructive" })
+  }
+  return out
+}
+
+function errorText(err: unknown): string {
+  const msg = (err as Error)?.message ?? String(err)
+  if (/401|unauthori[sz]ed/i.test(msg)) return `The server rejected the token (401): ${msg}`
+  return msg
+}
+
+export default defineRuntime(manifest, {
+  async test(ctx) {
+    let conn: McpConnection
+    try {
+      conn = new McpConnection(endpointFor(ctx.config, ctx.secrets))
+    } catch (err) {
+      return { ok: false, detail: (err as Error).message }
+    }
+    try {
+      const { tools } = await conn.listTools({ fresh: true })
+      const listing = listingFor(tools, ctx.config.toolPrefs)
+      return { ok: true, detail: `${tools.length} tool${tools.length === 1 ? "" : "s"} available`, data: { tools: listing } }
+    } catch (err) {
+      return { ok: false, detail: errorText(err) }
+    } finally {
+      await conn.close()
+    }
+  },
+
+  async start(ctx) {
+    const conn = new McpConnection(endpointFor(ctx.config, ctx.secrets))
+    let lastError: string | null = null
+    let toolCount = 0
+    try {
+      toolCount = (await conn.listTools({ fresh: true })).tools.length
+    } catch (err) {
+      await conn.close()
+      throw new Error(errorText(err))
+    }
+    const untrusted = ctx.trust === "external"
+
+    return {
+      async stop() {
+        await conn.close()
+      },
+      async tools() {
+        let defs: McpToolDef[]
+        try {
+          defs = (await conn.listTools()).tools
+        } catch (err) {
+          const detail = errorText(err)
+          if (detail !== lastError) {
+            lastError = detail
+            ctx.setStatus("error", detail)
+          }
+          return {}
+        }
+        if (lastError) {
+          lastError = null
+          ctx.setStatus("on")
+        }
+        toolCount = defs.length
+        const picked = selectTools(defs, ctx.config.toolPrefs)
+        const aiTools = await conn.tools(picked.map((p) => p.def))
+        const out: Record<string, PaluiTool> = {}
+        for (const p of picked) {
+          const t = aiTools[p.def.name]
+          if (!t) continue
+          out[p.def.name] = { tool: t, class: p.class, untrusted, title: p.def.title ?? p.def.annotations?.title ?? p.def.name }
+        }
+        return out
+      },
+      live() {
+        return { tools: toolCount, url: ctx.config.url, error: lastError }
+      },
+      async action(name) {
+        if (name === "listTools") {
+          const { tools } = await conn.listTools({ fresh: true })
+          toolCount = tools.length
+          return { tools: listingFor(tools, ctx.config.toolPrefs) }
+        }
+        throw new Error(`Unknown action ${name}`)
+      },
+    }
+  },
+})

@@ -1,0 +1,42 @@
+---
+title: MCP servers
+description: Add any Streamable HTTP MCP server as a tool source, with a class and a switch per tool and a trust flag per server.
+---
+
+Kind: `tools`. Each MCP server you add is its own connector, so you can pause one server without touching the others. Palui supports Streamable HTTP servers. stdio servers are planned, not in v1 (they need binaries in the container and a sandbox).
+
+## Connect
+
+1. On the Saklar page, choose Add connector, then MCP server. Presets for MCP servers you already run ask only for the token.
+2. Enter the server URL and pick the auth type: none, bearer token, or a custom header.
+3. Set the trust flag: `own` for a server you run, `external` for anything else.
+4. Press Test. It lists the server's tools.
+5. Review the tool table, set classes and switches, and connect.
+
+## Settings
+
+| Field | Notes |
+|---|---|
+| URL | The Streamable HTTP endpoint |
+| Auth | None, bearer, or custom header. The token or header value is a secret: write-only, shown masked. |
+| Trust | `own` or `external`. Results from `external` servers [taint the turn](/docs/concepts/taint-rule). |
+| Tools | One row per tool, with a Switch and a class |
+
+## Tools
+
+Whatever the server exposes. The tool table in the connector sheet has:
+
+- A Switch per tool. A tool that's off is never offered to the model.
+- A class per tool: `read`, `write` or `destructive`. The server's `readOnlyHint` and `destructiveHint` prefill it. An unknown tool defaults to `destructive`.
+- Search, for servers with long tool lists.
+- "Enable all read tools", to turn on every `read` tool in one go.
+
+Each server gets an instance id like `mcp-<slug>`, and its tools reach the model as `mcp-<slug>__<tool>`. Classes decide approvals. See [Tool classes](/docs/concepts/tool-classes).
+
+<Callout type="info" title="Tool budget">
+  A turn offers about 30 tools at most. With many servers on, the most relevant connectors go first. Turning off tools you don't use keeps the useful ones in.
+</Callout>
+
+## Pause and remove
+
+Pausing applies from the next turn. Tool calls already running finish. Removing asks first and deletes the stored token.

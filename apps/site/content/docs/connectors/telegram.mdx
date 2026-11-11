@@ -1,0 +1,63 @@
+---
+title: Telegram
+description: Chat with Palui from a Telegram bot. Connect with a bot token and claim owner with a one-time link.
+---
+
+Kind: `channel`. Chat with Palui from a Telegram bot you create. It's the most reliable channel, and the one with buttons for reminders, approvals and `/saklar`.
+
+## Connect
+
+<Steps>
+<Step>
+
+### Create a bot
+
+In Telegram, message @BotFather, send `/newbot` and follow the prompts. Copy the token it gives you (it looks like `<bot-id>:<your-bot-token>`).
+
+</Step>
+<Step>
+
+### Paste the token and test
+
+On the Saklar page, add Telegram and paste the token. Test calls Telegram's `getMe` and shows the bot's `@bot_username` when the token works.
+
+</Step>
+<Step>
+
+### Claim owner
+
+The wizard shows a `t.me/<bot>?start=<nonce>` link and a QR code. Open it on your phone and press Start. The nonce is single use and expires after 10 minutes. Only a `/start` with that nonce claims owner, and the wizard waits with a live status line until it arrives.
+
+</Step>
+</Steps>
+
+From then on, messages from your Telegram account reach Palui. Everyone else is dropped silently.
+
+## Settings
+
+| Field | Notes |
+|---|---|
+| Bot token | Secret. Write-only, shown masked. Replace it if you regenerate the token in @BotFather. |
+
+## How it behaves
+
+- Long polling. No public webhook URL needed.
+- Shows the typing action while a turn runs.
+- Replies are sent as HTML and split at 4096 characters.
+- Media in: photos (read by the `vision` model role), voice messages (transcribed by [Voice-in](/docs/connectors/voice-in)) and small documents (text extracted).
+- Inline keyboards for reminder actions (Done, Snooze 10m, 1h, tomorrow 09.00), approvals and `/saklar`.
+- DMs only in v1. Group chats are planned.
+
+## Tools
+
+None. Telegram is a channel: it carries messages, it doesn't give the model tools.
+
+## Pause and remove
+
+- Pause: polling stops. Replies and reminders waiting in the outbox stay queued without using up attempts and send when you resume. The owner claim and token are kept.
+- Remove: deletes the token. Waiting rows go to your fallback channel if one is on, otherwise they're cancelled.
+- `/saklar off telegram` sent from Telegram only works when another channel or the dashboard is reachable. See [Chat commands](/docs/chat-commands).
+
+<Callout type="info" title="One consumer per token">
+  Telegram allows one long-polling consumer per bot token. If you run a second Palui (for development), give it its own bot.
+</Callout>

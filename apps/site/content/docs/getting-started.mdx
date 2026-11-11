@@ -1,0 +1,82 @@
+---
+title: Getting started
+description: Install Palui Agent with Docker Compose, create the owner account, connect a model and Telegram, and send the first message.
+---
+
+You need a server with Docker and Docker Compose, a model provider (CLIProxyAPI or ai-gateway running on the Docker host), and a Telegram bot token. Plan on about 15 minutes.
+
+<Steps>
+<Step>
+
+### Install with Docker Compose
+
+Clone the repository (it's private for now, so you need access) and create a `.env` file next to `compose.yaml` with three keys:
+
+```bash
+git clone <repo-url> palui
+cd palui
+openssl rand -base64 32   # run twice: once for MASTER_KEY, once for BETTER_AUTH_SECRET
+```
+
+```bash
+MASTER_KEY=<output of openssl rand -base64 32>
+BETTER_AUTH_SECRET=<a second output of openssl rand -base64 32>
+APP_URL=https://palui.example.com
+```
+
+`APP_URL` is the public origin of your dashboard. Save a copy of `MASTER_KEY` in your password manager: every connector secret is encrypted with it, and a backup is useless without it.
+
+Then build and start both services:
+
+```bash
+docker compose up -d --build --wait
+```
+
+`--wait` returns once both services are healthy, and fails if either doesn't come up. See [Self-hosting](/docs/self-hosting) for what the two services do.
+
+</Step>
+<Step>
+
+### Create the owner
+
+The only way in is a single-use invite from the CLI:
+
+```bash
+docker compose exec app palui owner invite
+```
+
+It prints a link that works once and expires after 15 minutes. Open it and register a passkey. The dashboard lives at `/app` (for example `https://palui.example.com/app`). Run the same command again if you ever lose your passkey.
+
+</Step>
+<Step>
+
+### Connect a model
+
+Open the Saklar page in the dashboard and add a model connector: [CLIProxyAPI](/docs/connectors/cliproxy) or [ai-gateway](/docs/connectors/ai-gateway). The base URL defaults to a service on the Docker host (`http://host.docker.internal:8317` for CLIProxyAPI). Paste the API key and press Test. A working connector shows its model list.
+
+</Step>
+<Step>
+
+### Connect Telegram
+
+1. Create a bot with @BotFather (`/newbot`) and copy the token.
+2. Add the [Telegram](/docs/connectors/telegram) connector, paste the token and press Test. It shows the bot's `@bot_username`.
+3. The wizard shows a `t.me` link (and a QR code) with a one-time nonce. Open it on your phone and press Start. The nonce is single use and expires after 10 minutes.
+
+The wizard waits with a live status line until your `/start` arrives. From then on, your Telegram account is the owner on that channel.
+
+</Step>
+<Step>
+
+### Send the first message
+
+Send "halo" to your bot on Telegram. Or skip the phone: open Chats in the dashboard and use the "Palui (web)" chat.
+
+Try a reminder next: "ingetin minum air 10 menit lagi" (remind me to drink water in 10 minutes). The reply echoes the time it understood.
+
+</Step>
+</Steps>
+
+The Home page keeps a first-run checklist (owner passkey, model, channel, say hi, then optional recall and MCP) until every step is done.
+
+Next: add [memory](/docs/connectors/recall), [MCP servers](/docs/connectors/mcp) or [WhatsApp](/docs/connectors/whatsapp).

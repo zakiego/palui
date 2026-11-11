@@ -1,0 +1,496 @@
+/* The landing page. Everything is scoped under .lp-root, which is always dark
+   whatever theme the docs are set to. Palette: mono. Neutral black and grays
+   with no hue, and white as the only accent (the same as the docs' dark
+   --primary). Every text color clears WCAG AA on the page:
+   text 16.9:1, dim 7.7:1, faint 5.7:1, accent 19.8:1. */
+
+.lp-root {
+  --lp-bg: #0a0a0a;
+  --lp-surface: #111111;
+  --lp-bar: #0d0d0d;
+  --lp-line: #272727;
+  --lp-line-soft: #1c1c1c;
+  --lp-text: #ededed;
+  --lp-dim: #a1a1a1;
+  --lp-faint: #8a8a8a;
+  --lp-accent: #ffffff;
+  --lp-accent-hover: #d9d9d9;
+  --lp-accent-ink: #0a0a0a;
+  --lp-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  /* easeInOutSine, for things that swing back and forth. */
+  --lp-sine: cubic-bezier(0.37, 0, 0.63, 1);
+  --lp-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+  --lp-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  /* The site-wide focus outline reads this. */
+  --focus-ring: var(--lp-accent);
+  /* shadcn components on the landing take the landing's own colors. */
+  --primary: var(--lp-accent);
+  --primary-foreground: var(--lp-accent-ink);
+  --foreground: var(--lp-text);
+  --border: var(--lp-line);
+
+  color-scheme: dark;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--lp-bg);
+  color: var(--lp-text);
+  font-family: var(--lp-sans);
+}
+
+/* No light band when a phone overscrolls past the landing. */
+html:has(.lp-root),
+html:has(.lp-root) body {
+  background: #0a0a0a;
+  color-scheme: dark;
+}
+
+.lp-root ::selection {
+  background: #3a3a3a;
+  color: var(--lp-text);
+}
+
+/* ------------------------------------------------------------- header */
+.lp-header,
+.lp-footer,
+.lp-main {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.lp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.lp-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.lp-mark {
+  width: 24px;
+  height: 24px;
+}
+.lp-mark-tile {
+  fill: var(--lp-accent);
+}
+.lp-mark-face {
+  fill: var(--lp-accent-ink);
+}
+.lp-nav {
+  margin-right: -10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--lp-dim);
+  font-family: var(--lp-mono);
+  font-size: 14px;
+  transition: color 160ms var(--lp-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lp-nav:hover {
+    color: var(--lp-text);
+  }
+}
+/* A tap answers too, since the tap highlight is off site-wide. */
+.lp-nav:active,
+.lp-footer a:active {
+  color: var(--lp-text);
+  text-decoration-color: currentColor;
+}
+
+/* --------------------------------------------------------------- main
+   Stacked on a phone (copy, then the mascot), two columns from 1024px. */
+.lp-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-top: 8px;
+  padding-bottom: 24px;
+}
+.lp-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.lp-h1 {
+  margin: 0;
+  font-family: var(--lp-mono);
+  font-size: clamp(2rem, 1.4rem + 2.4vw, 3.25rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+.lp-lede {
+  margin: 14px 0 0;
+  max-width: 40ch;
+  color: var(--lp-dim);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.lp-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 20px;
+}
+.lp-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px 0 16px;
+  border-radius: 8px;
+  background: var(--lp-accent);
+  color: var(--lp-accent-ink);
+  font-size: 15px;
+  font-weight: 600;
+  transition:
+    transform 140ms var(--lp-ease),
+    background-color 160ms var(--lp-ease);
+}
+.lp-cta svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 180ms var(--lp-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lp-cta:hover {
+    background: var(--lp-accent-hover);
+  }
+  .lp-cta:hover svg {
+    transform: translateX(2px);
+  }
+}
+.lp-cta:active {
+  transform: scale(0.97);
+}
+
+/* ------------------------------------------------------------- mascot
+   The one visual: Palui and the three things it keeps (mascot-scene.tsx).
+   Every few seconds one of them has the stage (`data-acting`, from
+   lib/mascot.ts) and does its bit, while Palui leans its head that way. */
+.lp-mascot {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin: 0 auto;
+}
+.lp-mascot > svg {
+  display: block;
+  width: 100%;
+  max-width: 350px;
+  height: auto;
+  overflow: visible;
+}
+.lp-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Palui tips its head at the thing on stage. A transition, so the next look
+   takes over from wherever the head is. */
+.lp-head {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transition: transform 280ms var(--lp-ease);
+}
+.lp-head[data-look="notes"] {
+  transform: rotate(-4deg);
+}
+.lp-head[data-look="clock"] {
+  transform: translateY(2.5px);
+}
+.lp-head[data-look="toolbox"] {
+  transform: rotate(4deg);
+}
+
+/* Remembers: a fresh sheet lands on the stack, then its two lines are written
+   left to right. Afterwards it sinks one sheet's thickness into the stack
+   and fades, and the lines clear once it's gone. */
+.lp-note-new {
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 240ms var(--lp-ease),
+    transform 240ms var(--lp-ease);
+}
+/* A line is wiped in along the sheet, from where the pen starts. */
+.lp-note-line {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0s 240ms;
+}
+.lp-keep[data-acting] .lp-note-new {
+  opacity: 1;
+  transform: none;
+  /* The drop below is a keyframe, so no transition runs under it. */
+  transition: none;
+}
+.lp-keep[data-acting] .lp-note-line {
+  clip-path: inset(0);
+  transition: clip-path 280ms var(--lp-ease) 320ms;
+}
+.lp-keep[data-acting] .lp-note-line[data-line="2"] {
+  transition-duration: 240ms;
+  transition-delay: 540ms;
+}
+
+/* Reminds: the clock rattles on its feet twice, and the marks flash with it. */
+.lp-clock {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.lp-ring {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+/* Uses tools: the lid slides back, a hammer comes up out of the box and taps
+   twice. Closing runs the other way: the hammer drops first, then the lid. */
+.lp-lid {
+  transition: transform 240ms var(--lp-ease) 120ms;
+}
+.lp-keep[data-acting] .lp-lid {
+  /* 0.75 of a unit toward the back of the slab. */
+  transform: translate(13px, -7.5px);
+  transition: transform 260ms var(--lp-ease);
+}
+.lp-hammer {
+  /* Down in the box, below its front edge. */
+  transform: translateY(58px);
+  transition: transform 200ms var(--lp-ease);
+}
+.lp-keep[data-acting] .lp-hammer {
+  transform: none;
+  transition: transform 300ms var(--lp-ease) 160ms;
+}
+.lp-hammer-swing {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+/* ------------------------------------------------------------- footer */
+.lp-footer {
+  padding-top: 16px;
+  padding-bottom: 20px;
+  color: var(--lp-faint);
+  font-family: var(--lp-mono);
+  font-size: 13px;
+}
+.lp-footer a {
+  border-radius: 6px;
+  color: var(--lp-dim);
+  text-decoration: underline;
+  text-decoration-color: var(--lp-line);
+  text-underline-offset: 4px;
+  transition:
+    color 160ms var(--lp-ease),
+    text-decoration-color 160ms var(--lp-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lp-footer a:hover {
+    color: var(--lp-text);
+    text-decoration-color: currentColor;
+  }
+}
+
+/* ------------------------------------------------------------ entrance
+   Played once on load. The copy settles in, then Palui and its slab as one
+   piece, then the three things land one after another, each a little sooner
+   and from a little lower than the one before. After that Palui blinks while
+   the loop runs (data-idle), and the things take turns acting. Reduced motion
+   skips all of it, and global.css cuts every other transition short. */
+@media (prefers-reduced-motion: no-preference) {
+  .lp-intro > * {
+    animation: lp-rise 280ms var(--lp-ease) backwards;
+  }
+  .lp-intro > :nth-child(2) {
+    animation-delay: 40ms;
+  }
+  .lp-intro > :nth-child(3) {
+    animation-delay: 80ms;
+  }
+  .lp-stage {
+    animation: lp-rise 260ms var(--lp-ease) 120ms backwards;
+  }
+  .lp-keep {
+    --lp-drop: -14px;
+    animation: lp-land 280ms var(--lp-ease) 300ms backwards;
+  }
+  .lp-keep[data-keep="clock"] {
+    --lp-drop: -12px;
+    animation-delay: 390ms;
+  }
+  .lp-keep[data-keep="toolbox"] {
+    --lp-drop: -10px;
+    animation-delay: 470ms;
+  }
+  .lp-mascot[data-idle] .lp-eye {
+    animation: lp-blink 4.6s var(--lp-ease) infinite;
+  }
+  .lp-keep[data-acting] .lp-note-new {
+    animation: lp-note-drop 300ms var(--lp-ease);
+  }
+  .lp-keep[data-acting] .lp-clock {
+    animation: lp-rattle 1400ms var(--lp-sine);
+  }
+  .lp-keep[data-acting] .lp-ring {
+    animation: lp-ring 1400ms var(--lp-ease);
+  }
+  .lp-keep[data-acting] .lp-hammer-swing {
+    animation: lp-tap 720ms var(--lp-sine) 620ms;
+  }
+}
+@keyframes lp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes lp-land {
+  from {
+    opacity: 0;
+    transform: translateY(var(--lp-drop));
+  }
+}
+@keyframes lp-note-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+}
+/* Two bursts of five swings, each a little smaller than the last. */
+@keyframes lp-rattle {
+  0%,
+  30%,
+  50%,
+  80%,
+  100% {
+    transform: rotate(0);
+  }
+  5%,
+  55% {
+    transform: rotate(-6deg);
+  }
+  10%,
+  60% {
+    transform: rotate(6deg);
+  }
+  15%,
+  65% {
+    transform: rotate(-5deg);
+  }
+  20%,
+  70% {
+    transform: rotate(4deg);
+  }
+  25%,
+  75% {
+    transform: rotate(-2deg);
+  }
+}
+/* The marks spread out from the clock as they show. */
+@keyframes lp-ring {
+  0%,
+  30%,
+  50%,
+  80%,
+  100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  6%,
+  24%,
+  56%,
+  74% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lp-tap {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25%,
+  65% {
+    transform: rotate(-16deg);
+  }
+  45% {
+    transform: rotate(3deg);
+  }
+}
+@keyframes lp-blink {
+  0%,
+  95.5%,
+  100% {
+    transform: scaleY(1);
+  }
+  97.5% {
+    transform: scaleY(0.1);
+  }
+}
+
+/* ------------------------------------------------------- larger screens */
+@media (min-width: 640px) {
+  .lp-header,
+  .lp-footer,
+  .lp-main {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+  .lp-mascot > svg {
+    max-width: 400px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .lp-header,
+  .lp-footer,
+  .lp-main {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+  .lp-header {
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+  .lp-main {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 7fr);
+    align-items: center;
+    gap: 56px;
+    padding-bottom: 48px;
+  }
+  .lp-lede {
+    margin-top: 22px;
+    font-size: 18px;
+  }
+  .lp-cta-row {
+    margin-top: 30px;
+  }
+  .lp-cta {
+    height: 44px;
+    padding: 0 16px 0 18px;
+  }
+  .lp-mascot > svg {
+    max-width: 440px;
+  }
+}
+
+/* No double-tap zoom delay on the few controls. */
+.lp-cta,
+.lp-nav {
+  touch-action: manipulation;
+}

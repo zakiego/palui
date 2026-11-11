@@ -1,0 +1,46 @@
+/**
+ * Flip between light and dark. The theme starts on the system setting; the
+ * first press pins the opposite of whatever is showing.
+ *
+ * The accessible name says where the button goes, not where you are, because
+ * that is what pressing it does.
+ */
+
+import * as React from "react"
+import { MoonIcon, SunIcon } from "lucide-react"
+
+import { IconSwap } from "@/components/icon-swap"
+import { useTheme } from "@/components/theme-provider"
+import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+
+export function ThemeToggle({ className }: { className?: string }) {
+  const { resolvedTheme, setTheme } = useTheme()
+  // The server can't know the theme, so the label waits for the first client
+  // render; otherwise its text mismatches during hydration.
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => setMounted(true), [])
+  const dark = mounted && resolvedTheme === "dark"
+  const label = dark ? "Switch to light theme" : "Switch to dark theme"
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            className={className}
+            aria-label={label}
+            onClick={() => setTheme(dark ? "light" : "dark")}
+          />
+        }
+      >
+        <IconSwap active={dark} from={<SunIcon />} to={<MoonIcon />} />
+      </TooltipTrigger>
+      <TooltipContent>
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  )
+}

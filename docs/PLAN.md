@@ -417,7 +417,7 @@ Follows the TASTE.md lines.
   - (b) Chat replay: "ingetin bayar listrik besok jam 9", then the reminder firing the next morning.
   - (c) Saklar board: connectors switching on one by one.
   - Every variant gets an icon on each node, starts from step 1 on load, types its caption at about 55 ms per character with no caret, moves the visual only after the line is written, and keeps the visual and caption in one phone screen with the caption first.
-- Positioning while dev-only: "Personal agent, self-hosted. Not open for sign-ups." The landing is indexable (D4), `/app` is not.
+- Positioning while dev-only: "Personal agent, self-hosted." The landing is indexable (D4), `/app` is not.
 - Ship: OG image, favicon set, `robots.txt`, sitemap, per SHIP.md. Optionally, a small Si Palui-inspired mark (original drawing, not the comic's art).
 - Docs (Fumadocs):
   - Getting started: install, first owner, first connector, first message.
@@ -465,7 +465,7 @@ About 21 days in total. Every UI milestone runs the full zaki-design-ui pipeline
 | D1 | Name | Decided: Palui Agent (`palui`) |
 | D2 | WhatsApp number | Decided: utusan's number, as a separate linked device, chats split per section 18. utusan will be sunset |
 | D3 | Replace utusan? | Decided: yes, someday. Roadmap in section 18 |
-| D4 | Landing indexable now? | Decided: yes, with "not open for sign-ups" |
+| D4 | Landing indexable now? | Decided: yes |
 | D5 | Open source? | Decided: private |
 | D6 | Bot's default language | Decided: casual Indonesian, English when I write English |
 | D7 | Google Calendar read connector in v1? | Decided: yes, read-only, in M5 |

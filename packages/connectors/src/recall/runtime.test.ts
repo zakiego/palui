@@ -1,0 +1,242 @@
+import type http from "node:http"
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { afterEach, describe, expect, it } from "vitest"
+import { z } from "zod"
+import type { ConfigOf, PaluiTool, TurnInfo } from "@palui/core/saklar/define"
+import { fakeCtx, startMcpServer, type TestMcpServer } from "../mcp/test-helpers"
+import { normalizeSourceId, profileText, RecallApi } from "./api"
+import manifest from "./manifest"
+import runtime, { shouldRecall } from "./runtime"
+
+const KEY = "rcl_testkey123456"
+const turn: TurnInfo = { runId: "run_1", chatId: "chat_1", channel: "telegram", trigger: "message", tz: "Asia/Makassar", now: 0 }
+
+type Seen = { method: string; path: string; auth?: string; body?: unknown }
+
+function registerRecallTools(seenArgs: Record<string, unknown>[]) {
+  return (server: McpServer) => {
+    const container = z.string().optional()
+    server.registerTool(
+      "add_memory",
+      { inputSchema: { content: z.string().optional(), container }, annotations: { readOnlyHint: false, destructiveHint: false } },
+      async (args) => {
+        seenArgs.push({ tool: "add_memory", ...args })
+        return { content: [{ type: "text", text: "queued" }] }
+      },
+    )
+    for (const name of ["search_memories", "ask_memory", "get_profile", "list_memories"]) {
+      server.registerTool(name, { inputSchema: { query: z.string().optional(), container }, annotations: { readOnlyHint: true } }, async (args) => {
+        seenArgs.push({ tool: name, ...args })
+        return { content: [{ type: "text", text: `${name} ok` }] }
+      })
+    }
+    server.registerTool("purge_container", { inputSchema: { container } }, async () => ({ content: [{ type: "text", text: "purged" }] }))
+  }
+}
+
+type FakeOpts = { profileDelayMs?: number; profile?: Record<string, unknown> }
+
+async function fakeRecall(opts: FakeOpts = {}) {
+  const seen: Seen[] = []
+  const toolArgs: Record<string, unknown>[] = []
+  const send = (res: http.ServerResponse, status: number, body: unknown) => {
+    res.writeHead(status, { "content-type": "application/json" })
+    res.end(JSON.stringify(body))
+  }
+  const server = await startMcpServer({
+    token: KEY,
+    register: registerRecallTools(toolArgs),
+    rest: async (req, res, raw) => {
+      const url = new URL(req.url ?? "/", "http://x")
+      seen.push({ method: req.method ?? "", path: `${url.pathname}${url.search}`, auth: req.headers.authorization, body: raw ? JSON.parse(raw) : undefined })
+      if (url.pathname === "/health") return send(res, 200, { ok: true, vec: "v0.1" }), true
+      if (req.headers.authorization !== `Bearer ${KEY}`) return send(res, 401, { error: { type: "unauthorized", message: "missing or invalid API key" } }), true
+      if (url.pathname === "/v1/containers") {
+        return send(res, 200, { containers: [{ container: "default", memories: 3, documents: 1, lastActivity: 1 }, { container: "zaki", memories: 9, documents: 2, lastActivity: 2 }] }), true
+      }
+      if (url.pathname === "/v1/profile") {
+        if (opts.profileDelayMs) await new Promise((r) => setTimeout(r, opts.profileDelayMs))
+        if (res.destroyed) return true
+        return (
+          send(
+            res,
+            200,
+            opts.profile ?? {
+              container: url.searchParams.get("container"),
+              static: "Zaki lives in Banjarbaru.",
+              dynamic: "Building Palui.",
+              updatedAt: 1,
+              staticMemories: [],
+              dynamicMemories: [],
+              searchResults: [{ type: "memory", id: "m1", text: "Likes kopi susu", score: 0.9 }],
+            },
+          ),
+          true
+        )
+      }
+      if (url.pathname === "/v1/memories" && req.method === "POST") {
+        const b = JSON.parse(raw) as { container: string; source_id?: string }
+        return send(res, 202, { id: "doc_1", container: b.container, status: "queued", sourceId: b.source_id ?? null, duplicate: false }), true
+      }
+      if (url.pathname.startsWith("/v1/memories/") && req.method === "DELETE") {
+        const id = decodeURIComponent(url.pathname.split("/").pop() ?? "")
+        if (id !== "mem_1") return send(res, 404, { error: { type: "not_found", message: "no such memory" } }), true
+        return send(res, 200, { memory: { id, fact: "Old fact" } }), true
+      }
+      return false
+    },
+  })
+  const base = server.url.replace(/\/mcp$/, "")
+  return { server, base, seen, toolArgs }
+}
+
+type Config = ConfigOf<typeof manifest>
+const cfg = (url: string, extra: Partial<Config> = {}): Config => manifest.config.parse({ url, container: "zaki", ...extra })
+
+let srv: TestMcpServer | undefined
+afterEach(async () => {
+  await srv?.close()
+  srv = undefined
+})
+
+async function exec(t: PaluiTool | undefined, input: unknown) {
+  if (!t?.tool.execute) throw new Error("tool missing")
+  return t.tool.execute(input, { toolCallId: "c1", messages: [] } as never)
+}
+
+describe("recall manifest", () => {
+  it("applies defaults", () => {
+    expect(manifest.config.parse({})).toEqual({ url: "http://host.docker.internal:4800", container: "default", autoRecall: true, autoSave: true })
+    expect(manifest.secrets.apiKey.safeParse("rcl_abc").success).toBe(true)
+    expect(manifest.secrets.apiKey.safeParse("sk-abc").success).toBe(false)
+  })
+})
+
+describe("recall test()", () => {
+  it("checks /health then lists containers", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const res = await runtime.test(fakeCtx(cfg(f.base), { apiKey: KEY }))
+    expect(res.ok).toBe(true)
+    expect(res.detail).toBe("Connected, 2 containers")
+    expect((res.data?.containers as { container: string }[]).map((c) => c.container)).toEqual(["default", "zaki"])
+    expect(f.seen.map((s) => s.path)).toEqual(["/health", "/v1/containers"])
+  })
+
+  it("explains a bad key and an unreachable server", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    expect(await runtime.test(fakeCtx(cfg(f.base), { apiKey: "rcl_wrong" }))).toEqual({ ok: false, detail: "recall rejected the API key (401)" })
+    const down = await runtime.test(fakeCtx(cfg("http://127.0.0.1:1"), { apiKey: KEY }))
+    expect(down.ok).toBe(false)
+    expect(down.detail).toMatch(/Can't reach recall/)
+  })
+})
+
+describe("recall runtime", () => {
+  it("classes MCP tools, adds forget_memory, and defaults the container", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const running = await runtime.start(fakeCtx(cfg(f.base), { apiKey: KEY }))
+    try {
+      const tools = await running.tools!(turn)
+      expect(Object.fromEntries(Object.entries(tools).map(([k, v]) => [k, v.class]))).toEqual({
+        forget_memory: "destructive",
+        add_memory: "write",
+        search_memories: "read",
+        ask_memory: "read",
+        get_profile: "read",
+        list_memories: "read",
+        purge_container: "destructive",
+      })
+      expect(Object.values(tools).every((t) => !t.untrusted)).toBe(true)
+
+      await exec(tools.search_memories, { query: "kopi" })
+      await exec(tools.add_memory, { content: "x", container: "other" })
+      expect(f.toolArgs).toEqual([
+        { tool: "search_memories", query: "kopi", container: "zaki" },
+        { tool: "add_memory", content: "x", container: "other" },
+      ])
+
+      expect(await exec(tools.forget_memory, { id: "mem_1" })).toEqual({ forgotten: true, id: "mem_1", fact: "Old fact" })
+      expect(await exec(tools.forget_memory, { id: "nope" })).toMatchObject({ forgotten: false })
+      expect(f.seen.filter((s) => s.method === "DELETE").map((s) => s.path)).toEqual(["/v1/memories/mem_1", "/v1/memories/nope"])
+
+      expect(await running.action!("listContainers", {})).toMatchObject({ containers: [{ container: "default" }, { container: "zaki" }] })
+    } finally {
+      await running.stop()
+    }
+  })
+
+  it("recall() returns the profile text for the configured container", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const running = await runtime.start(fakeCtx(cfg(f.base), { apiKey: KEY }))
+    const text = await running.memory!.recall("what do I usually drink in the morning", { timeoutMs: 1500 })
+    expect(text).toContain("About the owner: Zaki lives in Banjarbaru.")
+    expect(text).toContain("- Likes kopi susu")
+    const call = f.seen.find((s) => s.path.startsWith("/v1/profile"))
+    expect(call?.path).toBe("/v1/profile?container=zaki&q=what+do+I+usually+drink+in+the+morning")
+    // Commands and short messages are skipped without a request.
+    expect(await running.memory!.recall("/status", { timeoutMs: 1500 })).toBeNull()
+    expect(await running.memory!.recall("halo", { timeoutMs: 1500 })).toBeNull()
+    expect(f.seen.filter((s) => s.path.startsWith("/v1/profile"))).toHaveLength(1)
+    expect(running.live!()).toMatchObject({ recall: { calls: 1, hits: 1, skippedShort: 2, skipRate: 0 } })
+    await running.stop()
+  })
+
+  it("recall() gives up with null on timeout", async () => {
+    const f = await fakeRecall({ profileDelayMs: 500 })
+    srv = f.server
+    const running = await runtime.start(fakeCtx(cfg(f.base), { apiKey: KEY }))
+    const started = Date.now()
+    expect(await running.memory!.recall("tell me about my plans for this week", { timeoutMs: 50 })).toBeNull()
+    expect(Date.now() - started).toBeLessThan(400)
+    expect(running.live!()).toMatchObject({ recall: { calls: 1, timeouts: 1, skipRate: 1 } })
+    await running.stop()
+  })
+
+  it("save() posts to /v1/memories with the container and source_id", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const running = await runtime.start(fakeCtx(cfg(f.base, { autoSave: false }), { apiKey: KEY }))
+    expect(running.memory!.autoSave).toBe(false)
+    expect(running.memory!.autoRecall).toBe(true)
+    await running.memory!.save({ sourceId: "ses_1:0-40", content: "Zaki: aku suka kopi\nPalui: noted", title: "Chat 10 Nov" })
+    await running.memory!.save({ sourceId: "ses_1:41-50", content: "   " })
+    const posts = f.seen.filter((s) => s.method === "POST")
+    expect(posts).toHaveLength(1)
+    expect(posts[0]?.body).toEqual({ container: "zaki", content: "Zaki: aku suka kopi\nPalui: noted", title: "Chat 10 Nov", source_id: "ses_1:0-40" })
+    await running.stop()
+  })
+
+  it("start() fails when recall is unreachable", async () => {
+    await expect(runtime.start(fakeCtx(cfg("http://127.0.0.1:1"), { apiKey: KEY }))).rejects.toThrow(/Can't reach recall/)
+  })
+})
+
+describe("helpers", () => {
+  it("shouldRecall skips commands and short messages", () => {
+    expect(shouldRecall("/new")).toBe(false)
+    expect(shouldRecall("apa kabar")).toBe(false)
+    expect(shouldRecall("ingat nggak aku suka apa")).toBe(true)
+  })
+
+  it("profileText falls back to facts and returns null when empty", () => {
+    expect(profileText({ container: "c", static: "", dynamic: "", updatedAt: null, staticMemories: [], dynamicMemories: [] })).toBeNull()
+    expect(
+      profileText({ container: "c", static: "", dynamic: "", updatedAt: null, staticMemories: [{ id: "1", fact: "Has a cat" }], dynamicMemories: [] }),
+    ).toBe("Facts about the owner:\n- Has a cat")
+  })
+
+  it("normalizeSourceId hashes ids over 200 characters", () => {
+    expect(normalizeSourceId("ses_1:0-40")).toBe("ses_1:0-40")
+    const long = normalizeSourceId("x".repeat(300))
+    expect(long).toMatch(/^palui:[0-9a-f]{64}$/)
+    expect(long.length).toBeLessThanOrEqual(200)
+  })
+
+  it("RecallApi strips trailing slashes", () => {
+    expect(new RecallApi("http://r:4800///", KEY).mcpUrl).toBe("http://r:4800/mcp")
+  })
+})

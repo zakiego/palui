@@ -1,0 +1,20 @@
+{
+  "name": "palui",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @palui/app dev",
+    "dev:runtime": "pnpm --filter @palui/runtime dev",
+    "build": "pnpm -r --workspace-concurrency=2 build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "cli": "pnpm --filter @palui/app cli",
+    "site:dev": "pnpm --filter @palui/site dev",
+    "site:build": "pnpm --filter @palui/site build",
+    "eval:reminders": "pnpm --filter @palui/core eval:reminders"
+  }
+}

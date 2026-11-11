@@ -1,0 +1,31 @@
+// Every connector runtime, keyed by manifest id. Imported by the runtime only.
+import type { AnyRuntime } from "@palui/core/saklar/define"
+import aiGateway from "./ai-gateway/runtime"
+import cliproxy from "./cliproxy/runtime"
+import gcal from "./gcal/runtime"
+import hooks from "./hooks/runtime"
+import jobs from "./jobs/runtime"
+import mcp from "./mcp/runtime"
+import recall from "./recall/runtime"
+import reminders from "./reminders/runtime"
+import telegram from "./telegram/runtime"
+import voice from "./voice/runtime"
+import web from "./web/runtime"
+import webfetch from "./webfetch/runtime"
+import whatsapp from "./whatsapp/runtime"
+
+export const runtimes: Record<string, AnyRuntime> = {
+  telegram,
+  whatsapp,
+  web,
+  cliproxy,
+  "ai-gateway": aiGateway,
+  recall,
+  mcp,
+  gcal,
+  reminders,
+  jobs,
+  voice,
+  webfetch,
+  hooks,
+}

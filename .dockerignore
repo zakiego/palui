@@ -1,0 +1,34 @@
+# The build context is the monorepo root. Only apps/app, apps/runtime and packages/* go into the image;
+# the site and the edge worker contribute just their package.json, because
+# pnpm needs every workspace manifest to install from the shared lockfile.
+# Patterns are anchored to the root, so nested ones need **/.
+.git
+**/node_modules
+**/.next
+**/out
+**/.output
+**/.nitro
+**/.tanstack
+**/.vite
+**/.source
+**/dist
+**/build
+**/.turbo
+**/.vercel
+**/.wrangler
+**/coverage
+**/*.log
+**/.env
+**/.env.*
+.DS_Store
+**/data
+docs
+ops
+scripts
+**/eval/last-run.txt
+**/*.test.ts
+apps/runtime/dist
+apps/site/*
+!apps/site/package.json
+apps/edge/*
+!apps/edge/package.json

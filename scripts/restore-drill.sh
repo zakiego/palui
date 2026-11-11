@@ -1,0 +1,178 @@
+#!/bin/bash
+# Restore drill: prove last night's backup can actually be restored.
+#
+#   scripts/restore-drill.sh                 newest palui-*.db.gz.age in R2 (last 7 days)
+#   scripts/restore-drill.sh <file>          a local .db.gz.age, .db.gz or .db
+#
+#   1. fetch the backup (or take the local file) into a private temp dir
+#   2. decrypt it with age, using the identity from the Keychain
+#      (`security find-generic-password -w`, never written to disk)
+#   3. restore it into a scratch compose project, `palui-drill`, with its own
+#      volume and the app on 127.0.0.1:4899. Only the app runs: starting the
+#      runtime would open a second Telegram poller and a second WhatsApp
+#      session against the real bot.
+#   4. wait for /health to answer 200, then run
+#      `cli.mjs secrets-check --require-some`, which decrypts every connector
+#      and hook secret with MASTER_KEY and exits non-zero on any failure, or
+#      when there was nothing to decrypt (an empty DB proves nothing)
+#   5. tear the drill project down with its volume, whatever happened
+#
+# Prints PASS or FAIL as the last line and exits 0 or 1.
+#
+# Needs: docker, age, MASTER_KEY in the environment (the production key: the
+# point is to prove the backup and the key still go together), and the image
+# already built on this host (palui:latest, or PALUI_IMAGE).
+set -euo pipefail
+
+BUCKET="${BACKUP_BUCKET:-palui-backups}"
+CF="${CF_WRAPPER:-$HOME/.agents/skills/cf-zakiego-lab/scripts/cf-zakiego-lab}"
+KEYCHAIN_SERVICE="${AGE_KEYCHAIN_SERVICE:-palui-backup-age-identity}"
+IMAGE="${PALUI_IMAGE:-palui:latest}"
+PROJECT="palui-drill"
+PORT="${DRILL_PORT:-4899}"
+# The port the app listens on inside the container.
+APP_PORT="${PALUI_APP_PORT:-3000}"
+HEALTH_TIMEOUT="${DRILL_HEALTH_TIMEOUT:-120}"
+LOOKBACK_DAYS=7
+
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+for d in "$HOME"/.nvm/versions/node/*/bin; do
+  [ -x "$d/cf" ] && CF_NODE_BIN="$d"
+done
+[ -n "${CF_NODE_BIN:-}" ] && export PATH="$CF_NODE_BIN:$PATH"
+
+log() { echo "[restore-drill] $*"; }
+
+tmpdir=""
+compose_file=""
+drill() { docker compose -p "$PROJECT" -f "$compose_file" "$@"; }
+
+finish() {
+  status=$?
+  if [ -n "$compose_file" ] && [ -f "$compose_file" ]; then
+    log "tearing down $PROJECT"
+    drill down -v --remove-orphans >/dev/null 2>&1 || log "WARNING: teardown failed, run: docker compose -p $PROJECT down -v"
+  fi
+  [ -n "$tmpdir" ] && rm -rf "$tmpdir"
+  if [ "$status" -eq 0 ]; then echo "PASS"; else echo "FAIL"; fi
+}
+trap finish EXIT
+
+command -v docker >/dev/null || { log "docker not found"; exit 1; }
+[ -n "${MASTER_KEY:-}" ] || { log "MASTER_KEY isn't set. Export the production key first (from your password manager)."; exit 1; }
+docker image inspect "$IMAGE" >/dev/null 2>&1 || { log "image $IMAGE not found on this host (set PALUI_IMAGE)"; exit 1; }
+if lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  log "port $PORT is already in use"
+  exit 1
+fi
+
+tmpdir=$(mktemp -d /tmp/palui-drill.XXXXXX)
+chmod 700 "$tmpdir"
+
+# --- 1. get the backup --------------------------------------------------------
+if [ $# -ge 1 ]; then
+  src="$1"
+  [ -f "$src" ] || { log "no such file: $src"; exit 1; }
+  log "using local file $src"
+else
+  [ -x "$CF" ] || { log "cf wrapper not found at $CF"; exit 1; }
+  command -v cf >/dev/null || { log "cf CLI not found"; exit 1; }
+  key=""
+  # Keys are palui/YYYY-MM-DD/palui-<ts>.db.gz.age, so walking back day by day
+  # and taking the highest name finds the newest without paging the bucket.
+  for i in $(seq 0 $((LOOKBACK_DAYS - 1))); do
+    day=$(date -v-"${i}"d +%Y-%m-%d)
+    key=$("$CF" r2 objects list --bucket-name "$BUCKET" --prefix "palui/$day/palui-" \
+      | python3 -c 'import json,sys
+d = json.load(sys.stdin)
+items = d if isinstance(d, list) else d.get("objects", d.get("result", []))
+keys = sorted(o.get("key", "") for o in items if o.get("key", "").endswith(".db.gz.age"))
+print(keys[-1] if keys else "")')
+    [ -n "$key" ] && break
+  done
+  [ -n "$key" ] || { log "no database backup in r2://$BUCKET/palui/ in the last $LOOKBACK_DAYS days"; exit 1; }
+  src="$tmpdir/$(basename "$key")"
+  log "fetching r2://$BUCKET/$key"
+  "$CF" r2 objects get "$key" --bucket-name "$BUCKET" > "$src"
+  log "fetched $(stat -f %z "$src") bytes"
+fi
+
+# --- 2. decrypt and unpack ----------------------------------------------------
+work="$src"
+case "$work" in
+  *.age)
+    command -v age >/dev/null || { log "age not found (brew install age)"; exit 1; }
+    out="$tmpdir/$(basename "${work%.age}")"
+    # The identity goes through a pipe, never a file.
+    age -d -i <(security find-generic-password -s "$KEYCHAIN_SERVICE" -w) -o "$out" "$work"
+    work="$out"
+    log "decrypted"
+    ;;
+esac
+case "$work" in
+  *.gz)
+    gzip -t "$work"
+    gunzip -c "$work" > "$tmpdir/palui.db"
+    work="$tmpdir/palui.db"
+    ;;
+  *.db) cp "$work" "$tmpdir/palui.db"; work="$tmpdir/palui.db" ;;
+  *) log "don't know how to restore $work (want .db.gz.age, .db.gz or .db)"; exit 1 ;;
+esac
+log "database $(stat -f %z "$work") bytes"
+
+# --- 3. scratch compose project -----------------------------------------------
+# Its own file, not compose.yaml plus an override: overrides append ports, so
+# the production port would come along. MASTER_KEY reaches the container from
+# this process's environment and is never written into the file.
+compose_file="$tmpdir/compose.drill.yaml"
+cat > "$compose_file" <<YAML
+name: $PROJECT
+services:
+  app:
+    image: $IMAGE
+    pull_policy: never
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /data
+      PORT: "$APP_PORT"
+      APP_URL: http://127.0.0.1:$PORT
+      MASTER_KEY: \${MASTER_KEY:?MASTER_KEY is required}
+      BETTER_AUTH_SECRET: drill-$(openssl rand -hex 16)
+    ports:
+      - "127.0.0.1:$PORT:$APP_PORT"
+    volumes:
+      - data:/data
+volumes:
+  data:
+YAML
+
+log "restoring into volume ${PROJECT}_data"
+drill create app >/dev/null
+# Copy the file in as root, then hand it to whoever owns /data in the image.
+docker run --rm --user root --entrypoint sh \
+  -v "${PROJECT}_data:/data" -v "$tmpdir:/restore:ro" "$IMAGE" \
+  -c 'cp /restore/palui.db /data/palui.db && chown "$(stat -c %u:%g /data)" /data/palui.db'
+
+log "starting the app on 127.0.0.1:$PORT"
+drill up -d app >/dev/null
+
+# --- 4. checks ----------------------------------------------------------------
+deadline=$((SECONDS + HEALTH_TIMEOUT))
+code=""
+until [ "$code" = "200" ]; do
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    log "/health didn't answer 200 within ${HEALTH_TIMEOUT}s (last: ${code:-no answer})"
+    drill logs --tail 50 app || true
+    exit 1
+  fi
+  sleep 2
+  code=$(curl -s -o "$tmpdir/health.json" -w '%{http_code}' -m 5 "http://127.0.0.1:$PORT/health" || true)
+done
+log "/health is green: $(head -c 300 "$tmpdir/health.json")"
+
+log "checking that every connector and hook secret decrypts"
+if ! drill exec -T app node .output/server/cli.mjs secrets-check --require-some; then
+  log "secrets-check failed: the backup has no secrets, or it and this MASTER_KEY don't go together"
+  exit 1
+fi
+log "secrets-check passed"

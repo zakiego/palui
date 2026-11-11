@@ -1,0 +1,45 @@
+---
+title: Channels
+description: Channels are the connectors you talk to Palui through. v1 ships Telegram, WhatsApp and the dashboard web chat, DMs only.
+---
+
+A channel is a connector of kind `channel`. It receives your messages, hands them to the runtime, and sends replies, reminders and approval prompts back. v1 has three:
+
+| Channel | How it connects | Notes |
+|---|---|---|
+| [Telegram](/docs/connectors/telegram) | Bot token from @BotFather, long polling | The most reliable channel. Inline buttons for reminders, approvals and `/saklar`. |
+| [WhatsApp](/docs/connectors/whatsapp) | Linked device, paired by phone-number code or QR | Uses an unofficial library. Keep volume low. |
+| [Web chat](/docs/connectors/web-chat) | Built into the dashboard | For testing without a phone. Streams replies and shows tool calls. |
+
+All three go through the same router and the same agent turn. A reply always goes back to the chat the message came from.
+
+## Owner only
+
+Palui has one owner. Each channel learns who that is when you connect it:
+
+- Telegram: you open a one-time `t.me` link with a nonce and press Start. Only that `/start` claims the owner.
+- WhatsApp: you enter your phone number in the wizard. Palui also learns your WhatsApp LID from your first DM and stores both.
+- Web chat: you're signed in to the dashboard with your passkey.
+
+Messages from anyone else are dropped silently. Palui never replies to them, and the reason is logged as a sentence. Messages the bot sent itself (`fromMe` on WhatsApp) are dropped too.
+
+## DMs only in v1
+
+v1 answers direct messages only. Group chats are planned: the code path exists, but the UI is hidden and it's not supported in v1.
+
+## When a channel is paused or removed
+
+- Paused: replies and reminders waiting in the outbox stay there without using up retry attempts. They send when you resume.
+- Removed: waiting rows go to the fallback channel if one is on. Otherwise they're cancelled and an event is logged.
+- Reminder fallback: after 2 failed send attempts, a reminder can fall back to your other channel. It's a setting.
+- You can't switch off the channel you're typing from unless another channel or the dashboard is reachable. See [Chat commands](/docs/chat-commands).
+
+## Media
+
+Telegram accepts photos (read with the `vision` model role), voice messages (transcribed by [Voice-in](/docs/connectors/voice-in)) and small documents (text extracted). Palui replies with text only. Voice replies are planned, not in v1.
+
+## Dev versus prod
+
+A Telegram bot token can only have one long-polling consumer, so a dev instance needs its own bot token. In dev mode Palui refuses to start a channel whose token matches the production one.
+
+Next: [Chats and sessions](/docs/concepts/chats-and-sessions) covers what happens to a message after it arrives.

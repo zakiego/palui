@@ -1,0 +1,70 @@
+---
+title: Reminders
+description: Set reminders in plain language, get them on time in the right timezone, and never lose one to a restart or a failed send.
+---
+
+Reminders are the feature most likely to be judged by their failures, so they're built to survive restarts, deploys and failed sends.
+
+## Setting a reminder
+
+Ask in chat, in Indonesian or English:
+
+```text
+ingetin bayar listrik besok jam 9
+remind me every Monday 8am to send the report
+```
+
+(The first one means "remind me to pay the electricity bill tomorrow at 9".) You can also use the New reminder dialog on the Reminders page, which takes the same natural language and previews the parsed time as you type.
+
+Palui always echoes back the time it understood, so a wrong parse shows right away:
+
+```text
+Besok, Rabu 11 Nov, 09.00 WITA
+```
+
+## Tools
+
+The [Reminders connector](/docs/connectors/reminders) gives the model five tools:
+
+| Tool | What it does |
+|---|---|
+| `ingatkan` | Create a reminder |
+| `daftar_pengingat` | List reminders |
+| `ubah_pengingat` | Change a reminder |
+| `batal_pengingat` | Cancel a reminder |
+| `tunda_pengingat` | Snooze a reminder |
+
+## Time zones and recurrence
+
+- The default zone is `Asia/Makassar` (WITA). You can change it in Settings.
+- Each reminder stores its own IANA zone, so "09.00" stays 09.00 in that zone even across daylight saving changes.
+- Recurring reminders use one grammar, RRULE. The next occurrence is computed in wall-clock time in the stored zone.
+
+## Delivery
+
+A due reminder becomes an outbox row. It's marked sent only after the channel acknowledges it. A failed send retries with backoff for up to 24 h. After 2 failed attempts it can fall back to your other channel (a setting).
+
+If Palui was down when a reminder was due, it fires once on start with a note:
+
+```text
+Bayar listrik (telat, harusnya 09.00)
+```
+
+("telat, harusnya 09.00" means "late, it was due at 09.00".) A recurring reminder that missed several runs fires once, not once per missed run.
+
+## Done and snooze
+
+Each reminder offers Done and Snooze for 10m, 1h or tomorrow 09.00.
+
+- Telegram: inline buttons under the reminder.
+- WhatsApp: reply to the reminder (quote it) with "done" or "tunda 1j" (snooze 1 hour).
+
+## Plain and smart reminders
+
+A plain reminder never calls the model. It sends its text at the due time, so it keeps working even when every model connector is paused.
+
+A smart reminder runs a prompt at fire time instead, for example "check the weather and tell me whether to bring an umbrella". It needs a model connector that's on.
+
+## Pausing the Reminders connector
+
+Pausing it hides the reminder tools from the model. Reminders you've already set still fire. The card says so.

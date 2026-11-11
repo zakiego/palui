@@ -1,0 +1,38 @@
+---
+title: Chats and sessions
+description: How a message moves from a channel through the inbox, router, queue and turn to the outbox, and how sessions and compaction work.
+---
+
+A chat is one conversation on one channel: your Telegram DM with the bot, your WhatsApp DM, the "Palui (web)" chat in the dashboard, or the chat an [inbound webhook](/docs/connectors/webhooks) posts into. The Chats page lists every chat across channels, with the transcript, inline tool calls and any pending approvals.
+
+A session is the current stretch of a chat that the model sees. Each chat has one active session.
+
+## A message, end to end
+
+<MessageFlowDiagram>
+  A message arrives from a channel and is written to the inbox in the messages table with status pending. The router reads it, checks that the sender is the owner, handles commands, and matches answers to pending approvals. Anything left goes into the chat's queue, which runs one turn at a time. The turn builds context, then runs the model loop with tools. The reply is written to the outbox, and the outbox worker sends it on the channel and marks it sent once the channel acknowledges it.
+</MessageFlowDiagram>
+
+1. Inbox. Every inbound message is written to the database with status `pending` before the channel handler returns. Pending rows are replayed on start, so a message sent in the middle of a deploy still gets an answer.
+2. Router. It identifies the channel and sender. Non-owners are dropped. Commands (`/new`, `/stop`, `/status`, `/saklar`) and approval answers are handled here and never reach the model.
+3. Per-chat queue. One turn at a time per chat. Messages that arrive mid-turn are batched into the next turn.
+4. Context. Your persona, the current date and time (WITA by default), the list of enabled capabilities, your recall profile, and the session.
+5. Model loop. The model runs with tools from every enabled connector, within the [turn budget](/docs/concepts/tool-classes#budgets). A tool that needs approval ends the turn and saves it (see [Approvals](/docs/concepts/approvals)).
+6. Reply. The reply goes to the outbox, split and formatted for the channel.
+7. Bookkeeping. Tokens, tool calls and duration are recorded as a run, visible on the Activity page.
+
+## What the model sees
+
+The session part of the context is a summary plus the last 30 messages.
+
+Past about 40 messages, compaction runs: the `fast` model role writes a summary, and older messages leave the context. They stay in the database and on the Chats page. If [recall auto-save](/docs/concepts/memory) is on, it runs at this point too.
+
+## Starting fresh with /new
+
+`/new` closes the current session and starts an empty one in the same chat. Auto-save to recall runs for the session you just closed.
+
+## Delivery
+
+Delivery is at least once. A reply or reminder is an outbox row, and it's marked `sent` only after the channel acknowledges it. Rows stuck in `sending` for more than 5 minutes go back to `pending` and are retried. A rare duplicate is possible. A lost message isn't supposed to be.
+
+On shutdown the runtime drains: it stops taking new turns, finishes the current step and releases its outbox claims. Together with the durable inbox, that's why a deploy doesn't drop messages. See [Upgrades](/docs/self-hosting/upgrades).

@@ -1,0 +1,46 @@
+---
+title: Tunnel
+description: How requests reach the app through a Cloudflare Worker and a tunnel, and how containers reach services on the Docker host.
+---
+
+The app listens only on the Docker host's loopback interface. Nothing on the host is opened to the internet. Public traffic arrives through a Cloudflare Tunnel, with a small Worker in front that splits the app from the docs site.
+
+## Edge routing
+
+<EdgeRoutingDiagram>
+  A request to your domain first hits a Cloudflare Worker. Requests for /app, /api and /health are sent through your tunnel to the app on the Docker host. Every other path is served by Cloudflare Pages, which hosts this documentation site.
+</EdgeRoutingDiagram>
+
+| Path | Goes to |
+|---|---|
+| `/app` | The app (dashboard) through the tunnel |
+| `/api`, including `/api/auth` and `/api/hooks` | The app through the tunnel |
+| `/health` | The app through the tunnel |
+| Everything else | Cloudflare Pages (the landing page and these docs) |
+
+The landing page and docs are indexable. The app's routes are `noindex`. On your own instance, use your own domain in place of `palui.zakiego.com`, and set `APP_URL` in `.env` to match.
+
+## The tunnel rule
+
+The tunnel needs one rule: forward to the app's loopback port on the Docker host. With `cloudflared`, that's one ingress entry:
+
+```yaml
+ingress:
+  - hostname: <your-tunnel-hostname>
+    service: http://127.0.0.1:4802
+  - service: http_status:404
+```
+
+Use the port your `compose.yaml` binds the app to. The runtime needs no tunnel rule: it only talks to the app over the compose network and makes outbound connections to Telegram and WhatsApp.
+
+## Reaching services on the Docker host
+
+Model providers and recall usually run on the same machine as Palui. From inside a container, reach them through `host.docker.internal`, not through their public hostnames. That skips the tunnel and Cloudflare's 100 s request limit, which a long model call can hit.
+
+| Service | Default URL in the connector |
+|---|---|
+| CLIProxyAPI | `http://host.docker.internal:8317` |
+| ai-gateway | `http://host.docker.internal:8793` |
+| recall | `http://host.docker.internal:4800` |
+
+These are the connector defaults. Change them in each connector's settings if your services listen elsewhere.

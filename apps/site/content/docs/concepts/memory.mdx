@@ -1,0 +1,37 @@
+---
+title: Memory
+description: Palui uses recall as long-term memory, with memory tools, optional auto-recall before a turn and auto-save at compaction.
+---
+
+Palui's long-term memory is [recall](/docs/connectors/recall), connected as a `memory` connector. Within a chat, the session (a summary plus the last 30 messages) is short-term memory. recall is what carries facts across sessions and chats.
+
+There are three ways memory gets used.
+
+## Memory tools
+
+The recall connector mounts recall's own MCP endpoint, so the model can call `add_memory`, `search_memories`, `ask_memory`, `get_profile` and `list_memories` when you ask it to remember or look something up. Forgetting a memory is a separate tool classed `destructive`, so it always asks first (see [Approvals](/docs/concepts/approvals)).
+
+## Auto-recall
+
+When the Auto-recall switch is on, Palui asks recall for your profile, matched against your message, before each turn. The result goes into the turn's context.
+
+- Timeout: 1.5 s. If recall doesn't answer in time, the turn goes on without memory.
+- Skipped for commands and for messages under 4 words.
+- The recall card shows the skip rate, for example "skipped 4 of last 20".
+
+## Auto-save
+
+When the Auto-save switch is on, Palui saves to recall at session compaction (past about 40 messages) and when you send `/new`.
+
+What gets saved: your own messages and the final replies.
+
+What's never saved:
+
+- Tool output. Results from MCP servers, web fetch or any other tool never go into recall. That keeps a poisoned tool result from becoming a permanent memory that auto-recall would feed back into every later turn.
+- Tainted turns. A turn that read untrusted content (web fetch, a webhook payload, an `external` MCP server) is skipped entirely. See [The taint rule](/docs/concepts/taint-rule).
+
+Each save carries a source id built from the session and the message range, so saving the same slice twice doesn't create duplicates.
+
+## Turning it off
+
+Each switch is separate: you can keep the memory tools and turn off auto-recall, or the reverse. Pausing the recall connector removes all three from the next turn on. See [Saklar](/docs/concepts/saklar).

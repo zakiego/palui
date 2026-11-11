@@ -1,0 +1,46 @@
+---
+title: Tool classes
+description: Every tool is classed read, write or destructive. The class decides when Palui asks first, and unknown tools fail closed.
+---
+
+Every tool the model can call has a class. The class decides whether the tool runs right away or asks you first.
+
+| Class | Meaning | Examples |
+|---|---|---|
+| `read` | Looks things up, changes nothing | search memories, list tasks, fetch a page |
+| `write` | Creates or changes something | add a memory, create a task, send a message |
+| `destructive` | Deletes or can't be undone | forget a memory, delete a record |
+
+## Fail closed
+
+A tool with no class is treated as `destructive`. For MCP servers, the tool's `readOnlyHint` and `destructiveHint` prefill the class, and you can change it per tool in the connector sheet. Anything left unknown stays `destructive`.
+
+## When a tool needs approval
+
+| Class | Normal turn | Tainted turn | Scheduled job | Webhook summary |
+|---|---|---|---|---|
+| `read` | Runs | Runs | Runs | No tools |
+| `write` | Runs | Needs approval | Needs approval | No tools |
+| `destructive` | Needs approval | Needs approval | Not available | No tools |
+
+A tainted turn is one that has read untrusted content. See [The taint rule](/docs/concepts/taint-rule). Webhook summaries run with zero tools. See [Inbound webhooks](/docs/connectors/webhooks). How approval works is on [Approvals](/docs/concepts/approvals).
+
+## Per-tool switches
+
+For MCP servers, each tool has its own Switch next to its class. "Enable all read tools" turns on every `read` tool in one go. A tool that's off is never offered to the model.
+
+## Namespacing
+
+Tool names the model sees are namespaced as `<connectorId>__<tool>`, so two servers can both have a `search` tool without clashing. For example, recall's search tool is `recall__search_memories`. MCP server instances get ids like `mcp-<slug>`, so their tools look like `mcp-notes__search`.
+
+## Budgets
+
+Each turn has limits:
+
+- 12 model steps at most.
+- 120 s of wall-clock time.
+- About 30 tools at most. When more are enabled, the most relevant connectors go first.
+
+There are also global caps: a daily token cap, a per-job daily token cap, and at most 60 runs per hour. Hitting a cap pauses turns and tells you on your channel.
+
+`/stop` aborts the running turn. `/status` shows the model, tokens used today and connector states. See [Chat commands](/docs/chat-commands).

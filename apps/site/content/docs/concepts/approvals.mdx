@@ -1,0 +1,40 @@
+---
+title: Approvals
+description: Risky tool calls wait for your yes. Pending approvals are saved, survive restarts, and turn into a denial after 10 minutes.
+---
+
+Some tool calls need your yes before they run. Which ones depends on the [tool class](/docs/concepts/tool-classes):
+
+- `destructive` tools always need approval.
+- `write` tools need approval in [tainted turns](/docs/concepts/taint-rule) and in [scheduled jobs](/docs/concepts/jobs).
+
+## How it works
+
+<ApprovalDiagram>
+  The model calls a tool that needs approval. The turn ends instead of waiting, and the request is saved as a pending approval. You get a prompt on your channel. Your answer, ya or batal or a button press, resumes the turn: approved tools run and the model carries on. If you don't answer within 10 minutes, the turn resumes with a denial.
+</ApprovalDiagram>
+
+1. The model asks to call a tool that needs approval.
+2. The turn ends right there. The request and the conversation so far are saved as a pending approval, and the chat's queue is freed, so the chat isn't blocked while you think.
+3. You get a prompt that names the tool and what it will do.
+4. Your answer resumes the turn with a new model call that carries your decision. If you approved, the tool runs. If you denied, the model is told and can reply accordingly.
+
+Because the pending approval lives in the database, it survives a restart or a deploy. You can answer after Palui comes back up.
+
+## Answering
+
+| Where | Approve | Deny |
+|---|---|---|
+| Telegram | The approve button | The deny button |
+| WhatsApp | Reply `ya` (yes) | Reply `batal` (cancel) |
+| Dashboard | Approve on the Chats page | Deny on the Chats page |
+
+The answer is matched by the router before the model sees anything. A "ya" that answers an approval isn't sent to the model as a message.
+
+## Expiry
+
+A pending approval expires after 10 minutes. The turn then resumes with a denial, so the model can close the loop ("OK, I didn't delete it") instead of leaving the conversation hanging.
+
+## Why not just a confirmation in the prompt
+
+Telling the model "ask before deleting" is a label in the prompt, and a prompt injection can talk the model out of it. Approvals are enforced by the runtime: the tool call physically doesn't run until you answer.

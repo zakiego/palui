@@ -1,0 +1,19 @@
+{
+  "title": "Connectors",
+  "pages": [
+    "index",
+    "telegram",
+    "whatsapp",
+    "web-chat",
+    "cliproxy",
+    "ai-gateway",
+    "recall",
+    "mcp",
+    "reminders",
+    "jobs",
+    "voice-in",
+    "web-fetch",
+    "webhooks",
+    "google-calendar"
+  ]
+}

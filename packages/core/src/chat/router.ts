@@ -1,0 +1,131 @@
+// The router (PLAN 8.2): decides what an inbound message is before any model
+// sees it. Order: sender checks, hook events, approval answers, commands,
+// reminder actions, then a turn.
+import { and, eq, like } from "drizzle-orm"
+import { outbox, pendingApprovals, type DB } from "@palui/db"
+import { pendingForChat } from "../approvals/store"
+import type { ChatRow } from "../chats"
+import { isOwner } from "../owner"
+import type { InboundMessage } from "../saklar/define"
+import type { StoredContent } from "./context"
+import type { ReminderActions } from "./deps"
+
+export type CommandName = "new" | "stop" | "status" | "saklar"
+
+export type Route =
+  | { kind: "ignore"; reason: string }
+  | { kind: "command"; name: CommandName; args: string[] }
+  // `batch`: a bare "ya"/"batal" with several requests waiting answers every
+  // pending request of the newest run (the reply says so).
+  | { kind: "approval"; approvalId: string; approved: boolean; batch?: string[] }
+  | { kind: "reminder"; reply: string }
+  | { kind: "hook"; hook: NonNullable<StoredContent["hook"]>; text: string }
+  | { kind: "turn" }
+
+// Checks that need only the inbound message. A non-null result is the reason
+// (a sentence) to drop it; dropped messages are never stored.
+export function senderCheck(db: DB, msg: InboundMessage): string | null {
+  if (msg.fromMe) return `Dropped a ${msg.channel} message sent from the bot's own account (fromMe).`
+  if (!isOwner(db, { channel: msg.channel, externalId: msg.senderExternalId, altId: msg.senderAltId })) {
+    return `Dropped a ${msg.channel} message from ${msg.senderExternalId}${msg.senderAltId ? ` (alt ${msg.senderAltId})` : ""}: not the owner.`
+  }
+  return null
+}
+
+// Checks that need the chat row.
+export function chatCheck(chat: ChatRow): string | null {
+  if (chat.channel === "whatsapp" && !chat.allowed) return `Dropped a WhatsApp message in ${chat.externalId}: the chat isn't in Palui's allowlist.`
+  return null
+}
+
+const COMMANDS: Record<string, CommandName> = { "/new": "new", "/stop": "stop", "/status": "status", "/saklar": "saklar" }
+
+export function parseCommand(text: string): { name: CommandName; args: string[] } | null {
+  const t = text.trim()
+  if (!t.startsWith("/")) return null
+  const [head, ...args] = t.split(/\s+/)
+  // Telegram adds @botname in groups: /status@palui_bot
+  const name = COMMANDS[head!.toLowerCase().replace(/@\S+$/, "")]
+  return name ? { name, args } : null
+}
+
+const YES = new Set(["ya", "y", "iya", "yes"])
+const NO = new Set(["batal", "no", "tidak", "nggak", "gak"])
+
+export function parseYesNo(text: string): boolean | null {
+  const t = text.trim().toLowerCase().replace(/[.!]+$/, "")
+  if (YES.has(t)) return true
+  if (NO.has(t)) return false
+  return null
+}
+
+// The approval whose prompt this message quotes: by the prompt's channel id, or
+// through the outbox row that sent it (WhatsApp has no buttons, PLAN 8.6).
+function quotedApproval(db: DB, chatId: string, channelMsgId: string): string | undefined {
+  const direct = db
+    .select({ id: pendingApprovals.id })
+    .from(pendingApprovals)
+    .where(and(eq(pendingApprovals.chatId, chatId), eq(pendingApprovals.promptMsgId, channelMsgId)))
+    .get()
+  if (direct) return direct.id
+  const sent = db
+    .select({ source: outbox.source })
+    .from(outbox)
+    .where(and(eq(outbox.chatId, chatId), eq(outbox.channelMsgId, channelMsgId), like(outbox.source, "approval:%")))
+    .get()
+  return sent?.source.slice("approval:".length)
+}
+
+export type RouteInput = {
+  db: DB
+  chat: ChatRow
+  content: StoredContent
+  text: string
+  replyToChannelMsgId?: string
+  reminderActions?: ReminderActions
+  now: number
+}
+
+export async function route(i: RouteInput): Promise<Route> {
+  const blocked = chatCheck(i.chat)
+  if (blocked) return { kind: "ignore", reason: blocked }
+  if (i.content.hook) return { kind: "hook", hook: i.content.hook, text: i.text }
+
+  const cb = i.content.callback?.data
+  if (cb) {
+    const m = /^(approve|deny):(.+)$/.exec(cb)
+    if (m) return { kind: "approval", approvalId: m[2]!, approved: m[1] === "approve" }
+    const s = /^saklar:(on|off):(.+)$/.exec(cb)
+    if (s) return { kind: "command", name: "saklar", args: [s[1]!, s[2]!] }
+    if (cb.startsWith("rem:") && i.reminderActions) {
+      const reply = await i.reminderActions.fromCallback(i.db, cb, i.chat.id, i.now)
+      if (reply !== null) return { kind: "reminder", reply }
+    }
+    return { kind: "ignore", reason: `Unknown button "${cb}".` }
+  }
+
+  const yn = parseYesNo(i.text)
+  if (yn !== null) {
+    // Quoting a prompt answers that one, even when it was already answered (the reply says so).
+    const quoted = i.replyToChannelMsgId ? quotedApproval(i.db, i.chat.id, i.replyToChannelMsgId) : undefined
+    if (quoted) return { kind: "approval", approvalId: quoted, approved: yn }
+    // Quoting some other message ("ya" to a reminder, say) is not an approval answer.
+    const pending = i.replyToChannelMsgId ? [] : pendingForChat(i.db, i.chat.id)
+    if (pending.length === 1) return { kind: "approval", approvalId: pending[0]!.id, approved: yn }
+    if (pending.length > 1) {
+      const newest = pending.at(-1)!.runId
+      const batch = pending.filter((p) => p.runId === newest).map((p) => p.id)
+      return { kind: "approval", approvalId: batch[0]!, approved: yn, batch }
+    }
+  }
+
+  const cmd = parseCommand(i.text)
+  if (cmd) return { kind: "command", ...cmd }
+
+  if (i.reminderActions && i.text.trim()) {
+    const reply = await i.reminderActions.fromText(i.db, i.text, i.replyToChannelMsgId, i.chat.id, i.now)
+    if (reply !== null) return { kind: "reminder", reply }
+  }
+  if (!i.text.trim() && !(i.content.media ?? []).length) return { kind: "ignore", reason: "Empty message." }
+  return { kind: "turn" }
+}

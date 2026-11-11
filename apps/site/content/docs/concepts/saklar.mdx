@@ -1,0 +1,71 @@
+---
+title: Saklar
+description: Every capability in Palui is a connector with one lifecycle that you can switch on, pause or remove without a restart.
+---
+
+Saklar is Indonesian for "switch". It's the name for Palui's connector model. Everything optional is a connector, and every connector shares one manifest shape, one lifecycle and one UI. The Saklar page in the dashboard and the `/saklar` chat command both use the word.
+
+## Connector kinds
+
+| Kind | What it is | Examples |
+|---|---|---|
+| `channel` | Where you talk to Palui | Telegram, WhatsApp, web chat |
+| `model` | Where the language model comes from | CLIProxyAPI, ai-gateway |
+| `memory` | Long-term memory | recall |
+| `tools` | External tools the agent can call | MCP servers |
+| `skill` | Built-in features | Reminders, Jobs, Voice-in, Web fetch, Inbound webhooks, Google Calendar |
+
+See the [connector list](/docs/connectors) for every v1 connector.
+
+## States
+
+<SaklarStatesDiagram>
+  A connector starts as not set up. Connecting it moves it to connecting, and a successful start moves it to on. From on, pausing moves it to paused, which keeps its credentials. Resuming a paused connector moves it back to connecting. A connector that fails while connecting or running goes to error and restarts with backoff. From any state, remove (after a confirmation) returns it to not set up and deletes its credentials.
+</SaklarStatesDiagram>
+
+| State | Meaning |
+|---|---|
+| not set up | No credentials, or a wizard draft that hasn't finished. The wizard keeps its progress if you close the sheet. |
+| connecting | Starting up or reconnecting. |
+| on | Running. Its tools and messages are live. |
+| paused | Stopped on purpose. Credentials are kept. |
+| error | It failed. The status detail says why (for example `unlinked` for WhatsApp). |
+
+## Pause versus remove
+
+Pause is the Switch on the card. It's instant, reversible and never asks for confirmation. A toast offers Undo. Resume goes back through connecting to on, with no re-pairing or re-entering keys.
+
+Remove sits in the danger area of the connector sheet. It always asks first, and the dialog names what you lose ("This unlinks the WhatsApp device. You'll need to pair again."). It deletes the credentials and returns the connector to not set up.
+
+## Edge cases
+
+| Situation | Rule |
+|---|---|
+| Pausing mid-turn | Applies from the next turn. Tool calls already running finish. |
+| Pausing the Reminders skill | Hides its tools only. Reminders already set still fire. The card says so. |
+| The only model connector is paused | The router replies with fixed text: "Model lagi off. Nyalakan: `/saklar on cliproxy`" (the model is off, turn it on with this command). Plain reminders and commands keep working. |
+| Channel paused with outbox rows waiting | Rows wait without using up attempts. They send on resume. |
+| Channel removed with rows waiting | Rows go to the fallback channel if one is on. Otherwise they're cancelled, with an event logged. |
+| `/saklar off telegram` sent from Telegram | Allowed only when another channel or the dashboard is reachable. The reply says how to undo it. Otherwise it's refused. |
+| recall auto-recall times out | The turn goes on without memory. The card shows the skip rate ("skipped 4 of last 20"). |
+| Connector throws repeatedly | `error` state, restarts with backoff (5 s, 30 s, 2 min, 10 min cap). After 5 min in `error`, you get a message on another channel. |
+
+## The supervisor
+
+The runtime's Saklar supervisor compares what you asked for (the stored connector rows) with what's actually running. It reconciles every 30 s, and right away when the dashboard pokes it. Each connector runs isolated, so one that throws never takes the process down. Every status change is written as an event, so the dashboard, `/health` and chat all show the same state.
+
+## Three ways to flip a Saklar
+
+1. Dashboard: the card Switch pauses and resumes. The sheet connects, configures, tests and removes.
+2. Chat, owner only: `/saklar` lists every connector with its state, and `/saklar off <id>` or `/saklar on <id>` flips one. Connect and remove stay in the dashboard. See [Chat commands](/docs/chat-commands).
+3. CLI on the Docker host:
+
+```bash
+docker compose exec app palui saklar list
+docker compose exec app palui saklar on <id>
+docker compose exec app palui saklar off <id>
+```
+
+## Secrets
+
+Connector secrets (API keys, bot tokens) are entered in the dashboard only. They're encrypted at rest with your `MASTER_KEY` and are write-only: you can replace one, but never read it back. The UI shows them masked, like `rcl_••••a91f`. Logs redact known key and bot-token patterns. See [Security](/docs/security).

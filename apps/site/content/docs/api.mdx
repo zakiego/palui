@@ -1,0 +1,73 @@
+---
+title: REST API
+description: The HTTP endpoints Palui's app serves, including /health, inbound webhooks, auth, and the dashboard's session-authenticated API.
+---
+
+The app service serves everything over HTTP: the dashboard at `/app`, the API under `/api`, and `/health`. The runtime has its own control API, but it's only reachable on the compose network and is never published.
+
+| Path | Auth | Stable in v1 |
+|---|---|---|
+| `GET /health` | None | Yes |
+| `POST /api/hooks/:slug` | HMAC signature | Yes |
+| `/api/auth/*` | Better Auth | Managed by Better Auth |
+| Other `/api/*` routes | Dashboard session | No, internal to the dashboard |
+
+## GET /health
+
+Public and unauthenticated. Use it for uptime checks.
+
+```http
+GET /health
+```
+
+The response is JSON with the schema version and connector state. This example is illustrative, not an exact schema:
+
+```json
+{
+  "ok": true,
+  "schema": { "db": 4, "code": 4 },
+  "connectors": [
+    { "id": "telegram", "status": "on" },
+    { "id": "whatsapp", "status": "error", "detail": "unlinked" },
+    { "id": "cliproxy", "status": "on" }
+  ]
+}
+```
+
+- It fails when the database schema is newer than the code. That's what makes a bad rollback show up as failed. See [Upgrades](/docs/self-hosting/upgrades).
+- Runtime connector state is reported in the body, not in the status code. A WhatsApp outage shows as `error` in the JSON while `/health` itself stays healthy, so a channel problem never fails a deploy.
+
+## POST /api/hooks/:slug
+
+Receives an event for an inbound webhook. The request must carry `x-palui-timestamp` (unix seconds, within 5 minutes of now) and `x-palui-signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`, signed with the hook's secret. A repeated signature is refused with 409, and a body over 256 KB with 413. See [Inbound webhooks](/docs/connectors/webhooks) for the signing example and the forward and summarize modes.
+
+```http
+POST /api/hooks/my-hook
+content-type: application/json
+x-palui-timestamp: 1794283200
+x-palui-signature: sha256=<signature>
+
+{"event":"deploy","status":"ok"}
+```
+
+## /api/auth/*
+
+Authentication is handled by Better Auth with passkeys. No endpoint creates an account from outside. The owner account comes from a single-use invite created on the Docker host:
+
+```bash
+docker compose exec app palui owner invite
+```
+
+The invite link is valid for 15 minutes. It's also how you recover from a lost passkey.
+
+## Dashboard API
+
+The dashboard talks to session-authenticated JSON endpoints under `/api`. They cover:
+
+- Connectors: list, connect, configure, test, pause, resume, remove.
+- Chats: the chat list, transcripts, the web chat, approval answers.
+- Reminders and jobs: list, create, change, run now, pause.
+- Activity: events, runs and token usage.
+- Settings: persona, timezone, language, model roles and failover, budgets.
+
+They need a signed-in dashboard session. They aren't a stable public contract in v1 and can change between releases. Don't build on them.

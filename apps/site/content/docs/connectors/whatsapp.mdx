@@ -1,0 +1,67 @@
+---
+title: WhatsApp
+description: Chat with Palui from WhatsApp. It links as a device on a number, paired by phone-number code or QR, and answers only the owner.
+---
+
+Kind: `channel`. Chat with Palui from WhatsApp. Palui links to a WhatsApp number as a linked device, the same way WhatsApp Web does, and answers DMs from your own number only.
+
+<Callout type="warn" title="Unofficial library">
+  The WhatsApp connector uses Baileys, an unofficial library. Keep volume low, use one owner and never broadcast. Telegram is the reliable channel.
+</Callout>
+
+## Connect
+
+<Steps>
+<Step>
+
+### Enter your phone number
+
+The wizard first asks for the owner's phone number: yours, the one you'll message the bot from. Messages from that number are accepted.
+
+</Step>
+<Step>
+
+### Pair the device
+
+On the phone that holds the bot's number, open WhatsApp, go to Linked devices and choose to link with a phone number. The wizard shows an 8-character pairing code like `ABCD-EFGH` with a copy button. A QR code is available as a fallback tab. Codes rotate, and the wizard shows roughly when the current one expires.
+
+</Step>
+<Step>
+
+### Say hi
+
+Send a DM from your number. Palui learns your WhatsApp LID from that first message and stores it next to the number, so later messages match either form.
+
+</Step>
+</Steps>
+
+Session files live in `/data/wa-auth` on the data volume.
+
+## Settings
+
+| Field | Notes |
+|---|---|
+| Owner phone number | The only number Palui answers |
+
+## How it behaves
+
+- DMs only in v1. Group chats are planned.
+- Shows an hourglass reaction while thinking, cleared when the reply goes out.
+- Anything the bot sent itself (`fromMe`) is dropped, so it never answers its own messages.
+- Reconnects with exponential backoff.
+- If another session takes over the device, Palui pauses with that reason instead of fighting for it.
+- If the device is logged out from the phone, the connector goes to `error` with the detail `unlinked`. Pair again to fix it.
+- Reminder replies: quote a reminder and reply "done" or "tunda 1j" (snooze 1 hour). Approval replies: "ya" or "batal".
+
+## Tools
+
+None. WhatsApp is a channel.
+
+## Pause and remove
+
+- Pause: disconnects but keeps the session. Resume reconnects without re-pairing. Waiting outbox rows send on resume.
+- Remove: "This unlinks the WhatsApp device. You'll need to pair again." The session files are deleted.
+
+<Callout type="error" title="Back up the session carefully">
+  The files in `/data/wa-auth` are enough to act as the bot's number. The [nightly backup](/docs/self-hosting/backups) encrypts them. Never copy them anywhere unencrypted.
+</Callout>

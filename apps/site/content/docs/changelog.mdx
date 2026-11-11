@@ -1,0 +1,59 @@
+---
+title: Changelog
+description: What ships in Palui Agent v1, which is still in development, and what is planned for later.
+---
+
+## v1 (in development)
+
+2026-11. Not released yet. This list is what v1 is built to ship.
+
+### Chat
+
+- Telegram and WhatsApp DMs, plus the web chat in the dashboard, in Indonesian or English.
+- One owner, claimed with a Telegram nonce link and a WhatsApp phone number.
+- Durable inbox and outbox with at-least-once delivery, so a deploy doesn't drop a message.
+- Sessions with compaction past about 40 messages.
+- Chat commands: `/saklar`, `/new`, `/stop`, `/status`.
+- Voice messages transcribed with ElevenLabs Scribe (Voice-in). Photos and small documents on Telegram.
+
+### Saklar
+
+- Every capability is a connector of kind `channel`, `model`, `memory`, `tools` or `skill`.
+- Pause, resume and remove from the dashboard, from chat or from the CLI, with no restart.
+- A supervisor with isolated connectors and backoff (5 s, 30 s, 2 min, 10 min cap), and an alert after 5 minutes in `error`.
+
+### Agent
+
+- CLIProxyAPI and ai-gateway as model providers, with per-role failover.
+- recall as long-term memory: tools, auto-recall, auto-save.
+- Any Streamable HTTP MCP server as a tool source, with per-tool switches, classes and trust flags.
+- Tool classes that fail closed, approvals that survive restarts, and the taint rule.
+- Turn budgets (12 steps, 120 s, about 30 tools) and global caps.
+
+### Skills
+
+- Reminders in natural language, with RRULE recurrence, IANA zones, Done and Snooze, and delivery that survives restarts.
+- Scheduled jobs, with a daily briefing and a heartbeat preset.
+- Web fetch behind an SSRF guard.
+- Inbound webhooks with HMAC signatures, in forward and summarize modes.
+- Google Calendar, read-only.
+
+### Dashboard and operations
+
+- Dashboard at `/app` with passkeys: Home, Chats, Reminders, Jobs, Saklar, Activity, Settings.
+- Docker Compose with two services from one image and one SQLite volume.
+- Pre-deploy snapshots, nightly age-encrypted backups to R2, and a restore drill.
+- Landing page and these docs on Cloudflare Pages.
+
+## Not in v1
+
+These are planned for later and are not part of v1:
+
+- Group chats. The code path exists, but the UI is hidden.
+- Voice replies (text to speech). v1 has voice input only.
+- stdio MCP servers, a shell tool and a browser tool. They need binaries in the container and a sandbox.
+- Subagents.
+- Self-written skills.
+- Multiple profiles or agents.
+- Multiple users.
+- A native app.

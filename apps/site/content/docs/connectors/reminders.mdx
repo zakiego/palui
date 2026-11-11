@@ -1,0 +1,42 @@
+---
+title: Reminders
+description: The built-in Reminders skill gives the model tools to create, list, change, cancel and snooze reminders.
+---
+
+Kind: `skill`. Built in. The Reminders connector gives the model the tools to manage reminders from chat. How reminders are parsed, scheduled and delivered is on the [Reminders concept page](/docs/concepts/reminders).
+
+## Connect
+
+Nothing to set up. Reminders is a built-in skill and is created on first boot. It needs a model connector for the tools, since the model is what turns "ingetin bayar listrik besok jam 9" into a reminder. The New reminder dialog on the Reminders page works too.
+
+## Settings
+
+| Setting | Notes |
+|---|---|
+| Time zone | Set on the Settings page. Default `Asia/Makassar` (WITA). Each reminder stores its own zone. |
+| Channel fallback | After 2 failed send attempts, deliver on your other channel |
+
+## Tools
+
+| Tool | What it does |
+|---|---|
+| `ingatkan` | Create a reminder. Echoes the parsed time back, like "Besok, Rabu 11 Nov, 09.00 WITA". |
+| `daftar_pengingat` | List reminders |
+| `ubah_pengingat` | Change a reminder |
+| `batal_pengingat` | Cancel a reminder |
+| `tunda_pengingat` | Snooze a reminder |
+
+Each tool's class is shown in the dashboard and decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
+
+## Replies on a reminder
+
+When a reminder fires, it comes with Done and Snooze (10m, 1h, tomorrow 09.00):
+
+- Telegram: inline buttons.
+- WhatsApp: quote the reminder and reply "done" or "tunda 1j" (snooze 1 hour).
+
+These replies are handled by the router and don't need the model.
+
+## Pause and remove
+
+Pausing hides the reminder tools from the model, from the next turn on. Reminders you've already set still fire, and the card says so. Plain reminders never call the model, so they keep firing even when every model connector is paused.

@@ -1,0 +1,15 @@
+{
+  "title": "Docs",
+  "pages": [
+    "index",
+    "getting-started",
+    "concepts",
+    "connectors",
+    "self-hosting",
+    "---Reference---",
+    "chat-commands",
+    "api",
+    "security",
+    "changelog"
+  ]
+}

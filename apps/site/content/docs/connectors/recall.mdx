@@ -1,0 +1,44 @@
+---
+title: recall
+description: Connect recall as Palui's long-term memory, with memory tools, auto-recall before a turn and auto-save at compaction.
+---
+
+Kind: `memory`. recall is a self-hosted memory service. Palui uses it for long-term memory: memory tools the model can call, auto-recall before each turn, and auto-save of your conversations. See [Memory](/docs/concepts/memory) for how the pieces fit.
+
+## Connect
+
+1. On the Saklar page, add recall.
+2. Keep the default URL if recall runs on the Docker host, or change it.
+3. Paste the API key (it starts with `rcl_`).
+4. Pick a container from the list. It's filled from recall's `GET /v1/containers`. recall's default container is `default`.
+5. Press Test. It calls `GET /health`, then `GET /v1/containers`.
+
+## Settings
+
+| Field | Default | Notes |
+|---|---|---|
+| URL | `http://host.docker.internal:4800` | recall on the Docker host |
+| API key | | Secret. Write-only, shown masked as `rcl_••••` plus the last 4 characters (no tail for values of 12 characters or fewer). |
+| Container | `default` | Which recall container holds Palui's memories |
+| Auto-recall | Switch | Fetch your profile before each turn |
+| Auto-save | Switch | Save conversations at compaction and on `/new` |
+
+## Tools
+
+recall's own `/mcp` endpoint is mounted the same way as an [MCP server](/docs/connectors/mcp), which gives the model `add_memory`, `search_memories`, `ask_memory`, `get_profile` and `list_memories`. Their classes and switches work like any MCP tool's.
+
+On top of those, forgetting a memory is one REST tool (`DELETE /v1/memories/:id`) classed `destructive`, so it always asks first.
+
+The model sees the tools namespaced, for example `recall__search_memories`.
+
+## Auto-recall
+
+Before a turn, Palui calls `GET /v1/profile` with your message as the query, with a 1.5 s timeout. It's skipped for commands and for messages under 4 words. If recall is slow, the turn goes on without memory, and the card shows the skip rate ("skipped 4 of last 20").
+
+## Auto-save
+
+At session compaction and on `/new`, Palui sends your messages plus the final replies to `POST /v1/memories`. It never sends tool output. Tainted turns are skipped. Each save has a source id built from the session and message range, so retries don't duplicate.
+
+## Pause and remove
+
+Pausing applies from the next turn: no memory tools, no auto-recall, no auto-save. Your memories stay in recall. Removing deletes the stored API key from Palui. It doesn't delete anything in recall.

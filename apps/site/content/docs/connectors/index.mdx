@@ -1,0 +1,40 @@
+---
+title: Connectors
+description: Every connector that ships in Palui Agent v1, grouped by kind, and how each connector page is laid out.
+---
+
+Everything optional in Palui is a connector. You add, test, pause and remove them on the Saklar page. See [Saklar](/docs/concepts/saklar) for the lifecycle every connector shares.
+
+## v1 connectors
+
+| Connector | Kind | What it does |
+|---|---|---|
+| [Telegram](/docs/connectors/telegram) | `channel` | Chat with Palui from a Telegram bot. |
+| [WhatsApp](/docs/connectors/whatsapp) | `channel` | Chat with Palui from WhatsApp, as a linked device. |
+| [Web chat](/docs/connectors/web-chat) | `channel` | Chat with Palui in the dashboard, no phone needed. |
+| [CLIProxyAPI](/docs/connectors/cliproxy) | `model` | Models through CLIProxyAPI, so existing subscriptions pay for them. |
+| [ai-gateway](/docs/connectors/ai-gateway) | `model` | A second model provider and the fallback in every chain. |
+| [recall](/docs/connectors/recall) | `memory` | Long-term memory: tools, auto-recall and auto-save. |
+| [MCP servers](/docs/connectors/mcp) | `tools` | Any Streamable HTTP MCP server, with per-tool switches. |
+| [Reminders](/docs/connectors/reminders) | `skill` | Reminders set in plain language that survive restarts. |
+| [Jobs](/docs/connectors/jobs) | `skill` | Scheduled agent jobs, the daily briefing and the heartbeat. |
+| [Voice-in](/docs/connectors/voice-in) | `skill` | Transcribes voice messages you send. |
+| [Web fetch](/docs/connectors/web-fetch) | `skill` | Reads web pages behind an SSRF guard. |
+| [Inbound webhooks](/docs/connectors/webhooks) | `skill` | Turns signed HTTP posts into messages. |
+| [Google Calendar](/docs/connectors/google-calendar) | `skill` | Read-only access to your calendar. |
+
+## How each page is laid out
+
+Every connector is defined by a manifest, and its page follows the same shape:
+
+1. What it does: one paragraph.
+2. Connect: the setup steps in the dashboard wizard, and what Test checks.
+3. Settings: the fields you can change later.
+4. Tools: what the model can call, with each tool's class.
+5. Pause and remove: what happens to its work and its credentials.
+
+Two rules hold for every connector. Pausing takes effect from the next turn, and tool calls already running finish. Removing asks first, deletes the stored credentials and returns the connector to not set up.
+
+## Not in v1
+
+stdio MCP servers, a shell tool and a browser tool are planned. They need binaries in the container and a sandbox. Voice replies, self-written skills, subagents and group chats are planned too. See the [changelog](/docs/changelog).

@@ -1,0 +1,43 @@
+---
+title: Upgrades
+description: Deploy a new version with a pre-deploy snapshot and one compose command, and roll back safely if the schema moved.
+---
+
+A deploy is three steps:
+
+```bash
+git pull
+scripts/pre-deploy.sh
+docker compose up -d --build --wait
+```
+
+`scripts/pre-deploy.sh` snapshots the database to `/data/backups/pre-deploy-<UTC>.db.gz` and keeps the newest 3. `--wait` makes Compose wait until every service is healthy, so the command fails if the new version doesn't come up.
+
+The app runs database migrations on start. The runtime waits for the app to be healthy and refuses to run on a schema it doesn't know.
+
+## Nothing is lost during a deploy
+
+Both services restart on every deploy, so the channel sockets drop for a moment. Messages and reminders survive anyway:
+
+- Durable inbox: every inbound message is written to the database before the channel handler returns. Messages that arrive while the runtime restarts are replayed when it comes back.
+- Durable outbox: replies and reminders are rows that stay `pending` until the channel acknowledges them. A row stuck in `sending` for more than 5 minutes goes back to `pending`.
+- SIGTERM drain: with `stop_grace_period: 60s`, the runtime stops taking new turns, finishes the current step and releases its outbox claims before it exits.
+- Overdue reminders fire once on start, marked "(telat, harusnya 09.00)" (late, it was due at 09.00).
+- Pending approvals are saved, so you can answer one after the restart.
+
+Docs-only changes don't touch the image (the site isn't part of it), so they don't restart the containers.
+
+## Rolling back
+
+Go back to the previous version and run the same command:
+
+```bash
+git checkout <previous-commit>
+docker compose up -d --build --wait
+```
+
+If the new version had already migrated the database, the old code finds a schema newer than itself. `/health` fails on purpose in that case, so a bad rollback shows as failed instead of half-working. To fix it, restore the pre-deploy snapshot taken just before the upgrade (see [Restore](/docs/self-hosting/backups#restore)), then start the old version again.
+
+<Callout type="info" title="Check both logs">
+  When a deploy fails, read `docker compose logs app` and `docker compose logs runtime`. A runtime that refuses an unknown schema says so in its own log.
+</Callout>

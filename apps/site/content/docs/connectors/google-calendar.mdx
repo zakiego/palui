@@ -1,0 +1,28 @@
+---
+title: Google Calendar
+description: Give Palui read-only access to your Google Calendar so it can answer questions about your schedule and include events in the briefing.
+---
+
+Kind: `skill`. Google Calendar gives the model read-only access to your calendar. It can answer "what's on tomorrow?" and add today's events to the [daily briefing](/docs/connectors/jobs#daily-briefing). It can't create, change or delete events.
+
+<Callout type="info" title="Status">
+  Google Calendar is in v1 as a read-only connector. It ships in a later v1 milestone, after the core connectors, so the setup below may still change.
+</Callout>
+
+## Connect
+
+1. On the Saklar page, add Google Calendar.
+2. Follow the sign-in step (planned: a Google OAuth sign-in that grants read access to your calendar).
+3. Press Test.
+
+## Settings
+
+Your Google account connection. The OAuth tokens are secrets: encrypted at rest and never shown.
+
+## Tools
+
+Read-only calendar tools. The exact tool list, with each tool's switch, is shown in the connector sheet in the dashboard.
+
+## Pause and remove
+
+Pausing applies from the next turn, and the daily briefing runs without calendar events. Removing deletes the stored OAuth tokens.

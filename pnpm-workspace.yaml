@@ -1,0 +1,20 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  protobufjs: true
+  sharp: true
+  workerd: true
+  "@parcel/watcher": true
+  unrs-resolver: true
+  baileys: false
+
+minimumReleaseAgeExclude:
+  - "@ai-sdk/gateway@4.0.139"
+  - "@fumadocs/base-ui@16.18.3"
+  - ai@7.0.166
+  - fumadocs-core@16.18.3
+  - fumadocs-mdx@15.5.3

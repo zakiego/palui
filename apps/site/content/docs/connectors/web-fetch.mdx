@@ -1,0 +1,31 @@
+---
+title: Web fetch
+description: Let Palui read web pages through fetch and readability, behind an SSRF guard. Results taint the turn.
+---
+
+Kind: `skill`. Web fetch lets the model read a web page: it fetches the URL, extracts the readable text and hands that to the model. The daily briefing uses it for the weather.
+
+## Connect
+
+Nothing to enter. Add Web fetch on the Saklar page and switch it on.
+
+## Settings
+
+None in v1.
+
+## Tools
+
+One tool that fetches a URL and returns the page's readable text. Its results are marked untrusted.
+
+## Safety
+
+<Callout type="warn" title="Results taint the turn">
+  Anyone can write a web page, including text aimed at the model. Once a turn reads a fetched page, it's tainted: every `write` tool needs your approval for the rest of that turn, and recall auto-save skips it. See [The taint rule](/docs/concepts/taint-rule).
+</Callout>
+
+- SSRF guard: every fetch the agent can steer goes through a guard that refuses requests to internal and private network addresses. A page can't trick Palui into reading services on your Docker host or your local network.
+- Fetched content is never saved to recall. Auto-save stores only your messages and the final replies.
+
+## Pause and remove
+
+Pausing applies from the next turn. The daily briefing then runs without the weather.

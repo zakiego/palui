@@ -1,0 +1,36 @@
+---
+title: Voice-in
+description: Transcribe the voice messages you send to Palui with ElevenLabs Scribe, so the agent can answer them like text.
+---
+
+Kind: `skill`. Voice-in turns the voice messages you send into text, so Palui can answer them like any other message. It uses ElevenLabs Scribe for speech to text.
+
+Voice-in is input only. Palui answers in text. Voice replies (text to speech) are planned, not in v1.
+
+## Connect
+
+1. Get an API key from ElevenLabs.
+2. On the Saklar page, add Voice-in and paste the key.
+3. Press Test.
+
+## Settings
+
+| Field | Notes |
+|---|---|
+| ElevenLabs API key | Secret. Write-only, shown masked. |
+
+## Fallback
+
+Gemini audio through [CLIProxyAPI](/docs/connectors/cliproxy) is planned as a fallback transcriber. It's conditional: it ships only if testing shows Gemini audio works reliably through CLIProxyAPI. Until then, ElevenLabs Scribe is the only transcriber.
+
+## How it behaves
+
+When a voice message arrives on a channel, the runtime sends the audio to the transcriber and puts the transcript into the turn as your message. From there it's a normal turn: same router, same tools, same approvals.
+
+## Tools
+
+None. Voice-in works on incoming audio, not as a tool the model calls.
+
+## Pause and remove
+
+Pausing applies from the next turn. Removing deletes the stored API key.

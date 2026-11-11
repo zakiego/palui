@@ -1,0 +1,53 @@
+---
+title: CLIProxyAPI
+description: Use CLIProxyAPI as a model provider so your existing Claude and Gemini subscriptions run Palui, with per-role protocols and failover.
+---
+
+Kind: `model`. CLIProxyAPI exposes the models from your existing subscriptions (Claude, Gemini and others) as an API. Palui uses it as its main model provider. You run CLIProxyAPI yourself, usually on the Docker host.
+
+## Connect
+
+1. On the Saklar page, add CLIProxyAPI.
+2. Keep the default base URL if CLIProxyAPI runs on the Docker host, or change it.
+3. Paste the API key and pick a protocol per role.
+4. Press Test. It calls `GET /v1/models`, then makes a 1-token call for each role. A working connector shows the model list.
+
+## Settings
+
+| Field | Default | Notes |
+|---|---|---|
+| Base URL | `http://host.docker.internal:8317` | CLIProxyAPI on the Docker host. Reaching it this way skips the tunnel. |
+| API key | | Secret. Write-only, shown masked. |
+| Protocol per role | | `anthropic` uses `/v1/messages`, `openai` uses `/v1/chat/completions`. Use `anthropic` for Claude models. |
+
+## Roles
+
+Palui asks for a model by role, and you pick the model for each role in Settings:
+
+| Role | Used for |
+|---|---|
+| `default` | Agent turns |
+| `fast` | Chat titles, session summaries, reminder parsing |
+| `vision` | Reading photos you send |
+
+## Failover
+
+Each role has a chain of model connectors. On a 5xx, a 429 or a quota error, Palui tries the next connector in the chain. [ai-gateway](/docs/connectors/ai-gateway) is the usual fallback.
+
+## Tools
+
+None. A model connector provides models, not tools.
+
+## Pause and remove
+
+Pausing applies from the next turn. If CLIProxyAPI is your only model connector and you pause it, the router answers every message with fixed text: "Model lagi off. Nyalakan: `/saklar on cliproxy`" (the model is off, turn it on with this command). Plain reminders and commands keep working. Removing deletes the stored API key.
+
+## Notes
+
+<Callout type="info" title="Prompt caching">
+  If CLIProxyAPI round-robins requests across several accounts, prompt caching mostly misses, because consecutive turns land on different accounts. Sticky routing caches better, but it's a CLIProxyAPI setting, not a Palui one.
+</Callout>
+
+<Callout type="warn" title="CLIProxyAPI logs">
+  If CLIProxyAPI logs requests to file, your prompts land there, including recall memories in the context. Cap the log size or turn file logging off.
+</Callout>

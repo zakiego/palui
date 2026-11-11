@@ -1,0 +1,96 @@
+---
+title: Inbound webhooks
+description: Turn signed HTTP posts from other services into messages in a chat, either forwarded as is or summarized with zero tools.
+---
+
+Kind: `skill`. Inbound webhooks let another service (a CI pipeline, a monitor, a form) send Palui an event over HTTP. Each hook has its own URL slug, its own secret and a chat it posts into. The payload becomes a message in that chat.
+
+## Connect
+
+1. On the Saklar page, add Inbound webhooks and create a hook.
+2. Give it a name and a slug. Its URL is `https://<your-domain>/api/hooks/<slug>`.
+3. Pick a mode (forward or summarize) and the chat it posts into.
+4. Palui generates the hook's secret and shows it once. Copy it into the sending service right away: after that it's write-only, like every other secret, and can only be rotated.
+
+## Settings
+
+| Field | Notes |
+|---|---|
+| Name | Shown in the chat and on the Activity page |
+| Slug | The last part of the URL |
+| Secret | Used to sign requests. Write-only, shown masked. |
+| Mode | `forward` or `summarize` |
+| Chat | Where the event shows up |
+
+## Sending an event
+
+```http
+POST /api/hooks/:slug
+content-type: application/json
+x-palui-timestamp: <unix time in seconds>
+x-palui-signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<raw body>">
+```
+
+Every request carries two headers:
+
+- `x-palui-timestamp`: the current unix time in seconds, set when you send the request.
+- `x-palui-signature`: the HMAC-SHA256 of the timestamp, a `.`, and the raw request body, keyed with the hook's secret, hex-encoded and prefixed with `sha256=`.
+
+Sign the exact bytes you send. Re-serializing the JSON after signing breaks the signature. Palui refuses a request when:
+
+| Status | Why |
+|---|---|
+| 401 | A header is missing, the signature is wrong, or the timestamp is more than 5 minutes away from Palui's clock |
+| 409 | The same signed request already arrived (a replay) |
+| 413 | The body is over 256 KB |
+| 404 / 503 | The slug doesn't exist, or the hook or the Webhooks connector is off |
+
+Because of the timestamp window, sign each request right before sending it, and keep the sender's clock in sync (NTP). A retry needs a fresh timestamp and signature.
+
+Signing and sending with `openssl` and `curl`:
+
+```bash
+SECRET='<your-hook-secret>'
+BODY='{"event":"deploy","status":"ok","service":"api"}'
+TS=$(date +%s)
+SIG=$(printf '%s.%s' "$TS" "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -hex | sed 's/^.* //')
+
+curl -X POST "https://palui.example.com/api/hooks/my-hook" \
+  -H 'content-type: application/json' \
+  -H "x-palui-timestamp: $TS" \
+  -H "x-palui-signature: sha256=$SIG" \
+  --data-raw "$BODY"
+```
+
+The same in Node:
+
+```js
+import { createHmac } from "node:crypto"
+
+const body = JSON.stringify({ event: "deploy", status: "ok" })
+const ts = Math.floor(Date.now() / 1000).toString()
+const sig = createHmac("sha256", secret).update(`${ts}.${body}`).digest("hex")
+
+await fetch(url, {
+  method: "POST",
+  headers: { "content-type": "application/json", "x-palui-timestamp": ts, "x-palui-signature": `sha256=${sig}` },
+  body,
+})
+```
+
+## Modes
+
+| Mode | What happens | Model |
+|---|---|---|
+| `forward` | The event text is sent to the chat as is | Not called |
+| `summarize` | One turn summarizes the event for you | Called, with zero tools. The turn is tainted. |
+
+Either way, the payload is treated as an untrusted message in the hook's chat. It never runs as a command, and a summary turn has no tools to misuse. See [The taint rule](/docs/concepts/taint-rule).
+
+## Tools
+
+None. Webhooks bring events in. They don't give the model tools.
+
+## Pause and remove
+
+Pausing applies to events from then on. Removing a hook deletes its secret, and its URL stops accepting events.

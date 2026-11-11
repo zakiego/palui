@@ -1,0 +1,60 @@
+---
+title: Security model
+description: "How Palui keeps one owner in control: passkeys, owner claims, approvals, the taint rule, encrypted secrets and a closed network."
+---
+
+Palui has one owner and assumes everything else is untrusted: other people messaging the bot, web pages, webhook payloads and tool results from servers you don't run.
+
+## Dashboard access
+
+- Passkeys only, through Better Auth.
+- There's no way to create an account over HTTP, from the first boot on.
+- The owner account comes from `docker compose exec app palui owner invite`, a single-use link valid for 15 minutes. You need shell access to the Docker host to run it.
+- The same command is the recovery path for a lost passkey.
+- App routes are `noindex`.
+
+## Channel owner
+
+- Telegram: claimed with a one-time `t.me` link carrying a nonce. The nonce is single use and expires after 10 minutes.
+- WhatsApp: your phone number, entered in the wizard, plus the LID Palui learns from your first DM.
+- Everyone else is dropped silently. Palui doesn't reply, and the drop is logged with the reason.
+
+## What the agent may do
+
+- Tool classes fail closed. Every tool is `read`, `write` or `destructive`, and an unclassified tool is `destructive`. See [Tool classes](/docs/concepts/tool-classes).
+- Approvals. `destructive` tools always ask you first. The runtime enforces it, not the prompt. See [Approvals](/docs/concepts/approvals).
+- The taint rule. Once a turn reads untrusted content (web fetch, a webhook payload, an `external` MCP server), every `write` tool needs approval for the rest of that turn. See [The taint rule](/docs/concepts/taint-rule).
+- Jobs and hooks. Scheduled jobs never get `destructive` tools, and every `write` needs approval. Webhook summaries run with zero tools.
+- Budgets. Each turn is capped at 12 steps, 120 s and about 30 tools. Daily token caps and a limit of 60 runs per hour stop runaway loops.
+
+## Memory
+
+recall auto-save stores only your messages and the final replies. It never stores tool output and skips tainted turns, so an injected tool result can't become a permanent memory that auto-recall feeds into every later turn.
+
+## Secrets
+
+- Connector secrets are encrypted at rest with AES-256-GCM, keyed by `MASTER_KEY` from `.env`.
+- They're write-only. You can replace one, never read it back. The UI shows them masked, like `rcl_••••a91f`.
+- Logs redact API key patterns (such as `rcl_`, `zkg_` and `sk-` keys) and bot tokens.
+- `.env` holds only three keys: `MASTER_KEY`, `BETTER_AUTH_SECRET` and `APP_URL`. Keep a copy of `MASTER_KEY` in your password manager.
+- Backups are encrypted with age before they leave the machine. See [Backups](/docs/self-hosting/backups).
+
+## Network
+
+- The app is bound to `127.0.0.1` on the Docker host and reached through your tunnel.
+- The runtime's control API lives on the compose network only. Its port is never published.
+- An SSRF guard sits in front of every fetch the agent can steer, so a page or a prompt can't make Palui read internal addresses.
+
+## Retention
+
+| Data | Kept for |
+|---|---|
+| Tool call arguments and results | 30 days |
+| Media | 14 days |
+| Events | 90 days |
+
+Messages stay in the database. Compaction only removes old messages from the model's context.
+
+## Model provider logs
+
+Palui sends prompts to your model provider. If that provider logs requests to disk (CLIProxyAPI can), your prompts and any recall memories in them end up there. Cap or disable those logs.

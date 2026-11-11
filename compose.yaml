@@ -1,0 +1,68 @@
+# zaki-selfhost compose file. deploy.sh runs `docker compose up -d --build --wait`,
+# which waits on EVERY service, so both healthchecks must be cheap and honest.
+# Secrets come from .env (MASTER_KEY, BETTER_AUTH_SECRET, APP_URL); every other
+# credential is encrypted in the database.
+name: palui
+
+x-logging: &logging           # caps logs at 30 MB per container
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  app:                        # keep this name, deploy.sh looks for it
+    build: .                  # the only service with build:, so compose builds once
+    image: palui:latest       # one tag, overwritten on every deploy; deploy.sh keeps palui:prev
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4802:3000" # loopback only, the tunnel is the only way in
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATA_DIR: /data
+      RUNTIME_URL: http://runtime:4891
+    volumes:
+      - data:/data
+    healthcheck:              # slim has no wget. /health fails when the DB is newer than the code
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    stop_grace_period: 60s
+    logging: *logging
+
+  runtime:
+    image: palui:latest       # the image `app` builds
+    pull_policy: never
+    command: ["node", "runtime/dist/index.mjs"]
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATA_DIR: /data
+      CONTROL_PORT: "4891"    # compose network only, never published
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # CLIProxyAPI :8317, ai-gateway :8793, recall :4800
+    volumes:
+      - data:/data
+      # Optional: lets the WhatsApp wizard check which chats utusan still binds
+      # (PLAN 5.1). Without it the wizard asks you to tick a box instead.
+      # - ${HOME}/.utusan/utusan.json:/utusan/utusan.json:ro
+    depends_on:
+      app:
+        condition: service_healthy   # the app runs migrations; the runtime refuses an unknown schema
+    healthcheck:              # liveness only: event loop, DB open, schema known. Connector state never fails it
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4891/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    stop_grace_period: 60s    # drains on SIGTERM: finish the current step, release outbox claims
+    logging: *logging
+
+volumes:
+  data:
