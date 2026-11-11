@@ -170,7 +170,6 @@ export type HarnessOptions = {
   deps?: EngineDeps
   approvalTtlMs?: number
   clock?: { now: number }
-  utusanFile?: string
 }
 
 export async function harness(o: HarnessOptions) {
@@ -181,7 +180,7 @@ export async function harness(o: HarnessOptions) {
   let engineRef: ReturnType<typeof createEngine> | undefined
   const sup = createSupervisor({ db, registry: o.registry, services, log: silentLogger, masterKey: TEST_KEY, dataDir: "/tmp/palui-test", clock: () => clock.now, inUse: (id) => engineRef?.inUse(id) ?? false })
   const bus = createTurnBus()
-  const engine = createEngine({ db, host: sup, log: silentLogger, clock: () => clock.now, bus, deps: o.deps, approvalTtlMs: o.approvalTtlMs, sendWaitMs: 20, utusanFile: o.utusanFile })
+  const engine = createEngine({ db, host: sup, log: silentLogger, clock: () => clock.now, bus, deps: o.deps, approvalTtlMs: o.approvalTtlMs, sendWaitMs: 20 })
   engineRef = engine
   Object.assign(services, engine.services)
   await sup.reconcile()

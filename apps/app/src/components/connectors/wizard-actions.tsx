@@ -265,7 +265,7 @@ function PairWhatsApp(props: WizardActionProps) {
   )
 }
 
-// The pairing code is for the number being LINKED (utusan's number, PLAN 5.1),
+// The pairing code is for the number being LINKED (Palui's own number, PLAN 5.1),
 // not the owner's. Without it, pairing is QR only.
 function PairPhone(props: WizardActionProps) {
   const { run } = useAction(props)

@@ -89,7 +89,7 @@ function dm(id: string, extra: Partial<WAMessage> = {}, key: Partial<WAMessage["
 
 describe("whatsapp manifest", () => {
   it("has the wizard steps and remove warning", () => {
-    expect(manifest.setup.map((s) => ("action" in s ? s.action : s.field))).toEqual(["ownerPhone", "pairWhatsApp", "utusanCleared"])
+    expect(manifest.setup.map((s) => ("action" in s ? s.action : s.field))).toEqual(["ownerPhone", "pairWhatsApp"])
     expect(manifest.removeWarning).toBe("This unlinks the WhatsApp device. You'll need to pair again.")
     expect(manifest.config.safeParse({ ownerPhone: "+62 812 3456 789" }).success).toBe(true)
     expect(manifest.config.safeParse({ ownerPhone: "abc" }).success).toBe(false)

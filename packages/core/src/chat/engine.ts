@@ -31,8 +31,6 @@ export type EngineOptions = {
   approvalTtlMs?: number
   // How long a command waits for its reply to go out before applying (self-channel off).
   sendWaitMs?: number
-  // utusan's config, for the WhatsApp chat split (default: the compose mount).
-  utusanFile?: string
 }
 
 export type Engine = ReturnType<typeof createEngine>
@@ -87,7 +85,7 @@ export function createEngine(opts: EngineOptions) {
       logEvent(db, { connectorId: msg.connectorId, kind: "router.ignore", message: reason }, now)
       return null
     }
-    const { chat, row } = writeInbound(db, msg, now, { utusanFile: opts.utusanFile })
+    const { chat, row } = writeInbound(db, msg, now)
     if (chat.channel === "web") ctx.bus.publish({ type: "message", chatId: chat.id, messageId: row.id, role: "user", text: row.text })
     void routeInOrder(chat.id, row.id)
     return { chatId: chat.id, messageId: row.id }

@@ -2,13 +2,12 @@ import { describe, expect, it } from "vitest"
 import { z } from "zod"
 import { describeField, type FieldStep, wizardFieldInfo, wizardInitialValues, wizardPayload } from "./zod-fields"
 
-// Shaped like the WhatsApp manifest's confirmation step, inline so this test
-// doesn't depend on the manifest change.
+// A boolean wizard step, inline so this test doesn't depend on any manifest.
 const config = z.object({
-  utusanCleared: z.boolean().default(false),
+  notify: z.boolean().default(false),
   name: z.string().optional(),
 })
-const step: FieldStep = { field: "utusanCleared", label: "This chat isn't bound in utusan", help: "Unbind it in utusan first." }
+const step: FieldStep = { field: "notify", label: "Send notifications", help: "Off keeps it quiet." }
 const manifest = {
   config,
   secrets: { token: z.string() },
@@ -26,17 +25,17 @@ describe("boolean config fields in the connector wizard", () => {
   })
 
   it("starts from the schema default, then from the stored value", () => {
-    expect(wizardInitialValues(manifest, {})).toEqual({ utusanCleared: false, name: "", token: "" })
-    expect(wizardInitialValues(manifest, { utusanCleared: true })).toMatchObject({ utusanCleared: true })
+    expect(wizardInitialValues(manifest, {})).toEqual({ notify: false, name: "", token: "" })
+    expect(wizardInitialValues(manifest, { notify: true })).toMatchObject({ notify: true })
   })
 
   it("saves true and false as booleans that the schema accepts", () => {
-    const on = wizardPayload(manifest, { utusanCleared: true, name: " x ", token: "" })
-    expect(on).toEqual({ config: { utusanCleared: true, name: "x" }, secrets: {} })
-    const off = wizardPayload(manifest, { utusanCleared: false, name: "", token: "t" })
-    expect(off.config.utusanCleared).toBe(false)
+    const on = wizardPayload(manifest, { notify: true, name: " x ", token: "" })
+    expect(on).toEqual({ config: { notify: true, name: "x" }, secrets: {} })
+    const off = wizardPayload(manifest, { notify: false, name: "", token: "t" })
+    expect(off.config.notify).toBe(false)
     expect(off.secrets).toEqual({ token: "t" })
-    expect(config.shape.utusanCleared.safeParse(on.config.utusanCleared)).toEqual({ success: true, data: true })
-    expect(config.shape.utusanCleared.safeParse(off.config.utusanCleared)).toEqual({ success: true, data: false })
+    expect(config.shape.notify.safeParse(on.config.notify)).toEqual({ success: true, data: true })
+    expect(config.shape.notify.safeParse(off.config.notify)).toEqual({ success: true, data: false })
   })
 })

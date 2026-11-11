@@ -21,9 +21,6 @@ export default defineManifest({
     pairPhone: phone.optional(),
     // Learned on connect: the digits of the linked account.
     linkedNumber: z.string().optional(),
-    // The owner confirms the chat's utusan binding is gone. Only consulted when
-    // Palui can't read utusan.json itself (PLAN 5.1, 18). Unset means false.
-    utusanCleared: z.boolean().optional(),
   }),
   secrets: {},
   setup: [
@@ -32,12 +29,6 @@ export default defineManifest({
       action: "pairWhatsApp",
       label: "Link the WhatsApp number",
       help: "On the phone that runs the number: WhatsApp > Linked devices > Link with phone number, then type the code.",
-    },
-    {
-      field: "utusanCleared",
-      label: "This chat isn't bound in utusan",
-      help: "Remove the chat's binding from utusan first (PLAN 18). Only needed when Palui can't read utusan's config.",
-      optional: true,
     },
   ],
   removeWarning: "This unlinks the WhatsApp device. You'll need to pair again.",
