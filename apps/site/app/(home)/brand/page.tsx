@@ -17,11 +17,20 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: "#0a0a0a", colorScheme: "dark" }
 
-// Every file here is written by scripts/brand-icons.mjs into public/brand.
+// Every file here is written by scripts/brand-icons.mjs into public/brand,
+// as palui-avatar-<design>-<theme>.png and .svg.
 const avatars = [
-  { file: "palui-avatar-head", name: "Head", note: "The mascot. Reads best on a phone." },
-  { file: "palui-avatar-dark", name: "Face, dark", note: "Flat, white on black." },
-  { file: "palui-avatar-light", name: "Face, light", note: "Flat, black on white." },
+  { design: "head", name: "Head", note: "The 3D head from the corner. Reads best in a chat list." },
+  { design: "front", name: "Head, straight", note: "The same head, face on." },
+  { design: "wave", name: "Waving", note: "Palui saying hi. A friendly first message." },
+  { design: "bust", name: "Portrait", note: "Head and shoulders, cropped like a photo." },
+  { design: "body", name: "Full body", note: "Palui standing. Best where the picture shows big." },
+  { design: "tile", name: "App icon", note: "The flat mark on its tile." },
+  { design: "face", name: "Face", note: "The flat face alone. Sharpest at tiny sizes." },
+]
+const themes = [
+  { theme: "dark", name: "Dark" },
+  { theme: "light", name: "Light" },
 ]
 
 const marks = [
@@ -53,24 +62,33 @@ export default function BrandPage() {
         <p className="br-text">Square, 1024 × 1024. WhatsApp and Telegram crop it to a circle, and everything stays inside it.</p>
         <ul className="br-avatars">
           {avatars.map((a) => (
-            <li key={a.file} className="br-card">
-              <div className="br-preview">
-                <img src={`/brand/${a.file}.png`} alt={`Palui profile picture, ${a.name.toLowerCase()}`} width={160} height={160} className="br-circle" />
-                {/* The size it shows at in a chat list. */}
-                <img src={`/brand/${a.file}.png`} alt="" width={40} height={40} className="br-circle br-circle-sm" />
-              </div>
+            <li key={a.design} className="br-card">
               <div className="br-card-body">
                 <h3 className="br-h3">{a.name}</h3>
                 <p className="br-note">{a.note}</p>
-                <div className="br-actions">
-                  <a href={`/brand/${a.file}.png`} download className="br-btn">
-                    <Download aria-hidden="true" />
-                    PNG
-                  </a>
-                  <a href={`/brand/${a.file}.svg`} download className="br-btn br-btn-quiet">
-                    SVG
-                  </a>
-                </div>
+              </div>
+              <div className="br-variants">
+                {themes.map((t) => {
+                  const file = `/brand/palui-avatar-${a.design}-${t.theme}`
+                  return (
+                    <div key={t.theme} className="br-variant">
+                      <div className="br-preview">
+                        <img src={`${file}.png`} alt={`Palui profile picture, ${a.name.toLowerCase()}, ${t.name.toLowerCase()}`} width={112} height={112} className="br-circle" />
+                        {/* The size it shows at in a chat list. */}
+                        <img src={`${file}.png`} alt="" width={32} height={32} className="br-circle br-circle-sm" />
+                      </div>
+                      <div className="br-actions">
+                        <a href={`${file}.png`} download className="br-btn">
+                          <Download aria-hidden="true" />
+                          {t.name}
+                        </a>
+                        <a href={`${file}.svg`} download className="br-btn br-btn-quiet" aria-label={`${t.name} SVG`}>
+                          SVG
+                        </a>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </li>
           ))}

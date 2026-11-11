@@ -82,23 +82,37 @@
   border-radius: 12px;
   background: var(--lp-surface);
 }
+.br-variants {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.br-variant {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
 .br-preview {
   display: flex;
   align-items: flex-end;
-  gap: 16px;
+  gap: 8px;
 }
 .br-circle {
   display: block;
-  width: 128px;
-  height: 128px;
+  width: 112px;
+  height: auto;
+  max-width: calc(100% - 40px);
+  aspect-ratio: 1;
+  object-fit: cover;
   border-radius: 50%;
   /* The light avatar would vanish into a light page; on this dark one the
      ring only shows the edge of the crop. */
   box-shadow: 0 0 0 1px var(--lp-line);
 }
 .br-circle-sm {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
 }
 .br-card-body {
   display: flex;
@@ -108,8 +122,12 @@
 .br-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
+}
+.br-actions .br-btn {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 14px;
 }
 
 /* ------------------------------------------------------------ buttons */
@@ -296,7 +314,7 @@
     padding-bottom: 64px;
   }
   .br-avatars {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .br-marks {
     grid-template-columns: repeat(2, minmax(0, 1fr));
