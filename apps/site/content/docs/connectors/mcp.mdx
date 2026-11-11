@@ -36,7 +36,7 @@ Whatever the server exposes. The tool table on the connector page has:
 Each server gets an instance id like `mcp-<slug>`, and its tools reach the model as `mcp-<slug>__<tool>`. Classes decide approvals. See [Tool classes](/docs/concepts/tool-classes).
 
 <Callout type="info" title="Tool budget">
-  A turn offers about 30 tools at most. With many servers on, the most relevant connectors go first. Turning off tools you don't use keeps the useful ones in.
+  A turn loads about 64 tools up front. With more servers on, Palui loads the rest when it needs them: it searches by keyword with `palui__cari_tool`, then calls what it found, and those tools stay loaded for the rest of the conversation. That costs one extra step the first time, so turning off tools you don't use still helps.
 </Callout>
 
 ## Pause and remove

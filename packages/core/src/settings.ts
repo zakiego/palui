@@ -60,7 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
   budgets: {
     maxSteps: 12,
     turnTimeoutMs: 120_000,
-    maxTools: 30,
+    maxTools: 64,
     dailyTokenCap: 2_000_000,
     maxRunsPerHour: 60,
   },

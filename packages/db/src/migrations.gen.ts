@@ -11,5 +11,9 @@ export const migrations: { name: string; sql: string }[] = [
   {
     "name": "0002_tan_legion",
     "sql": "CREATE TABLE `instructions` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`title` text NOT NULL,\n\t`body` text NOT NULL,\n\t`enabled` integer DEFAULT true NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n);\n--> statement-breakpoint\nCREATE TABLE `preferences` (\n\t`key` text PRIMARY KEY NOT NULL,\n\t`value` text NOT NULL,\n\t`updated_at` integer NOT NULL\n);\n"
+  },
+  {
+    "name": "0003_curved_devos",
+    "sql": "ALTER TABLE `sessions` ADD `loaded_tools` text;"
   }
 ]

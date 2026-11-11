@@ -1141,3 +1141,74 @@ describe("the same call asked again", () => {
     expect(pendingRows(h.db).map((r) => r.toolCallId)).toEqual(["c3"])
   })
 })
+
+describe("tool search", () => {
+  // Regression: a remote MCP server added last sorted after the skills and the
+  // tools-per-turn cap cut all its tools while it still showed as enabled.
+  const read = (d: string) => ({ tool: fnTool(d, () => d), class: "read" as const })
+  const skill = () =>
+    toolsRuntime("notes", () => ({ simpan_instruksi: read("Save a standing instruction"), daftar_instruksi: read("List instructions"), hapus_instruksi: read("Delete an instruction") }), "skill")
+  const sholat = (calls: string[]) =>
+    toolsRuntime("mcp-jadwal-sholat", () => ({
+      search_cities: read("Search cities"),
+      get_prayer_times: { tool: fnTool("Prayer times for a city and date", (i) => { calls.push(String(i.city)); return "Subuh 04:30" }), class: "read" as const },
+      list_methods: read("List calculation methods"),
+    }))
+  async function setup(steps: Parameters<typeof scriptedModel>[0], calls: string[] = [], extra: Record<string, import("../connectors/define").AnyRuntime> = {}) {
+    const rows: Record<string, "tools" | "skill"> = { notes: "skill", "mcp-jadwal-sholat": "tools" }
+    for (const id of Object.keys(extra)) rows[id] = "tools"
+    const h = await basic(steps, { registry: { notes: skill(), "mcp-jadwal-sholat": sholat(calls), ...extra }, rows })
+    setSetting(h.db, "budgets", { ...getSetting(h.db, "budgets"), maxTools: 4 })
+    return h
+  }
+
+  it("finds a remote MCP tool over the cap and calls it in the same turn", async () => {
+    const calls: string[] = []
+    const h = await setup(
+      [callTool("palui__cari_tool", { query: "jadwal sholat" }), callTool("mcp-jadwal-sholat__get_prayer_times", { city: "Banjarbaru" }), say("Subuh 04:30")],
+      calls,
+    )
+    await h.engine.inbound(tgMessage("jadwal sholat banjarbaru"))
+    await h.engine.idle()
+    const [first, second] = h.m.offered
+    expect(first).toEqual(["notes__simpan_instruksi", "notes__daftar_instruksi", "notes__hapus_instruksi", "palui__cari_tool"])
+    expect(second).toContain("mcp-jadwal-sholat__get_prayer_times")
+    expect(calls).toEqual(["Banjarbaru"])
+    const prompt = promptText(h.m.prompts[0])
+    expect(prompt).toContain("jadwal-sholat (3 to load with palui__cari_tool: search_cities, get_prayer_times, list_methods)")
+    expect(prompt).toContain("Never tell the owner a tool or capability doesn't exist without searching first.")
+  })
+
+  it("keeps loaded tools for the next turns of the session", async () => {
+    const h = await setup([callTool("palui__cari_tool", { names: ["get_prayer_times"] }), say("ok"), say("lagi")])
+    await h.engine.inbound(tgMessage("jadwal sholat"))
+    await h.engine.idle()
+    await h.engine.inbound(tgMessage("besok?"))
+    await h.engine.idle()
+    const next = h.m.offered.at(-1)!
+    expect(next, JSON.stringify(h.m.offered)).toContain("mcp-jadwal-sholat__get_prayer_times")
+    expect(next).toContain("palui__cari_tool")
+    expect(next).toHaveLength(4)
+  })
+
+  it("never finds tools of a disabled connector or a disabled tool", async () => {
+    const off = toolsRuntime("mcp-off", () => ({ prayer_alarm: read("Prayer alarm") }))
+    const h = await setup([callTool("palui__cari_tool", { query: "prayer alarm" }), say("ok")], [], { "mcp-off": off })
+    pauseConnector(h.db, "mcp-off")
+    await h.sup.reconcile()
+    await h.engine.inbound(tgMessage("alarm sholat"))
+    await h.engine.idle()
+    const result = h.db.select().from(toolCalls).where(eq(toolCalls.tool, "palui__cari_tool")).get()!
+    expect(result.resultPreview).not.toContain("prayer_alarm")
+    expect(promptText(h.m.prompts[0])).not.toContain("mcp-off")
+  })
+
+  it("loads everything up front when the tools fit", async () => {
+    const h = await basic([say("ok")], { registry: { notes: skill(), "mcp-jadwal-sholat": sholat([]) }, rows: { notes: "skill", "mcp-jadwal-sholat": "tools" } })
+    await h.engine.inbound(tgMessage("halo"))
+    await h.engine.idle()
+    expect(h.m.offered[0]).toHaveLength(6)
+    expect(h.m.offered[0]).not.toContain("palui__cari_tool")
+    expect(promptText(h.m.prompts[0])).toContain("jadwal-sholat (3 tools)")
+  })
+})

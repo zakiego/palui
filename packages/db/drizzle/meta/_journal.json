@@ -22,6 +22,13 @@
       "when": 1794397388974,
       "tag": "0002_tan_legion",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1794401783332,
+      "tag": "0003_curved_devos",
+      "breakpoints": true
     }
   ]
 }

@@ -13,6 +13,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Added
 
+- Tool search. When more tools are enabled than Tools per turn (Settings, Limits), Palui loads a core set and lists the rest by name. It finds what it needs with `palui__cari_tool` (keywords in any language or exact names), calls it in the same turn, and keeps it loaded for the rest of the conversation. However many skills and MCP servers you add, none of their tools get dropped. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 - A Notes page and an Instructions & preferences skill. Palui can save standing instructions (always after your approval) and key-value defaults like `default_city`, and reads both at the start of every turn. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 - A Remote MCP setup skill: ask Palui in chat to add a public MCP server (https, no auth) and it checks the URL, lists the tools and adds it after you approve. It can also list servers and remove the ones it added. See the Jadwal Sholat example in the docs.
 - Palui can keep the important files you send in chat, like an ID card, a receipt or a ticket. Ask it in chat ("simpan KTP ini"), and the new Attachments page lists what it saved, with download and delete. It doesn't save everything you send, only files that matter or that you ask for. Files are encrypted with `MASTER_KEY` inside the database, capped at 10 MB, and limited to images, PDF, text and Office files. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
@@ -32,6 +33,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Fixed
 
+- Tools from an MCP server added last no longer vanish. A turn offered 30 tools at most, the skills took most of them, and a new server's tools were cut without a word while it still showed as on. The up-front limit is now 64, and anything past it loads through tool search (see Added).
 - A connector page no longer stays on "Connecting" after the connector is already on. The status refreshes with the rest of the page every few seconds.
 - Adding an MCP server shows Auth and Token right away instead of hiding them under "More settings". Header name shows only for the custom header mode, and Token only when the server needs one.
 - Palui no longer re-checks your reminders, or any earlier work, on every message. Later turns now see the tool calls earlier turns made and their results, so it stops doubting its own replies and stops taking back answers that were right.

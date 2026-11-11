@@ -1,0 +1,1 @@
+ALTER TABLE `sessions` ADD `loaded_tools` text;

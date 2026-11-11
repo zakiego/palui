@@ -392,7 +392,7 @@ export const en = {
   "settings.limits.turnTimeoutS": "Turn time limit (seconds)",
   "settings.limits.turnTimeoutSHelp": "10 to 600.",
   "settings.limits.maxTools": "Tools per turn",
-  "settings.limits.maxToolsHelp": "1 to 128.",
+  "settings.limits.maxToolsHelp": "1 to 128. Past this, Palui loads the rest through tool search.",
   "settings.limits.dailyTokenCap": "Daily token cap",
   "settings.limits.dailyTokenCapHelp": "Across every chat and job.",
   "settings.limits.maxRunsPerHour": "Runs per hour",

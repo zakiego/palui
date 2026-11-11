@@ -100,10 +100,18 @@ export default defineRuntime(manifest, {
         await conn.close()
       },
       async tools() {
+        // A failed listing or connect marks the connector as errored (shown on the
+        // Connectors page) instead of quietly offering no tools.
         let defs: McpToolDef[]
+        let picked: ReturnType<typeof selectTools>
+        let aiTools: Awaited<ReturnType<McpConnection["tools"]>>
         try {
           defs = (await conn.listTools()).tools
+          picked = selectTools(defs, ctx.config.toolPrefs)
+          aiTools = await conn.tools(picked.map((p) => p.def))
         } catch (err) {
+          ctx.log.warn("mcp tool listing failed, offering no tools this turn", { connector_id: ctx.id, error: err })
+          conn.reset()
           const detail = errorText(err)
           if (detail !== lastError) {
             lastError = detail
@@ -116,8 +124,6 @@ export default defineRuntime(manifest, {
           ctx.setStatus("on")
         }
         toolCount = defs.length
-        const picked = selectTools(defs, ctx.config.toolPrefs)
-        const aiTools = await conn.tools(picked.map((p) => p.def))
         const out: Record<string, PaluiTool> = {}
         for (const p of picked) {
           const t = aiTools[p.def.name]

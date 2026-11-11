@@ -39,7 +39,7 @@ Each turn has limits:
 
 - 12 model steps at most.
 - 120 s of wall-clock time.
-- About 30 tools at most. When more are enabled, the most relevant connectors go first.
+- About 64 tools loaded up front. When more are enabled, the rest are still listed by name and Palui loads them on demand through tool search (`palui__cari_tool`). Change the limit in Settings, Limits.
 
 There are also global caps: a daily token cap, a per-job daily token cap, and at most 60 runs per hour. Hitting a cap pauses turns and tells you on your channel.
 

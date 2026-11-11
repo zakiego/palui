@@ -2,7 +2,7 @@
 // budget, approvals, reply, bookkeeping.
 import { and, eq, inArray, like } from "drizzle-orm"
 import { isStepCount, streamText, type ModelMessage, type ToolApprovalResponse } from "ai"
-import { events, jobs, messages, newId, pendingApprovals, runs, toolCalls, type DB, type RunStatus, type RunTrigger } from "@palui/db"
+import { events, jobs, messages, newId, pendingApprovals, runs, sessions, toolCalls, type DB, type RunStatus, type RunTrigger } from "@palui/db"
 import { approvalsForRun, createApproval, preview, supersedeSameCall, type ApprovalRow, type ResumeContext } from "../approvals/store"
 import { checkGlobalBudget, jobOverCap, pausedNotice, recordRunStart, recordRunTokens } from "../budget"
 import { getChat, getSession, type ChatRow } from "../chats"
@@ -15,7 +15,7 @@ import type { TurnInfo } from "../connectors/define"
 import type { Supervisor } from "../connectors/supervisor"
 import { notesPrompt } from "../notes/service"
 import { getAllSettings, type ModelRole } from "../settings"
-import { collectTools, type CollectedTools } from "../tools/collect"
+import { collectTools, emptyTools, SEARCH_TOOL, STICKY_MAX, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
 import { buildSystem, hasImages, loadHistory, loadToolCalls, quotesOutsider, toModelMessages, type StoredContent } from "./context"
 import type { EngineDeps } from "./deps"
@@ -80,14 +80,30 @@ export function sendToChat(ctx: EngineCtx, chat: ChatRow, text: string, source: 
   return row
 }
 
+// One line per enabled skill or tool connector. With tool search on, a connector
+// with tools still to load names them, so the model knows they exist.
 function capabilityList(ctx: EngineCtx, tools: CollectedTools): string[] {
   const out: string[] = []
+  const active = new Set(tools.active)
   for (const e of ctx.host.running()) {
     if (e.row.kind === "model" || e.row.kind === "channel") continue
-    const n = Object.values(tools.meta).filter((m) => m.connectorId === e.id).length
-    out.push(n ? `${e.row.label} (${n} tools)` : e.row.label)
+    const metas = Object.values(tools.meta).filter((m) => m.connectorId === e.id)
+    const loaded = metas.filter((m) => active.has(m.name)).length
+    const waiting = metas.filter((m) => !active.has(m.name)).map((m) => m.tool)
+    if (!waiting.length) out.push(loaded ? `${e.row.label} (${loaded} tools)` : e.row.label)
+    else {
+      const shown = waiting.slice(0, 8).join(", ") + (waiting.length > 8 ? `, +${waiting.length - 8} more` : "")
+      out.push(`${e.row.label} (${loaded ? `${loaded} tools loaded, ` : ""}${waiting.length} to load with ${SEARCH_TOOL}: ${shown})`)
+    }
   }
   return out
+}
+
+// Keep tools loaded by search for the rest of the session, most recent first.
+function rememberLoaded(db: DB, sessionId: string, names: string[]) {
+  const row = db.select({ loadedTools: sessions.loadedTools }).from(sessions).where(eq(sessions.id, sessionId)).get()
+  const next = [...new Set([...names, ...(row?.loadedTools ?? [])])].slice(0, STICKY_MAX)
+  db.update(sessions).set({ loadedTools: next }).where(eq(sessions.id, sessionId)).run()
 }
 
 export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<TurnResult> {
@@ -170,12 +186,16 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     const noTools = input.noTools || origin === "hook"
     const scope = input.resume ? input.resume.context.toolScope : input.toolScope
     const tools: CollectedTools = noTools
-      ? { tools: {}, meta: {}, connectorIds: [] }
+      ? emptyTools()
       : await collectTools(ctx.host.running(), {
           turn: turnInfo,
           maxTools: settings.budgets.maxTools,
           scope,
           excludeDestructive: unattended(origin),
+          sticky: session?.loadedTools,
+          onLoad: (names) => {
+            if (chat.sessionId) rememberLoaded(db, chat.sessionId, names)
+          },
           log: rlog,
           onUntrustedResult: (m) => {
             if (!state.tainted) rlog.info("turn tainted by an untrusted tool result", { tool: m.name })
@@ -184,6 +204,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
           onToolStart: (id) => toolStarts.set(id, ctx.clock()),
         })
     for (const id of tools.connectorIds) active.connectorIds.add(id)
+    if (tools.deferred.length) rlog.info("more tools than maxTools, the rest load through tool search", { max_tools: settings.budgets.maxTools, active: tools.active.length, deferred: tools.deferred.length })
 
     // Messages and system prompt.
     let system: string
@@ -210,6 +231,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         channel: chat.channel,
         chat: { id: chat.id, externalId: chat.externalId, kind: chat.kind, sessionId: chat.sessionId },
         capabilities: capabilityList(ctx, tools),
+        toolSearch: tools.deferred.length > 0,
         notes: notesPrompt(db),
         recall,
         summary: input.trigger === "message" ? session?.summary : null,
@@ -230,6 +252,9 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
       system,
       messages: modelMessages,
       tools: tools.tools,
+      // With tool search on, only the active names reach the model; a search
+      // appends to tools.active, and the next step offers the loaded tools.
+      ...(tools.deferred.length ? { activeTools: [...tools.active], prepareStep: () => ({ activeTools: [...tools.active] }) } : {}),
       maxRetries: 1,
       stopWhen: [isStepCount(settings.budgets.maxSteps), () => ctx.draining],
       abortSignal: AbortSignal.any([controller.signal, AbortSignal.timeout(settings.budgets.turnTimeoutMs)]),

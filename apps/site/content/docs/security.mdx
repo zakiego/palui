@@ -25,7 +25,7 @@ Palui has one owner and assumes everything else is untrusted: other people messa
 - Approvals. `destructive` tools always ask you first. The runtime enforces it, not the prompt. See [Approvals](/docs/concepts/approvals).
 - The taint rule. Once a turn reads untrusted content (web fetch, a webhook payload, an `external` MCP server), every `write` tool needs approval for the rest of that turn. See [The taint rule](/docs/concepts/taint-rule).
 - Jobs and hooks. Scheduled jobs never get `destructive` tools, and every `write` needs approval. Webhook summaries run with zero tools.
-- Budgets. Each turn is capped at 12 steps, 120 s and about 30 tools. Daily token caps and a limit of 60 runs per hour stop runaway loops.
+- Budgets. Each turn is capped at 12 steps, 120 s and about 64 tools loaded up front (more load on demand through tool search). Daily token caps and a limit of 60 runs per hour stop runaway loops.
 
 ## Memory
 

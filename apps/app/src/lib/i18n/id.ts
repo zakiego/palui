@@ -391,7 +391,7 @@ export const id: Record<Key, string> = {
   "settings.limits.turnTimeoutS": "Batas waktu giliran (detik)",
   "settings.limits.turnTimeoutSHelp": "10 sampai 600.",
   "settings.limits.maxTools": "Tool per giliran",
-  "settings.limits.maxToolsHelp": "1 sampai 128.",
+  "settings.limits.maxToolsHelp": "1 sampai 128. Lebih dari ini, sisanya dimuat lewat pencarian tool.",
   "settings.limits.dailyTokenCap": "Batas token harian",
   "settings.limits.dailyTokenCapHelp": "Untuk semua obrolan dan tugas.",
   "settings.limits.maxRunsPerHour": "Run per jam",

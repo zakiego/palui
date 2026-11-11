@@ -193,6 +193,9 @@ export const sessions = sqliteTable(
     // Messages created at or before this time are folded into `summary`.
     summarizedUntil: integer("summarized_until"),
     savedToRecallAt: integer("saved_to_recall_at"),
+    // Namespaced tool names loaded through tool search, most recent first. They
+    // stay in the turn's active tools for the rest of the session.
+    loadedTools: json<string[]>("loaded_tools"),
     createdAt: integer("created_at").notNull(),
     closedAt: integer("closed_at"),
   },

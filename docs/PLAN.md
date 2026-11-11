@@ -239,7 +239,7 @@ ai-gateway
 - Same shape, `zkg_` key. The fallback in every chain.
 
 Budget
-- Per turn: 12 steps, 120 s wall clock, about 30 tools at most (the most relevant connectors first when there are more).
+- Per turn: 12 steps, 120 s wall clock, about 64 tools loaded up front. Past that, tool search takes over: tools loaded earlier in the session go first, then skills, memory and the rest, one slot goes to `palui__cari_tool`, and every other enabled tool is named in the capability list and loaded on demand by keyword or exact name. Loaded tools join the active set from the next step and stay for the session (`sessions.loaded_tools`, 20 most recent).
 - Global: a daily token cap, a per-job daily cap, and a max of 60 runs per hour. Hitting a cap pauses turns and tells me on the channel.
 - `/stop` aborts the running turn (`abortSignal`). `/status` shows the model, tokens today and connector states.
 

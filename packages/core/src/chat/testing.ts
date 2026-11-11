@@ -114,9 +114,12 @@ export type Step = Chunk[] | Error | (() => Promise<Chunk[]>)
 // A mock model that plays steps in order; the prompts it saw are kept.
 export function scriptedModel(steps: Step[], fallback: Step = say("ok")) {
   const prompts: unknown[] = []
+  // Tool names offered on each model call, in call order.
+  const offered: string[][] = []
   const model = new MockLanguageModelV4({
     doStream: async (options) => {
       prompts.push(options.prompt)
+      offered.push((options.tools ?? []).map((t) => t.name))
       const s = steps.length ? steps.shift()! : fallback
       if (s instanceof Error) throw s
       const chunks = typeof s === "function" ? await s() : s
@@ -131,7 +134,7 @@ export function scriptedModel(steps: Step[], fallback: Step = say("ok")) {
       return { content: text ? [{ type: "text", text }] : [], finishReason: { unified: "stop", raw: undefined }, usage: usage(), warnings: [] } as never
     },
   })
-  return { model, prompts, steps }
+  return { model, prompts, steps, offered }
 }
 
 export function promptText(prompt: unknown): string {
