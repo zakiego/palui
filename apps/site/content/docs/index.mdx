@@ -5,23 +5,23 @@ description: Palui Agent is a self-hosted personal AI assistant for one owner, r
 
 Palui Agent is a personal AI assistant you run on your own server. It has one owner. You talk to it from WhatsApp, Telegram or the web chat in its dashboard, in Indonesian or English. It remembers things through recall, reminds you on time, runs scheduled jobs, and reaches your tools through MCP.
 
-Every capability is a connector. Channels, models, memory, tools and skills all share one lifecycle, and each one can be switched on, paused or removed from one screen or one chat command, with no restart. That switch is called Saklar (Indonesian for "switch").
+Channels, models, memory, tools and skills are all connectors. You add and manage them on the Connectors page in the dashboard.
 
 <Callout type="info" title="Self-hosted, one owner">
   It's a personal agent you run yourself. Anyone other than the owner who messages the bot gets no reply.
 </Callout>
 
 <ArchitectureDiagram>
-  Messages arrive from three channels: WhatsApp, Telegram and the dashboard web chat. They flow into the runtime container, which holds the router, agent turns, the scheduler, the outbox and the Saklar supervisor. Next to it, the app container serves the dashboard, the REST API, authentication, the /health endpoint and database migrations. Both containers share one SQLite database on a single volume. Model providers, the recall memory service and MCP servers sit outside both containers and are reached over the network.
+  Messages arrive from three channels: WhatsApp, Telegram and the dashboard web chat. They flow into the runtime container, which holds the router, agent turns, the scheduler, the outbox and the connector supervisor. Next to it, the app container serves the dashboard, the REST API, authentication, the /health endpoint and database migrations. Both containers share one SQLite database on a single volume. Model providers, the recall memory service and MCP servers sit outside both containers and are reached over the network.
 </ArchitectureDiagram>
 
 ## Where to go next
 
 <Cards>
   <Card title="Getting started" href="/docs/getting-started" description="Install with Docker Compose, create the owner, connect a model and a channel." />
-  <Card title="Saklar" href="/docs/concepts/saklar" description="How connectors work: kinds, states, pause versus remove." />
+  <Card title="Connector lifecycle" href="/docs/concepts/connectors" description="How connectors work: kinds, states, pause versus remove." />
   <Card title="Connectors" href="/docs/connectors" description="One page per connector: what it does, how to connect it, its tools." />
-  <Card title="Chat commands" href="/docs/chat-commands" description="/saklar, /new, /stop, /status and the approval replies." />
+  <Card title="Chat commands" href="/docs/chat-commands" description="/connectors, /new, /stop, /status and the approval replies." />
   <Card title="Self-hosting" href="/docs/self-hosting" description="Compose, volumes, backups, upgrades and the tunnel." />
   <Card title="Security" href="/docs/security" description="Owner identity, approvals, the taint rule and how secrets are stored." />
 </Cards>

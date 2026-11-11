@@ -1,4 +1,4 @@
-// The Saklar supervisor (PLAN 4.4). Desired state: the `connectors` rows
+// The connector supervisor (PLAN 4.4). Desired state: the `connectors` rows
 // (enabled, config_hash). Running state: the handles held here. It reconciles on
 // a control poke and every 30 s. Each connector is isolated: a throw never takes
 // the process down.
@@ -253,7 +253,7 @@ export function createSupervisor(opts: SupervisorOptions) {
   }
 
   // Decide what one connector needs. Starts are pushed to `starts` instead of
-  // awaited, so a slow start never holds up a later poke (a /saklar off).
+  // awaited, so a slow start never holds up a later poke (a /connectors off).
   async function reconcileRow(row: ConnectorRow, starts: Promise<void>[]): Promise<void> {
     const slot = slots.get(row.id)
     try {
@@ -306,7 +306,7 @@ export function createSupervisor(opts: SupervisorOptions) {
       .all()
     for (const row of due) {
       const target = otherChannel(row.id)
-      const text = `Saklar ${row.label} error lebih dari 5 menit: ${row.statusDetail ?? "tanpa detail"}. Cek dashboard.`
+      const text = `Konektor ${row.label} error lebih dari 5 menit: ${row.statusDetail ?? "tanpa detail"}. Cek dashboard.`
       if (target) {
         enqueueOutbox(db, { chatId: target.chatId, channel: target.channel, payload: { text }, source: "system", expiresAt: now + 24 * 3600_000 }, now)
         notifyOutbox()

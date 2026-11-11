@@ -6,7 +6,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { statusSummary } from "@/server/events-stream"
 import { firstRunFacts, nextReminders, recentRuns, startOfDay, tokensSince } from "@/server/queries"
 import { runtime } from "@/server/runtime"
-import { listSaklar } from "@/server/saklar"
+import { listConnectorItems } from "@/server/connectors"
 import { requireUser, requireWriter } from "@/server/session"
 
 export const getShell = createServerFn({ method: "GET" }).handler(async () => {
@@ -15,7 +15,7 @@ export const getShell = createServerFn({ method: "GET" }).handler(async () => {
   return {
     viewer,
     summary: statusSummary(db),
-    connectors: listSaklar({ db, masterKey: safeKey() }).map((c) => ({ id: c.id, label: c.label, status: c.status, enabled: c.enabled, kind: c.kind })),
+    connectors: listConnectorItems({ db, masterKey: safeKey() }).map((c) => ({ id: c.id, label: c.label, status: c.status, enabled: c.enabled, kind: c.kind })),
     uiLanguage: settings.uiLanguage,
     timezone: settings.timezone,
   }
@@ -32,7 +32,7 @@ function safeKey(): string {
 export const getHome = createServerFn({ method: "GET" }).handler(async () => {
   const { db } = await requireUser()
   const settings = getAllSettings(db)
-  const items = listSaklar({ db, masterKey: safeKey() })
+  const items = listConnectorItems({ db, masterKey: safeKey() })
   const facts = firstRunFacts(db)
   const live = (k: string) => items.some((c) => c.kind === k && (c.status === "on" || c.status === "connecting"))
   const checklist = {

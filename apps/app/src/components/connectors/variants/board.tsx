@@ -1,4 +1,4 @@
-// Saklar layout 3, "Board": a wiring board with Palui in the middle and every
+// Connectors page layout 3, "Board": a wiring board with Palui in the middle and every
 // connector a node on a cable (PLAN 11.7 variant 3, the spatial axis). Channels
 // plug in on the left, everything Palui uses on the right. A running connector's
 // cable is solid; a paused one hangs unplugged (dashed, with a gap at the bus).
@@ -17,17 +17,17 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useT } from "@/lib/i18n"
 import { manifestFor } from "@/lib/manifests"
 import { cn } from "@/lib/utils"
-import { SAKLAR_GROUPS, SaklarSwitch } from "../shared"
-import { detailFor, type SaklarItem, type SaklarLayoutProps, type SaklarLive } from "./types"
+import { CONNECTOR_GROUPS, ConnectorSwitch } from "../shared"
+import { detailFor, type ConnectorItem, type ConnectorLayoutProps, type ConnectorLiveMap } from "./types"
 
 type Side = "in" | "out"
 
-export function SaklarBoard({ items, live, onOpen }: SaklarLayoutProps) {
+export function ConnectorBoard({ items, live, onOpen }: ConnectorLayoutProps) {
   const t = useT()
   const on = items.filter((i) => i.status === "on").length
   const setUp = items.filter((i) => i.status !== "not_set_up").length
-  const inputs = SAKLAR_GROUPS.filter((g) => g.kind === "channel")
-  const outputs = SAKLAR_GROUPS.filter((g) => g.kind !== "channel")
+  const inputs = CONNECTOR_GROUPS.filter((g) => g.kind === "channel")
+  const outputs = CONNECTOR_GROUPS.filter((g) => g.kind !== "channel")
   return (
     <div className="grid gap-y-0 @5xl/main:grid-cols-[minmax(0,1fr)_15rem_minmax(0,1fr)] @5xl/main:items-center">
       <div className="order-first @5xl/main:order-none @5xl/main:col-start-2 @5xl/main:row-start-1 @5xl/main:flex @5xl/main:items-center">
@@ -51,7 +51,7 @@ export function SaklarBoard({ items, live, onOpen }: SaklarLayoutProps) {
 
 // One side of the board. The bus is the border on the side that faces Palui
 // (the start edge on a phone, where both sides stack under the hub).
-function BoardSide({ side, groups, items, live, onOpen, className }: { side: Side; groups: typeof SAKLAR_GROUPS; items: SaklarItem[]; live: SaklarLive; onOpen: (id: string) => void; className?: string }) {
+function BoardSide({ side, groups, items, live, onOpen, className }: { side: Side; groups: typeof CONNECTOR_GROUPS; items: ConnectorItem[]; live: ConnectorLiveMap; onOpen: (id: string) => void; className?: string }) {
   const t = useT()
   const present = groups.filter((g) => items.some((i) => i.kind === g.kind))
   if (!present.length) return null
@@ -78,7 +78,7 @@ function BoardSide({ side, groups, items, live, onOpen, className }: { side: Sid
   )
 }
 
-function BoardNode({ side, item, live, onOpen }: { side: Side; item: SaklarItem; live: SaklarLive; onOpen: () => void }) {
+function BoardNode({ side, item, live, onOpen }: { side: Side; item: ConnectorItem; live: ConnectorLiveMap; onOpen: () => void }) {
   const t = useT()
   const m = manifestFor(item.type)
   const Icon = connectorIcon(m?.icon)
@@ -97,16 +97,16 @@ function BoardNode({ side, item, live, onOpen }: { side: Side; item: SaklarItem;
           </ItemTitle>
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <ConnectorStatusBadge status={item.status} />
-            {item.trust === "external" && <Badge variant="outline">{t("saklar.external")}</Badge>}
+            {item.trust === "external" && <Badge variant="outline">{t("connectors.external")}</Badge>}
           </div>
           {(detail || (item.status === "paused" && m?.pauseNote)) && (
             <ItemDescription className="line-clamp-2 break-words">{detail ?? m?.pauseNote}</ItemDescription>
           )}
         </ItemContent>
         <ItemActions className="-my-1.5 -me-1.5 flex-col items-end gap-0 self-stretch">
-          {setUp && <SaklarSwitch item={item} />}
-          <Button variant="ghost" size="sm" className="mt-auto" onClick={onOpen} aria-label={`${setUp ? t("common.open") : t("saklar.continueSetup")} ${item.label}`}>
-            {setUp ? t("common.open") : t("saklar.continueSetup")}
+          {setUp && <ConnectorSwitch item={item} />}
+          <Button variant="ghost" size="sm" className="mt-auto" onClick={onOpen} aria-label={`${setUp ? t("common.open") : t("connectors.continueSetup")} ${item.label}`}>
+            {setUp ? t("common.open") : t("connectors.continueSetup")}
           </Button>
         </ItemActions>
       </Item>
@@ -143,7 +143,7 @@ function Cable({ status, side }: { status: string; side: Side }) {
   )
 }
 
-export function SaklarBoardSkeleton() {
+export function ConnectorBoardSkeleton() {
   return (
     <div className="grid gap-4 @5xl/main:grid-cols-[1fr_15rem_1fr] @5xl/main:items-center">
       <Skeleton className="h-16 max-w-[16rem] rounded-xl @5xl/main:col-start-2 @5xl/main:max-w-none" />

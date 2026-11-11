@@ -53,7 +53,7 @@ function setup(registry: Record<string, ReturnType<typeof fakeRuntime>>) {
   }
 }
 
-describe("saklar supervisor", () => {
+describe("connector supervisor", () => {
   it("starts enabled connectors (connecting -> on) and keeps a status the connector reports", async () => {
     const a = fakeRuntime("alpha", "tools")
     const wa = fakeRuntime("whatsapp", "channel", { reportStatus: "connecting", channel: fakeChannel("whatsapp") })
@@ -167,7 +167,7 @@ describe("saklar supervisor", () => {
   })
 })
 
-describe("saklar supervisor: errors after start and remove", () => {
+describe("connector supervisor: errors after start and remove", () => {
   type Extra = { restartOnError?: boolean; unlinkOnRemove?: boolean }
   function live(id: string, kind: "channel" | "tools", extra: Extra = {}, startFails?: () => boolean) {
     const ctxs: import("./define").ConnectorContext[] = []

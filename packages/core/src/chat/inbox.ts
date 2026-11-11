@@ -7,10 +7,10 @@ import { chats, messages, newId, type DB } from "@palui/db"
 import { ensureChat, findChat, type ChatRow } from "../chats"
 import { logEvent } from "../events"
 import type { Logger } from "../log"
-import { getConnector } from "../saklar/store"
+import { getConnector } from "../connectors/store"
 import { checkUtusan, UTUSAN_CONFIG_PATH } from "../utusan"
-import type { InboundMedia, InboundMessage } from "../saklar/define"
-import type { RunningEntry } from "../saklar/supervisor"
+import type { InboundMedia, InboundMessage } from "../connectors/define"
+import type { RunningEntry } from "../connectors/supervisor"
 import type { StoredContent, StoredMedia } from "./context"
 
 export type MessageRow = typeof messages.$inferSelect

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import worker from "./index.ts"
 
-const SITE = "https://palui-site.pages.dev"
+const SITE = "https://palui-web.pages.dev"
 const bindings = { SITE_ORIGIN: SITE }
 
 afterEach(() => vi.unstubAllGlobals())
@@ -35,7 +35,7 @@ describe("edge worker", () => {
   })
 
   it("sends /app, /api/auth and /health to the origin", async () => {
-    for (const path of ["/app", "/app/saklar", "/api/auth/get-session", "/health"]) {
+    for (const path of ["/app", "/app/connectors", "/api/auth/get-session", "/health"]) {
       const calls = stubFetch(() => new Response("ok"))
       const req = new Request(`https://palui.zakiego.com${path}`)
       await worker.fetch(req, bindings)

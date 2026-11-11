@@ -15,6 +15,18 @@ export function fullDate(ms: number): string {
   return dateFmt.format(ms)
 }
 
+const timeFmt = new Intl.DateTimeFormat("en", { timeStyle: "short" })
+
+// Intl puts a breakable space before AM or PM: U+0020, or U+202F in WebKit. Swap either for U+00A0.
+export function noBreak(text: string): string {
+  return text.replace(/[\u0020\u202F]/g, "\u00A0")
+}
+
+// A clock time that never wraps, like "11:42 AM" with a non-breaking space.
+export function clockTime(ms: number): string {
+  return noBreak(timeFmt.format(ms))
+}
+
 export function plural(n: number, one: string, many = `${one}s`) {
   return `${n.toLocaleString("en")} ${n === 1 ? one : many}`
 }

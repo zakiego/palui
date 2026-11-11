@@ -1,8 +1,8 @@
 // The hooks skill has no tools: the app verifies and ingests requests itself
 // (@palui/core/hooks). The connector exists so hooks can be paused like any
-// other Saklar (verifyHookRequest answers 503 while it's paused).
+// other connector (verifyHookRequest answers 503 while it's paused).
 import { listHooks } from "@palui/core/hooks/index"
-import { defineRuntime } from "@palui/core/saklar/define"
+import { defineRuntime } from "@palui/core/connectors/define"
 import manifest from "./manifest"
 
 export default defineRuntime(manifest, {

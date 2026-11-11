@@ -1,5 +1,5 @@
-// The Home Saklar summary (PLAN 11.4, 11.6): a connector map that follows the
-// Saklar pick (Cards: grouped by kind, an icon tile per connector). Palui sits
+// The Home connector summary (PLAN 11.4, 11.6): a connector map that follows the
+// Connectors page pick (Cards: grouped by kind, an icon tile per connector). Palui sits
 // at the root and every connector hangs off one wire, with its status and its
 // Switch, so Home is one tap from off too.
 // Motion: the wires draw once ever (a localStorage flag), then stay static. A
@@ -13,7 +13,7 @@ import { PaluiMark } from "@/components/palui-mark"
 import { useT, type Key } from "@/lib/i18n"
 import { manifestFor } from "@/lib/manifests"
 import { cn } from "@/lib/utils"
-import { SAKLAR_GROUPS, SaklarSwitch } from "./shared"
+import { CONNECTOR_GROUPS, ConnectorSwitch } from "./shared"
 
 export type MapConnector = { id: string; type: string; kind: string; label: string; status: string; statusDetail: string | null; enabled: boolean }
 
@@ -40,7 +40,7 @@ export function ConnectorMap({ connectors }: { connectors: MapConnector[] }) {
   const t = useT()
   const draw = useDrawOnce()
   const rows: Row[] = [{ key: "hub", type: "hub" }]
-  for (const g of SAKLAR_GROUPS) {
+  for (const g of CONNECTOR_GROUPS) {
     const list = connectors.filter((c) => c.kind === g.kind)
     if (!list.length) continue
     rows.push({ key: `g-${g.kind}`, type: "group", label: g.label })
@@ -48,7 +48,7 @@ export function ConnectorMap({ connectors }: { connectors: MapConnector[] }) {
   }
   const last = rows.length - 1
   return (
-    <ul className="@container/map flex flex-col" data-draw={draw ? "" : undefined} aria-label={t("home.saklar")}>
+    <ul className="@container/map flex flex-col" data-draw={draw ? "" : undefined} aria-label={t("home.connectors")}>
       {rows.map((row, i) => (
         <li key={row.key} className="relative flex min-h-9 items-center gap-3" style={{ "--i": i } as React.CSSProperties}>
           {/* The wire: a trunk segment per row (half for the root and the last
@@ -88,7 +88,7 @@ function MapNode({ c }: { c: MapConnector }) {
         <ConnectorStatusBadge status={c.status} className="@sm/map:hidden" />
       </div>
       <ConnectorStatusBadge status={c.status} className="hidden @sm/map:inline-flex" />
-      {setUp ? <SaklarSwitch item={c} className="-me-2" /> : <span className="size-11 shrink-0" aria-hidden="true" />}
+      {setUp ? <ConnectorSwitch item={c} className="-me-2" /> : <span className="size-11 shrink-0" aria-hidden="true" />}
     </div>
   )
 }

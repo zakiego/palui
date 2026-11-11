@@ -1,4 +1,4 @@
-import { upsertConnector } from "@palui/core/saklar/store"
+import { upsertConnector } from "@palui/core/connectors/store"
 import { memoryDb, schema, type DB } from "@palui/db"
 import { sql } from "drizzle-orm"
 import { describe, expect, it } from "vitest"

@@ -6,8 +6,8 @@ import { connectors, messages, outbox, pendingApprovals, type Channel, type DB }
 import { getChat } from "../chats"
 import { logEvent } from "../events"
 import type { Logger } from "../log"
-import type { ChannelHandle, SendResult } from "../saklar/define"
-import { ownerChat } from "../saklar/rules"
+import type { ChannelHandle, SendResult } from "../connectors/define"
+import { ownerChat } from "../connectors/rules"
 import { getSetting } from "../settings"
 import { onOutboxEnqueued, type OutboxRow } from "./enqueue"
 

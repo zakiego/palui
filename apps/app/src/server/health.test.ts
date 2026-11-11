@@ -1,4 +1,4 @@
-import { upsertConnector } from "@palui/core/saklar/store"
+import { upsertConnector } from "@palui/core/connectors/store"
 import { memoryDb } from "@palui/db"
 import { describe, expect, it } from "vitest"
 import { health } from "./health"

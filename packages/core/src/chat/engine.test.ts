@@ -7,7 +7,7 @@ import { chats, events, memoryDb, messages, outbox, passkey, pendingApprovals, r
 import { getChat } from "../chats"
 import { listEvents } from "../events"
 import { claimOwner, createClaim, getOwner, setWhatsAppOwner } from "../owner"
-import { getConnector, pauseConnector, resumeConnector } from "../saklar/store"
+import { getConnector, pauseConnector, resumeConnector } from "../connectors/store"
 import { getSetting, setSetting } from "../settings"
 import {
   callTool,
@@ -49,7 +49,7 @@ function modelChain(db: DB, ids: string[]) {
   setSetting(db, "modelRoles", { default: links, fast: links, vision: links })
 }
 
-async function basic(steps: Parameters<typeof scriptedModel>[0] = [], extra: { registry?: Record<string, import("../saklar/define").AnyRuntime>; rows?: Record<string, "tools" | "skill" | "memory" | "model" | "channel"> } = {}) {
+async function basic(steps: Parameters<typeof scriptedModel>[0] = [], extra: { registry?: Record<string, import("../connectors/define").AnyRuntime>; rows?: Record<string, "tools" | "skill" | "memory" | "model" | "channel"> } = {}) {
   const db = memoryDb()
   ownTelegram(db)
   modelChain(db, ["cliproxy"])
@@ -152,24 +152,24 @@ describe("commands", () => {
     expect(outboxTexts(h.db)).toContain("Oke, aku stop.")
   })
 
-  it("/saklar lists with Telegram buttons and turns connectors on and off", async () => {
+  it("/connectors lists with Telegram buttons and turns connectors on and off", async () => {
     const h = await basic([], { registry: { alpha: toolsRuntime("alpha", () => ({})) }, rows: { alpha: "tools" } })
-    await h.engine.inbound(tgMessage("/saklar"))
+    await h.engine.inbound(tgMessage("/connectors"))
     await h.engine.idle()
     const list = h.db.select().from(outbox).all().at(-1)!
     expect(list.payload.text).toContain("alpha: nyala")
-    expect(list.payload.actions).toContainEqual({ id: "saklar:off:alpha", label: "Matikan alpha" })
-    await h.engine.inbound(tgMessage("", { callback: { data: "saklar:off:alpha" } }))
+    expect(list.payload.actions).toContainEqual({ id: "connector:off:alpha", label: "Matikan alpha" })
+    await h.engine.inbound(tgMessage("", { callback: { data: "connector:off:alpha" } }))
     await h.engine.idle()
     expect(getConnector(h.db, "alpha")).toMatchObject({ enabled: false, status: "paused" })
-    await h.engine.inbound(tgMessage("/saklar on alpha"))
+    await h.engine.inbound(tgMessage("/connectors on alpha"))
     await h.engine.idle()
     expect(getConnector(h.db, "alpha")).toMatchObject({ enabled: true, status: "on" })
   })
 
-  it("/saklar off <channel> from that channel needs another way back", async () => {
+  it("/connectors off <channel> from that channel needs another way back", async () => {
     const h = await basic()
-    await h.engine.inbound(tgMessage("/saklar off telegram"))
+    await h.engine.inbound(tgMessage("/connectors off telegram"))
     await h.engine.idle()
     expect(outboxTexts(h.db).at(-1)).toContain("Gak bisa matiin Telegram dari sini")
     expect(getConnector(h.db, "telegram")!.enabled).toBe(true)
@@ -177,18 +177,18 @@ describe("commands", () => {
     // A passkey makes the dashboard a way back.
     h.db.insert(user).values({ id: "u1", name: "Zaki", email: "z@x", createdAt: new Date(), updatedAt: new Date() }).run()
     h.db.insert(passkey).values({ id: "p1", publicKey: "k", userId: "u1", credentialID: "c1", counter: 0, deviceType: "singleDevice", backedUp: false }).run()
-    await h.engine.inbound(tgMessage("/saklar off telegram"))
+    await h.engine.inbound(tgMessage("/connectors off telegram"))
     await h.engine.idle()
     expect(outboxTexts(h.db).at(-1)).toContain("telegram dimatikan. Buat nyalain lagi: nyalakan lagi dari dashboard")
     expect(getConnector(h.db, "telegram")!.enabled).toBe(false)
   })
 
-  it("/saklar off telegram is allowed when WhatsApp is reachable, and says how to undo", async () => {
+  it("/connectors off telegram is allowed when WhatsApp is reachable, and says how to undo", async () => {
     const wa = fakeChannel("whatsapp")
     const h = await basic([], { registry: { whatsapp: channelRuntime("whatsapp", wa) }, rows: { whatsapp: "channel" } })
-    await h.engine.inbound(tgMessage("/saklar off telegram"))
+    await h.engine.inbound(tgMessage("/connectors off telegram"))
     await h.engine.idle()
-    expect(outboxTexts(h.db).at(-1)).toBe("telegram dimatikan. Buat nyalain lagi: kirim `/saklar on telegram` dari WhatsApp.")
+    expect(outboxTexts(h.db).at(-1)).toBe("telegram dimatikan. Buat nyalain lagi: kirim `/connectors on telegram` dari WhatsApp.")
     expect(getConnector(h.db, "telegram")!.enabled).toBe(false)
   })
 })
@@ -293,7 +293,7 @@ describe("turn", () => {
       registry: { cliproxy: modelRuntime("cliproxy", () => a.model), "ai-gateway": modelRuntime("ai-gateway", () => b.model), telegram: channelRuntime("telegram", fakeChannel("telegram")) },
       rows: { cliproxy: "model", "ai-gateway": "model", telegram: "channel" },
     })
-    await h.engine.inbound(tgMessage("/saklar off cliproxy"))
+    await h.engine.inbound(tgMessage("/connectors off cliproxy"))
     await h.engine.inbound(tgMessage("halo"))
     await h.engine.idle()
     expect(outboxTexts(db).at(-1)).toBe("dari gateway")
@@ -726,7 +726,7 @@ describe("unattended turns", () => {
 })
 
 describe("interrupted runs", () => {
-  async function restartWith(db: DB, steps: Parameters<typeof scriptedModel>[0], extra: Record<string, import("../saklar/define").AnyRuntime> = {}) {
+  async function restartWith(db: DB, steps: Parameters<typeof scriptedModel>[0], extra: Record<string, import("../connectors/define").AnyRuntime> = {}) {
     const tg = fakeChannel("telegram")
     const m = scriptedModel(steps)
     const h = await harness({ db, registry: { cliproxy: modelRuntime("cliproxy", () => m.model), telegram: channelRuntime("telegram", tg), ...extra } })
@@ -1001,7 +1001,7 @@ describe("whatsapp chat split", () => {
     const { seedConnector } = await import("./testing")
     seedConnector(db, "whatsapp", "channel", { config })
     await h.sup.reconcile()
-    const send = async (extra: Partial<import("../saklar/define").InboundMessage> = {}) => {
+    const send = async (extra: Partial<import("../connectors/define").InboundMessage> = {}) => {
       const r = await h.engine.inbound({ channel: "whatsapp", connectorId: "whatsapp", chatKind: "dm", chatExternalId: "555@lid", senderExternalId: "555@lid", senderAltId: OWNER, text: "halo", at: 0, ...extra })
       await h.engine.idle()
       return db.select().from(messages).where(eq(messages.id, r!.messageId)).get()!

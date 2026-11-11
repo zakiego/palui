@@ -4,7 +4,7 @@ import { tool } from "ai"
 import { z } from "zod"
 import type { DB } from "@palui/db"
 import { describeJobSchedule, describeNextRun, listJobs } from "@palui/core/jobs/service"
-import { defineRuntime, type PaluiTool } from "@palui/core/saklar/define"
+import { defineRuntime, type PaluiTool } from "@palui/core/connectors/define"
 import manifest from "./manifest"
 
 export function jobTools(db: DB, clock: () => number = () => Date.now()): Record<string, PaluiTool> {

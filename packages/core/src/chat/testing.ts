@@ -2,8 +2,8 @@
 // by runtime code.
 import { eq } from "drizzle-orm"
 import { connectors, type Channel, type ConnectorKind, type DB, type OutboxPayload } from "@palui/db"
-import type { ChannelHandle } from "../saklar/define"
-import { upsertConnector } from "../saklar/store"
+import type { ChannelHandle } from "../connectors/define"
+import { upsertConnector } from "../connectors/store"
 
 export const TEST_KEY = "test-master-key-test-master-key-1234"
 
@@ -65,8 +65,8 @@ import { MockLanguageModelV4 } from "ai/test"
 import { z } from "zod"
 import { memoryDb } from "@palui/db"
 import { silentLogger } from "../log"
-import { defineManifest, defineRuntime, type AnyRuntime, type InboundMessage, type MemoryHandle, type PaluiTool, type RunningConnector } from "../saklar/define"
-import { createSupervisor } from "../saklar/supervisor"
+import { defineManifest, defineRuntime, type AnyRuntime, type InboundMessage, type MemoryHandle, type PaluiTool, type RunningConnector } from "../connectors/define"
+import { createSupervisor } from "../connectors/supervisor"
 import { createTurnBus } from "./bus"
 import type { EngineDeps } from "./deps"
 import { createEngine } from "./engine"
@@ -177,7 +177,7 @@ export async function harness(o: HarnessOptions) {
   const db = o.db ?? memoryDb()
   const clock = o.clock ?? { now: Date.UTC(2026, 10, 10, 6, 0, 0) }
   for (const [id, kind] of Object.entries(o.rows ?? {})) if (!db.select().from(connectors).where(eq(connectors.id, id)).get()) seedConnector(db, id, kind)
-  const services = {} as import("../saklar/define").ConnectorServices
+  const services = {} as import("../connectors/define").ConnectorServices
   let engineRef: ReturnType<typeof createEngine> | undefined
   const sup = createSupervisor({ db, registry: o.registry, services, log: silentLogger, masterKey: TEST_KEY, dataDir: "/tmp/palui-test", clock: () => clock.now, inUse: (id) => engineRef?.inUse(id) ?? false })
   const bus = createTurnBus()

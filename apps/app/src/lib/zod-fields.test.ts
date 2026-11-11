@@ -15,7 +15,7 @@ const manifest = {
   setup: [step, { field: "name", label: "Name" }, { field: "token", label: "Token" }, { action: "pairWhatsApp" as const, label: "Pair" }],
 }
 
-describe("boolean config fields in the Saklar wizard", () => {
+describe("boolean config fields in the connector wizard", () => {
   it("describes z.boolean().default(false) as an optional boolean defaulting to false", () => {
     expect(describeField(z.boolean().default(false))).toEqual({ kind: "boolean", optional: true, defaultValue: false })
     expect(describeField(z.boolean())).toEqual({ kind: "boolean", optional: false, defaultValue: undefined })

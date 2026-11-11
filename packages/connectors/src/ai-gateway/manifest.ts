@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { defineManifest } from "@palui/core/saklar/define"
+import { defineManifest } from "@palui/core/connectors/define"
 
 const proto = z.enum(["anthropic", "openai"]).default("anthropic")
 
@@ -18,5 +18,5 @@ export default defineManifest({
     { field: "baseUrl", label: "Base URL", placeholder: "http://host.docker.internal:8793", optional: true },
     { field: "apiKey", label: "API key", secret: true, placeholder: "zkg_..." },
   ],
-  docs: { commands: ["/saklar on ai-gateway", "/saklar off ai-gateway"] },
+  docs: { commands: ["/connectors on ai-gateway", "/connectors off ai-gateway"] },
 })

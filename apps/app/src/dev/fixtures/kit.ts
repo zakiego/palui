@@ -3,7 +3,7 @@
 // components, never a mocked shape.
 import { ensureChat, ensureWebChat, type ChatRow } from "@palui/core/chats"
 import { masterKey } from "@palui/core/config"
-import { setConnectorStatus, upsertConnector } from "@palui/core/saklar/store"
+import { setConnectorStatus, upsertConnector } from "@palui/core/connectors/store"
 import { type Settings, setSetting } from "@palui/core/settings"
 import {
   chats,

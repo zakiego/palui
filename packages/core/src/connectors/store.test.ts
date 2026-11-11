@@ -18,7 +18,7 @@ import {
 const KEY = "test-master-key-test-master-key-1234"
 const manifest = { id: "telegram", kind: "channel" as const, name: "Telegram" }
 
-describe("saklar store", () => {
+describe("connector store", () => {
   it("creates a draft, merges secrets, and changes the hash only when config or secrets change", () => {
     const db = memoryDb()
     const a = upsertConnector(db, { id: "telegram", manifest, secrets: { botToken: "123:abc" } }, KEY)

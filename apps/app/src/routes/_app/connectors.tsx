@@ -1,4 +1,4 @@
-// Saklar (PLAN 4, 11.4): every connector grouped by kind. Health and control are
+// Connectors page (PLAN 4, 11.4): every connector grouped by kind. Health and control are
 // one element: each connector shows its state and is one tap from off. Pause
 // never asks; remove (in the sheet) always does. The layout is the Explore pick
 // (PLAN 11.7); `?v=1|2|3` shows the picker to flip between the three variants.
@@ -6,17 +6,17 @@ import * as React from "react"
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
 import { PlusIcon, ToggleRightIcon } from "lucide-react"
 import { z } from "zod"
-import type { ConnectorManifest } from "@palui/core/saklar/define"
+import type { ConnectorManifest } from "@palui/core/connectors/define"
 
 import { AppError } from "@/components/app-error"
 import { connectorIcon } from "@/components/connector-icon"
 import { PageHeader } from "@/components/page-header"
 import { RuntimeAlert } from "@/components/runtime-alert"
-import { ConnectorSheet, type SheetTarget } from "@/components/saklar/connector-sheet"
-import { DEFAULT_SAKLAR_LAYOUT, SAKLAR_LAYOUTS } from "@/components/saklar/layouts"
-import { PrototypePicker } from "@/components/saklar/prototype-picker"
-import { SAKLAR_GROUPS, StatusAnnouncer } from "@/components/saklar/shared"
-import type { SaklarItem } from "@/components/saklar/variants/types"
+import { ConnectorSheet, type SheetTarget } from "@/components/connectors/connector-sheet"
+import { DEFAULT_CONNECTOR_LAYOUT, CONNECTOR_LAYOUTS } from "@/components/connectors/layouts"
+import { PrototypePicker } from "@/components/connectors/prototype-picker"
+import { CONNECTOR_GROUPS, StatusAnnouncer } from "@/components/connectors/shared"
+import type { ConnectorItem } from "@/components/connectors/variants/types"
 import { slugify } from "@/lib/slug"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,26 +24,26 @@ import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, Comma
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLiveRefresh } from "@/hooks/use-live-events"
-import { getSaklar } from "@/lib/fns/saklar"
+import { getConnectorsPage } from "@/lib/fns/connectors"
 import { useT } from "@/lib/i18n"
 import { manifestFor, manifests } from "@/lib/manifests"
 import { cn } from "@/lib/utils"
 
-export const Route = createFileRoute("/_app/saklar")({
+export const Route = createFileRoute("/_app/connectors")({
   validateSearch: z.object({
     open: z.string().max(64).optional(),
     // The Explore picker: 1 Cards, 2 Rows, 3 Board. Absent means the pick.
-    v: z.number().int().min(1).max(SAKLAR_LAYOUTS.length).optional().catch(undefined),
+    v: z.number().int().min(1).max(CONNECTOR_LAYOUTS.length).optional().catch(undefined),
   }),
-  loader: () => getSaklar(),
-  head: () => ({ meta: [{ title: "Saklar · Palui" }] }),
-  component: SaklarPage,
-  pendingComponent: SaklarSkeleton,
+  loader: () => getConnectorsPage(),
+  head: () => ({ meta: [{ title: "Connectors · Palui" }] }),
+  component: ConnectorsPage,
+  pendingComponent: ConnectorsSkeleton,
   errorComponent: AppError,
 })
 
-type Item = SaklarItem
-const GROUPS = SAKLAR_GROUPS
+type Item = ConnectorItem
+const GROUPS = CONNECTOR_GROUPS
 
 function toTarget(item: Item): SheetTarget {
   return {
@@ -83,7 +83,7 @@ function newTarget(m: ConnectorManifest, existing: Item[], preset?: NonNullable<
   }
 }
 
-function SaklarPage() {
+function ConnectorsPage() {
   const data = Route.useLoaderData()
   const { open: openId, v } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
@@ -114,18 +114,18 @@ function SaklarPage() {
   }
 
   const visible = data.items
-  const layoutIndex = v ? v - 1 : DEFAULT_SAKLAR_LAYOUT
-  const { Layout } = SAKLAR_LAYOUTS[layoutIndex]
+  const layoutIndex = v ? v - 1 : DEFAULT_CONNECTOR_LAYOUT
+  const { Layout } = CONNECTOR_LAYOUTS[layoutIndex]
 
   return (
     <>
       <PageHeader
-        title={t("saklar.title")}
-        description={t("saklar.description")}
+        title={t("connectors.title")}
+        description={t("connectors.description")}
         actions={
           <Button onClick={() => setCatalogOpen(true)}>
             <PlusIcon data-icon="inline-start" />
-            {t("saklar.add")}
+            {t("connectors.add")}
           </Button>
         }
       />
@@ -137,13 +137,13 @@ function SaklarPage() {
             <EmptyMedia variant="icon">
               <ToggleRightIcon />
             </EmptyMedia>
-            <EmptyTitle>{t("saklar.empty")}</EmptyTitle>
-            <EmptyDescription>{t("saklar.emptyBody")}</EmptyDescription>
+            <EmptyTitle>{t("connectors.empty")}</EmptyTitle>
+            <EmptyDescription>{t("connectors.emptyBody")}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <Button onClick={() => setCatalogOpen(true)}>
               <PlusIcon data-icon="inline-start" />
-              {t("saklar.add")}
+              {t("connectors.add")}
             </Button>
           </EmptyContent>
         </Empty>
@@ -156,7 +156,7 @@ function SaklarPage() {
       <StatusAnnouncer items={visible} />
       {v && (
         <PrototypePicker
-          names={SAKLAR_LAYOUTS.map((l) => l.name)}
+          names={CONNECTOR_LAYOUTS.map((l) => l.name)}
           active={layoutIndex}
           onChange={(i) => void navigate({ search: (prev) => ({ ...prev, v: i + 1 }), replace: true })}
         />
@@ -178,9 +178,9 @@ function SaklarPage() {
 function Catalog({ open, onOpenChange, items, onPick }: { open: boolean; onOpenChange: (o: boolean) => void; items: Item[]; onPick: (m: ConnectorManifest, preset?: NonNullable<ConnectorManifest["presets"]>[number]) => void }) {
   const t = useT()
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} title={t("saklar.add")} description={t("saklar.catalog")}>
+    <CommandDialog open={open} onOpenChange={onOpenChange} title={t("connectors.add")} description={t("connectors.catalog")}>
       <Command>
-      <CommandInput placeholder={t("saklar.catalog")} />
+      <CommandInput placeholder={t("connectors.catalog")} />
       <CommandList>
         <CommandEmpty>{t("command.empty")}</CommandEmpty>
         {GROUPS.map(({ kind, label }) => {
@@ -198,7 +198,7 @@ function Catalog({ open, onOpenChange, items, onPick }: { open: boolean; onOpenC
                       <span className="truncate">{m.name}</span>
                       <span className="truncate text-caption text-muted-foreground">{m.summary}</span>
                     </span>
-                    {added && <Badge variant="outline">{t("saklar.added")}</Badge>}
+                    {added && <Badge variant="outline">{t("connectors.added")}</Badge>}
                   </CommandItem>
                 )
                 const presets = (m.presets ?? []).map((p) => (
@@ -206,7 +206,7 @@ function Catalog({ open, onOpenChange, items, onPick }: { open: boolean; onOpenC
                     <Icon aria-hidden="true" />
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate">{p.label}</span>
-                      <span className="truncate text-caption text-muted-foreground">{t("saklar.presetHint", { name: m.name })}</span>
+                      <span className="truncate text-caption text-muted-foreground">{t("connectors.presetHint", { name: m.name })}</span>
                     </span>
                   </CommandItem>
                 ))
@@ -221,9 +221,9 @@ function Catalog({ open, onOpenChange, items, onPick }: { open: boolean; onOpenC
   )
 }
 
-function SaklarSkeleton() {
+function ConnectorsSkeleton() {
   const { v } = Route.useSearch()
-  const { Skeleton: LayoutSkeleton } = SAKLAR_LAYOUTS[v ? v - 1 : DEFAULT_SAKLAR_LAYOUT]
+  const { Skeleton: LayoutSkeleton } = CONNECTOR_LAYOUTS[v ? v - 1 : DEFAULT_CONNECTOR_LAYOUT]
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-4">

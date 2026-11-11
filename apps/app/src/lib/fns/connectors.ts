@@ -1,4 +1,4 @@
-// Saklar page: list, pause/resume, the connect wizard, test, actions, remove.
+// Connectors page: list, pause/resume, the connect wizard, test, actions, remove.
 import { config, masterKey } from "@palui/core/config"
 import { getOwner, setWhatsAppOwner } from "@palui/core/owner"
 import { listEvents } from "@palui/core/events"
@@ -9,18 +9,18 @@ import { getDb } from "@/server/db"
 import { z } from "zod"
 import { asJson, type JsonObject } from "@/lib/json"
 import { callRuntime, runtime } from "@/server/runtime"
-import { connectSaklar, listSaklar, pauseSaklar, removeSaklar, resumeSaklar, SaklarError, saveDraft } from "@/server/saklar"
+import { connectConnectorAction, listConnectorItems, pauseConnectorAction, removeConnectorAction, resumeConnectorAction, ConnectorError, saveDraft } from "@/server/connectors"
 import { requireUser, requireWriter } from "@/server/session"
 
 const id = z.string().min(1).max(64)
 
-function deps(db: Parameters<typeof listSaklar>[0]["db"]) {
+function deps(db: Parameters<typeof listConnectorItems>[0]["db"]) {
   return { db, rt: runtime(), masterKey: masterKey() }
 }
 
-export const getSaklar = createServerFn({ method: "GET" }).handler(async () => {
+export const getConnectorsPage = createServerFn({ method: "GET" }).handler(async () => {
   const { db } = await requireUser()
-  const items = listSaklar(deps(db)).map((c) => ({ ...c, config: asJson<JsonObject>(c.config) }))
+  const items = listConnectorItems(deps(db)).map((c) => ({ ...c, config: asJson<JsonObject>(c.config) }))
   let live: Record<string, { running: boolean; status: string; detail: string | null }> = {}
   let runtimeUp = true
   try {
@@ -56,27 +56,27 @@ export const pauseConnectorFn = createServerFn({ method: "POST" })
   .validator(z.object({ id }))
   .handler(async ({ data }) => {
     const { db } = await requireWriter()
-    return pauseSaklar(deps(db), data.id)
+    return pauseConnectorAction(deps(db), data.id)
   })
 
 export const resumeConnectorFn = createServerFn({ method: "POST" })
   .validator(z.object({ id }))
   .handler(async ({ data }) => {
     const { db } = await requireWriter()
-    return resumeSaklar(deps(db), data.id)
+    return resumeConnectorAction(deps(db), data.id)
   })
 
 export const removeConnectorFn = createServerFn({ method: "POST" })
   .validator(z.object({ id }))
   .handler(async ({ data }) => {
     const { db } = await requireWriter()
-    return removeSaklar(deps(db), data.id)
+    return removeConnectorAction(deps(db), data.id)
   })
 
 type FieldResult = { ok: true } | { ok: false; message: string; fields: Record<string, string> }
 
 function asFieldResult(err: unknown): FieldResult {
-  if (err instanceof SaklarError) return { ok: false, message: err.message, fields: err.fields }
+  if (err instanceof ConnectorError) return { ok: false, message: err.message, fields: err.fields }
   throw err
 }
 
@@ -108,7 +108,7 @@ export const connectConnectorFn = createServerFn({ method: "POST" })
     const { db } = await requireWriter()
     try {
       saveDraft(deps(db), data)
-      const res = await connectSaklar(deps(db), data.id)
+      const res = await connectConnectorAction(deps(db), data.id)
       return { ok: true, runtimeReachable: res.runtimeReachable }
     } catch (err) {
       return asFieldResult(err)

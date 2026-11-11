@@ -10,7 +10,7 @@ All of M0 to M6 is in code with tests. 529 tests pass, typecheck and build are g
 
 | Package | Tests |
 |---|---|
-| core (engine, reminders, jobs, approvals, budgets, outbox, saklar, hooks, SSRF) | 271 |
+| core (engine, reminders, jobs, approvals, budgets, outbox, connectors, hooks, SSRF) | 271 |
 | connectors (13 connectors) | 145 (+7 live tests, skipped by default) |
 | app (dashboard, auth, CLI, routes) | 74 |
 | runtime (control API, main, deps) | 12 |
@@ -22,7 +22,7 @@ All of M0 to M6 is in code with tests. 529 tests pass, typecheck and build are g
 - Web chat works end to end in the compose stack against CLIProxyAPI. Proof: `docs/screenshots/e2e-web-chat-desktop.png` and this runtime log line:
   `{"msg":"turn finished","run_id":"run_0mw9mohbztawr1ufoue","status":"ok","steps":2,"tokens_in":5457,"tokens_out":235,"ms":4768,"tainted":false,"connector_id":"cliproxy"}`
 - Reminder parse eval, live against CLIProxyAPI (claude-haiku-4-5): 60/60 (Indonesian 30/30, English 30/30). Pass mark 95%.
-- 42 screenshots in `docs/screenshots/`: every dashboard page at desktop and 390 px, the 3 Saklar variants, a sheet, empty states, the 3 landing heroes, a docs page, and the end-to-end chat and approval flow.
+- 42 screenshots in `docs/screenshots/`: every dashboard page at desktop and 390 px, the 3 Connectors page variants, a sheet, empty states, the 3 landing heroes, a docs page, and the end-to-end chat and approval flow.
 - Cold reviews by fresh agents found 7 HIGH and about 28 MEDIUM issues. All fixed with regression tests. A live test then caught one more (a write tool in the same step as a web fetch skipped approval). Fixed too. A last review of the fix commits found no HIGH and 2 MEDIUM (a crash-looping message, a timed-out send that could arrive twice). Both fixed.
 
 ## Verified live vs fakes
@@ -42,7 +42,7 @@ Only with fakes:
 
 ## Picks for you to confirm
 
-- Saklar page: Cards (`apps/app/DESIGN.md`). Open `/app/saklar?v=2` (Rows) or `?v=3` (Board) to compare. The pick lives in `apps/app/src/components/saklar/layouts.ts`.
+- Connectors page: Cards (`apps/app/DESIGN.md`). Open `/app/connectors?v=2` (Rows) or `?v=3` (Board) to compare. The pick lives in `apps/app/src/components/connectors/layouts.ts`.
 - Landing: you picked it on 2026-11-10 (dark terminal, Mono palette, "An agent friend you host yourself"). Nothing left to confirm there.
 - Dashboard accent: Banjar sasirangan indigo, oklch(0.45 0.15 270) light, oklch(0.7 0.13 270) dark. The site no longer uses it, so say if the dashboard should go Mono too.
 
@@ -83,25 +83,25 @@ Only with fakes:
    umask 077 && nano .env
    ```
    Put in three keys: `MASTER_KEY=` (from `openssl rand -base64 32`, also save it in your password manager), `BETTER_AUTH_SECRET=` (another `openssl rand -base64 32`), `APP_URL=https://palui.zakiego.com`.
-   deploy.sh runs `git pull --ff-only` on whatever branch is checked out, so this works on `feat/v1`. Switch the checkout to `main` once you merge.
+   deploy.sh runs `git pull --ff-only` on whatever branch is checked out. Done 2026-11-11: `~/selfhost/palui` is on `main`.
 2. Port and deploy: `~/.agents/skills/zaki-selfhost/scripts/free-port.sh` (should print 4802, else edit `compose.yaml`), then `~/.agents/skills/zaki-selfhost/scripts/deploy.sh palui`.
 3. Hostname: `~/.agents/skills/zaki-selfhost/scripts/add-host.sh palui.zakiego.com 4802 "Palui Agent"`, then restart the tunnel in Terminal: `sudo launchctl kickstart -k system/com.cloudflare.cloudflared`.
 4. Owner and model:
    ```bash
    cd ~/selfhost/palui
    docker compose exec app palui owner invite        # open the link, add a passkey
-   docker compose exec -T app palui saklar connect cliproxy --secret-stdin apiKey < ~/.config/palui/cliproxy-key
+   docker compose exec -T app palui connectors connect cliproxy --secret-stdin apiKey < ~/.config/palui/cliproxy-key
    ```
    Say hi in Chats.
-5. Telegram: in Telegram, @BotFather, `/newbot`, copy the token. Dashboard, Saklar, Telegram, paste, Connect, open the claim link, press Start. (Or `docker compose exec -T app palui saklar connect telegram --secret-stdin botToken < token.txt`, then get the claim link in the sheet.)
-6. WhatsApp (utusan's number, as a new linked device): first remove your DM's binding from `~/.utusan/utusan.json`. Dashboard, Saklar, WhatsApp: save your phone as owner, tick "This chat isn't bound in utusan", press Start pairing, then type utusan's number under "Number to link" and press Get code. On utusan's phone: WhatsApp, Linked devices, Link with phone number, enter the 8-character code.
-7. Done 2026-11-10: landing and docs are live at https://palui.zakiego.com (Pages project `palui-site`, a Direct Upload, plus the `palui-edge` Worker on `palui.zakiego.com/*`). Until steps 2 and 3 run, `/app`, `/api` and `/health` fall through to the `*.zakiego.com` wildcard and answer 404. To redeploy the site after a docs change:
+5. Telegram: in Telegram, @BotFather, `/newbot`, copy the token. Dashboard, Connectors, Telegram, paste, Connect, open the claim link, press Start. (Or `docker compose exec -T app palui connectors connect telegram --secret-stdin botToken < token.txt`, then get the claim link in the sheet.)
+6. WhatsApp (utusan's number, as a new linked device): first remove your DM's binding from `~/.utusan/utusan.json`. Dashboard, Connectors, WhatsApp: save your phone as owner, tick "This chat isn't bound in utusan", press Start pairing, then type utusan's number under "Number to link" and press Get code. On utusan's phone: WhatsApp, Linked devices, Link with phone number, enter the 8-character code.
+7. Done 2026-11-10: landing and docs are live at https://palui.zakiego.com (the `palui-edge` Worker on `palui.zakiego.com/*`, sending site paths to Pages). Until steps 2 and 3 run, `/app`, `/api` and `/health` fall through to the `*.zakiego.com` wildcard and answer 404. Since 2026-11-11 the site is the git-connected Pages project `palui-web`, which builds `apps/site` on every push to `main`, so there's nothing to deploy by hand. Build logs:
    ```bash
-   cd ~/Code/JS/Node/2026/palui && pnpm --filter @palui/site build
-   XDG_CONFIG_HOME="$HOME/.wrangler-accounts/personal" npx wrangler pages deploy apps/site/out --project-name palui-site --branch main
+   CF="$HOME/.agents/skills/cf-zakiego-lab/scripts/cf-zakiego-lab"
+   "$CF" pages deployments list --project-name palui-web
    ```
-8. Auto-deploy: add `"zakiego/palui": "palui"` to `~/.agents/skills/zaki-selfhost/webhook/apps.json`, `launchctl kickstart -k gui/$(id -u)/id.zakiego.selfhost-webhook`, then create the GitHub hook with the command in the zaki-selfhost skill ("Add a repo", step 3).
+8. Done 2026-11-11 (hook id `710181508`). Auto-deploy: add `"zakiego/palui": "palui"` to `~/.agents/skills/zaki-selfhost/webhook/apps.json`, `launchctl kickstart -k gui/$(id -u)/id.zakiego.selfhost-webhook`, then create the GitHub hook with the command in the zaki-selfhost skill ("Add a repo", step 3).
 9. Monitoring: add `https://palui.zakiego.com/health` to the `http` list in `~/.agents/skills/m4-alerts/config.default.json`.
-10. Backups: `brew install age`, `age-keygen -o /tmp/palui.key`, put the public key in `~/.config/palui/age-recipient`, store the private key in the Keychain as `palui-backup-age-identity` (`security add-generic-password -s palui-backup-age-identity -a palui -w "$(cat /tmp/palui.key)"`), `rm /tmp/palui.key`, create the R2 bucket `palui-backups`, then `ops/install-backup.sh`. Test with `scripts/restore-drill.sh`.
-11. Optional: recall memory (make a `rcl_` key in recall for Palui, then Saklar, recall) and MCP presets (vorneo, keuangan, todomap, linear: token only).
+10. Done 2026-11-11, and the restore drill passed. Backups: `brew install age`, `age-keygen -o /tmp/palui.key`, put the public key in `~/.config/palui/age-recipient` (`age-keygen -y /tmp/palui.key`), store only the `AGE-SECRET-KEY-` line in the Keychain as `palui-backup-age-identity` (`security add-generic-password -s palui-backup-age-identity -a palui -w "$(grep AGE-SECRET-KEY /tmp/palui.key)"`), `rm /tmp/palui.key`, create the R2 bucket `palui-backups`, then `ops/install-backup.sh`. Test with `scripts/restore-drill.sh`. Don't store the whole key file: the Keychain returns a multi-line value as hex, and age can't read that back. Copy the secret key into your password manager too, since the Keychain is its only copy.
+11. Optional: recall memory (make a `rcl_` key in recall for Palui, then Connectors, recall) and MCP presets (vorneo, keuangan, todomap, linear: token only).
 12. Optional: fix the D8 log cap in `/opt/homebrew/etc/cliproxyapi.conf` (gap 10).

@@ -1,5 +1,5 @@
 import type { ToolClass } from "@palui/db"
-import { defineRuntime, type ConfigOf, type PaluiTool, type SecretsOf } from "@palui/core/saklar/define"
+import { defineRuntime, type ConfigOf, type PaluiTool, type SecretsOf } from "@palui/core/connectors/define"
 import { authHeaders, McpConnection, suggestClass, type McpEndpoint, type McpToolDef } from "./client"
 import manifest from "./manifest"
 

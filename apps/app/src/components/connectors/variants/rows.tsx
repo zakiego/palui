@@ -1,4 +1,4 @@
-// Saklar layout 2, "Rows": dense rows in the style of Raycast or macOS
+// Connectors page layout 2, "Rows": dense rows in the style of Raycast or macOS
 // settings (PLAN 11.7 variant 2, the density axis). One line per connector with
 // its status inline; the chevron opens the details in place.
 import * as React from "react"
@@ -15,12 +15,12 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useT } from "@/lib/i18n"
 import { manifestFor } from "@/lib/manifests"
-import { SAKLAR_GROUPS, SaklarSwitch } from "../shared"
-import { detailFor, type SaklarItem, type SaklarLayoutProps, type SaklarLive } from "./types"
+import { CONNECTOR_GROUPS, ConnectorSwitch } from "../shared"
+import { detailFor, type ConnectorItem, type ConnectorLayoutProps, type ConnectorLiveMap } from "./types"
 
-export function SaklarRows({ items, live, onOpen }: SaklarLayoutProps) {
+export function ConnectorRows({ items, live, onOpen }: ConnectorLayoutProps) {
   const t = useT()
-  return SAKLAR_GROUPS.map(({ kind, label }) => {
+  return CONNECTOR_GROUPS.map(({ kind, label }) => {
     const rows = items.filter((i) => i.kind === kind)
     if (!rows.length) return null
     return (
@@ -41,7 +41,7 @@ export function SaklarRows({ items, live, onOpen }: SaklarLayoutProps) {
   })
 }
 
-function ConnectorRow({ item, live, onOpen }: { item: SaklarItem; live: SaklarLive; onOpen: () => void }) {
+function ConnectorRow({ item, live, onOpen }: { item: ConnectorItem; live: ConnectorLiveMap; onOpen: () => void }) {
   const t = useT()
   const m = manifestFor(item.type)
   const Icon = connectorIcon(m?.icon)
@@ -63,15 +63,15 @@ function ConnectorRow({ item, live, onOpen }: { item: SaklarItem; live: SaklarLi
         </ItemContent>
         <ItemActions className="gap-0">
           {setUp ? (
-            <SaklarSwitch item={item} />
+            <ConnectorSwitch item={item} />
           ) : (
-            <Button variant="outline" size="sm" className="me-1.5" onClick={onOpen} aria-label={`${t("saklar.continueSetup")} ${item.label}`}>
-              {t("saklar.continueSetup")}
+            <Button variant="outline" size="sm" className="me-1.5" onClick={onOpen} aria-label={`${t("connectors.continueSetup")} ${item.label}`}>
+              {t("connectors.continueSetup")}
             </Button>
           )}
           <CollapsibleTrigger
             render={<Button variant="ghost" size="icon" className="group/chevron size-11" aria-controls={panelId} />}
-            aria-label={t("saklar.details", { name: item.label })}
+            aria-label={t("connectors.details", { name: item.label })}
           >
             <ChevronDownIcon aria-hidden="true" className="transition-transform duration-150 ease-emphasized group-data-panel-open/chevron:rotate-180" />
           </CollapsibleTrigger>
@@ -80,27 +80,27 @@ function ConnectorRow({ item, live, onOpen }: { item: SaklarItem; live: SaklarLi
       <CollapsibleContent id={panelId} className="border-t bg-muted/40">
         <div className="flex flex-col gap-3 px-3 py-3 ps-14">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-caption">
-            <dt className="text-muted-foreground">{t("saklar.field.id")}</dt>
+            <dt className="text-muted-foreground">{t("connectors.field.id")}</dt>
             <dd className="min-w-0 font-mono break-all">{item.id}</dd>
-            <dt className="text-muted-foreground">{t("saklar.field.what")}</dt>
+            <dt className="text-muted-foreground">{t("connectors.field.what")}</dt>
             <dd className="min-w-0 text-pretty">{m?.summary ?? item.type}</dd>
             {detail && (
               <>
-                <dt className="text-muted-foreground">{t("saklar.field.detail")}</dt>
+                <dt className="text-muted-foreground">{t("connectors.field.detail")}</dt>
                 <dd className="min-w-0 break-words">{detail}</dd>
               </>
             )}
             {item.status === "paused" && m?.pauseNote && (
               <>
-                <dt className="text-muted-foreground">{t("saklar.field.whilePaused")}</dt>
+                <dt className="text-muted-foreground">{t("connectors.field.whilePaused")}</dt>
                 <dd className="min-w-0 text-pretty">{m.pauseNote}</dd>
               </>
             )}
           </dl>
           <div className="flex flex-wrap items-center gap-2">
-            {item.trust === "external" && <Badge variant="outline">{t("saklar.external")}</Badge>}
-            <Button variant="outline" size="sm" className="ms-auto" onClick={onOpen} aria-label={`${setUp ? t("common.open") : t("saklar.continueSetup")} ${item.label}`}>
-              {setUp ? t("common.open") : t("saklar.continueSetup")}
+            {item.trust === "external" && <Badge variant="outline">{t("connectors.external")}</Badge>}
+            <Button variant="outline" size="sm" className="ms-auto" onClick={onOpen} aria-label={`${setUp ? t("common.open") : t("connectors.continueSetup")} ${item.label}`}>
+              {setUp ? t("common.open") : t("connectors.continueSetup")}
             </Button>
           </div>
         </div>
@@ -109,7 +109,7 @@ function ConnectorRow({ item, live, onOpen }: { item: SaklarItem; live: SaklarLi
   )
 }
 
-export function SaklarRowsSkeleton() {
+export function ConnectorRowsSkeleton() {
   return [0, 1].map((g) => (
     <div key={g} className="flex flex-col gap-2">
       <Skeleton className="h-4 w-20" />

@@ -59,7 +59,7 @@ export function demo(k: Kit) {
   k.message(
     web,
     "assistant",
-    "**Rekap minggu ini** (W46):\n\n1. *3 deal* masuk di Vorneo, 1 survei dijadwalkan\n2. Pengingat `bayar listrik` besok jam 09.00\n3. Detail di https://vorneo.id/deals?week=2026-W46\n\n- Telegram: on\n- WhatsApp: **error 440**, perlu pairing ulang\n\n```\npalui saklar on whatsapp\n```\n\nLihat [dashboard Palui](https://palui.zakiego.com/app/saklar) untuk detail.",
+    "**Rekap minggu ini** (W46):\n\n1. *3 deal* masuk di Vorneo, 1 survei dijadwalkan\n2. Pengingat `bayar listrik` besok jam 09.00\n3. Detail di https://vorneo.id/deals?week=2026-W46\n\n- Telegram: on\n- WhatsApp: **error 440**, perlu pairing ulang\n\n```\npalui connectors on whatsapp\n```\n\nLihat [dashboard Palui](https://palui.zakiego.com/app/connectors) untuk detail.",
     now - 29 * MIN,
   )
 

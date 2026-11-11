@@ -121,8 +121,8 @@ function EventsTab({ data }: { data: Awaited<ReturnType<typeof getEvents>> }) {
                 {t("activity.clearFilters")}
               </Button>
             ) : (
-              <Button variant="outline" size="sm" render={<Link to="/saklar" />}>
-                {t("nav.saklar")}
+              <Button variant="outline" size="sm" render={<Link to="/connectors" />}>
+                {t("nav.connectors")}
               </Button>
             )}
           </EmptyContent>

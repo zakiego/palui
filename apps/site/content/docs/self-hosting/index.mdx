@@ -6,13 +6,13 @@ description: Run Palui with Docker Compose as two services from one image, shari
 Palui runs as two Compose services built from one image. Both share a single data volume.
 
 <ArchitectureDiagram>
-  Messages arrive from three channels: WhatsApp, Telegram and the dashboard web chat. They flow into the runtime container, which holds the router, agent turns, the scheduler, the outbox and the Saklar supervisor. Next to it, the app container serves the dashboard, the REST API, authentication, the /health endpoint and database migrations. Both containers share one SQLite database on a single volume. Model providers, the recall memory service and MCP servers sit outside both containers and are reached over the network.
+  Messages arrive from three channels: WhatsApp, Telegram and the dashboard web chat. They flow into the runtime container, which holds the router, agent turns, the scheduler, the outbox and the connector supervisor. Next to it, the app container serves the dashboard, the REST API, authentication, the /health endpoint and database migrations. Both containers share one SQLite database on a single volume. Model providers, the recall memory service and MCP servers sit outside both containers and are reached over the network.
 </ArchitectureDiagram>
 
 | Service | What it runs |
 |---|---|
 | `app` | The dashboard, the REST API, auth and `/health`. It's the only service that runs database migrations. |
-| `runtime` | A plain Node process: channel sockets, agent turns, the scheduler, the outbox and the Saklar supervisor. |
+| `runtime` | A plain Node process: channel sockets, agent turns, the scheduler, the outbox and the connector supervisor. |
 
 Long-lived sockets (WhatsApp, Telegram polling) live in the runtime so the app stays a normal web server. Both restart on a deploy. The durable inbox and outbox are what keep messages safe through that, see [Upgrades](/docs/self-hosting/upgrades).
 

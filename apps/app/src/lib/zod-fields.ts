@@ -1,6 +1,6 @@
 // Reads manifest zod schemas as form fields. Pure, so the client wizard and the
 // server validation share it.
-import type { ConnectorManifest, SetupStep } from "@palui/core/saklar/define"
+import type { ConnectorManifest, SetupStep } from "@palui/core/connectors/define"
 import type { z } from "zod"
 
 type Def = { type?: string; innerType?: z.ZodType; options?: unknown; defaultValue?: unknown; entries?: Record<string, unknown> }

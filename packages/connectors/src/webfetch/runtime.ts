@@ -3,7 +3,7 @@ import { tool, type Tool } from "ai"
 import { parseHTML } from "linkedom"
 import { z } from "zod"
 import { safeFetch, SafeFetchError, type SafeFetchOptions, type SafeResponse } from "@palui/core/net/fetch"
-import { defineRuntime } from "@palui/core/saklar/define"
+import { defineRuntime } from "@palui/core/connectors/define"
 import manifest from "./manifest"
 
 export const MAX_TEXT_CHARS = 12_000

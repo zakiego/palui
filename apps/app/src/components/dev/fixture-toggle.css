@@ -25,7 +25,7 @@
   -webkit-user-select: none;
 }
 
-/* The Saklar prototype picker sits in the same spot when `?v=` is set. */
+/* The Connectors prototype picker sits in the same spot when `?v=` is set. */
 body:has(.proto-picker) .fixture-toggle {
   bottom: 68px;
 }

@@ -1,17 +1,17 @@
-// The connector sheet (PLAN 11.4 Saklar): the setup wizard generated from the
+// The connector sheet (PLAN 11.4 Connectors): the setup wizard generated from the
 // manifest's `setup` steps and zod schemas, Test, Connect, recent events, and
 // the danger area. A Drawer under 768px. Closing it keeps progress as a draft.
 import * as React from "react"
 import { useRouter } from "@tanstack/react-router"
 import { toast } from "sonner"
-import type { ConnectorManifest, SetupStep } from "@palui/core/saklar/define"
+import type { ConnectorManifest, SetupStep } from "@palui/core/connectors/define"
 
 import { ConnectorStatusBadge } from "@/components/connector-status"
 import { ResponsiveSheet } from "@/components/responsive-sheet"
 import { SimpleSelect } from "@/components/simple-select"
 import { CircleAlertIcon } from "lucide-react"
 import { RuntimeAlert } from "@/components/runtime-alert"
-import { WizardAction } from "@/components/saklar/wizard-actions"
+import { WizardAction } from "@/components/connectors/wizard-actions"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { usePoll } from "@/hooks/use-poll"
-import { connectConnectorFn, getConnectorDetail, removeConnectorFn, saveConnectorDraft, testConnectorFn } from "@/lib/fns/saklar"
+import { connectConnectorFn, getConnectorDetail, removeConnectorFn, saveConnectorDraft, testConnectorFn } from "@/lib/fns/connectors"
 import { errorMessage, inZone } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 import type { JsonObject } from "@/lib/json"
@@ -161,8 +161,8 @@ function SheetBody({
       }
       const p = testConnectorFn({ data: { id: target.id } })
       toast.promise(p, {
-        loading: t("saklar.testing", { name: label || m.name }),
-        success: (r) => r.detail || t("saklar.works"),
+        loading: t("connectors.testing", { name: label || m.name }),
+        success: (r) => r.detail || t("connectors.works"),
         error: (err) => errorMessage(err),
       })
       await p.catch(() => {})
@@ -220,7 +220,7 @@ function SheetBody({
   const close = (next: boolean) => {
     if (!next && dirty && busy === null) {
       void save(true).then((ok) => {
-        if (!ok) toast.warning(t("saklar.partialSave"), { description: t("saklar.partialSaveFix") })
+        if (!ok) toast.warning(t("connectors.partialSave"), { description: t("connectors.partialSaveFix") })
       })
     }
     onOpenChange(next)
@@ -246,18 +246,18 @@ function SheetBody({
           {fieldSteps.length > 0 && (
             <Button variant="outline" disabled={busy !== null || !dirty} onClick={() => void onSave()}>
               {busy === "save" && <Spinner data-icon="inline-start" />}
-              {t("saklar.saveDraft")}
+              {t("connectors.saveDraft")}
             </Button>
           )}
           {!target.isNew || saved ? (
             <Button variant="outline" disabled={busy !== null} onClick={() => void onTest()}>
               {busy === "test" && <Spinner data-icon="inline-start" />}
-              {t("saklar.test")}
+              {t("connectors.test")}
             </Button>
           ) : null}
           <Button className="ms-auto" disabled={busy !== null} onClick={() => void onConnect()}>
             {busy === "connect" && <Spinner data-icon="inline-start" />}
-            {status === "on" || status === "connecting" ? t("saklar.saveReconnect") : t("saklar.connect")}
+            {status === "on" || status === "connecting" ? t("connectors.saveReconnect") : t("connectors.connect")}
           </Button>
         </div>
       }
@@ -266,16 +266,16 @@ function SheetBody({
       {target.statusDetail && status === "error" && (
         <Alert variant="destructive">
           <CircleAlertIcon aria-hidden="true" />
-          <AlertTitle>{t("saklar.errorTitle", { name: label || m.name })}</AlertTitle>
+          <AlertTitle>{t("connectors.errorTitle", { name: label || m.name })}</AlertTitle>
           <AlertDescription className="break-words">
             <span className="block">{target.statusDetail}</span>
-            <span className="block">{t("saklar.errorFix")}</span>
+            <span className="block">{t("connectors.errorFix")}</span>
           </AlertDescription>
         </Alert>
       )}
       {target.secretsError && (
         <Alert variant="destructive">
-          <AlertDescription>{target.secretsError} {t("saklar.secretsFix")}</AlertDescription>
+          <AlertDescription>{target.secretsError} {t("connectors.secretsFix")}</AlertDescription>
         </Alert>
       )}
       {m.description && <p className="text-sm text-pretty text-muted-foreground">{m.description}</p>}
@@ -285,10 +285,10 @@ function SheetBody({
       <FieldGroup>
         {m.multiple && (
           <Field data-invalid={!!errors.label}>
-            <FieldLabel htmlFor={`${target.id}-label`}>{t("saklar.field.name")}</FieldLabel>
+            <FieldLabel htmlFor={`${target.id}-label`}>{t("connectors.field.name")}</FieldLabel>
             <Input id={`${target.id}-label`} value={label} maxLength={80} onChange={(e) => (setLabel(e.target.value), setDirty(true))} />
             <FieldDescription>
-              Id <code className="font-mono">{target.id}</code>, used in tool names and <code className="font-mono">/saklar</code>.
+              Id <code className="font-mono">{target.id}</code>, used in tool names and <code className="font-mono">/connectors</code>.
             </FieldDescription>
           </Field>
         )}
@@ -332,7 +332,7 @@ function SheetBody({
           <Separator />
           <section aria-labelledby={`${target.id}-events`} className="flex flex-col gap-2">
             <h3 id={`${target.id}-events`} className="text-heading">
-              {t("saklar.events")}
+              {t("connectors.events")}
             </h3>
             {!detail.data && !detail.error ? (
               <div className="flex flex-col gap-2">
@@ -344,7 +344,7 @@ function SheetBody({
                 <AlertDescription>{detail.error}</AlertDescription>
               </Alert>
             ) : detail.data!.events.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("saklar.eventsEmpty")}</p>
+              <p className="text-sm text-muted-foreground">{t("connectors.eventsEmpty")}</p>
             ) : (
               <ol className="flex flex-col gap-1.5">
                 {detail.data!.events.map((e) => (
@@ -361,23 +361,23 @@ function SheetBody({
           <Separator />
           <section aria-labelledby={`${target.id}-danger`} className="flex flex-col gap-3">
             <h3 id={`${target.id}-danger`} className="text-heading">
-              {t("saklar.danger")}
+              {t("connectors.danger")}
             </h3>
-            <p className="text-sm text-pretty text-muted-foreground">{m.removeWarning ?? t("saklar.removeDefault")}</p>
+            <p className="text-sm text-pretty text-muted-foreground">{m.removeWarning ?? t("connectors.removeDefault")}</p>
             <AlertDialog>
               <AlertDialogTrigger render={<Button variant="destructive" className="self-start" disabled={busy !== null} />}>
                 {busy === "remove" && <Spinner data-icon="inline-start" />}
-                {t("saklar.remove")} {label || m.name}
+                {t("connectors.remove")} {label || m.name}
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{t("saklar.removeTitle", { name: label || m.name })}</AlertDialogTitle>
-                  <AlertDialogDescription>{m.removeWarning ?? t("saklar.removeDefault")}</AlertDialogDescription>
+                  <AlertDialogTitle>{t("connectors.removeTitle", { name: label || m.name })}</AlertDialogTitle>
+                  <AlertDialogDescription>{m.removeWarning ?? t("connectors.removeDefault")}</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                   <AlertDialogAction variant="danger" onClick={() => void onRemove()}>
-                    {t("saklar.remove")}
+                    {t("connectors.remove")}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -389,7 +389,7 @@ function SheetBody({
         <Field orientation="horizontal">
           <Switch id={`${target.id}-trust`} checked={trust === "external"} onCheckedChange={(v) => (setTrust(v ? "external" : "own"), setDirty(true))} />
           <FieldLabel htmlFor={`${target.id}-trust`} className="font-normal">
-            {t("saklar.trustLabel")}
+            {t("connectors.trustLabel")}
           </FieldLabel>
         </Field>
       )}

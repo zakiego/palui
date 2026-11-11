@@ -1,11 +1,11 @@
-// ⌘K (PLAN 11.3): page navigation, "saklar off <id>" / "saklar on <id>",
+// ⌘K (PLAN 11.3): page navigation, "turn off <id>" / "turn on <id>",
 // "new reminder" and "open chat".
 import * as React from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { BellPlusIcon, MessageSquareIcon, PowerIcon, PowerOffIcon } from "lucide-react"
 
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command"
-import { useSaklarToggle } from "@/hooks/use-saklar-toggle"
+import { useConnectorToggle } from "@/hooks/use-connector-toggle"
 import { useT } from "@/lib/i18n"
 import { PAGES } from "@/lib/pages"
 
@@ -14,7 +14,7 @@ export type CommandConnector = { id: string; label: string; status: string; enab
 export function CommandMenu({ open, onOpenChange, connectors }: { open: boolean; onOpenChange: (open: boolean) => void; connectors: CommandConnector[] }) {
   const t = useT()
   const navigate = useNavigate()
-  const toggle = useSaklarToggle()
+  const toggle = useConnectorToggle()
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -52,20 +52,20 @@ export function CommandMenu({ open, onOpenChange, connectors }: { open: boolean;
         {live.length > 0 && (
           <>
             <CommandSeparator />
-            <CommandGroup heading={t("command.saklar")}>
+            <CommandGroup heading={t("command.connectors")}>
               {live.map((c) =>
                 c.enabled ? (
-                  <CommandItem key={`off-${c.id}`} value={`saklar off ${c.id} ${c.label}`} onSelect={() => run(() => void toggle(c, false))}>
+                  <CommandItem key={`off-${c.id}`} value={`turn off ${c.id} ${c.label}`} onSelect={() => run(() => void toggle(c, false))}>
                     <PowerOffIcon aria-hidden="true" />
                     <span className="min-w-0 truncate">
-                      saklar off <span className="font-mono">{c.id}</span>
+                      turn off <span className="font-mono">{c.id}</span>
                     </span>
                   </CommandItem>
                 ) : (
-                  <CommandItem key={`on-${c.id}`} value={`saklar on ${c.id} ${c.label}`} onSelect={() => run(() => void toggle(c, true))}>
+                  <CommandItem key={`on-${c.id}`} value={`turn on ${c.id} ${c.label}`} onSelect={() => run(() => void toggle(c, true))}>
                     <PowerIcon aria-hidden="true" />
                     <span className="min-w-0 truncate">
-                      saklar on <span className="font-mono">{c.id}</span>
+                      turn on <span className="font-mono">{c.id}</span>
                     </span>
                   </CommandItem>
                 ),

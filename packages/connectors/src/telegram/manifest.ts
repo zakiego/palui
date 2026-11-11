@@ -1,7 +1,7 @@
 // Telegram channel manifest (PLAN 4.1, 5.1). Imported by the app and the runtime,
-// so it only imports zod and the Saklar contract.
+// so it only imports zod and the connector contract.
 import { z } from "zod"
-import { defineManifest } from "@palui/core/saklar/define"
+import { defineManifest } from "@palui/core/connectors/define"
 
 export default defineManifest({
   id: "telegram",
@@ -10,7 +10,7 @@ export default defineManifest({
   icon: "send",
   summary: "Chat with Palui from a Telegram bot.",
   description:
-    "Long polling with grammY. Paste a bot token from @BotFather, then open the claim link and press Start to become the owner. Replies are sent as HTML, split at 4096 characters, with inline buttons for reminders, approvals and /saklar.",
+    "Long polling with grammY. Paste a bot token from @BotFather, then open the claim link and press Start to become the owner. Replies are sent as HTML, split at 4096 characters, with inline buttons for reminders, approvals and /connectors.",
   config: z.object({
     // Learned at runtime from getMe, so the claim link works before polling starts.
     botUsername: z.string().optional(),

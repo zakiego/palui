@@ -102,7 +102,7 @@ export const ownerInvites = sqliteTable("owner_invites", {
   createdAt: integer("created_at").notNull(),
 })
 
-// --- Saklar ------------------------------------------------------------------------
+// --- Connectors -----------------------------------------------------------------------
 
 export const CONNECTOR_KINDS = ["channel", "model", "memory", "tools", "skill"] as const
 export type ConnectorKind = (typeof CONNECTOR_KINDS)[number]

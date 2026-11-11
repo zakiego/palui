@@ -1,4 +1,4 @@
-// Saklar edge-case rules (PLAN 4.3) that need more than one table to decide.
+// Connector edge-case rules (PLAN 4.3) that need more than one table to decide.
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { chats, passkey, type Channel, type DB } from "@palui/db"
 import { ensureChat, type ChatRow } from "../chats"
@@ -30,7 +30,7 @@ export function dashboardReachable(db: DB): boolean {
 
 export type ChannelEntry = { id: string; row: Pick<ConnectorRow, "kind">; handle: { channel?: ChannelHandle } }
 
-// `/saklar off <channel>` sent from that same channel: allowed only when another
+// `/connectors off <channel>` sent from that same channel: allowed only when another
 // channel is reachable or the dashboard is (a passkey exists). Returns the way
 // back for the reply, or null when turning it off would lock the owner out.
 export function selfChannelOffUndo(db: DB, from: Channel, running: ChannelEntry[], targetId: string): string | null {
@@ -47,7 +47,7 @@ export function selfChannelOffUndo(db: DB, from: Channel, running: ChannelEntry[
     if (ok) others.push(ch.channel)
   }
   const ways: string[] = []
-  if (others.length) ways.push(`kirim \`/saklar on ${targetId}\` dari ${others.map(channelName).join(" atau ")}`)
+  if (others.length) ways.push(`kirim \`/connectors on ${targetId}\` dari ${others.map(channelName).join(" atau ")}`)
   if (dashboardReachable(db)) ways.push("nyalakan lagi dari dashboard")
   return ways.length ? ways.join(", atau ") : null
 }

@@ -1,4 +1,4 @@
-// The `prototype` skill's variant picker (its PICKER.md), kept on the Saklar
+// The `prototype` skill's variant picker (its PICKER.md), kept on the Connectors
 // page until Zaki confirms the Explore pick. It shows only when the URL has
 // `?v=<n>`: 1-N and the arrow keys switch, the choice lives in the URL. The
 // variant swap itself is instant.

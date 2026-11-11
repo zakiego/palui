@@ -31,6 +31,8 @@ export function SimpleSelect({
   size,
   disabled,
   "aria-label": ariaLabel,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedBy,
 }: {
   id?: string
   value: string
@@ -40,6 +42,8 @@ export function SimpleSelect({
   size?: "sm" | "default"
   disabled?: boolean
   "aria-label"?: string
+  "aria-invalid"?: boolean
+  "aria-describedby"?: string
 }) {
   return (
     <Select value={value} onValueChange={picked(onChange)} disabled={disabled}>
@@ -48,6 +52,8 @@ export function SimpleSelect({
         className={className}
         size={size}
         aria-label={ariaLabel}
+        aria-invalid={ariaInvalid || undefined}
+        aria-describedby={ariaDescribedBy}
       >
         <SelectValue>
           {(v: string) => options.find((o) => o.value === v)?.label ?? v}

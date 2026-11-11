@@ -7,7 +7,7 @@
 // Refuses to run when NODE_ENV is production.
 import { createServer } from "node:http"
 import { config } from "@palui/core/config"
-import { listConnectors, setConnectorStatus } from "@palui/core/saklar/store"
+import { listConnectors, setConnectorStatus } from "@palui/core/connectors/store"
 import { dbPath, migrations, openDb } from "@palui/db"
 
 if (config().mode === "prod") throw new Error("demo-runtime is for dev databases only")

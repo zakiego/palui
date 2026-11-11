@@ -8,7 +8,7 @@
 // be probed with kill(pid, 0)), so the pid is only kept for the error message. The
 // container hostname is never used as an identity either.
 //
-// After a crash the lock stays fresh for up to 2 minutes. The Saklar supervisor
+// After a crash the lock stays fresh for up to 2 minutes. The connector supervisor
 // retries a failed start (5 s, 30 s, 120 s), so the channel comes back on its own.
 import { randomBytes } from "node:crypto"
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, statSync, utimesSync, writeSync } from "node:fs"

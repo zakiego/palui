@@ -7,7 +7,7 @@ Kind: `model`. CLIProxyAPI exposes the models from your existing subscriptions (
 
 ## Connect
 
-1. On the Saklar page, add CLIProxyAPI.
+1. On the Connectors page, add CLIProxyAPI.
 2. Keep the default base URL if CLIProxyAPI runs on the Docker host, or change it.
 3. Paste the API key and pick a protocol per role.
 4. Press Test. It calls `GET /v1/models`, then makes a 1-token call for each role. A working connector shows the model list.
@@ -40,7 +40,7 @@ None. A model connector provides models, not tools.
 
 ## Pause and remove
 
-Pausing applies from the next turn. If CLIProxyAPI is your only model connector and you pause it, the router answers every message with fixed text: "Model lagi off. Nyalakan: `/saklar on cliproxy`" (the model is off, turn it on with this command). Plain reminders and commands keep working. Removing deletes the stored API key.
+Pausing applies from the next turn. If CLIProxyAPI is your only model connector and you pause it, the router answers every message with fixed text: "Model lagi off. Nyalakan: `/connectors on cliproxy`" (the model is off, turn it on with this command). Plain reminders and commands keep working. Removing deletes the stored API key.
 
 ## Notes
 

@@ -15,9 +15,9 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppActivityRouteImport } from './routes/_app/activity'
 import { Route as AppChatsRouteImport } from './routes/_app/chats'
+import { Route as AppConnectorsRouteImport } from './routes/_app/connectors'
 import { Route as AppJobsRouteImport } from './routes/_app/jobs'
 import { Route as AppRemindersRouteImport } from './routes/_app/reminders'
-import { Route as AppSaklarRouteImport } from './routes/_app/saklar'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -55,6 +55,11 @@ const AppChatsRoute = AppChatsRouteImport.update({
   path: '/chats',
   getParentRoute: () => AppRoute,
 } as any)
+const AppConnectorsRoute = AppConnectorsRouteImport.update({
+  id: '/connectors',
+  path: '/connectors',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppJobsRoute = AppJobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
@@ -63,11 +68,6 @@ const AppJobsRoute = AppJobsRouteImport.update({
 const AppRemindersRoute = AppRemindersRouteImport.update({
   id: '/reminders',
   path: '/reminders',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSaklarRoute = AppSaklarRouteImport.update({
-  id: '/saklar',
-  path: '/saklar',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
@@ -112,9 +112,9 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/activity': typeof AppActivityRoute
   '/chats': typeof AppChatsRoute
+  '/connectors': typeof AppConnectorsRoute
   '/jobs': typeof AppJobsRoute
   '/reminders': typeof AppRemindersRoute
-  '/saklar': typeof AppSaklarRoute
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -128,9 +128,9 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/activity': typeof AppActivityRoute
   '/chats': typeof AppChatsRoute
+  '/connectors': typeof AppConnectorsRoute
   '/jobs': typeof AppJobsRoute
   '/reminders': typeof AppRemindersRoute
-  '/saklar': typeof AppSaklarRoute
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/': typeof AppIndexRoute
@@ -147,9 +147,9 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/activity': typeof AppActivityRoute
   '/_app/chats': typeof AppChatsRoute
+  '/_app/connectors': typeof AppConnectorsRoute
   '/_app/jobs': typeof AppJobsRoute
   '/_app/reminders': typeof AppRemindersRoute
-  '/_app/saklar': typeof AppSaklarRoute
   '/_app/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/_app/': typeof AppIndexRoute
@@ -167,9 +167,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/activity'
     | '/chats'
+    | '/connectors'
     | '/jobs'
     | '/reminders'
-    | '/saklar'
     | '/settings'
     | '/invite/$token'
     | '/api/auth/$'
@@ -183,9 +183,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/activity'
     | '/chats'
+    | '/connectors'
     | '/jobs'
     | '/reminders'
-    | '/saklar'
     | '/settings'
     | '/invite/$token'
     | '/'
@@ -201,9 +201,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/_app/activity'
     | '/_app/chats'
+    | '/_app/connectors'
     | '/_app/jobs'
     | '/_app/reminders'
-    | '/_app/saklar'
     | '/_app/settings'
     | '/invite/$token'
     | '/_app/'
@@ -270,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppChatsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/connectors': {
+      id: '/_app/connectors'
+      path: '/connectors'
+      fullPath: '/connectors'
+      preLoaderRoute: typeof AppConnectorsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/jobs': {
       id: '/_app/jobs'
       path: '/jobs'
@@ -282,13 +289,6 @@ declare module '@tanstack/react-router' {
       path: '/reminders'
       fullPath: '/reminders'
       preLoaderRoute: typeof AppRemindersRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/saklar': {
-      id: '/_app/saklar'
-      path: '/saklar'
-      fullPath: '/saklar'
-      preLoaderRoute: typeof AppSaklarRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/settings': {
@@ -346,9 +346,9 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppActivityRoute: typeof AppActivityRoute
   AppChatsRoute: typeof AppChatsRoute
+  AppConnectorsRoute: typeof AppConnectorsRoute
   AppJobsRoute: typeof AppJobsRoute
   AppRemindersRoute: typeof AppRemindersRoute
-  AppSaklarRoute: typeof AppSaklarRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
 }
@@ -356,9 +356,9 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppActivityRoute: AppActivityRoute,
   AppChatsRoute: AppChatsRoute,
+  AppConnectorsRoute: AppConnectorsRoute,
   AppJobsRoute: AppJobsRoute,
   AppRemindersRoute: AppRemindersRoute,
-  AppSaklarRoute: AppSaklarRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
 }

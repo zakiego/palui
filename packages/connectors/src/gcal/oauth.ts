@@ -6,7 +6,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto"
 import { eq } from "drizzle-orm"
 import { connectors, type DB } from "@palui/db"
-import { getConnector, getSecrets, patchConnectorConfig, upsertConnector } from "@palui/core/saklar/store"
+import { getConnector, getSecrets, patchConnectorConfig, upsertConnector } from "@palui/core/connectors/store"
 import manifest from "./manifest"
 
 export const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"

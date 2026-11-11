@@ -8,7 +8,7 @@ import {
   BackupDiagram,
   EdgeRoutingDiagram,
   MessageFlowDiagram,
-  SaklarStatesDiagram,
+  ConnectorStatesDiagram,
 } from "@/components/diagram/docs-diagrams"
 
 export function getMDXComponents(components?: MDXComponents) {
@@ -19,7 +19,7 @@ export function getMDXComponents(components?: MDXComponents) {
     BackupDiagram,
     EdgeRoutingDiagram,
     MessageFlowDiagram,
-    SaklarStatesDiagram,
+    ConnectorStatesDiagram,
     Step,
     Steps,
     Tab,

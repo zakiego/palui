@@ -83,7 +83,7 @@ describe("safeHref", () => {
     expect(safeHref("https://a.b")).toBe("https://a.b")
     expect(safeHref("mailto:z@a.b")).toBe("mailto:z@a.b")
     expect(safeHref("javascript:alert(1)")).toBeNull()
-    expect(safeHref("/app/saklar")).toBeNull()
+    expect(safeHref("/app/connectors")).toBeNull()
   })
 })
 

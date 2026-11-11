@@ -317,7 +317,7 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
       )}
       <FieldGroup>
         <Field data-invalid={!!errors.name}>
-          <FieldLabel htmlFor="job-name">{t("saklar.field.name")}</FieldLabel>
+          <FieldLabel htmlFor="job-name">{t("connectors.field.name")}</FieldLabel>
           <Input id="job-name" value={form.name} maxLength={80} aria-invalid={!!errors.name} onChange={(e) => set("name", e.target.value)} />
           {errors.name && <FieldError>{errors.name}</FieldError>}
         </Field>
@@ -327,7 +327,7 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
           <FieldDescription>Wall-clock time in the zone below, so 07:00 stays 07:00 across DST.</FieldDescription>
           {errors.rrule && <FieldError>{errors.rrule}</FieldError>}
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="job-start">{t("jobs.field.start")}</FieldLabel>
             <Input id="job-start" type="datetime-local" value={form.localStart} onChange={(e) => set("localStart", e.target.value)} />
@@ -351,7 +351,7 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
           )}
           {errors.chatId && <FieldError>{errors.chatId}</FieldError>}
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="job-role">{t("jobs.field.role")}</FieldLabel>
             <SimpleSelect

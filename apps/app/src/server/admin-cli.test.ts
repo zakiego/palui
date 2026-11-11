@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { ensureWebChat } from "@palui/core/chats"
-import { getConnector, upsertConnector } from "@palui/core/saklar/store"
+import { getConnector, upsertConnector } from "@palui/core/connectors/store"
 import { hooks, memoryDb, openDb, type DB } from "@palui/db"
 import { decrypt } from "@palui/db/crypto"
 import { describe, expect, it } from "vitest"
@@ -36,7 +36,7 @@ describe("admin cli", () => {
     expect(await h.run()).toBe(0)
     expect(h.out[0]).toMatch(/owner invite/)
     expect(await h.run("frobnicate")).toBe(1)
-    expect(await h.run("saklar", "--nope")).toBe(1)
+    expect(await h.run("connectors", "--nope")).toBe(1)
   })
 
   it("owner invite prints a working single-use link", async () => {
@@ -50,34 +50,34 @@ describe("admin cli", () => {
     expect(JSON.parse(h.out[1]!)).toMatchObject({ url: expect.any(String), recovery: false })
   })
 
-  it("saklar list, off and on", async () => {
+  it("connectors list, off and on", async () => {
     const h = harness()
-    expect(await h.run("saklar", "list")).toBe(0)
+    expect(await h.run("connectors", "list")).toBe(0)
     expect(h.out[0]).toMatch(/no connectors yet/)
     upsertConnector(h.db, { id: "telegram", manifest: telegram, enabled: true }, TEST_MASTER_KEY)
     h.db.$client.prepare("UPDATE connectors SET status = 'on'").run()
 
-    expect(await h.run("saklar", "off", "telegram")).toBe(0)
+    expect(await h.run("connectors", "off", "telegram")).toBe(0)
     expect(h.out.at(-1)).toBe("telegram paused")
     expect(getConnector(h.db, "telegram")!.status).toBe("paused")
     expect(h.rt.reconcile).toHaveBeenCalled()
 
-    expect(await h.run("saklar", "on", "telegram", "--json")).toBe(0)
+    expect(await h.run("connectors", "on", "telegram", "--json")).toBe(0)
     expect(JSON.parse(h.out.at(-1)!)).toEqual({ id: "telegram", state: "resumed", runtimeReachable: true })
 
-    expect(await h.run("saklar", "list", "--json")).toBe(0)
+    expect(await h.run("connectors", "list", "--json")).toBe(0)
     expect(JSON.parse(h.out.at(-1)!)).toEqual([{ id: "telegram", type: "telegram", kind: "channel", enabled: true, status: "connecting", detail: null }])
 
-    expect(await h.run("saklar", "off", "nope")).toBe(1)
+    expect(await h.run("connectors", "off", "nope")).toBe(1)
     expect(h.err.at(-1)).toMatch(/No connector "nope"/)
-    expect(await h.run("saklar", "off")).toBe(1)
+    expect(await h.run("connectors", "off")).toBe(1)
   })
 
-  it("saklar off still works with the runtime down, and says so", async () => {
+  it("connectors off still works with the runtime down, and says so", async () => {
     const h = harness({ rt: downRuntime })
     upsertConnector(h.db, { id: "telegram", manifest: telegram, enabled: true }, TEST_MASTER_KEY)
     h.db.$client.prepare("UPDATE connectors SET status = 'on'").run()
-    expect(await h.run("saklar", "off", "telegram")).toBe(0)
+    expect(await h.run("connectors", "off", "telegram")).toBe(0)
     expect(getConnector(h.db, "telegram")!.status).toBe("paused")
     expect(h.err.at(-1)).toMatch(/runtime isn't reachable/)
   })
@@ -139,19 +139,19 @@ describe("admin cli", () => {
     }
   })
 
-  it("saklar connect saves the secret from stdin and switches the connector on", async () => {
+  it("connectors connect saves the secret from stdin and switches the connector on", async () => {
     const token = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0"
     const h = harness({ stdin: `${token}\n` })
-    expect(await h.run("saklar", "connect", "telegram", "--secret-stdin", "botToken")).toBe(0)
+    expect(await h.run("connectors", "connect", "telegram", "--secret-stdin", "botToken")).toBe(0)
     const row = getConnector(h.db, "telegram")!
     expect(row).toMatchObject({ enabled: true, status: "connecting", type: "telegram" })
     expect(row.secrets).not.toContain(token)
     expect(h.out.join("\n")).not.toContain(token)
   })
 
-  it("saklar connect refuses a bad secret and names the field", async () => {
+  it("connectors connect refuses a bad secret and names the field", async () => {
     const h = harness({ stdin: "not-a-token" })
-    expect(await h.run("saklar", "connect", "telegram", "--secret-stdin", "botToken")).toBe(1)
+    expect(await h.run("connectors", "connect", "telegram", "--secret-stdin", "botToken")).toBe(1)
     expect(h.err.join("\n")).toMatch(/botToken/)
   })
 })

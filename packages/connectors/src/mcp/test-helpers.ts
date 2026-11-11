@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
 import { memoryDb, type Trust } from "@palui/db"
 import { silentLogger } from "@palui/core/log"
-import type { ConnectorContext } from "@palui/core/saklar/define"
+import type { ConnectorContext } from "@palui/core/connectors/define"
 
 export type FakeCtx<C, S> = ConnectorContext<C, S> & {
   statuses: { status: string; detail?: string }[]

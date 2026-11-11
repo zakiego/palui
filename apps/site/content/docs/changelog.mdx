@@ -13,10 +13,10 @@ description: What ships in Palui Agent v1, which is still in development, and wh
 - One owner, claimed with a Telegram nonce link and a WhatsApp phone number.
 - Durable inbox and outbox with at-least-once delivery, so a deploy doesn't drop a message.
 - Sessions with compaction past about 40 messages.
-- Chat commands: `/saklar`, `/new`, `/stop`, `/status`.
+- Chat commands: `/connectors`, `/new`, `/stop`, `/status`.
 - Voice messages transcribed with ElevenLabs Scribe (Voice-in). Photos and small documents on Telegram.
 
-### Saklar
+### Connectors
 
 - Every capability is a connector of kind `channel`, `model`, `memory`, `tools` or `skill`.
 - Pause, resume and remove from the dashboard, from chat or from the CLI, with no restart.
@@ -40,7 +40,7 @@ description: What ships in Palui Agent v1, which is still in development, and wh
 
 ### Dashboard and operations
 
-- Dashboard at `/app` with passkeys: Home, Chats, Reminders, Jobs, Saklar, Activity, Settings.
+- Dashboard at `/app` with passkeys: Home, Chats, Reminders, Jobs, Connectors, Activity, Settings.
 - Docker Compose with two services from one image and one SQLite volume.
 - Pre-deploy snapshots, nightly age-encrypted backups to R2, and a restore drill.
 - Landing page and these docs on Cloudflare Pages.

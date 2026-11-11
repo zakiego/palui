@@ -88,7 +88,7 @@ function LoginPage() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <Button size="lg" disabled={busy || !ownerExists} onClick={() => void signIn()} autoFocus>
+          <Button size="lg" disabled={busy || !ownerExists} onClick={() => void signIn()}>
             {busy ? <Spinner data-icon="inline-start" /> : <FingerprintIcon data-icon="inline-start" />}
             {t("login.passkey")}
           </Button>

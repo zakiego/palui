@@ -19,7 +19,7 @@ export function actionReplyWord(action: OutboxAction): string {
   if (head === "deny") return "batal"
   if (head === "rem" && second === "done") return "done"
   if (head === "rem" && second === "snooze" && fourth && SNOOZE_WORDS[fourth]) return SNOOZE_WORDS[fourth]
-  if (head === "saklar" && (second === "on" || second === "off") && parts[2]) return `/saklar ${second} ${parts.slice(2).join(":")}`
+  if (head === "connector" && (second === "on" || second === "off") && parts[2]) return `/connectors ${second} ${parts.slice(2).join(":")}`
   return action.label.trim().toLowerCase()
 }
 
