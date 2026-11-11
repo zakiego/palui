@@ -50,3 +50,16 @@ pnpm cli owner invite    # single-use owner link (15 min)
 pnpm test && pnpm typecheck && pnpm build
 pnpm eval:reminders      # 60-phrase parse eval, live against CLIProxyAPI (needs PALUI_EVAL_KEY)
 ```
+
+## Fixture data (dev only)
+
+`apps/app/src/dev/fixtures` holds five datasets for the dashboard: `demo`, `worst` (the realistic worst case for every rendered value), `empty`, `one` and `huge`. Fill a scratch database with one, then run the dashboard against it:
+
+```bash
+cd apps/app
+DATA_DIR=/tmp/palui-demo pnpm tsx scripts/seed-demo.ts worst
+DATA_DIR=/tmp/palui-demo pnpm dev
+DATA_DIR=/tmp/palui-demo CONTROL_PORT=4891 pnpm tsx scripts/demo-runtime.ts   # optional stand-in for the runtime
+```
+
+On a database a fixture filled, the dev dashboard shows a "Demo data / Worst case / Empty / One / 1,000 rows" toggle at the bottom. It replaces every product row, so it refuses a database with data that didn't come from a fixture, and it isn't in a production build. Check a UI change against `worst` at 390 px and 768 px before calling it done. When a new field reaches the UI, add its worst case to `worst.ts`.
