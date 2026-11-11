@@ -24,6 +24,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Fixed
 
+- On WhatsApp, "typing…" no longer flashes for a split second and disappears before the ⏳ reaction. The reaction now goes first and typing starts about 1.5 seconds later, and a reply that comes faster than that skips typing altogether.
 - After you approve a tool, Palui no longer trusts lists it read in the same step before your answer. It used to say a delete hadn't worked because a list taken a second earlier still showed the item.
 - A routine's shadow flow no longer blocks a flow you create with the same name. Shadow flows are now hidden from every flow tool, not only the list, and the shadow one moves aside to `<name> (rutinitas)`.
 - Checking a draft flow now finds the recap tool (`flows__ringkasan`) for a recap step, and a re-ask that uses the routine-style `{{n}}` points to `{{run.followUps}}`.

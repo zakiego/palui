@@ -435,17 +435,40 @@ describe("whatsapp inbound", () => {
 })
 
 describe("whatsapp typing and send", () => {
-  it("reacts while thinking and clears the reaction on off", async () => {
-    const { r, sock, ctx } = await openRunning()
+  it("reacts while thinking, types only after the reaction, and clears both on off", async () => {
+    const { r, sock, ctx } = await openRunning({ deps: { reactionLeadMs: 30 } })
     sock().message(dm("IN1"))
     await until(() => ctx.inbound.length === 1)
     await r.channel?.typing?.(OWNER_JID, true)
     expect(sock().sent.at(-1)).toMatchObject({ jid: OWNER_JID, content: { react: { text: THINKING_REACTION, key: { id: "IN1" } } } })
+    // Typing waits for the reaction to land, so it never flashes before ⏳.
+    await settle()
+    expect(sock().presence).not.toContainEqual({ type: "composing", jid: OWNER_JID })
+    await new Promise((res) => setTimeout(res, 50))
     await settle()
     expect(sock().presence).toContainEqual({ type: "composing", jid: OWNER_JID })
     await r.channel?.typing?.(OWNER_JID, false)
     expect(sock().sent.at(-1)).toMatchObject({ content: { react: { text: "", key: { id: "IN1" } } } })
     expect(sock().presence.at(-1)).toEqual({ type: "paused", jid: OWNER_JID })
+  })
+
+  it("never starts typing when the reply comes before the reaction lead", async () => {
+    const { r, sock, ctx } = await openRunning({ deps: { reactionLeadMs: 30 } })
+    sock().message(dm("IN1"))
+    await until(() => ctx.inbound.length === 1)
+    await r.channel?.typing?.(OWNER_JID, true)
+    await r.channel?.send(OWNER_JID, { text: "oke", format: "plain" })
+    await new Promise((res) => setTimeout(res, 50))
+    await settle()
+    expect(sock().presence).not.toContainEqual({ type: "composing", jid: OWNER_JID })
+  })
+
+  it("types right away when there is no message to react to", async () => {
+    const { r, sock } = await openRunning()
+    await r.channel?.typing?.(OWNER_JID, true)
+    await settle()
+    expect(sock().sent).toEqual([])
+    expect(sock().presence).toContainEqual({ type: "composing", jid: OWNER_JID })
   })
 
   it("sends WhatsApp formatting with an actions hint, quoting the original", async () => {

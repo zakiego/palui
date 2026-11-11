@@ -82,6 +82,10 @@ export type WhatsAppDeps = {
   backoffBaseMs: number
   backoffMaxMs: number
   presenceRefreshMs: number
+  // How long "typing..." waits after the thinking reaction. WhatsApp clears the
+  // typing indicator when a message (a reaction too) lands, and presence travels
+  // faster than messages, so typing sent right away flashes and vanishes before ⏳.
+  reactionLeadMs: number
   typingMaxMs: number
 }
 
@@ -92,6 +96,7 @@ const defaultDeps: WhatsAppDeps = {
   backoffBaseMs: 1000,
   backoffMaxMs: 60_000,
   presenceRefreshMs: 8000,
+  reactionLeadMs: 1500,
   typingMaxMs: 10 * 60_000,
 }
 
@@ -200,7 +205,7 @@ async function startWhatsApp(ctx: Ctx, deps: WhatsAppDeps): Promise<RunningConne
     if (recent.size > 200) recent.delete(recent.keys().next().value as string)
   }
   const lastInbound = new Map<string, WAMessageKey>()
-  const thinking = new Map<string, { key?: WAMessageKey; refresh: ReturnType<typeof setInterval>; cap: ReturnType<typeof setTimeout> }>()
+  const thinking = new Map<string, { key?: WAMessageKey; lead?: ReturnType<typeof setTimeout>; refresh?: ReturnType<typeof setInterval>; cap: ReturnType<typeof setTimeout> }>()
 
   const clearPairing = () => {
     live.qr = null
@@ -470,6 +475,7 @@ async function startWhatsApp(ctx: Ctx, deps: WhatsAppDeps): Promise<RunningConne
     const t = thinking.get(jid)
     if (!t) return
     thinking.delete(jid)
+    clearTimeout(t.lead)
     clearInterval(t.refresh)
     clearTimeout(t.cap)
     const s = sock
@@ -510,13 +516,23 @@ async function startWhatsApp(ctx: Ctx, deps: WhatsAppDeps): Promise<RunningConne
           .then(() => cur.sendPresenceUpdate("composing", chatExternalId))
           .catch(() => {})
       }
-      const refresh = setInterval(compose, deps.presenceRefreshMs)
       const cap = setTimeout(() => void stopThinking(chatExternalId), deps.typingMaxMs)
-      refresh.unref?.()
       cap.unref?.()
-      thinking.set(chatExternalId, { ...(key ? { key } : {}), refresh, cap })
-      if (key) await s.sendMessage(chatExternalId, { react: { text: THINKING_REACTION, key } }).catch((err: unknown) => log.debug("reaction failed", { err: String(err) }))
-      compose()
+      const t: { key?: WAMessageKey; lead?: ReturnType<typeof setTimeout>; refresh?: ReturnType<typeof setInterval>; cap: ReturnType<typeof setTimeout> } = { ...(key ? { key } : {}), cap }
+      thinking.set(chatExternalId, t)
+      const startTyping = () => {
+        t.lead = undefined
+        if (thinking.get(chatExternalId) !== t) return
+        compose()
+        t.refresh = setInterval(compose, deps.presenceRefreshMs)
+        t.refresh.unref?.()
+      }
+      if (!key) return startTyping()
+      // The reaction goes first and typing follows once it has landed (see reactionLeadMs).
+      await s.sendMessage(chatExternalId, { react: { text: THINKING_REACTION, key } }).catch((err: unknown) => log.debug("reaction failed", { err: String(err) }))
+      if (thinking.get(chatExternalId) !== t) return
+      t.lead = setTimeout(startTyping, deps.reactionLeadMs)
+      t.lead.unref?.()
     },
 
     reachable: () => !stopped && live.connection === "open",
@@ -589,6 +605,7 @@ async function startWhatsApp(ctx: Ctx, deps: WhatsAppDeps): Promise<RunningConne
     if (reconnectTimer) clearTimeout(reconnectTimer)
     reconnectTimer = undefined
     for (const t of thinking.values()) {
+      clearTimeout(t.lead)
       clearInterval(t.refresh)
       clearTimeout(t.cap)
     }
