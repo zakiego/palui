@@ -59,6 +59,7 @@ Triggers (each has id, kind, start = first step id):
 - poll: { tool, connectorId?, args, everyMin: 5..1440, select: "path.in.result", fire: "change"|"truthy" }. trigger.value, trigger.previous.
 - event: { event: "checkin.answered"|"checkin.missed"|"run.failed"|"run.done", flow: "<flow name>"|"self" }.
 - Every flow can also run manually (jalankan_flow); trigger.args are its args.
+Names: trigger ids, step ids and set value names are lowercase letters, digits and _, starting with a letter, max 32 ("ask_1", "last_at"; not "L" or "Ask1"). Answer ids are lowercase letters, digits and _, max 20.
 Steps (each has id, kind, optional next (step id or null to end; default the next in the array), name, onError: "fail"|"continue"|<step id>, timeoutSec):
 - tool: { tool: "<connectorId>__<tool>" (as palui__cari_tool shows), args, parse?: {field:"text", as:"json"}, retry?: {max, backoffSec} }. Output steps.<id>.data (or .error with onError).
 - if: { when: "<expression>", then: <id|null>, else: <id|null> }.
@@ -67,10 +68,10 @@ Steps (each has id, kind, optional next (step id or null to end; default the nex
   deadline (default next, max 7 days): {kind:"next", plusMin?} the schedule's next occurrence (plusMin:-10 = 10 min before it) | {kind:"after", minutes: N or "{{template}}"} | {kind:"at", at: "<template or ISO>", plusMin?} a computed time, e.g. {kind:"at", at:"{{steps.nextp.data.next.timestamp}}", plusMin:-10}. A deadline already past skips the ask silently and goes onMissed. Re-asks stop at the deadline.
 - wait: { minutes } or { until: "<template>", plusMin? } (max 7 days).
 - prompt: { prompt: "<literal instruction, no templates>", input: { name: "{{...}}" }, tools: [], send: false, model: "main"|"fast" }. Output text, silent.
-- set: { scope: "run"|"flow", values: { name: "<expression or template>" } } -> vars.<name> or flow.<name> (flow ones persist).
+- set: { scope: "run"|"flow", values: { name: "<expression or template>" } } -> vars.<name> or flow.<name> (flow ones persist). Times in expressions are epoch ms: "trigger.nextAt - 10 * 60000" is 10 minutes before the next occurrence.
 - each: { items: "<path to a list>", where?: "<expression on item>", key?: "{{item.id}}", max: 20, body: <step id> } runs body once per item, deduped by key across runs.
 Templates "{{path | filter}}" go only in tool args, message/check-in text, prompt input, set values, wait.until, checkin deadline.at and deadline.minutes, each.key. Paths start with trigger, steps, vars, flow, item, index, now (now.date, now.time, now.weekday), run (run.followUps: the re-ask number, for check-in followUp.text). Filters: time, date, json, default("x"), join(", "), lines("field"), upper, lower, round(n), truncate(n).
-Expressions (if.when, set, each.where): and or not, == != < <= > >=, + - * /, functions exists empty contains startsWith len lower any count number round min max date daysUntil hoursUntil minutesSince weekday today.
+Expressions (if.when, set, each.where): and or not, == != < <= > >=, + - * /, functions exists empty contains startsWith len lower any count number round min max choose(cond, a, b) date daysUntil hoursUntil minutesSince weekday today.
 Destructive tools are never allowed. Write tools need the owner's approval once per version.`
 
 const definitionInput = z.record(z.string(), z.unknown()).describe("The flow definition (see buat_flow).")

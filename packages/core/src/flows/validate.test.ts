@@ -149,3 +149,26 @@ describe("limits", () => {
     expect(canonicalJson({ b: 1, a: { d: 1, c: 2 } })).toBe(canonicalJson({ a: { c: 2, d: 1 }, b: 1 }))
   })
 })
+
+describe("naming problems (rpt_0mwcj91x26l822n6pa5)", () => {
+  it("names the bad step id and set key instead of a bare zod message", () => {
+    const def = base([
+      { id: "start", kind: "if", when: "true", then: "Init", else: null },
+      { id: "Init", kind: "set", values: { L: "now" }, next: null },
+    ])
+    expect(problems(def)).toEqual([
+      'steps[0].then: "Init": Ids use lowercase letters, digits and _, starting with a letter (max 32), like ask_1.',
+      'steps[1].id: "Init": Ids use lowercase letters, digits and _, starting with a letter (max 32), like ask_1.',
+      'steps[1].values.L: Key "L": Variable names use lowercase letters, digits and _, starting with a letter (max 32), like last_at.',
+    ])
+  })
+
+  it("accepts a templated after deadline and a computed at deadline", () => {
+    const def = base([
+      { id: "calc", kind: "set", values: { left: "10" } },
+      { id: "ask", kind: "checkin", text: "x", deadline: { kind: "after", minutes: "{{vars.left}}" } },
+      { id: "ask2", kind: "checkin", text: "y", deadline: { kind: "at", at: "{{vars.left}}", plusMin: -10 }, next: null },
+    ])
+    expect(problems(def)).toEqual([])
+  })
+})

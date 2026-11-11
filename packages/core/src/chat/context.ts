@@ -222,7 +222,11 @@ export function loadHistory(db: DB, sessionId: string, summarizedUntil: number |
 export type ToolCallRow = typeof toolCalls.$inferSelect & { awaitingApproval?: boolean }
 
 // Arguments past this size (a long document body, say) are not repeated on every later turn.
-const MAX_REPLAYED_ARGS = 2000
+export const MAX_REPLAYED_ARGS = 2000
+// Except the newest call of each tool, up to this size: a flow draft written in
+// one turn is what the next turn fixes, and rebuilding it from scratch costs a
+// whole slow step (rpt_0mwcj91x26l822n6pa5). Fits a full flow definition.
+export const MAX_LATEST_ARGS = 32_000
 
 // The tool calls made by the runs behind these rows, oldest first. Without them
 // the model only sees its own prose ("udah aku set"), can't tell a call that ran
@@ -258,7 +262,8 @@ function replayedOutput(c: ToolCallRow): ToolResultPart["output"] {
 }
 
 // One past run's calls as an assistant message plus its tool message.
-function replayedCalls(calls: ToolCallRow[], seen: Set<string>): ModelMessage[] {
+// `latest`: row ids of the newest call of each tool, which keep larger arguments.
+function replayedCalls(calls: ToolCallRow[], seen: Set<string>, latest: Set<string>): ModelMessage[] {
   const callParts: ToolCallPart[] = []
   const resultParts: ToolResultPart[] = []
   for (const c of calls) {
@@ -267,7 +272,8 @@ function replayedCalls(calls: ToolCallRow[], seen: Set<string>): ModelMessage[] 
     if (seen.has(toolCallId)) continue
     seen.add(toolCallId)
     const size = JSON.stringify(c.args ?? {}).length
-    const input = size > MAX_REPLAYED_ARGS ? { note: `arguments left out of the history (${size} characters)` } : c.args && typeof c.args === "object" && !Array.isArray(c.args) ? c.args : {}
+    const max = latest.has(c.id) ? MAX_LATEST_ARGS : MAX_REPLAYED_ARGS
+    const input = size > max ? { note: `arguments left out of the history (${size} characters)` } : c.args && typeof c.args === "object" && !Array.isArray(c.args) ? c.args : {}
     callParts.push({ type: "tool-call", toolCallId, toolName: c.tool, input })
     resultParts.push({ type: "tool-result", toolCallId, toolName: c.tool, output: replayedOutput(c) })
   }
@@ -294,6 +300,10 @@ export function toModelMessages(rows: HistoryRow[], withImages: Set<string>, cal
   const byRun = new Map<string, ToolCallRow[]>()
   for (const c of calls) byRun.set(c.runId, [...(byRun.get(c.runId) ?? []), c])
   const seen = new Set<string>()
+  // `calls` come oldest first, so the last row per tool is its newest call.
+  const newest = new Map<string, string>()
+  for (const c of calls) newest.set(c.tool, c.id)
+  const latest = new Set(newest.values())
   // Runs whose messages were passed and whose calls are not in `out` yet, in order.
   const open: string[] = []
   const flush = (keep?: string | null) => {
@@ -302,7 +312,7 @@ export function toModelMessages(rows: HistoryRow[], withImages: Set<string>, cal
         open.push(runId)
         continue
       }
-      out.push(...replayedCalls(byRun.get(runId) ?? [], seen))
+      out.push(...replayedCalls(byRun.get(runId) ?? [], seen, latest))
       byRun.delete(runId)
     }
   }

@@ -18,7 +18,7 @@ export const MAX_EACH = 50
 export const DEFAULT_EACH = 20
 export const MAX_WAIT_MIN = 7 * 24 * 60
 
-const id = z.string().regex(ID_RE, "Use lowercase letters, digits and _, starting with a letter (max 32)")
+const id = z.string().regex(ID_RE, "Ids use lowercase letters, digits and _, starting with a letter (max 32), like ask_1")
 const target = id.nullable()
 const text = (max: number) => z.string().trim().min(1).max(max)
 
@@ -178,7 +178,7 @@ export const setStepSchema = z.object({
   scope: z.enum(["run", "flow"]).default("run"),
   // A value with "{{" is a template, anything else an expression.
   values: z
-    .record(z.string().regex(ID_RE, "Variable names use lowercase letters, digits and _"), text(2000))
+    .record(z.string().regex(ID_RE, "Variable names use lowercase letters, digits and _, starting with a letter (max 32), like last_at"), text(2000))
     .refine((v) => Object.keys(v).length >= 1 && Object.keys(v).length <= 20, "Set 1 to 20 values"),
 })
 
@@ -240,8 +240,33 @@ export function canonicalJson(v: unknown): string {
   )
 }
 
-export function zodProblems(e: z.ZodError): { path: string; message: string }[] {
-  return e.issues.slice(0, 12).map((i) => ({ path: formatPath(i.path), message: i.message }))
+// `input` is the parsed value: an id or key that breaks the naming rule is quoted
+// in the message, so "steps[1].id" says which name to fix and how.
+export function zodProblems(e: z.ZodError, input?: unknown): { path: string; message: string }[] {
+  return e.issues.slice(0, 12).map((i) => ({ path: formatPath(i.path), message: issueMessage(i, input) }))
+}
+
+function issueMessage(i: z.core.$ZodIssue, input: unknown): string {
+  // A record key that fails its schema: zod only says "Invalid key in record".
+  if (i.code === "invalid_key") {
+    const key = String(i.path.at(-1) ?? "")
+    const inner = i.issues[0]?.message
+    return `Key "${key}": ${inner && inner !== "Invalid input" ? inner : "not allowed here"}.`
+  }
+  if (i.code === "invalid_format" && i.format === "regex") {
+    const v = valueAt(input, i.path)
+    if (typeof v === "string") return `"${v}": ${i.message}.`
+  }
+  return i.message
+}
+
+function valueAt(v: unknown, path: readonly PropertyKey[]): unknown {
+  let cur = v
+  for (const p of path) {
+    if (!cur || typeof cur !== "object") return undefined
+    cur = (cur as Record<PropertyKey, unknown>)[p]
+  }
+  return cur
 }
 
 export function formatPath(path: readonly PropertyKey[]): string {

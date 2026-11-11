@@ -14,7 +14,8 @@ import { compactJson } from "./values"
 
 export const LIMITS = {
   stepExecutionsPerRun: 100,
-  messagesPerRun: 5,
+  // A check-in chain (ask, four growing reminders, a last one) is six asks.
+  messagesPerRun: 10,
   runsPerFlowPerHour: 30,
   runsPerHour: 120,
   runningPerFlow: 3,

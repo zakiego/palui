@@ -112,6 +112,8 @@ describe("semantics", () => {
     expect(run("round(2.456, 2)")).toBe(2.46)
     expect(run("min(3, 5)")).toBe(3)
     expect(run("max(3, 5)")).toBe(5)
+    expect(run("choose(3 > 2, 'a', 'b')")).toBe("a")
+    expect(run("choose(null, 1, 2)")).toBe(2)
     expect(run('date("2026-11-11")')).toBe(localToUtc("2026-11-11T00:00", TZ))
     expect(run('daysUntil("2026-11-13")')).toBe(2)
     expect(run('daysUntil("2026-11-11T23:59")')).toBe(0)

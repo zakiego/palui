@@ -18,9 +18,14 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 ### Added
 
 - A flow check-in's deadline can now be computed. `{kind:"at", at:"{{steps.nextp.data.next.timestamp}}", plusMin:-10}` stops it 10 minutes before a time a tool returned, `{kind:"next", plusMin:-10}` stops it 10 minutes before the schedule's next occurrence, and `after` takes a template like `"{{vars.left}}"`. A deadline that has already passed skips the ask and takes `onMissed`, so a reminder chain like "last reminder 10 minutes before the next prayer" works whatever the gap between prayers is.
+- Flow expressions get `choose(cond, a, b)`, which returns `a` when `cond` is true and `b` otherwise. "Remind at +70 minutes unless that's within 10 minutes of the last reminder" is now `choose(trigger.at + 70 * 60000 <= vars.last - 10 * 60000, trigger.at + 70 * 60000, vars.last)`.
 
 ### Changed
 
+- The default turn time limit is now 5 minutes instead of 2. A slow model (Opus on high effort) spent 70 to 80 seconds on each step that wrote a flow draft, so a 2 minute turn fit one such step and then had to stop and say it ran out of time. An install that saved its budgets keeps its own value; change "Turn time limit" in Settings or ask Palui to.
+- A flow run can send 10 messages instead of 5. A prayer check-in chain (the ask, reminders at +10, +30, +70 and +150 minutes, and a last one before the next prayer) is six asks, and the Zuhur and Isya runs failed with "More than 5 messages in one run". Re-asks and missed notes still don't count.
+- The newest call of each tool keeps its arguments in the history up to 32,000 characters, so the next turn sees the flow draft it wrote last time instead of "arguments left out of the history" and fixes it rather than rebuilding it. Older large calls are still left out.
+- A flow id or set value name that breaks the naming rule now gets a problem that quotes the name (`"Init": Ids use lowercase letters...`, `Key "L": Variable names use...`) instead of "Invalid key in record", and buat_flow spells the rule out.
 - A flow's page now draws its steps as a graph: triggers on top, each step as a card, branches as labelled arrows, and an "ends" mark wherever a run can finish. Click a step to read it in full under the graph.
 
 ### Fixed

@@ -320,3 +320,102 @@ describe("write steps: per-run approval (RFC 7.2)", () => {
     expect(h2.db.select().from(pendingApprovals).where(eq(pendingApprovals.tool, "reminders__daftar_pengingat")).all()).toHaveLength(1)
   })
 })
+
+// The owner's full rule from rpt_0mwcj91x26l822n6pa5: ask when the prayer
+// starts, remind at +10, +30, +70 and +150 minutes, skip a reminder within 10
+// minutes of the last one, the last one always 10 minutes before the next
+// prayer (Subuh tomorrow for Isya), and close 1 minute before the next prayer.
+const SHOLAT_GROWING = (() => {
+  const answers = [
+    { id: "done", label: "Sudah", words: ["udah", "sudah"], closes: true, reply: "Alhamdulillah 🤲" },
+    { id: "not_yet", label: "Belum", words: ["belum"], closes: false },
+  ]
+  const ask = (id: string, text: string, until: string, onMissed: string) => ({ id, kind: "checkin", text, answers, followUp: { everyMin: 5, max: 0 }, deadline: { kind: "at", at: `{{${until}}}` }, onMissed, next: null })
+  // A reminder planned within 10 minutes of the last one moves onto it, so its ask is skipped.
+  const at = (min: number) => `choose(trigger.at + ${min} * 60000 <= vars.last - 10 * 60000, trigger.at + ${min} * 60000, vars.last)`
+  return {
+    name: "Sholat 5 waktu",
+    tz: "Asia/Makassar",
+    triggers: [{ id: "main", kind: "schedule", start: "plan", lateGraceMin: 60, source: SHOLAT.triggers[0]!.source }],
+    steps: [
+      { id: "plan", kind: "set", values: { last: "trigger.nextAt - 10 * 60000" } },
+      { id: "plan_times", kind: "set", values: { r1: at(10), r2: at(30), r3: at(70), r4: at(150) } },
+      ask("ask_0", "🕌 Waktu {{trigger.label}} masuk ({{trigger.time}}). Udah sholat?", "vars.r1", "ask_1"),
+      ask("ask_1", "Udah sholat {{trigger.label}}?", "vars.r2", "ask_2"),
+      ask("ask_2", "Udah sholat {{trigger.label}}?", "vars.r3", "ask_3"),
+      ask("ask_3", "Udah sholat {{trigger.label}}?", "vars.r4", "ask_4"),
+      ask("ask_4", "Udah sholat {{trigger.label}}?", "vars.last", "final"),
+      {
+        id: "final",
+        kind: "checkin",
+        text: "⏰ Terakhir: udah sholat {{trigger.label}}? 10 menit lagi masuk waktu berikutnya",
+        answers,
+        followUp: { everyMin: 5, max: 0 },
+        deadline: { kind: "next", plusMin: -1 },
+        missedText: "{{trigger.label}} kelewat, dicatat ya",
+        next: null,
+      },
+    ],
+  }
+})()
+
+describe("growing reminders up to 10 minutes before the next prayer", () => {
+  // Fake times on 2026-11-10: Subuh 04.34, Zuhur 12.00, Asar 15.25, Magrib 18.11, Isya 19.23; Subuh 04.35 on the 11th.
+  const texts = (h: ReturnType<typeof flowHarness>) => sentTexts(h.db).map((x) => x.text)
+
+  it("Zuhur: every reminder fits, the last one at 15.15, closed at 15.24", async () => {
+    const h = flowHarness({ engine: { readSource: fakePrayerTool() } })
+    const { flow } = h.create(SHOLAT_GROWING)
+    await h.run(at("2026-11-10T10:00"))
+    for (const t of ["12:00", "12:10", "12:30", "13:10", "14:30", "15:15"]) await h.run(at(`2026-11-10T${t}`))
+    expect(texts(h)).toEqual([
+      "🕌 Waktu Zuhur masuk (12.00). Udah sholat?",
+      "Udah sholat Zuhur?",
+      "Udah sholat Zuhur?",
+      "Udah sholat Zuhur?",
+      "Udah sholat Zuhur?",
+      "⏰ Terakhir: udah sholat Zuhur? 10 menit lagi masuk waktu berikutnya",
+    ])
+    const run = runsOf(h.db, flow.id).find((r) => r.runKey?.endsWith("dhuhr"))!
+    expect((run.wait as { deadlineAt: number }).deadlineAt).toBe(at("2026-11-10T15:24"))
+    await h.run(at("2026-11-10T15:24"))
+    expect(texts(h).at(-1)).toBe("Zuhur kelewat, dicatat ya")
+  })
+
+  it("Magrib: reminders past 19.03 are skipped, the last one lands at 19.13", async () => {
+    const h = flowHarness({ engine: { readSource: fakePrayerTool() } })
+    h.create(SHOLAT_GROWING)
+    await h.run(at("2026-11-10T17:00"))
+    for (const t of ["18:11", "18:21", "18:41", "19:13"]) await h.run(at(`2026-11-10T${t}`))
+    expect(texts(h)).toEqual([
+      "🕌 Waktu Magrib masuk (18.11). Udah sholat?",
+      "Udah sholat Magrib?",
+      "Udah sholat Magrib?",
+      "⏰ Terakhir: udah sholat Magrib? 10 menit lagi masuk waktu berikutnya",
+    ])
+  })
+
+  it("Isya: the last reminder is 10 minutes before Subuh tomorrow", async () => {
+    const h = flowHarness({ engine: { readSource: fakePrayerTool() } })
+    const { flow } = h.create(SHOLAT_GROWING)
+    await h.run(at("2026-11-10T19:00"))
+    for (const t of ["2026-11-10T19:23", "2026-11-10T19:33", "2026-11-10T19:53", "2026-11-10T20:33", "2026-11-10T21:53", "2026-11-11T04:25"]) await h.run(at(t))
+    expect(texts(h).at(-1)).toBe("⏰ Terakhir: udah sholat Isya? 10 menit lagi masuk waktu berikutnya")
+    // Magrib (18.11) was still running when the test started and catches up first.
+    expect(texts(h).filter((x) => x.includes("Isya"))).toHaveLength(6)
+    const run = runsOf(h.db, flow.id).find((r) => r.runKey?.endsWith("isha"))!
+    expect((run.wait as { deadlineAt: number }).deadlineAt).toBe(at("2026-11-11T04:34"))
+  })
+
+  it("an answer stops the chain", async () => {
+    const h = flowHarness({ engine: { readSource: fakePrayerTool() } })
+    const { flow } = h.create(SHOLAT_GROWING)
+    await h.run(at("2026-11-10T11:00"))
+    await h.run(at("2026-11-10T12:00"))
+    const run = runsOf(h.db, flow.id).find((r) => r.runKey?.endsWith("dhuhr"))!
+    answerFlowCheckin(h.db, { chatId: h.chatId, runId: run.id, answer: "done" }, at("2026-11-10T12:05"))
+    await h.run(at("2026-11-10T15:20"))
+    expect(texts(h)).toEqual(["🕌 Waktu Zuhur masuk (12.00). Udah sholat?"])
+    expect(runsOf(h.db, flow.id).find((r) => r.id === run.id)!.status).toBe("done")
+  })
+})

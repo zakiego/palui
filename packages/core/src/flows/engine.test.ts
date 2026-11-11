@@ -117,12 +117,12 @@ describe("manual runs, branches and limits", () => {
 
   it("caps messages per run and fails the run with a sentence", async () => {
     const h = flowHarness()
-    const steps = Array.from({ length: 6 }, (_, i) => ({ id: `m${i}`, kind: "message", text: `${i}` }))
+    const steps = Array.from({ length: 11 }, (_, i) => ({ id: `m${i}`, kind: "message", text: `${i}` }))
     const { flow } = h.create({ name: "Spam", steps })
     h.engine.startRun({ flowId: flow.id, triggerKind: "manual", runKey: "manual:1", payload: {}, now: h.now() })
     await h.run(h.now())
-    expect(sentTexts(h.db).filter((s) => s.source.startsWith("flow:"))).toHaveLength(5)
-    expect(runsOf(h.db, flow.id)[0]).toMatchObject({ status: "failed", error: "Step m5: More than 5 messages in one run." })
+    expect(sentTexts(h.db).filter((s) => s.source.startsWith("flow:"))).toHaveLength(10)
+    expect(runsOf(h.db, flow.id)[0]).toMatchObject({ status: "failed", error: "Step m10: More than 10 messages in one run." })
   })
 
   it("skips runs past the per-flow hourly limit", async () => {

@@ -73,7 +73,7 @@ export function parseDefinition(raw: unknown): { definition: FlowDefinition | nu
   }
   if (size > MAX_DEFINITION_BYTES) return { definition: null, problems: [{ path: "(root)", message: `The definition is ${Math.round(size / 1024)} KB; the limit is 32 KB.` }] }
   const r = definitionSchema.safeParse(up)
-  if (!r.success) return { definition: null, problems: zodProblems(r.error) }
+  if (!r.success) return { definition: null, problems: zodProblems(r.error, up) }
   return { definition: r.data, problems: [] }
 }
 

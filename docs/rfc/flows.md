@@ -312,7 +312,7 @@ Considered and left out: `switch` (chained `if` is enough at this size), `http` 
 - Sends to the flow's chat through the outbox, in the same transaction that finishes the step, so a restart never sends it twice.
 - Optional `to`: a literal chat id (never a template) of another chat the owner owns or has allowed (PLAN 19.2), like a Telegram group or the web chat. Validated at save. Sending anywhere other than the flow's own chat or the owner's DMs counts as a write call, so it shows up in `write_calls` and needs the version approval (7.2). Other people read those chats, so it is a side effect.
 - Optional `actions` (buttons) only with literal labels whose ids map to `chat` triggers. Not in the MVP.
-- Output: `{ outboxId, text, chatId }`. Max 5 messages per run. Failure: the outbox handles retries; the step itself only fails if the chat is gone.
+- Output: `{ outboxId, text, chatId }`. Max 10 messages per run (follow-up re-asks and missed texts don't count). Failure: the outbox handles retries; the step itself only fails if the chat is gone.
 
 ### 5.4 `checkin`
 

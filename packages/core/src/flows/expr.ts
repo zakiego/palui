@@ -35,6 +35,8 @@ export const FUNCTIONS: Record<string, [min: number, max: number]> = {
   round: [1, 2],
   min: [2, 2],
   max: [2, 2],
+  // choose(cond, a, b): a when cond is truthy, else b.
+  choose: [3, 3],
   date: [1, 1],
   daysUntil: [1, 1],
   hoursUntil: [1, 1],
@@ -609,6 +611,8 @@ function callFn(name: string, args: unknown[], env: EvalEnv, warn: (w: string) =
       if (x === null || y === null) return x ?? y
       return name === "min" ? Math.min(x, y) : Math.max(x, y)
     }
+    case "choose":
+      return truthy(a) ? b : c
     case "date":
       return toMs(a, env.tz, env.now)
     case "daysUntil": {

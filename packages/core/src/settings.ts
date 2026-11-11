@@ -59,7 +59,9 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   budgets: {
     maxSteps: 12,
-    turnTimeoutMs: 120_000,
+    // Long enough for a slow model to write and test a flow draft in one turn:
+    // at 120 s an Opus step that wrote a draft took 70-80 s, leaving room for one.
+    turnTimeoutMs: 300_000,
     maxTools: 64,
     dailyTokenCap: 2_000_000,
     maxRunsPerHour: 60,
