@@ -11,8 +11,6 @@ export default defineManifest({
   name: "WhatsApp",
   icon: "message-circle",
   summary: "Chat with Palui from WhatsApp, as a linked device.",
-  description:
-    "Palui links to a WhatsApp number as its own linked device (Baileys) and answers DMs from the owner's number only. Pair with an 8-character code, or scan the QR as a fallback. Baileys is unofficial: keep volume low and never broadcast. Telegram is the reliable channel.",
   config: z.object({
     // The owner's own number. Messages from it (and its learned LID) are accepted.
     ownerPhone: phone.optional(),
@@ -28,7 +26,6 @@ export default defineManifest({
     {
       action: "pairWhatsApp",
       label: "Link the WhatsApp number",
-      help: "On the phone that runs the number: WhatsApp > Linked devices > Link with phone number, then type the code.",
     },
   ],
   removeWarning: "This unlinks the WhatsApp device. You'll need to pair again.",

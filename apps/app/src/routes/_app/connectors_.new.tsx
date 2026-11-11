@@ -100,7 +100,7 @@ function NewConnectorPage() {
           <ArrowLeftIcon data-icon="inline-start" />
           {t("nav.connectors")}
         </Button>
-        <PageHeader title={t("connectors.add")} description={t("connectors.newDescription")} />
+        <PageHeader title={t("connectors.add")} />
       </div>
       <InputGroup className="max-w-md">
         <InputGroupAddon>
@@ -195,7 +195,7 @@ function Choice({
 function NewConnectorSkeleton() {
   return (
     <PagePending page="nav.connectors">
-      <PageHeaderSkeleton title="w-44" description="w-96" />
+      <PageHeaderSkeleton title="w-44" />
       <Skeleton className="h-9 w-full max-w-md" />
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }, (_, i) => (

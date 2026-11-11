@@ -58,7 +58,6 @@ function ConnectorsPage() {
     <>
       <PageHeader
         title={t("connectors.title")}
-        description={t("connectors.description")}
         actions={
           <Button render={<Link to="/connectors/new" />}>
             <PlusIcon data-icon="inline-start" />
@@ -107,7 +106,7 @@ function ConnectorsSkeleton() {
   const { Skeleton: LayoutSkeleton } = CONNECTOR_LAYOUTS[v ? v - 1 : DEFAULT_CONNECTOR_LAYOUT]
   return (
     <PagePending page="nav.connectors">
-      <PageHeaderSkeleton title="w-36" description="w-80" action="w-36" />
+      <PageHeaderSkeleton title="w-36" action="w-36" />
       <div className="flex flex-col gap-6">
         <LayoutSkeleton />
       </div>

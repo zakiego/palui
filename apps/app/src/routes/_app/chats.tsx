@@ -78,7 +78,6 @@ function ChatsPage() {
     <>
       <PageHeader
         title={t("chats.title")}
-        description={t("chats.description")}
         actions={
           // The list sits beside the transcript only when the page itself is
           // wide enough (a container query, so an open sidebar counts). Below
@@ -620,7 +619,7 @@ const CHAT_ROWS = [
 function ChatsSkeleton() {
   return (
     <PagePending page="nav.chats">
-      <PageHeaderSkeleton title="w-20" description="w-64" wraps={false} action="w-28 @3xl/main:hidden" />
+      <PageHeaderSkeleton title="w-20" wraps={false} action="w-28 @3xl/main:hidden" />
       <div className="grid min-h-0 flex-1 gap-4 @3xl/main:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
         <Card className={cn("hidden min-h-0 gap-0 py-0 @3xl/main:flex", PANE_HEIGHT)}>
           <div className="border-b px-4 py-3">

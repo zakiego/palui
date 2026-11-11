@@ -65,7 +65,7 @@ function ActivityPage() {
 
   return (
     <>
-      <PageHeader title={t("activity.title")} description={t("activity.description")} />
+      <PageHeader title={t("activity.title")} />
       <Tabs value={tab} onValueChange={(v) => void navigate({ search: (p) => ({ ...p, tab: v as typeof tab }) })} className="gap-4">
         <TabsList>
           <TabsTrigger value="events">{t("activity.events")}</TabsTrigger>

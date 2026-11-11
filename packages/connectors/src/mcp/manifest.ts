@@ -21,18 +21,16 @@ export default defineManifest({
   name: "MCP server",
   icon: "plug",
   summary: "Give Palui the tools of an MCP server you run or trust.",
-  description:
-    "Connects one MCP server over Streamable HTTP. Every tool gets its own Switch and a class: read, write or destructive. Destructive tools always ask before running, and tools from an external server taint the turn so writes ask too.",
   multiple: true,
   trust: "external",
   config: mcpConfig,
   secrets: { token: z.string().min(1).optional() },
   setup: [
-    { field: "url", label: "Server URL", placeholder: "https://example.com/api/mcp", help: "Streamable HTTP endpoint. SSE-only servers aren't supported." },
-    { field: "authMode", label: "Auth", askFirst: true, help: "bearer sends Authorization: Bearer <token>. header sends the token in a header you name." },
+    { field: "url", label: "Server URL", placeholder: "https://example.com/api/mcp", help: "Streamable HTTP only, not SSE." },
+    { field: "authMode", label: "Auth", askFirst: true, help: "bearer: Authorization header. header: a header you name." },
     { field: "headerName", label: "Header name", askFirst: true, placeholder: "x-api-key", showIf: { field: "authMode", in: ["header"] } },
     { field: "token", label: "Token", secret: true, optional: true, askFirst: true, showIf: { field: "authMode", in: ["bearer", "header"] } },
-    { action: "listTools", label: "Pick which tools Palui may use", help: "Read-only tools are prefilled as read, the rest as write or destructive from the server's hints." },
+    { action: "listTools", label: "Pick which tools Palui may use" },
   ],
   presets: [
     { id: "vorneo", label: "Vorneo", config: { url: "https://vorneo.id/api/mcp/", authMode: "bearer" }, secretFields: ["token"] },
@@ -54,7 +52,7 @@ export default defineManifest({
       trust: "own",
     },
   ],
-  removeWarning: "This removes the server and its token from Palui. The server itself isn't touched.",
+  removeWarning: "This removes the token from Palui. The server isn't touched.",
   docs: {
     notes: [
       "Tools are namespaced <connector id>__<tool>, for example mcp-vorneo__search_listings.",

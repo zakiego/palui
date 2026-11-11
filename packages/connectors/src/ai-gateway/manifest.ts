@@ -8,7 +8,7 @@ export default defineManifest({
   kind: "model",
   name: "ai-gateway",
   icon: "network",
-  summary: "Zaki's ai-gateway on the host, the fallback in every model chain.",
+  summary: "Fallback models through ai-gateway on the host.",
   config: z.object({
     baseUrl: z.string().url().default("http://host.docker.internal:8793"),
     protocols: z.object({ default: proto, fast: proto, vision: proto }).partial().default({}),

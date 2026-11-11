@@ -21,14 +21,12 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - The T3 Code setup asks for the pairing code first and shows the command to make one in a block with a Copy button. The text on its page is cut down to one short line per field, and the longer explanation lives in the docs.
 - A connector that isn't set up yet opens with just the setup guide and the fields it needs. The optional settings sit behind a "More settings" link and show in full once it's connected. A step with a command now shows the command above the box you paste into.
 - Every connector's setup now puts the guide above the field: where the value comes from first, then the box to paste it into. Telegram shows `/newbot` to send to @BotFather, CLIProxyAPI shows the command that prints its keys, and Google Calendar shows your real redirect URI with a Copy button before asking for the client ID.
+- The rest of the dashboard got the same cut as T3 Code. Pages drop their subtitles, every connector page loses its long description, and field helpers, empty states and confirms are one short line. The how-it-works detail is in the docs, and the Google Calendar page there now has the OAuth client setup steps.
 
 ### Fixed
 
 - A connector page no longer stays on "Connecting" after the connector is already on. The status refreshes with the rest of the page every few seconds.
 - Adding an MCP server shows Auth and Token right away instead of hiding them under "More settings". Header name shows only for the custom header mode, and Token only when the server needs one.
-
-### Fixed
-
 - Palui no longer re-checks your reminders, or any earlier work, on every message. Later turns now see the tool calls earlier turns made and their results, so it stops doubting its own replies and stops taking back answers that were right.
 - Asking for the same thing again while an approval prompt still waits now drops the older request. You no longer get a late "that didn't run" message about something that was already answered.
 

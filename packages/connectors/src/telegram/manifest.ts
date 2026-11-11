@@ -9,18 +9,16 @@ export default defineManifest({
   name: "Telegram",
   icon: "send",
   summary: "Chat with Palui from a Telegram bot.",
-  description:
-    "Long polling with grammY. Paste a bot token from @BotFather, then open the claim link and press Start to become the owner. Replies are sent as HTML, split at 4096 characters, with inline buttons for reminders, approvals and /connectors.",
   config: z.object({
     // Learned at runtime from getMe, so the claim link works before polling starts.
     botUsername: z.string().optional(),
   }),
   secrets: { botToken: z.string().regex(/^\d+:[\w-]{30,}$/, "That doesn't look like a bot token from @BotFather (123456789:AA...).") },
   setup: [
-    { field: "botToken", label: "Bot token", help: "Send this to @BotFather in Telegram, then paste the token it gives you.", command: "/newbot", secret: true, placeholder: "123456789:AA..." },
+    { field: "botToken", label: "Bot token", help: "Send this to @BotFather, then paste the token.", command: "/newbot", secret: true, placeholder: "123456789:AA..." },
     { action: "claimOwner", label: "Open the link and press Start" },
   ],
-  removeWarning: "This deletes the bot token from Palui. The bot stops answering until you connect it again. The bot itself stays in @BotFather.",
+  removeWarning: "This deletes the bot token. The bot stays in @BotFather.",
   docs: {
     notes: [
       "Dev and prod need different bot tokens: two getUpdates consumers on one token get HTTP 409.",

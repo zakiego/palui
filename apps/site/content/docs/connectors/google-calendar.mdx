@@ -11,9 +11,13 @@ Kind: `skill`. Google Calendar gives the model read-only access to your calendar
 
 ## Connect
 
-1. On the Connectors page, add Google Calendar.
-2. Follow the sign-in step (planned: a Google OAuth sign-in that grants read access to your calendar).
-3. Press Test.
+1. In Google Cloud Console, open APIs and Services, then Credentials, and create an OAuth client of type Web application.
+2. Add `<APP_URL>/api/oauth/google/callback` as an authorized redirect URI.
+3. On the Connectors page, add Google Calendar and paste the client ID and secret.
+4. Press Connect with Google. Palui asks only for the `calendar.readonly` scope.
+5. Press Test.
+
+To revoke access fully after removing the connector, also remove Palui at [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
 
 ## Settings
 

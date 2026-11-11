@@ -90,7 +90,7 @@ function SettingsPage() {
   const tab = search.tab ?? "general"
   return (
     <>
-      <PageHeader title={t("settings.title")} description={t("settings.description")} />
+      <PageHeader title={t("settings.title")} />
       <Tabs value={tab} onValueChange={(v) => void navigate({ search: { tab: v as (typeof TABS)[number] }, replace: true })} className="gap-4">
         <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
           <TabsList>
@@ -159,7 +159,6 @@ function GeneralTab({ data }: { data: Data }) {
     <Card>
       <CardHeader>
         <CardTitle>{t("settings.general.title")}</CardTitle>
-        <CardDescription>{t("settings.general.body")}</CardDescription>
       </CardHeader>
       <CardContent>
         <FieldGroup>
@@ -184,7 +183,7 @@ function GeneralTab({ data }: { data: Data }) {
                 autoComplete="off"
                 list="timezone-options"
                 aria-invalid={timezoneError ? true : undefined}
-                aria-describedby={timezoneError ? "timezone-error timezone-help" : "timezone-help"}
+                aria-describedby={timezoneError ? "timezone-error" : undefined}
                 value={timezone}
                 onChange={(e) => {
                   setTimezone(e.target.value)
@@ -197,7 +196,6 @@ function GeneralTab({ data }: { data: Data }) {
                 ))}
               </datalist>
               {timezoneError && <FieldError id="timezone-error" role={undefined}>{timezoneError}</FieldError>}
-              <FieldDescription id="timezone-help">{t("settings.tz.help")}</FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor="language">{t("settings.language")}</FieldLabel>
@@ -613,7 +611,6 @@ function BackupCard({ backup }: { backup: Data["backup"] }) {
     <Card>
       <CardHeader>
         <CardTitle>{t("settings.backups.title")}</CardTitle>
-        <CardDescription>{t("settings.backups.body")}</CardDescription>
       </CardHeader>
       <CardContent>
         {backup ? (
@@ -692,7 +689,7 @@ function HooksCard({ data }: { data: Data }) {
                 <WebhookIcon />
               </EmptyMedia>
               <EmptyTitle>{t("settings.hooks.empty")}</EmptyTitle>
-              <EmptyDescription>{data.chats.length ? t("settings.hooks.emptyBody") : t("settings.hooks.emptyNoChat")}</EmptyDescription>
+              {!data.chats.length && <EmptyDescription>{t("settings.hooks.emptyNoChat")}</EmptyDescription>}
             </EmptyHeader>
           </Empty>
         ) : (
@@ -726,7 +723,7 @@ function HooksCard({ data }: { data: Data }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{created ? t("settings.hooks.created") : t("settings.hooks.new")}</DialogTitle>
-            <DialogDescription>{created ? t("settings.hooks.createdBody") : t("settings.hooks.newBody")}</DialogDescription>
+            {created && <DialogDescription>{t("settings.hooks.createdBody")}</DialogDescription>}
           </DialogHeader>
           {created ? (
             <FieldGroup>
@@ -742,6 +739,13 @@ function HooksCard({ data }: { data: Data }) {
                 <div className="flex min-w-0 items-center gap-2">
                   <code className="min-w-0 flex-1 rounded-md bg-muted p-2 font-mono text-caption break-all">{created.secret}</code>
                   <CopyButton text={created.secret} />
+                </div>
+              </Field>
+              <Field>
+                <FieldLabel>{t("settings.hooks.tryIt")}</FieldLabel>
+                <div className="flex min-w-0 items-start gap-2">
+                  <code className="min-w-0 flex-1 rounded-md bg-muted p-2 font-mono text-caption break-all">{curlFor(created.url, created.secret)}</code>
+                  <CopyButton text={curlFor(created.url, created.secret)} />
                 </div>
               </Field>
             </FieldGroup>
@@ -846,4 +850,10 @@ function SettingsSkeleton() {
       </div>
     </PagePending>
   )
+}
+
+// A ready-to-run signed request for a new hook, so the secret can be tested
+// right away. Signing is HMAC-SHA256 over "<timestamp>.<raw body>".
+function curlFor(url: string, secret: string): string {
+  return `BODY='Hello from curl'; TS=$(date +%s); curl -X POST '${url}' -H "x-palui-timestamp: $TS" -H "x-palui-signature: sha256=$(printf '%s.%s' "$TS" "$BODY" | openssl dgst -sha256 -hmac '${secret}' -hex | sed 's/^.* //')" -d "$BODY"`
 }

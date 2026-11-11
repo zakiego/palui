@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { StatusText } from "@/components/ui/status-text"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -64,7 +64,6 @@ function RemindersPage() {
     <>
       <PageHeader
         title={t("reminders.title")}
-        description={t("reminders.description")}
         actions={
           <Button onClick={() => setNew(true)}>
             <BellPlusIcon data-icon="inline-start" />
@@ -340,7 +339,6 @@ function NewReminderDialog({ open, onOpenChange, data }: { open: boolean; onOpen
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t("reminders.new")}</DialogTitle>
-          <DialogDescription>{t("reminders.inputHelp")}</DialogDescription>
         </DialogHeader>
         <form
           onSubmit={(e) => {
@@ -413,7 +411,7 @@ function NewReminderDialog({ open, onOpenChange, data }: { open: boolean; onOpen
 function RemindersSkeleton() {
   return (
     <PagePending page="nav.reminders">
-      <PageHeaderSkeleton title="w-36" description="w-80" action="w-36" />
+      <PageHeaderSkeleton title="w-36" action="w-36" />
       <div className="flex flex-col gap-4">
         <TabsSkeleton className="w-64" />
         <TableSkeleton

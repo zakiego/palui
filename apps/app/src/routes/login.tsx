@@ -63,7 +63,6 @@ function LoginPage() {
     <AuthFrame>
       <div className="flex flex-col gap-1.5 text-center">
         <h1 className="font-heading text-title">{t("login.title")}</h1>
-        <p className="text-sm text-pretty text-muted-foreground">{t("login.subtitle")}</p>
       </div>
 
       {!configured && (

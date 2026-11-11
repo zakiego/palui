@@ -91,7 +91,7 @@ function ClaimOwner(props: WizardActionProps) {
     return (
       <p className="flex items-center gap-2 text-sm">
         <CircleCheckIcon className="text-success" aria-hidden="true" />
-        Owner claimed. Only that Telegram account gets answers.
+        Owner claimed.
       </p>
     )
   }
@@ -210,7 +210,7 @@ function PairWhatsApp(props: WizardActionProps) {
     return (
       <p className="flex items-center gap-2 text-sm">
         <CircleCheckIcon className="text-success" aria-hidden="true" />
-        Linked. Pausing keeps the link; removing unlinks it.
+        Linked.
       </p>
     )
   }
@@ -307,7 +307,7 @@ function PairPhone(props: WizardActionProps) {
             Get code
           </Button>
         </div>
-        <p className="text-caption text-muted-foreground">The WhatsApp number Palui links to as an extra device. Leave it empty to pair with the QR instead.</p>
+        <p className="text-caption text-muted-foreground">Palui's own number, not yours. Leave empty for QR.</p>
         {error && <FieldError>{error}</FieldError>}
       </Field>
     </form>
@@ -344,7 +344,7 @@ function PickContainer(props: WizardActionProps) {
         options.length ? (
           <SimpleSelect aria-label="recall container" className="w-full" value={current} options={[...new Set([current, ...options])].map((o) => ({ value: o, label: o }))} onChange={(v) => void choose(v)} />
         ) : (
-          <p className="text-sm text-muted-foreground">recall has no containers yet. It uses "default" until you add memories.</p>
+          <p className="text-sm text-muted-foreground">No containers yet. Palui uses "default".</p>
         )
       ) : (
         <p className="text-sm">
