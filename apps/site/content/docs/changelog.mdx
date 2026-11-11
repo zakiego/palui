@@ -15,6 +15,11 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 - Each connector now opens on its own page (`/app/connectors/<id>`) instead of a side sheet, with a back link and the Save, Test and Connect buttons pinned at the bottom. Old `?open=<id>` links redirect there.
 - The T3 Code setup asks for the pairing code first and shows the command to make one in a block with a Copy button. The text on its page is cut down to one short line per field, and the longer explanation lives in the docs.
+- A connector that isn't set up yet opens with just the setup guide and the fields it needs. The optional settings sit behind a "More settings" link and show in full once it's connected. A step with a command now shows the command above the box you paste into.
+
+### Fixed
+
+- A connector page no longer stays on "Connecting" after the connector is already on. The status refreshes with the rest of the page every few seconds.
 
 ## 0.3.0 (2026-11-11)
 

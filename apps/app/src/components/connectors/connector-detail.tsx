@@ -55,7 +55,12 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
   const [saved, setSaved] = React.useState(!target.isNew)
 
   const detail = usePoll(() => getConnectorDetail({ data: { id: target.id } }), { intervalMs: 3000, deps: [target.id] })
-  const status = target.status
+  // The poll keeps the status fresh; the loader's copy is only the first paint.
+  const status = detail.data?.status?.status ?? target.status
+  const statusDetail = detail.data?.status ? detail.data.status.statusDetail : target.statusDetail
+  // Before the first connect the page is only the guide and the required
+  // fields; everything optional waits until it's connected (or asked for).
+  const [showAll, setShowAll] = React.useState(false)
 
   const set = (k: string, v: string | boolean) => {
     setValues((prev) => ({ ...prev, [k]: v }))
@@ -185,6 +190,10 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
   )
 
   const fieldSteps = m.setup.filter((s): s is FieldStep => "field" in s)
+  const settingUp = status === "not_set_up"
+  const requiredSteps = fieldSteps.filter((s) => !fieldInfo(m, s).optional || errors[s.field])
+  const hiddenCount = settingUp && !showAll && requiredSteps.length > 0 ? fieldSteps.length - requiredSteps.length : 0
+  const shownSteps = hiddenCount > 0 ? requiredSteps : fieldSteps
   const actionSteps = m.setup.filter((s): s is ActionStep => "action" in s)
   const live = detail.data?.live ?? {}
 
@@ -205,12 +214,12 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
       </div>
       <div className="flex w-full max-w-2xl flex-col gap-6">
       {detail.data && !detail.data.runtimeUp && <RuntimeAlert />}
-      {target.statusDetail && status === "error" && (
+      {statusDetail && status === "error" && (
         <Alert variant="destructive">
           <CircleAlertIcon aria-hidden="true" />
           <AlertTitle>{t("connectors.errorTitle", { name: label || m.name })}</AlertTitle>
           <AlertDescription className="break-words">
-            <span className="block">{target.statusDetail}</span>
+            <span className="block">{statusDetail}</span>
             <span className="block">{t("connectors.errorFix")}</span>
           </AlertDescription>
         </Alert>
@@ -221,7 +230,7 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
         </Alert>
       )}
       {m.description && <p className="text-sm text-pretty text-muted-foreground">{m.description}</p>}
-      {m.pauseNote && <p className="text-caption text-pretty text-muted-foreground">{m.pauseNote}</p>}
+      {m.pauseNote && !settingUp && <p className="text-caption text-pretty text-muted-foreground">{m.pauseNote}</p>}
 
       {(m.multiple || fieldSteps.length > 0) && (
       <FieldGroup>
@@ -234,7 +243,7 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
             </FieldDescription>
           </Field>
         )}
-        {fieldSteps.map((step) => (
+        {shownSteps.map((step) => (
           <WizardField
             key={step.field}
             id={`${target.id}-${step.field}`}
@@ -246,6 +255,11 @@ export function ConnectorDetail({ target, manifest: m, appUrl }: { target: Conne
             onChange={(v) => set(step.field, v)}
           />
         ))}
+        {hiddenCount > 0 && (
+          <Button variant="ghost" size="sm" className="-ms-2.5 self-start text-muted-foreground" onClick={() => setShowAll(true)}>
+            {t("connectors.moreSettings", { n: hiddenCount })}
+          </Button>
+        )}
       </FieldGroup>
       )}
 
@@ -378,7 +392,7 @@ function WizardField({
   error: string | undefined
   onChange: (v: string | boolean) => void
 }) {
-  const describedBy = [step.help ? `${id}-help` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined
+  const describedBy = [step.help ? `${id}-help` : null, step.command && info.secret && stored ? `${id}-stored` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined
   if (info.kind === "boolean") {
     return (
       <Field orientation="horizontal" data-invalid={!!error}>
@@ -413,6 +427,13 @@ function WizardField({
         {step.label}
         {info.optional && <span className="font-normal text-muted-foreground">(optional)</span>}
       </FieldLabel>
+      {/* A step with a command is a guide: run this, then paste. Show it first. */}
+      {step.command && (
+        <>
+          {step.help && <FieldDescription id={`${id}-help`}>{step.help}</FieldDescription>}
+          <CommandBlock command={step.command} />
+        </>
+      )}
       <Input
         id={id}
         type={info.secret ? "password" : info.kind === "number" ? "number" : "text"}
@@ -427,13 +448,14 @@ function WizardField({
         onChange={(e) => onChange(e.target.value)}
         className={info.secret || info.kind !== "string" ? "font-mono" : undefined}
       />
-      {(step.help || (info.secret && stored)) && (
-        <FieldDescription id={`${id}-help`}>
-          {step.help}
-          {info.secret && stored ? `${step.help ? " " : ""}Saved as ${stored}. Leave empty to keep it.` : ""}
-        </FieldDescription>
-      )}
-      {step.command && <CommandBlock command={step.command} />}
+      {step.command
+        ? info.secret && stored && <FieldDescription id={`${id}-stored`}>Saved as {stored}. Leave empty to keep it.</FieldDescription>
+        : (step.help || (info.secret && stored)) && (
+            <FieldDescription id={`${id}-help`}>
+              {step.help}
+              {info.secret && stored ? `${step.help ? " " : ""}Saved as ${stored}. Leave empty to keep it.` : ""}
+            </FieldDescription>
+          )}
       {error && <FieldError id={`${id}-error`}>{error}</FieldError>}
     </Field>
   )

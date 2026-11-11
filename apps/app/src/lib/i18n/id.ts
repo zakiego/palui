@@ -158,6 +158,7 @@ export const id: Record<Key, string> = {
   "connectors.resumed": "{name} dilanjutkan",
   "connectors.test": "Tes",
   "connectors.connect": "Sambungkan",
+  "connectors.moreSettings": "Pengaturan lain ({n})",
   "connectors.saveDraft": "Simpan",
   "connectors.remove": "Hapus",
   "connectors.continueSetup": "Lanjutkan pengaturan",

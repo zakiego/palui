@@ -159,6 +159,7 @@ export const en = {
   "connectors.resumed": "{name} resumed",
   "connectors.test": "Test",
   "connectors.connect": "Connect",
+  "connectors.moreSettings": "More settings ({n})",
   "connectors.saveDraft": "Save",
   "connectors.remove": "Remove",
   "connectors.continueSetup": "Continue setup",
