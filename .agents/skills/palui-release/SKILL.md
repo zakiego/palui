@@ -1,35 +1,34 @@
 ---
 name: palui-release
-description: Release Palui Agent. The agent picks the semver bump from the changelog, asks the owner once, then cuts, commits, pushes and tags the release on main from the local machine. Use right after a user-visible palui PR merges, before a deploy, or when asked to "release", "cut a release", "bump the version", "ship 0.2.0", "tag it" or "what version are we on".
+description: Release Palui Agent. A T3 scheduled task runs this every night at 00:00 WITA in a fresh thread. It tags the last merged release, picks the semver bump from the changelog, and opens a release PR. Merging that PR is the owner's yes. Use when the nightly scheduled run fires, or when asked to "release", "cut a release", "bump the version", "ship 0.2.0", "tag it" or "what version are we on".
 ---
 
 # Palui release
 
-The owner doesn't think about versions. You pick the bump, ask once, and do everything else locally. No release PR, no CI.
+The owner doesn't think about versions. Every night a T3 scheduled task ("Palui nightly release", 00:00 Asia/Makassar, new thread per run) runs the steps below. It opens a release PR when `## Unreleased` has something in it. The owner merges that PR when they want the release out, and the next nightly run tags it. No CI, no GitHub Release.
 
-The version lives only in `"version"` in the root `package.json`. `packages/core/src/version.ts` reads it, and `GET /health` reports it. The changelog is `apps/site/content/docs/changelog.mdx`. `apps/site/lib/changelog.test.ts` fails `pnpm test` when the two disagree. All mechanics go through `pnpm release` (`scripts/release.ts`). Never edit the version or move changelog sections by hand.
+The version lives only in `"version"` in the root `package.json`. `packages/core/src/version.ts` reads it, and `GET /health` reports it. The changelog is `apps/site/content/docs/changelog.mdx`. `apps/site/lib/changelog.test.ts` fails `pnpm test` when the two disagree. All mechanics go through `scripts/release.ts` (`pnpm release <cmd>`, or `node scripts/release.ts <cmd>` when node_modules isn't installed; it has no dependencies). Never edit the version or move changelog sections by hand.
 
-## When to run it
+PRs other than the release PR never bump the version, so parallel PRs can't fight over a number.
 
-- Right after a PR that added a changelog line merges. If you merged it, or the owner says it merged, offer the release in the same reply.
-- Before a deploy, if `## Unreleased` on origin/main has anything in it.
-- When the owner asks.
+## Nightly steps
 
-PRs never bump the version themselves, so parallel PRs can't fight over a number.
-
-## Steps
-
-1. Get on a clean, fresh origin/main. In a worktree main is usually checked out elsewhere, so detach:
+1. Work in a throwaway worktree on a fresh origin/main, never the owner's checkout:
    ```bash
-   git fetch origin && git switch --detach origin/main
+   git fetch origin --tags
+   git worktree add --detach /tmp/palui-release-$(date +%Y%m%d) origin/main
+   cd /tmp/palui-release-$(date +%Y%m%d)
    ```
-   With uncommitted work in the checkout, use a fresh worktree instead of touching it.
-2. Ask the script what the notes call for:
+2. Tag a release PR that merged since last night. It finds the first-parent commit on main that set the current version (merge or squash commit) and pushes `vX.Y.Z`. It's a no-op when the tag already exists:
    ```bash
-   pnpm release suggest
+   node scripts/release.ts tag-merged
    ```
-   It prints e.g. `minor: 0.1.0 -> 0.2.0 (has Added)` or `nothing to release`. If nothing, stop and say so.
-3. Sanity-check the suggestion against the notes yourself. The rules:
+3. Ask what the notes call for:
+   ```bash
+   node scripts/release.ts suggest
+   ```
+   `nothing to release`: go to step 7.
+4. Sanity-check the suggestion against the notes:
 
    | Unreleased has | 0.x | >= 1.0 |
    | --- | --- | --- |
@@ -37,29 +36,56 @@ PRs never bump the version themselves, so parallel PRs can't fight over a number
    | any `### Added` or `### Changed` | minor | minor |
    | any `### Breaking` | minor | major |
 
-   `1.0.0` happens only when the owner says v1 is done. Never suggest it on your own; you can mention it when the v1 scope in `docs/PLAN.md` looks finished. If a bullet sits under the wrong heading (a feature filed under Fixed), fix the heading on a branch first rather than overriding the bump.
-4. Ask the owner with AskUserQuestion, one question. Put the suggestion first and marked "(Recommended)", the other sensible bumps as options, and the Unreleased bullets in the question so they see what ships. Keep it short, e.g. "Release 0.2.0? It has 2 Added, 1 Fixed."
-5. On a yes, ship it. This bumps, commits `chore(release): vX.Y.Z`, pushes main, tags and pushes the tag:
+   `1.0.0` happens only when the owner says v1 is done. Never open it on your own. If a bullet sits under the wrong heading (a feature filed under Fixed), go with the script's bump and say so in the PR body. Don't fix headings in the nightly run.
+5. Check for an open release PR:
    ```bash
-   pnpm release ship minor        # or patch, major, or an exact 0.4.0
+   gh pr list --state open --json number,headRefName,url -q '.[] | select(.headRefName | startswith("release/v"))'
+   git fetch origin <headRefName> && git rev-parse FETCH_HEAD^1 origin/main
    ```
-   The date defaults to today in Asia/Makassar; pass `--date YYYY-MM-DD` only to backdate.
-6. Report the result in one line: version, short sha, and the changelog link https://palui.zakiego.com/docs/changelog (the site redeploys from main).
+   - The release commit's parent is still origin/main (both shas match) and its version matches the suggestion: nothing changed, keep it. Go to step 7.
+   - Otherwise it's stale. Close it without a comment: `gh pr close <n> --delete-branch`.
+6. Cut the release on `release/vX.Y.Z`, push it, open the PR:
+   ```bash
+   node scripts/release.ts open minor        # or patch, major, or an exact 0.9.0
+   node scripts/release.ts notes             # the bullets for the body
+   gh pr create --draft --base main --assignee zakiego --label enhancement \
+     --title "chore(release): vX.Y.Z" --body-file /tmp/palui-release-pr.md
+   ```
+   Use label `bug` when the release is only `### Fixed`. Body (unwrapped lines):
+   ```md
+   TL;DR: Release X.Y.Z (<bump>, <counts, e.g. 2 Added, 1 Fixed>). Merge it to ship; the next nightly run tags vX.Y.Z.
 
-The owner's yes on step 4 covers the commit and both pushes for that release. It doesn't cover a GitHub Release or a deploy: those are separate asks.
+   ## What ships
+   <output of `node scripts/release.ts notes`>
+
+   ## How I checked
+   - `pnpm release check` passes on the branch
+   ```
+   The date in the heading defaults to today in Asia/Makassar. Link the PR to the thread (`link_pull_request`).
+7. Clean up and report in one line: what got tagged, the PR link, or "nothing to release".
+   ```bash
+   cd - && git worktree remove /tmp/palui-release-$(date +%Y%m%d)
+   ```
+
+The owner opted into this schedule, which covers pushing `release/v*` branches, opening and closing release PRs, and pushing `vX.Y.Z` tags. It doesn't cover merging the PR, a GitHub Release, or any other post.
+
+## Releasing by hand
+
+When the owner asks for a release right now, run steps 1 to 6 yourself. Only when they explicitly say to skip the PR, `node scripts/release.ts ship <bump>` commits, pushes main and tags in one go.
 
 ## When it goes wrong
 
 - `HEAD isn't origin/main`: main moved or you're on a branch. Redo step 1.
-- `pushing main failed`: someone pushed in between. Nothing is tagged. `git reset --hard origin/main` (only the local release commit is lost), then start over at step 1.
-- Main pushed but the tag push failed: from that same commit, `pnpm release tag` then `git push origin vX.Y.Z`.
+- `release/vX.Y.Z already exists on origin`: a PR from an earlier run is still open. Step 5 decides whether to keep or close it.
+- `couldn't find the commit on origin/main that set X.Y.Z`: someone bumped the version outside a release PR. Stop and tell the owner.
+- The tag push failed after tagging: `git push origin vX.Y.Z`.
 - Never reuse, move or delete a tag, and never force-push. A broken release gets a new patch.
 
 ## Rules
 
 - Never put a release heading above `## Unreleased`, and never edit an old release's notes except to fix a typo.
 - Heading shape is exact: `## 0.2.0 (2026-11-20)`. The test rejects `## v0.2.0`, `## 0.2.0 - 2026-11-20` and friends.
-- Check what's running after a deploy:
+- Merging to main redeploys. Check what's running:
   ```bash
   curl -s https://palui.zakiego.com/health | jq '{version, runtime: .runtime.version}'
   ```

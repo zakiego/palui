@@ -53,21 +53,22 @@ pnpm test && pnpm typecheck && pnpm build
 pnpm eval:reminders      # 60-phrase parse eval, live against CLIProxyAPI (needs PALUI_EVAL_KEY)
 pnpm release check       # package.json version and changelog agree
 pnpm release suggest     # the bump Unreleased calls for
-pnpm release ship minor  # cut, commit, push main, tag (after the owner says yes)
+pnpm release open minor  # cut the release on release/vX.Y.Z and push it (nightly task opens the PR)
+pnpm release tag-merged  # tag the merged release on main
 ```
 
 ## Versions and changelog
 
 - SemVer. The version lives only in the root `package.json` `"version"`. `packages/core/src/version.ts` reads it, and `GET /health` reports it for the app and the runtime.
 - The changelog is `apps/site/content/docs/changelog.mdx` (https://palui.zakiego.com/docs/changelog). Every user-visible PR adds its bullet under `## Unreleased` in the same PR. `apps/site/lib/changelog.test.ts` fails when the changelog and the version disagree.
-- The owner doesn't pick versions. After a user-visible PR merges, the agent runs `pnpm release suggest`, asks the owner once, then `pnpm release ship <bump>` commits, pushes main and tags `vX.Y.Z` from the local machine (`palui-release`). PRs never bump the version. Never bump it by hand. While on `0.x`, the v1 scope is still being built; `1.0.0` means v1 is done, and only the owner calls that.
+- The owner doesn't pick versions. A T3 scheduled task runs `palui-release` every night at 00:00 WITA in a new thread: it tags the last merged release (`pnpm release tag-merged`), then opens a `chore(release): vX.Y.Z` PR from `release/vX.Y.Z` when Unreleased has something (`pnpm release open <bump>`). Merging that PR is the owner's yes. Other PRs never bump the version. Never bump it by hand. While on `0.x`, the v1 scope is still being built; `1.0.0` means v1 is done, and only the owner calls that.
 
 ## Skills
 
 Repo workflows live in `.agents/skills/` (`.claude/skills` links there). Use them instead of improvising:
 
 - `palui-changelog`: add an Unreleased entry for a user-visible change.
-- `palui-release`: pick the bump, cut the release, tag it.
+- `palui-release`: the nightly release run: tag the merged release, open the next release PR.
 - `palui-pr`: checks and conventions before opening a PR against `main`.
 - `palui-new-connector`: add a connector end to end.
 - `palui-schema-change`: change `schema.ts` and ship the migration safely.

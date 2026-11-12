@@ -107,7 +107,7 @@ export function checkChangelog(src: string, version: string): string[] {
   const latest = releases[0]
   if (!latest) problems.push("no release yet: add one, e.g. `## 0.1.0 (YYYY-MM-DD)`")
   else if (latest.version !== version)
-    problems.push(`package.json says ${version} but the newest changelog release is ${latest.version}. Release with \`pnpm release ship\`, never bump by hand.`)
+    problems.push(`package.json says ${version} but the newest changelog release is ${latest.version}. Release through the release PR (\`pnpm release open\`), never bump by hand.`)
   return problems
 }
 
