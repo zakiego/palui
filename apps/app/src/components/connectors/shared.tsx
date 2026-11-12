@@ -4,8 +4,11 @@
 //   Undo, aria-label "Pause <name>" / "Resume <name>", a 44 px target.
 // - useStatusAnnouncer: one polite announcement per status change, never on load.
 import * as React from "react"
+import { Link } from "@tanstack/react-router"
+import { ArrowLeftIcon } from "lucide-react"
 import type { ConnectorManifest } from "@palui/core/connectors/define"
 
+import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { useConnectorToggle } from "@/hooks/use-connector-toggle"
 import { useT, type Key } from "@/lib/i18n"
@@ -18,6 +21,23 @@ export const CONNECTOR_GROUPS: { kind: ConnectorManifest["kind"]; label: Key }[]
   { kind: "tools", label: "connectors.group.tools" },
   { kind: "skill", label: "connectors.group.skill" },
 ]
+
+// The back link above a connector page. Opened from an agent's Tools tab
+// (?agent=<id>), it returns there instead of to the Connectors list.
+export function ConnectorsBackLink({ agent }: { agent?: { slug: string; name: string } }) {
+  const t = useT()
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="-ms-2.5 max-w-full self-start text-muted-foreground"
+      render={agent ? <Link to="/agents/$slug" params={{ slug: agent.slug }} search={{ tab: "tools" }} /> : <Link to="/connectors" />}
+    >
+      <ArrowLeftIcon data-icon="inline-start" />
+      <span className="truncate">{agent ? agent.name : t("nav.connectors")}</span>
+    </Button>
+  )
+}
 
 export const STATUS_LABEL: Record<string, Key> = {
   on: "status.on",

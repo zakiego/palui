@@ -4,18 +4,17 @@
 // Picking one opens its page, /connectors/<id>, as a draft until it's saved.
 import { z } from "zod"
 import * as React from "react"
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import { ArrowLeftIcon, PlusIcon, SearchIcon } from "lucide-react"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { PlusIcon, SearchIcon } from "lucide-react"
 import type { ConnectorManifest } from "@palui/core/connectors/define"
 
 import { AppError } from "@/components/app-error"
 import { connectorIcon } from "@/components/connector-icon"
-import { CONNECTOR_GROUPS } from "@/components/connectors/shared"
+import { CONNECTOR_GROUPS, ConnectorsBackLink } from "@/components/connectors/shared"
 import { newConnectorId } from "@/components/connectors/targets"
 import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending } from "@/components/page-pending"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item"
@@ -100,10 +99,7 @@ function NewConnectorPage() {
   return (
     <>
       <div className="flex flex-col gap-3">
-        <Button variant="ghost" size="sm" className="-ms-2.5 self-start text-muted-foreground" render={<Link to="/connectors" />}>
-          <ArrowLeftIcon data-icon="inline-start" />
-          {t("nav.connectors")}
-        </Button>
+        <ConnectorsBackLink agent={data.agents.find((a) => a.id === agent)} />
         <PageHeader title={t("connectors.add")} />
       </div>
       <InputGroup className="max-w-md">
