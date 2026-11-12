@@ -19,6 +19,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - Setting up a WhatsApp group no longer needs the dashboard. Mention Palui in a new group and it replies with your agents and the `/agent <slug>` to send. Before, every message in a group that wasn't allowed yet was dropped, `/agent` included.
 - The Chats page marks chats whose "Answer here" is off as Off.
 - You can answer a flow check-in before it asks. While a run is still waiting before its check-in (like the 10 minutes after "Waktu Ashar sudah masuk"), "udah" is kept, and when the run gets there it skips the question and its reminders and follows that answer's branch. Only a closing answer counts early; a "belum" still waits for the question.
+- Palui can tell you when a new version is running. It's off by default. Turn it on under Settings, General, "New version notice", and pick the chat it goes to. After a deploy it sends one message with the new and old version and a link to the changelog. A restart on the same version, or a fresh install, sends nothing.
 
 ### Changed
 

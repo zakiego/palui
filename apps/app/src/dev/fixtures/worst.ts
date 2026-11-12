@@ -75,6 +75,8 @@ export function worst(k: Kit) {
   k.setting("timezone", TZ_LONG)
   k.setting("persona", fill(`${DEFAULT_PERSONA}\nSelalu sebut sumber data, tanggal pengambilan, dan zona waktunya. Jangan pernah menghapus apa pun tanpa persetujuan.\n\n`, LIMITS.persona))
   k.setting("fallbackChannel", "none")
+  // On, pointing at a chat that was removed: the card says to pick another one.
+  k.setting("deployNotice", { enabled: true, chatId: "chat_0mhremoved0000000000" })
   k.setting("budgets", { maxSteps: 50, turnTimeoutMs: 600_000, maxTools: 128, dailyTokenCap: 100_000_000, maxRunsPerHour: 1000 })
   const sixSteps = [
     { connectorId: "cliproxy", model: within(MODEL_LONG, LIMITS.model), effort: "xhigh" as const },

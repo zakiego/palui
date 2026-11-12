@@ -34,11 +34,12 @@ import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader,
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { authClient, passkeyCancelled } from "@/lib/auth-client"
 import { removePasskey } from "@/lib/fns/session"
@@ -100,8 +101,9 @@ function SettingsPage() {
             <TabsTrigger value="hooks">{t("settings.tab.hooks")}</TabsTrigger>
           </TabsList>
         </div>
-        <TabsContent value="general" keepMounted>
+        <TabsContent value="general" keepMounted className="flex flex-col gap-4">
           <GeneralTab data={data} />
+          <DeployNoticeCard data={data} />
         </TabsContent>
         <TabsContent value="models" keepMounted>
           <ModelsTab data={data} />
@@ -237,6 +239,77 @@ function GeneralTab({ data }: { data: Data }) {
               <FieldDescription>{t("settings.fallback.help")}</FieldDescription>
             </Field>
           </div>
+        </FieldGroup>
+      </CardContent>
+      <CardFooter className="justify-end border-t">
+        <Button disabled={busy} onClick={submit}>
+          {busy && <Spinner data-icon="inline-start" />}
+          {t("common.save")}
+        </Button>
+      </CardFooter>
+    </Card>
+  )
+}
+
+// Off by default. When on, the runtime messages this chat once per new version.
+function DeployNoticeCard({ data }: { data: Data }) {
+  const saved = data.settings.deployNotice
+  const known = saved.chatId !== null && data.chats.some((c) => c.id === saved.chatId)
+  const [enabled, setEnabled] = React.useState(saved.enabled)
+  const [chatId, setChatId] = React.useState(known ? saved.chatId! : "")
+  const [chatError, setChatError] = React.useState<string>()
+  const t = useT()
+  const { busy, save } = useSave()
+  const submit = () => {
+    if (enabled && !chatId) {
+      setChatError(t("settings.deploy.pickChat"))
+      return
+    }
+    void save({ deployNotice: { enabled, chatId: chatId || null } })
+  }
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("settings.deploy.title")}</CardTitle>
+        <CardDescription>{t("settings.deploy.body")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <FieldGroup>
+          <Field orientation="horizontal" className="items-center gap-3">
+            <FieldContent className="min-w-0">
+              <FieldLabel htmlFor="deploy-notice">{t("settings.deploy.toggle")}</FieldLabel>
+            </FieldContent>
+            <Switch
+              id="deploy-notice"
+              checked={enabled}
+              onCheckedChange={(v) => {
+                setEnabled(v)
+                if (!v) setChatError(undefined)
+              }}
+            />
+          </Field>
+          <Field data-invalid={chatError ? true : undefined}>
+            <FieldLabel htmlFor="deploy-chat">{t("settings.deploy.chat")}</FieldLabel>
+            {data.chats.length === 0 ? (
+              <FieldDescription>{t("settings.deploy.noChats")}</FieldDescription>
+            ) : (
+              <SimpleSelect
+                id="deploy-chat"
+                className="w-full @2xl/main:max-w-md"
+                value={chatId}
+                disabled={!enabled}
+                aria-invalid={chatError ? true : undefined}
+                aria-describedby={chatError ? "deploy-chat-error" : undefined}
+                options={data.chats.map((c) => ({ value: c.id, label: `${c.title} (${c.channel})` }))}
+                onChange={(v) => {
+                  setChatId(v)
+                  setChatError(undefined)
+                }}
+              />
+            )}
+            {saved.chatId !== null && !known && <FieldDescription>{t("settings.deploy.chatGone")}</FieldDescription>}
+            {chatError && <FieldError id="deploy-chat-error" role={undefined}>{chatError}</FieldError>}
+          </Field>
         </FieldGroup>
       </CardContent>
       <CardFooter className="justify-end border-t">
