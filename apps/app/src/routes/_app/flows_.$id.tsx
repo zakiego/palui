@@ -1,8 +1,10 @@
-// One flow (RFC flows 10), read-only: its triggers, the steps as a graph with
-// their branches, what it may change, the version history with what each
-// version changed, and recent runs (each opens its step log on the run page).
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon, MessagesSquareIcon, SearchXIcon } from "lucide-react"
+// One flow (RFC flows 10), read-only, in tabs kept in ?tab=: Steps (its
+// triggers, the steps as a graph with their branches, what it may change),
+// Runs (each opens its step log on the run page, then the saved state), and
+// Versions (what each version changed).
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router"
+import { ArrowLeftIcon, GitCommitVerticalIcon, HistoryIcon, MessagesSquareIcon, SearchXIcon, WorkflowIcon } from "lucide-react"
+import { z } from "zod"
 
 import { AppError } from "@/components/app-error"
 import { PagePending, SkeletonText } from "@/components/page-pending"
@@ -13,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { StatusText } from "@/components/ui/status-text"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useLiveRefresh } from "@/hooks/use-live-events"
 import { getFlowFn } from "@/lib/fns/flows"
 import { ago, inZone } from "@/lib/format"
@@ -20,7 +23,11 @@ import { useLabel, useT } from "@/lib/i18n"
 import { FLOW_RUN_TONE, FlowBadges } from "@/components/flow-badges"
 import { FlowGraph } from "@/components/flow-graph"
 
+const TABS = ["steps", "runs", "versions"] as const
+type Tab = (typeof TABS)[number]
+
 export const Route = createFileRoute("/_app/flows_/$id")({
+  validateSearch: z.object({ tab: z.enum(TABS).optional() }),
   loader: ({ params }) => getFlowFn({ data: { id: params.id } }),
   head: () => ({ meta: [{ title: "Flow · Palui" }] }),
   component: FlowPage,
@@ -43,6 +50,8 @@ function BackButton() {
 function FlowPage() {
   const { flow, timezone } = Route.useLoaderData()
   const router = useRouter()
+  const navigate = useNavigate({ from: Route.fullPath })
+  const tab: Tab = Route.useSearch().tab ?? "steps"
   const t = useT()
   useLiveRefresh(() => void router.invalidate(), (e) => e.kind.startsWith("flow"))
   if (!flow) {
@@ -71,39 +80,63 @@ function FlowPage() {
           </AlertDescription>
         </Alert>
       )}
-      <Triggers flow={flow} timezone={timezone} />
-      <Steps flow={flow} />
-      {flow.writeCalls.length > 0 && (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle className="flex flex-wrap items-center gap-2">
-              {t("flow.writeCalls")}
-              <StatusText tone={flow.approval === "approved" ? "success" : "warning"}>{flow.approval === "approved" ? t("flow.approved") : t("flow.notApproved")}</StatusText>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="flex flex-col gap-1.5">
-              {flow.writeCalls.map((w) => (
-                <li key={w} className="font-mono text-xs break-all">
-                  {w}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-      <Runs flow={flow} timezone={timezone} />
-      <Versions flow={flow} timezone={timezone} />
-      {flow.state && (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>{t("flow.state")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="max-h-64 overflow-auto font-mono text-xs break-words whitespace-pre-wrap">{flow.state}</pre>
-          </CardContent>
-        </Card>
-      )}
+      <Tabs value={tab} onValueChange={(v) => void navigate({ search: { tab: v as Tab }, replace: true, resetScroll: false })} className="gap-6">
+        <TabsList variant="line" aria-label={t("flow.sections")}>
+          <TabsTrigger value="steps">
+            <WorkflowIcon aria-hidden="true" className="hidden @xl/main:block" />
+            {t("flow.steps")}
+            <span className="font-normal text-muted-foreground tabular-nums">{flow.steps.length.toLocaleString()}</span>
+          </TabsTrigger>
+          <TabsTrigger value="runs">
+            <HistoryIcon aria-hidden="true" className="hidden @xl/main:block" />
+            {t("flow.runs")}
+          </TabsTrigger>
+          <TabsTrigger value="versions">
+            <GitCommitVerticalIcon aria-hidden="true" className="hidden @xl/main:block" />
+            {t("flow.versions")}
+            <span className="font-normal text-muted-foreground tabular-nums">{flow.versions.length.toLocaleString()}</span>
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="steps" className="flex flex-col gap-6 text-base">
+          <Triggers flow={flow} timezone={timezone} />
+          <Steps flow={flow} />
+          {flow.writeCalls.length > 0 && (
+            <Card size="sm">
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2">
+                  {t("flow.writeCalls")}
+                  <StatusText tone={flow.approval === "approved" ? "success" : "warning"}>{flow.approval === "approved" ? t("flow.approved") : t("flow.notApproved")}</StatusText>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="flex flex-col gap-1.5">
+                  {flow.writeCalls.map((w) => (
+                    <li key={w} className="font-mono text-xs break-all">
+                      {w}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        <TabsContent value="runs" className="flex flex-col gap-6 text-base">
+          <Runs flow={flow} timezone={timezone} />
+          {flow.state && (
+            <Card size="sm">
+              <CardHeader>
+                <CardTitle>{t("flow.state")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className="max-h-64 overflow-auto font-mono text-xs break-words whitespace-pre-wrap">{flow.state}</pre>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        <TabsContent value="versions" className="flex flex-col gap-6 text-base">
+          <Versions flow={flow} timezone={timezone} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
@@ -175,14 +208,8 @@ function Triggers({ flow, timezone }: { flow: Flow; timezone: string }) {
 // The definition as a graph (components/flow-graph.tsx): triggers on top,
 // branches as labelled arrows, and the picked step in full below it.
 function Steps({ flow }: { flow: Flow }) {
-  const t = useT()
   return (
     <Card size="sm">
-      <CardHeader>
-        <CardTitle className="tabular-nums">
-          {t("flow.steps")} · {flow.steps.length}
-        </CardTitle>
-      </CardHeader>
       <CardContent>
         <FlowGraph steps={flow.steps} triggers={flow.triggers} />
       </CardContent>
@@ -195,9 +222,6 @@ function Runs({ flow, timezone }: { flow: Flow; timezone: string }) {
   const label = useLabel()
   return (
     <Card size="sm">
-      <CardHeader>
-        <CardTitle>{t("flow.runs")}</CardTitle>
-      </CardHeader>
       <CardContent>
         {flow.runs.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("flow.noRuns")}</p>
@@ -238,11 +262,6 @@ function Versions({ flow, timezone }: { flow: Flow; timezone: string }) {
   const by = (s: string) => (s.startsWith("agent:") ? t("flow.by.agent") : s === "migration" ? t("flow.by.migration") : t("flow.by.owner"))
   return (
     <Card size="sm">
-      <CardHeader>
-        <CardTitle className="tabular-nums">
-          {t("flow.versions")} · {flow.versions.length}
-        </CardTitle>
-      </CardHeader>
       <CardContent>
         <ul className="flex flex-col divide-y">
           {flow.versions.map((v) => (
@@ -278,6 +297,7 @@ function FlowPageSkeleton() {
           <SkeletonText className="font-heading text-title" width="w-64" />
           <Skeleton className="h-5 w-40" />
         </div>
+        <Skeleton className="h-10" />
         <Skeleton className="h-32" />
         <Skeleton className="h-64" />
       </div>
