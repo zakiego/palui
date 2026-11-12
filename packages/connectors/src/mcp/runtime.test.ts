@@ -191,10 +191,12 @@ describe("flow approval per tool (RFC flows 7.2)", () => {
 
 describe("saved files in tool args", () => {
   const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46])
+  const received: string[] = []
   const registerUpload = (server: McpServer) => {
-    server.registerTool("upload_attachment", { description: "Upload a file", inputSchema: { file: z.string() } }, async ({ file }) => ({
-      content: [{ type: "text", text: `got ${file}` }],
-    }))
+    server.registerTool("upload_attachment", { description: "Upload a file", inputSchema: { file: z.string() } }, async ({ file }) => {
+      if (file.startsWith("data:")) received.push(file)
+      return { content: [{ type: "text", text: `got ${file}` }] }
+    })
   }
 
   async function setupFile(trust: "own" | "external") {
@@ -212,7 +214,9 @@ describe("saved files in tool args", () => {
     const { running, tools, id } = await setupFile("own")
     try {
       const out = (await exec(tools.upload_attachment, { file: `palui:attachment/${id}` })) as { content: { text: string }[] }
-      expect(out.content[0]?.text).toBe(`got data:image/jpeg;base64,${JPEG.toString("base64")}`)
+      // The server received the data URL; its echo comes back as the short ref.
+      expect(out.content[0]?.text).toBe(`got palui:attachment/${id}`)
+      expect(received).toEqual([`data:image/jpeg;base64,${JPEG.toString("base64")}`])
       // A plain id isn't a ref and goes through as is.
       expect(((await exec(tools.upload_attachment, { file: id })) as { content: { text: string }[] }).content[0]?.text).toBe(`got ${id}`)
     } finally {
@@ -224,7 +228,7 @@ describe("saved files in tool args", () => {
     const own = await setupFile("own")
     try {
       const other = await own.running.tools!({ ...turn, chatId: own.otherChatId })
-      expect(await exec(other.upload_attachment, { file: `palui:attachment/${own.id}` })).toMatchObject({ ok: false, error: expect.stringContaining("No saved attachment") })
+      expect(await exec(other.upload_attachment, { file: `palui:attachment/${own.id}` })).toMatchObject({ isError: true, content: [{ text: expect.stringContaining("No saved attachment") }] })
     } finally {
       await own.running.stop()
       await srv?.close()
@@ -232,7 +236,7 @@ describe("saved files in tool args", () => {
     }
     const ext = await setupFile("external")
     try {
-      expect(await exec(ext.tools.upload_attachment, { file: `palui:attachment/${ext.id}` })).toMatchObject({ ok: false, error: expect.stringContaining("own") })
+      expect(await exec(ext.tools.upload_attachment, { file: `palui:attachment/${ext.id}` })).toMatchObject({ isError: true, content: [{ text: expect.stringContaining("own") }] })
     } finally {
       await ext.running.stop()
     }
