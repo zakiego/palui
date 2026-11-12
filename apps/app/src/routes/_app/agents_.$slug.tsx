@@ -15,7 +15,7 @@ import { AvatarPicker } from "@/components/agents/avatar-picker"
 import { AppError } from "@/components/app-error"
 import { ConnectorStatusBadge } from "@/components/connector-status"
 import { ToolsByScope } from "@/components/agent-tools/by-scope"
-import { groupTools } from "@/components/agent-tools/shared"
+import { groupTools, type Permission } from "@/components/agent-tools/shared"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
@@ -48,7 +48,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useLiveRefresh } from "@/hooks/use-live-events"
 import { setConnectorOwnerFn } from "@/lib/fns/connectors"
-import { deleteAgentFn, getAgentMemoryFn, getAgentPage, getAgentToolsFn, saveAgentFn, setChatAllowedFn, setChatDeployNoticeFn, setChatReplyModeFn } from "@/lib/fns/agents"
+import { deleteAgentFn, getAgentMemoryFn, getAgentPage, getAgentToolsFn, saveAgentFn, setAgentToolPermissionsFn, setChatAllowedFn, setChatDeployNoticeFn, setChatReplyModeFn } from "@/lib/fns/agents"
 import { ago, errorMessage } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 
@@ -751,6 +751,29 @@ function ToolsTab({ agent }: { agent: Agent }) {
       toast.error(errorMessage(err))
     }
   }
+  // Tool permissions save at once, like the scope. Rolled back when the save fails.
+  const router = useRouter()
+  const [permissions, setPermissions] = React.useState(agent.toolPermissions)
+  const savePermissions = async (patch: { allowAll?: boolean; tools?: Record<string, Permission | null> }, next: typeof permissions) => {
+    const before = permissions
+    setPermissions(next)
+    try {
+      const r = await setAgentToolPermissionsFn({ data: { id: agent.id, ...patch } })
+      setPermissions(r.toolPermissions)
+      void router.invalidate()
+    } catch (err) {
+      setPermissions(before)
+      toast.error(errorMessage(err))
+    }
+  }
+  const setAllowAll = (allowAll: boolean) => void savePermissions({ allowAll }, { ...permissions, allowAll })
+  const setPermission = (name: string, p: Permission | null) => {
+    const tools = { ...permissions.tools }
+    if (p) tools[name] = p
+    else delete tools[name]
+    void savePermissions({ tools: { [name]: p } }, { ...permissions, tools })
+  }
+
   const tools = data?.tools ?? null
   const guestSafe = tools?.filter((x) => x.guestSafe).length ?? 0
 
@@ -760,12 +783,21 @@ function ToolsTab({ agent }: { agent: Agent }) {
   const safe = tools ? t("agents.tools.safe", { n: guestSafe.toLocaleString() }) : t("agents.tools.safeOnly")
   const others = agent.isDefault ? t("agents.tools.paluiOthers") : agent.guestTools === "none" ? t("agents.tools.none") : safe
   // Palui answers only you in a group, as in your own chats (turn.ts: shared needs a non-default agent).
-  const inGroups = agent.isDefault ? t("agents.tools.youRule") : agent.ownerPowers === "approve" ? t("agents.tools.groupsApprove") : agent.guestTools === "none" ? t("agents.tools.none") : safe
+  const youRule = permissions.allowAll ? t("agents.tools.youAllowAll") : t("agents.tools.youRule")
+  const inGroups = agent.isDefault ? youRule : agent.ownerPowers === "approve" ? (permissions.allowAll ? t("agents.tools.groupsAllowAll") : t("agents.tools.groupsApprove")) : agent.guestTools === "none" ? t("agents.tools.none") : safe
 
   return (
     <>
+      <Field orientation="horizontal" className="max-w-2xl">
+        <FieldContent>
+          <FieldLabel htmlFor="agent-allow-all">{t("agents.perm.allowAll")}</FieldLabel>
+          <FieldDescription>{t("agents.perm.allowAllHint")}</FieldDescription>
+        </FieldContent>
+        <Switch id="agent-allow-all" checked={permissions.allowAll} onCheckedChange={(v) => setAllowAll(v)} />
+      </Field>
+
       <ItemGroup className="gap-1">
-        <Rule icon={<UserIcon />} label={t("agents.tools.you")} value={t("agents.tools.youRule")} />
+        <Rule icon={<UserIcon />} label={t("agents.tools.you")} value={youRule} />
         <Rule icon={<UsersIcon />} label={t("agents.tools.groups")} value={inGroups} />
         <Rule icon={<MessagesSquareIcon />} label={t("agents.tools.others")} value={others} />
       </ItemGroup>
@@ -810,7 +842,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
       )}
       {tools && tools.length > 0 && groups.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">{t("agents.tools.searchEmpty")}</p>}
       {data && tools && groups.length > 0 && (
-        <ToolsByScope agent={agent} data={data} tools={tools} groups={groups} query={query} ownerOf={ownerOf} setScope={(id, scope) => void setScope(id, scope)} />
+        <ToolsByScope agent={agent} data={data} tools={tools} groups={groups} query={query} ownerOf={ownerOf} setScope={(id, scope) => void setScope(id, scope)} permissions={permissions} setPermission={setPermission} />
       )}
     </>
   )

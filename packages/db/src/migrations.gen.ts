@@ -43,5 +43,9 @@ export const migrations: { name: string; sql: string }[] = [
   {
     "name": "0010_familiar_genesis",
     "sql": "ALTER TABLE `connectors` ADD `agent_id` text;"
+  },
+  {
+    "name": "0011_rare_apocalypse",
+    "sql": "ALTER TABLE `agents` ADD `tool_permissions` text;"
   }
 ]

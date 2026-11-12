@@ -20,6 +20,7 @@ import { notesPrompt } from "../notes/service"
 import { flowCheckinsPrompt } from "../flows/checkin"
 import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, emptyTools, SEARCH_TOOL, STICKY_MAX, type CollectedTools } from "../tools/collect"
+import { deniedTools, needsApproval, permissionFor } from "../tools/permissions"
 import type { TurnBus } from "./bus"
 import { limitNotice, shouldWrapUp, stepClock, WRAP_UP_NOTE, type RanTool, type WrapUpReason } from "./turn-limits"
 import { config } from "../config"
@@ -245,6 +246,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
           scope,
           only: toolNames,
           excludeDestructive: unattended(origin),
+          deny: deniedTools(agent.toolPermissions),
           sticky: session?.loadedTools,
           onLoad: (names) => {
             if (chat.sessionId) rememberLoaded(db, chat.sessionId, names)
@@ -317,6 +319,9 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
     model = failoverModel(chain, (from, e) => rlog.warn("model failed, trying the next one in the chain", { connector_id: from.connectorId, model: from.model, error: (e as Error)?.message }))
     // Shared chats (PLAN 19.4): every write needs approval, like jobs.
     const strict = unattended(origin) || origin === "hook" || mode !== "owner"
+    // The owner's own message (in their chat, or with owner powers in a shared
+    // one): the agent's tool permissions may skip the prompt here, nowhere else.
+    const ownerTurn = origin === "message" && mode !== "guest"
     void typing(true)
     ctx.bus.publish({ type: "turn-start", chatId: chat.id, runId })
     const clock = stepClock(performance.now())
@@ -352,10 +357,14 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
           rlog.info("turn tainted by an untrusted tool call", { tool: meta.name })
           state.tainted = true
         }
-        const cls = meta?.class ?? "destructive"
-        if (cls === "destructive") return "user-approval"
-        if (cls === "write" && (state.tainted || strict)) return "user-approval"
-        return undefined
+        const ask = needsApproval({
+          class: meta?.class ?? "destructive",
+          permission: permissionFor(agent.toolPermissions, toolCall.toolName),
+          ownerTurn,
+          tainted: state.tainted,
+          strict,
+        })
+        return ask ? "user-approval" : undefined
       },
       onError: () => {},
     })

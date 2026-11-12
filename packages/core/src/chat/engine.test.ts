@@ -6,6 +6,7 @@ import { listEvents } from "../events"
 import { claimOwner, createClaim, getOwner, setWhatsAppOwner } from "../owner"
 import { getConnector, pauseConnector, resumeConnector } from "../connectors/store"
 import { getSetting, setSetting } from "../settings"
+import { getDefaultAgent, setToolPermissions } from "../agents"
 import {
   callTool,
   callTools,
@@ -732,6 +733,39 @@ describe("taint", () => {
     expect(notes).toEqual([])
     expect(h.db.select().from(pendingApprovals).get()).toMatchObject({ tool: "notes__add", toolClass: "write" })
     expect(h.db.select().from(runs).where(eq(runs.tainted, true)).all()).toHaveLength(1)
+  })
+
+  it("allow-all runs a destructive tool without asking in the owner's chat", async () => {
+    const executed: string[] = []
+    const h = await basic([callTool("alpha__nuke", { what: "temp" }, "c1"), say("udah")], {
+      registry: { alpha: toolsRuntime("alpha", () => ({ nuke: { tool: fnTool("nuke", (i) => void executed.push(String(i.what))), class: "destructive" } })) },
+      rows: { alpha: "tools" },
+    })
+    setToolPermissions(h.db, getDefaultAgent(h.db).id, { allowAll: true })
+    await h.engine.inbound(tgMessage("hapus temp"))
+    await h.engine.idle()
+    expect(executed).toEqual(["temp"])
+    expect(h.db.select().from(pendingApprovals).all()).toHaveLength(0)
+  })
+
+  it("a tool set to ask asks even with allow-all on, and a tool set to off is never offered", async () => {
+    const ran: string[] = []
+    const h = await basic([callTool("alpha__look", {}, "c1")], {
+      registry: {
+        alpha: toolsRuntime("alpha", () => ({
+          look: { tool: fnTool("look", () => void ran.push("look")), class: "read" },
+          drop: { tool: fnTool("drop", () => void ran.push("drop")), class: "destructive" },
+        })),
+      },
+      rows: { alpha: "tools" },
+    })
+    setToolPermissions(h.db, getDefaultAgent(h.db).id, { allowAll: true, tools: { alpha__look: "ask", alpha__drop: "deny" } })
+    await h.engine.inbound(tgMessage("lihat"))
+    await h.engine.idle()
+    expect(ran).toEqual([])
+    expect(h.db.select().from(pendingApprovals).get()).toMatchObject({ tool: "alpha__look" })
+    expect(h.m.offered[0]).toContain("alpha__look")
+    expect(h.m.offered[0]).not.toContain("alpha__drop")
   })
 
   it("a write tool runs without approval in a clean turn", async () => {

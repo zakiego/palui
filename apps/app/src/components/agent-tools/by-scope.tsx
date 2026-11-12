@@ -252,7 +252,7 @@ function Groups({
                       <Badge variant="outline">MCP</Badge>
                     )}
                   </span>
-                  <GroupMeta list={list} />
+                  <GroupMeta list={list} permissions={props.permissions} />
                 </span>
               </AccordionTrigger>
               <AccordionContent className="flex flex-col gap-1 px-4 pb-4 @xl/main:ps-16">
