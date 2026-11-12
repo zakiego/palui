@@ -51,5 +51,9 @@ export const migrations: { name: string; sql: string }[] = [
   {
     "name": "0012_petite_lester",
     "sql": "CREATE TABLE `attachment_shares` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`attachment_id` text NOT NULL,\n\t`token_hash` text NOT NULL,\n\t`visibility` text NOT NULL,\n\t`created_by` text NOT NULL,\n\t`expires_at` integer NOT NULL,\n\t`revoked_at` integer,\n\t`open_count` integer DEFAULT 0 NOT NULL,\n\t`last_opened_at` integer,\n\t`created_at` integer NOT NULL\n);\n--> statement-breakpoint\nCREATE UNIQUE INDEX `attachment_shares_token_hash_unique` ON `attachment_shares` (`token_hash`);--> statement-breakpoint\nCREATE INDEX `attachment_shares_attachment` ON `attachment_shares` (`attachment_id`,`created_at`);"
+  },
+  {
+    "name": "0013_tranquil_starjammers",
+    "sql": "ALTER TABLE `agents` ADD `recall_read_containers` text;--> statement-breakpoint\nALTER TABLE `agents` ADD `recall_per_chat` integer DEFAULT false NOT NULL;"
   }
 ]

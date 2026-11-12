@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { eq } from "drizzle-orm"
 import { chats, connectors, memoryDb } from "@palui/db"
-import { AgentError, agentContainer, assignAgent, createAgent, deleteAgent, getDefaultAgent, listAgents, setToolPermissions, updateAgent } from "./agents"
+import { AgentError, agentContainer, agentReadContainers, assignAgent, chatContainer, createAgent, deleteAgent, getDefaultAgent, listAgents, memoryScope, setToolPermissions, updateAgent } from "./agents"
 import { ensureChat, getChat } from "./chats"
 import { createInstruction, listInstructions } from "./notes/service"
 import { setSetting } from "./settings"
@@ -29,6 +29,39 @@ describe("agents", () => {
     expect(() => createAgent(db, { slug: "chef", name: "x", persona: "p" })).toThrow(AgentError)
     expect(() => createAgent(db, { slug: "9x", name: "x", persona: "p" })).toThrow(AgentError)
     expect(() => updateAgent(db, chef.id, { dailyTokenCap: -1 })).toThrow(AgentError)
+  })
+
+  it("gives each chat its own container when asked, at most 64 characters", () => {
+    const db = memoryDb()
+    const shop = createAgent(db, { slug: "shop", name: "Shop", persona: "p", recallPerChat: true })
+    const a = agentContainer(shop, "cht_a")!
+    expect(a).toMatch(/^agent-shop-c[0-9a-f]{10}$/)
+    expect(agentContainer(shop, "cht_b")).not.toBe(a)
+    expect(agentContainer(shop, "cht_a")).toBe(a)
+    // No chat (the dashboard's summary): the base container.
+    expect(agentContainer(shop)).toBe("agent-shop")
+    const long = chatContainer("x".repeat(64), "cht_a")
+    expect(long.length).toBeLessThanOrEqual(64)
+    expect(long).toMatch(/^[a-z0-9][a-z0-9_-]{0,63}$/)
+    // Palui keeps the owner's one container.
+    const palui = updateAgent(db, getDefaultAgent(db).id, { recallPerChat: true })
+    expect(agentContainer(palui, "cht_a")).toBeUndefined()
+  })
+
+  it("reads shared containers but never the owner's memory", () => {
+    const db = memoryDb()
+    db.insert(connectors).values({ id: "recall", type: "recall", kind: "memory", label: "recall", enabled: true, status: "on", config: { container: "zaki" }, createdAt: 1, updatedAt: 1 }).run()
+    const shop = createAgent(db, { slug: "shop", name: "Shop", persona: "p", recallReadContainers: [" KB-Menu ", "kb-menu", "kb-faq"] })
+    expect(agentReadContainers(shop)).toEqual(["kb-menu", "kb-faq"])
+    expect(memoryScope(shop, "cht_a")).toEqual({ container: "agent-shop", read: ["kb-menu", "kb-faq"], locked: true })
+    expect(() => updateAgent(db, shop.id, { recallReadContainers: ["zaki"] })).toThrow(/owner's memory/)
+    expect(() => updateAgent(db, shop.id, { recallContainer: "zaki" })).toThrow(/owner's memory/)
+    expect(() => updateAgent(db, shop.id, { recallReadContainers: ["a", "b", "c", "d", "e", "f"] })).toThrow(/At most 5/)
+    expect(() => updateAgent(db, shop.id, { recallReadContainers: ["no spaces!"] })).toThrow(AgentError)
+    expect(agentReadContainers(updateAgent(db, shop.id, { recallReadContainers: [] }))).toEqual([])
+    // Palui is the owner's agent: unlocked, and it may read anything.
+    const palui = updateAgent(db, getDefaultAgent(db).id, { recallReadContainers: ["kb-menu"] })
+    expect(memoryScope(palui)).toEqual({ container: undefined, read: ["kb-menu"], locked: false })
   })
 
   it("keeps an avatar photo small and the icon and color to known names", () => {

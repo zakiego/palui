@@ -11,8 +11,14 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
+### Added
+
+- Agents can keep a separate memory per chat. On an agent's Memory tab, "Separate memory per chat" gives each chat its own recall container, so what one customer said never comes up in another customer's chat. New agents start with it on; existing ones keep their single container until you turn it on. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
+- Shared containers on an agent's Memory tab: up to 5 recall containers it reads but never writes, like a `kb-shop` you fill with product facts. Auto-recall shows them next to the agent's own memory, labeled as reference only. Palui can use them too.
+
 ### Fixed
 
+- An agent other than Palui can no longer read or change your memory through recall's tools. Before, its `search_memories` and `add_memory` defaulted to Palui's container and took any container the model named, so a question from you in a group could pull your private facts into that group. Its tools now reach only its own container and its shared ones, `forget_memory` checks the memory's container first, and recall tools Palui doesn't know yet (like `upcoming`, which can read every container) are left out. Agents also can't pick your container as their own or as a shared one.
 - A photo or document you sent a few messages ago can still be saved. Before, `save_attachment` only took files from the message being answered, so when the agent showed a transaction preview first and you said "ya" later, the receipt couldn't be saved or attached anymore and the agent asked you to send it again. Now it can pick a file from this chat's last 24 hours (`earlier: true`), matched by caption and time.
 
 ### Changed

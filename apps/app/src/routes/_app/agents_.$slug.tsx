@@ -73,6 +73,8 @@ type SaveData = Parameters<typeof saveAgentFn>[0]["data"]
 const NAME_MAX = 40
 const PERSONA_MAX = 8000
 const CONTAINER_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/
+const MAX_READS = 5
+const splitReads = (v: string) => [...new Set(v.split(/[\s,]+/).map((c) => c.trim().toLowerCase()).filter(Boolean))]
 const CHANNEL = {
   telegram: { Icon: TelegramIcon, label: "Telegram" },
   whatsapp: { Icon: WhatsAppIcon, label: "WhatsApp" },
@@ -86,12 +88,15 @@ type Form = {
   guestTools: "none" | "safe"
   cap: string
   container: string
+  // Comma or space separated in the input, a list on save.
+  reads: string
+  perChat: boolean
   bot: string
   avatarImage: string | null
   avatarIcon: string | null
   avatarColor: string | null
 }
-type FormErrors = Partial<Record<"name" | "persona" | "cap" | "container", string>>
+type FormErrors = Partial<Record<"name" | "persona" | "cap" | "container" | "reads", string>>
 
 function formFor(a: Agent): Form {
   return {
@@ -101,6 +106,8 @@ function formFor(a: Agent): Form {
     guestTools: a.guestTools,
     cap: String(a.dailyTokenCap),
     container: a.recallContainer ?? "",
+    reads: a.recallReadContainers.join(", "),
+    perChat: a.recallPerChat,
     bot: a.telegramConnectorId ?? "",
     avatarImage: a.avatarImage,
     avatarIcon: a.avatarIcon,
@@ -179,17 +186,20 @@ function AgentSettings({ data }: { data: Loaded }) {
     const cap = Number(form.cap.replace(/[.,\s]/g, ""))
     if (!form.cap.trim() || !Number.isInteger(cap) || cap < 0) next.cap = t("agents.err.cap")
     if (form.container.trim() && !CONTAINER_RE.test(form.container.trim())) next.container = t("agents.err.container")
+    const reads = splitReads(form.reads)
+    if (reads.length > MAX_READS) next.reads = t("agents.err.readsMax", { n: MAX_READS })
+    else if (reads.some((c) => !CONTAINER_RE.test(c))) next.reads = t("agents.err.container")
     setErrors(next)
-    const first = (["name", "persona", "cap", "container"] as const).find((k) => next[k])
+    const first = (["name", "persona", "cap", "container", "reads"] as const).find((k) => next[k])
     if (first) {
-      const target: Tab = first === "container" ? "memory" : "settings"
+      const target: Tab = first === "container" || first === "reads" ? "memory" : "settings"
       if (target !== tab) await navigate({ search: { tab: target }, replace: true })
       requestAnimationFrame(() => document.getElementById(`agent-${first}`)?.focus())
       return
     }
     setBusy("save")
     try {
-      const clean: Form = { ...form, name: form.name.trim(), persona: form.persona.trim(), cap: String(cap), container: form.container.trim() }
+      const clean: Form = { ...form, name: form.name.trim(), persona: form.persona.trim(), cap: String(cap), container: form.container.trim(), reads: reads.join(", ") }
       await saveAgentFn({
         data: {
           id: agent.id,
@@ -199,6 +209,8 @@ function AgentSettings({ data }: { data: Loaded }) {
           guestTools: clean.guestTools,
           dailyTokenCap: cap,
           recallContainer: clean.container || null,
+          recallReadContainers: reads,
+          recallPerChat: clean.perChat,
           telegramConnectorId: clean.bot || null,
           avatarImage: clean.avatarImage,
           avatarIcon: (clean.avatarIcon || null) as SaveData["avatarIcon"],
@@ -426,6 +438,31 @@ function AgentSettings({ data }: { data: Loaded }) {
                 <FieldDescription>{t("agents.containerHint")}</FieldDescription>
               )}
             </Field>
+            <Field data-invalid={!!errors.reads}>
+              <FieldLabel htmlFor="agent-reads">{t("agents.field.reads")}</FieldLabel>
+              <Input
+                id="agent-reads"
+                className="font-mono"
+                spellCheck={false}
+                autoCapitalize="none"
+                autoComplete="off"
+                maxLength={MAX_READS * 66}
+                placeholder="kb-shop, kb-faq"
+                value={form.reads}
+                aria-invalid={!!errors.reads}
+                onChange={(e) => set("reads", e.target.value)}
+              />
+              {errors.reads ? <FieldError>{errors.reads}</FieldError> : <FieldDescription>{isDefault ? t("agents.readsHintDefault") : t("agents.readsHint")}</FieldDescription>}
+            </Field>
+            {!isDefault && (
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="agent-per-chat">{t("agents.field.perChat")}</FieldLabel>
+                  <FieldDescription>{t("agents.perChatHint")}</FieldDescription>
+                </FieldContent>
+                <Switch id="agent-per-chat" checked={form.perChat} onCheckedChange={(v) => set("perChat", v)} />
+              </Field>
+            )}
           </TabsContent>
 
           <TabsContent value="tools" className="flex flex-col gap-6 text-base">
@@ -674,7 +711,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 
 function MemoryStats({ agent }: { agent: Agent }) {
   const t = useT()
-  const { data, error } = useTabData(() => getAgentMemoryFn({ data: { id: agent.id } }), `${agent.id}:${agent.recallContainer ?? ""}`)
+  const { data, error } = useTabData(() => getAgentMemoryFn({ data: { id: agent.id } }), `${agent.id}:${agent.recallContainer ?? ""}:${agent.recallPerChat}:${agent.recallReadContainers.join(",")}`)
   if (error) return <LoadError message={error} />
   if (!data) {
     return (
@@ -710,8 +747,22 @@ function MemoryStats({ agent }: { agent: Agent }) {
       {data.error && <LoadError message={data.error} />}
       <dl className="flex flex-col divide-y">
         <Fact label={t("agents.memory.where")}>
-          <span className="font-mono">{data.container}</span>
+          <span className="font-mono">{data.perChat ? `${data.container}-c…` : data.container}</span>
         </Fact>
+        {data.perChat && (
+          <Fact label={t("agents.memory.chatContainers")}>
+            <span className="tabular-nums">{s ? data.chatContainers.toLocaleString() : "–"}</span>
+          </Fact>
+        )}
+        {data.reads.length > 0 && (
+          <Fact label={t("agents.memory.reads")}>
+            <span className="flex flex-col items-end gap-1 font-mono">
+              {data.reads.map((c) => (
+                <span key={c}>{c}</span>
+              ))}
+            </span>
+          </Fact>
+        )}
         <Fact label={t("agents.memory.memories")}>
           <span className="tabular-nums">{s ? s.memories.toLocaleString() : "–"}</span>
         </Fact>

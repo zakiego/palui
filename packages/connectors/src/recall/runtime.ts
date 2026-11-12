@@ -1,7 +1,7 @@
 import { tool, type Tool } from "ai"
 import { z } from "zod"
 import type { ToolClass } from "@palui/db"
-import { defineRuntime, type ConfigOf, type MemoryHandle, type PaluiTool } from "@palui/core/connectors/define"
+import { defineRuntime, type ConfigOf, type MemoryHandle, type PaluiTool, type TurnInfo } from "@palui/core/connectors/define"
 import { McpConnection } from "../mcp/client"
 import { profileText, RecallApi, RecallError } from "./api"
 import manifest from "./manifest"
@@ -62,12 +62,18 @@ export function createMemoryHandle(api: RecallApi, config: Config, stats: Recall
 }
 
 // The one REST tool: recall's MCP server has no forget, so it's DELETE /v1/memories/:id.
-export function forgetTool(api: RecallApi): Tool {
+// A locked scope (an agent other than Palui) may only forget its own container's
+// memories: the id is looked up first, and any other container answers "no memory".
+export function forgetTool(api: RecallApi, scope?: { container: string; locked: boolean }): Tool {
   return tool({
     description: "Forget one memory in recall by its id (from search_memories or list_memories). The fact stops being recalled. Ask the owner first.",
     inputSchema: z.object({ id: z.string().min(1).describe("Memory id") }),
     execute: async ({ id }) => {
       try {
+        if (scope?.locked) {
+          const found = await api.getMemory(id)
+          if (found.memory?.container !== scope.container) return { forgotten: false, id, error: "No memory with that id" }
+        }
         const res = await api.forget(id)
         return { forgotten: true, id, fact: res.memory?.fact }
       } catch (err) {
@@ -78,18 +84,38 @@ export function forgetTool(api: RecallApi): Tool {
   })
 }
 
-// Default recall's optional `container` argument to the configured container,
-// so the model doesn't silently write into recall's server default.
-function withContainer(t: Tool, container: string): Tool {
+export class ContainerError extends Error {}
+
+// The container a recall tool call runs against. An empty `container` argument
+// becomes the turn's own container, so the model never writes into recall's
+// server default. A locked scope (any agent but Palui) can't reach past its own
+// container, and its read list for read tools: the owner's memory stays the owner's.
+export function resolveContainer(asked: unknown, cls: ToolClass, scope: { container: string; read: string[]; locked: boolean }): string {
+  const name = typeof asked === "string" ? asked.trim() : ""
+  if (!name || name === scope.container) return scope.container
+  if (!scope.locked) return name
+  if (cls === "read" && scope.read.includes(name)) return name
+  const allowed = cls === "read" ? [scope.container, ...scope.read] : [scope.container]
+  throw new ContainerError(`This agent can't use recall container ${name.slice(0, 64)}. It can ${cls === "read" ? "read" : "write"} ${allowed.join(", ")}.`)
+}
+
+function withContainer(t: Tool, cls: ToolClass, scope: { container: string; read: string[]; locked: boolean }): Tool {
   const execute = t.execute
   if (!execute) return t
   return {
     ...t,
     execute: (input: unknown, options: Parameters<typeof execute>[1]) => {
       const args = (input && typeof input === "object" ? input : {}) as Record<string, unknown>
-      return execute({ ...args, container: args.container || container }, options)
+      return execute({ ...args, container: resolveContainer(args.container, cls, scope) }, options)
     },
   }
+}
+
+// The turn's scope with the connector's container filled in. No scope (a flow
+// step, the catalog): the owner's, unlocked.
+export function turnScope(turn: Pick<TurnInfo, "memory"> | undefined, fallback: string): { container: string; read: string[]; locked: boolean } {
+  const m = turn?.memory
+  return { container: m?.container || fallback, read: m?.read ?? [], locked: !!m?.locked }
 }
 
 function explain(err: unknown): string {
@@ -124,7 +150,6 @@ export default defineRuntime(manifest, {
     }
     const mcp = new McpConnection({ url: api.mcpUrl, headers: { Authorization: `Bearer ${ctx.secrets.apiKey}` } })
     const stats: RecallStats = { calls: 0, hits: 0, empty: 0, skippedShort: 0, timeouts: 0, errors: 0 }
-    const forget = forgetTool(api)
     let mcpError: string | null = null
 
     return {
@@ -132,16 +157,21 @@ export default defineRuntime(manifest, {
       async stop() {
         await mcp.close()
       },
-      async tools() {
+      async tools(turn) {
+        const scope = turnScope(turn, ctx.config.container)
         const out: Record<string, PaluiTool> = {
-          forget_memory: { tool: forget, class: "destructive", title: "Forget memory" },
+          forget_memory: { tool: forgetTool(api, scope), class: "destructive", title: "Forget memory" },
         }
         try {
           const { tools: defs } = await mcp.listTools()
           const aiTools = await mcp.tools(defs)
           for (const def of defs) {
             const t = aiTools[def.name]
-            if (t) out[def.name] = { tool: withContainer(t, ctx.config.container), class: recallToolClass(def.name), title: def.title ?? def.name }
+            // A tool recall adds later may take arguments that reach other
+            // containers (upcoming's all_containers), so a locked scope gets known tools only.
+            if (scope.locked && !(def.name in RECALL_TOOL_CLASSES)) continue
+            const cls = recallToolClass(def.name)
+            if (t) out[def.name] = { tool: withContainer(t, cls, scope), class: cls, title: def.title ?? def.name }
           }
           if (mcpError) {
             mcpError = null

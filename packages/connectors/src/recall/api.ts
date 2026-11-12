@@ -117,6 +117,10 @@ export class RecallApi {
     })
   }
 
+  getMemory(id: string, signal?: AbortSignal) {
+    return this.call<{ memory: RecallMemory & { container: string } }>("GET", `/v1/memories/${encodeURIComponent(id)}`, { signal })
+  }
+
   forget(id: string, signal?: AbortSignal) {
     return this.call<{ memory: RecallMemory }>("DELETE", `/v1/memories/${encodeURIComponent(id)}`, { signal })
   }

@@ -1,6 +1,7 @@
 // Agents (PLAN 19): named personas with their own instructions, recall
 // container and daily cap. Exactly one is the default (Palui), the owner's
 // personal agent; it never answers in a shared chat.
+import { createHash } from "node:crypto"
 import { asc, desc, eq, isNull } from "drizzle-orm"
 import { agents, chats, connectors, instructions, newId, type DB, type GuestTools, type OwnerPowers, type ToolPermission } from "@palui/db"
 import type { ChatRow } from "./chats"
@@ -18,6 +19,7 @@ export const MAX_PERSONA = 8000
 export const MAX_AGENTS = 20
 // recall container names: what recall itself accepts.
 export const RECALL_CONTAINER = /^[a-z0-9][a-z0-9_-]{0,63}$/
+export const MAX_READ_CONTAINERS = 5
 
 // Avatar choices (PLAN 19.7). Names only: the dashboard maps them to lucide
 // icons and theme colors, so a stored value it doesn't know falls back.
@@ -109,9 +111,50 @@ export function agentForChat(db: DB, chat: Pick<ChatRow, "agentId">): AgentRow {
 }
 
 // Where the agent's memory lives; undefined means the recall connector's own container.
-export function agentContainer(agent: AgentRow): string | undefined {
-  if (agent.isDefault) return agent.recallContainer ?? undefined
-  return agent.recallContainer ?? `agent-${agent.slug}`
+// With `recallPerChat` and a chat, each chat gets its own container, so what one
+// customer said never comes back in another customer's chat.
+export function agentContainer(agent: Pick<AgentRow, "isDefault" | "recallContainer" | "slug" | "recallPerChat">, chatId?: string | null): string | undefined {
+  const base = agent.isDefault ? (agent.recallContainer ?? undefined) : (agent.recallContainer ?? `agent-${agent.slug}`)
+  if (!agent.recallPerChat || !chatId || !base) return base
+  return chatContainer(base, chatId)
+}
+
+// `<base>-c<10 hex>`, at most 64 characters (what recall accepts).
+export function chatContainer(base: string, chatId: string): string {
+  const hash = createHash("sha256").update(chatId).digest("hex").slice(0, 10)
+  return `${chatContainerPrefix(base)}${hash}`
+}
+
+// What every per-chat container of this base starts with.
+export function chatContainerPrefix(base: string): string {
+  return `${base.slice(0, 64 - 12).replace(/[-_]+$/, "")}-c`
+}
+
+// Containers it reads on top of its own and never writes.
+export function agentReadContainers(agent: Pick<AgentRow, "recallReadContainers">): string[] {
+  return Array.isArray(agent.recallReadContainers) ? agent.recallReadContainers.filter((c) => typeof c === "string" && RECALL_CONTAINER.test(c)) : []
+}
+
+// What a turn of this agent may touch in recall (PLAN 19.5). The default agent
+// is the owner's: its tools may name any container. Every other agent is
+// locked to its own container for writes, plus its read list for reads.
+export type MemoryScope = { container: string | undefined; read: string[]; locked: boolean }
+
+export function memoryScope(agent: AgentRow, chatId?: string | null): MemoryScope {
+  return { container: agentContainer(agent, chatId), read: agentReadContainers(agent), locked: !agent.isDefault }
+}
+
+// The owner's own memory: the memory connector's container and the default
+// agent's override. No other agent may read or write it.
+export function ownerContainers(db: DB): string[] {
+  const out = new Set<string>()
+  for (const c of db.select({ kind: connectors.kind, config: connectors.config }).from(connectors).where(eq(connectors.kind, "memory")).all()) {
+    const name = typeof c.config?.container === "string" && c.config.container ? c.config.container : "default"
+    out.add(name)
+  }
+  const def = db.select({ recallContainer: agents.recallContainer }).from(agents).where(eq(agents.isDefault, true)).get()
+  if (def?.recallContainer) out.add(def.recallContainer)
+  return [...out]
 }
 
 // A group, or a DM with someone who isn't the owner (PLAN 19.2).
@@ -129,10 +172,18 @@ export type AgentInput = {
   guestTools?: GuestTools
   dailyTokenCap?: number
   recallContainer?: string | null
+  recallReadContainers?: string[] | null
+  recallPerChat?: boolean
   telegramConnectorId?: string | null
   avatarImage?: string | null
   avatarIcon?: string | null
   avatarColor?: string | null
+}
+
+// Trimmed, lowercased, unique; null when empty.
+function readList(list: string[] | null | undefined): string[] | null {
+  const out = [...new Set((list ?? []).map((c) => c.trim().toLowerCase()).filter(Boolean))]
+  return out.length ? out : null
 }
 
 function clean(text: string): string {
@@ -142,7 +193,7 @@ function clean(text: string): string {
     .trim()
 }
 
-function checkFields(db: DB, i: Partial<AgentInput>, selfId?: string) {
+function checkFields(db: DB, i: Partial<AgentInput>, selfId?: string, isDefault = false) {
   if (i.name !== undefined) {
     if (!i.name) throw new AgentError("Name is empty.")
     if (i.name.length > MAX_AGENT_NAME) throw new AgentError(`Name is at most ${MAX_AGENT_NAME} characters.`)
@@ -155,6 +206,17 @@ function checkFields(db: DB, i: Partial<AgentInput>, selfId?: string) {
   if (i.guestTools !== undefined && i.guestTools !== "none" && i.guestTools !== "safe") throw new AgentError("Guest tools must be none or safe.")
   if (i.dailyTokenCap !== undefined && !(Number.isInteger(i.dailyTokenCap) && i.dailyTokenCap >= 0)) throw new AgentError("Daily cap must be a whole number, 0 or more.")
   if (i.recallContainer && !RECALL_CONTAINER.test(i.recallContainer)) throw new AgentError("Recall container uses lowercase letters, digits, - and _.")
+  if (i.recallReadContainers) {
+    if (i.recallReadContainers.length > MAX_READ_CONTAINERS) throw new AgentError(`At most ${MAX_READ_CONTAINERS} shared containers.`)
+    for (const c of i.recallReadContainers) if (!RECALL_CONTAINER.test(c)) throw new AgentError(`${c.slice(0, 64)} isn't a recall container name: lowercase letters, digits, - and _.`)
+  }
+  // The owner's memory stays Palui's (PLAN 19.1): no other agent writes or reads it.
+  if (!isDefault) {
+    const owner = ownerContainers(db)
+    if (i.recallContainer && owner.includes(i.recallContainer)) throw new AgentError(`${i.recallContainer} is the owner's memory. Only Palui uses it.`)
+    const hit = i.recallReadContainers?.find((c) => owner.includes(c))
+    if (hit) throw new AgentError(`${hit} is the owner's memory. Only Palui reads it.`)
+  }
   if (i.avatarImage) {
     if (i.avatarImage.length > MAX_AVATAR_IMAGE) throw new AgentError("That photo is too big. Pick a smaller one.")
     if (!AVATAR_IMAGE.test(i.avatarImage)) throw new AgentError("The photo must be a PNG, JPEG or WebP image.")
@@ -172,6 +234,7 @@ export function createAgent(db: DB, input: AgentInput, now = Date.now()): AgentR
   if (!AGENT_SLUG.test(slug)) throw new AgentError("Slug is 2 to 24 characters: lowercase letters, digits and -, starting with a letter.")
   if (getAgentBySlug(db, slug)) throw new AgentError(`There's already an agent called ${slug}.`)
   const fields = { ...input, name: clean(input.name).replace(/\n+/g, " "), persona: clean(input.persona) }
+  if (fields.recallReadContainers !== undefined) fields.recallReadContainers = readList(fields.recallReadContainers)
   checkFields(db, fields)
   if (listAgents(db).length >= MAX_AGENTS) throw new AgentError(`At most ${MAX_AGENTS} agents.`)
   return db
@@ -185,6 +248,8 @@ export function createAgent(db: DB, input: AgentInput, now = Date.now()): AgentR
       guestTools: fields.guestTools ?? "safe",
       dailyTokenCap: fields.dailyTokenCap ?? 0,
       recallContainer: fields.recallContainer || null,
+      recallReadContainers: fields.recallReadContainers ?? null,
+      recallPerChat: fields.recallPerChat ?? false,
       telegramConnectorId: fields.telegramConnectorId || null,
       avatarImage: fields.avatarImage || null,
       avatarIcon: fields.avatarIcon || null,
@@ -202,13 +267,14 @@ export function updateAgent(db: DB, id: string, patch: Partial<Omit<AgentInput, 
   const fields: Partial<AgentInput> = { ...patch }
   if (patch.name !== undefined) fields.name = clean(patch.name).replace(/\n+/g, " ")
   if (patch.persona !== undefined) fields.persona = clean(patch.persona)
+  if (patch.recallReadContainers !== undefined) fields.recallReadContainers = readList(patch.recallReadContainers)
   // The default agent never runs in shared chats, so it has no shared-chat rules or bot of its own.
   if (row.isDefault) {
     delete fields.ownerPowers
     delete fields.guestTools
     delete fields.telegramConnectorId
   }
-  checkFields(db, fields, id)
+  checkFields(db, fields, id, row.isDefault)
   const set: Partial<AgentRow> = { updatedAt: now }
   if (fields.name !== undefined) set.name = fields.name
   if (fields.persona !== undefined) set.persona = fields.persona
@@ -216,6 +282,8 @@ export function updateAgent(db: DB, id: string, patch: Partial<Omit<AgentInput, 
   if (fields.guestTools !== undefined) set.guestTools = fields.guestTools
   if (fields.dailyTokenCap !== undefined) set.dailyTokenCap = fields.dailyTokenCap
   if (fields.recallContainer !== undefined) set.recallContainer = fields.recallContainer || null
+  if (fields.recallReadContainers !== undefined) set.recallReadContainers = fields.recallReadContainers
+  if (fields.recallPerChat !== undefined) set.recallPerChat = fields.recallPerChat
   if (fields.telegramConnectorId !== undefined) set.telegramConnectorId = fields.telegramConnectorId || null
   if (fields.avatarImage !== undefined) set.avatarImage = fields.avatarImage || null
   if (fields.avatarIcon !== undefined) set.avatarIcon = fields.avatarIcon || null

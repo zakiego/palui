@@ -119,7 +119,7 @@ export function createKit(db: DB, now = Date.now()) {
     },
 
     // Raw insert, so a fixture can use values at the form limits.
-    agent(values: { slug: string; name: string; persona: string; ownerPowers?: "off" | "approve"; guestTools?: "none" | "safe"; dailyTokenCap?: number; toolPermissions?: ToolPermissions | null; recallContainer?: string | null; telegramConnectorId?: string | null; avatarImage?: string | null; avatarIcon?: string | null; avatarColor?: string | null; tokensToday?: number }) {
+    agent(values: { slug: string; name: string; persona: string; ownerPowers?: "off" | "approve"; guestTools?: "none" | "safe"; dailyTokenCap?: number; toolPermissions?: ToolPermissions | null; recallContainer?: string | null; recallReadContainers?: string[] | null; recallPerChat?: boolean; telegramConnectorId?: string | null; avatarImage?: string | null; avatarIcon?: string | null; avatarColor?: string | null; tokensToday?: number }) {
       const id = newId("agt")
       const { tokensToday, ...row } = values
       db.insert(agents).values({ id, ...row, createdAt: now, updatedAt: now }).run()

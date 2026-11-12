@@ -97,6 +97,10 @@ export type TurnInfo = {
   agentId?: string
   // The flow whose tool step is calling (RFC flows 5.1). Built-in flow tools default to it.
   flowId?: string
+  // What the memory connector's tools may touch this turn (PLAN 19.5). Unset:
+  // the connector's own container and any other the model names (the owner).
+  // `locked`: writes go to `container` only, reads to it and `read`.
+  memory?: { container?: string | undefined; read: string[]; locked: boolean }
 }
 
 // A tool plus its connector metadata. `class` drives approvals (PLAN 10); `untrusted`

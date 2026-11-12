@@ -4,7 +4,7 @@ import { connectorServesAgent } from "../connectors/store"
 import { and, asc, eq, inArray, like } from "drizzle-orm"
 import { isStepCount, streamText, type ModelMessage, type SystemModelMessage, type ToolApprovalResponse } from "ai"
 import { events, jobs, messages, newId, pendingApprovals, runs, sessions, toolCalls, type DB, type RunStatus, type RunTrigger } from "@palui/db"
-import { agentForChat, getAgent, isSharedChat, type AgentRow } from "../agents"
+import { agentForChat, getAgent, isSharedChat, memoryScope, type AgentRow } from "../agents"
 import { findAttachmentRefs, labelFileRefs } from "../attachments/refs"
 import { approvalsForRun, createApproval, preview, supersedeSameCall, type ApprovalRow, type ResumeContext, type TurnMode } from "../approvals/store"
 import { agentOverCap, budgetTokens, checkGlobalBudget, firstAgentNoticeToday, jobOverCap, pausedNotice, recordAgentTokens, recordRunStart, recordRunTokens } from "../budget"
@@ -234,7 +234,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
 
   try {
     const batchRunId = input.resume ? (input.resume.context.batchRunId ?? input.resume.previousRunId) : runId
-    const turnInfo: TurnInfo = { runId, chatId: chat.id, channel: chat.channel, trigger: input.trigger, tz: settings.timezone, now: startedAt, jobId, batchRunId, agentId: agent.id }
+    const turnInfo: TurnInfo = { runId, chatId: chat.id, channel: chat.channel, trigger: input.trigger, tz: settings.timezone, now: startedAt, jobId, batchRunId, agentId: agent.id, memory: memoryScope(agent, chat.id) }
     const guest = mode === "guest"
     const noTools = input.noTools || origin === "hook" || (guest && agent.guestTools === "none")
     const scope = input.resume ? input.resume.context.toolScope : input.toolScope
@@ -284,7 +284,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         .filter((h) => batch.has(h.id))
         .map((h) => h.text)
         .join("\n")
-      const recall = input.trigger === "message" ? await autoRecall(db, findMemory(ctx.host.running()), batchText, rlog, startedAt, agent) : null
+      const recall = input.trigger === "message" ? await autoRecall(db, findMemory(ctx.host.running()), batchText, rlog, startedAt, agent, chat.id) : null
       // Stable first, volatile last (see ./context): the system blocks and the
       // history repeat from turn to turn, the clock, check-ins and recall ride
       // at the end of the newest message.

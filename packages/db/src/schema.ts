@@ -841,6 +841,10 @@ export const agents = sqliteTable("agents", {
   isDefault: bool("is_default").notNull().default(false),
   // null: the recall connector's own container (the default agent).
   recallContainer: text("recall_container"),
+  // Extra containers it reads but never writes (shared notes the owner curates).
+  recallReadContainers: json<string[]>("recall_read_containers"),
+  // One container per chat, so people in one chat never see what was said in another.
+  recallPerChat: bool("recall_per_chat").notNull().default(false),
   ownerPowers: text("owner_powers").$type<OwnerPowers>().notNull().default("off"),
   guestTools: text("guest_tools").$type<GuestTools>().notNull().default("safe"),
   // Tokens per day across all its chats; 0 means no cap of its own.

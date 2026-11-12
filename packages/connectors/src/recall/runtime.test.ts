@@ -6,7 +6,7 @@ import type { ConfigOf, PaluiTool, TurnInfo } from "@palui/core/connectors/defin
 import { fakeCtx, startMcpServer, type TestMcpServer } from "../mcp/test-helpers"
 import { normalizeSourceId, profileText, RecallApi } from "./api"
 import manifest from "./manifest"
-import runtime, { shouldRecall } from "./runtime"
+import runtime, { resolveContainer, shouldRecall } from "./runtime"
 
 const KEY = "rcl_testkey123456"
 const turn: TurnInfo = { runId: "run_1", chatId: "chat_1", channel: "telegram", trigger: "message", tz: "Asia/Makassar", now: 0 }
@@ -78,10 +78,11 @@ async function fakeRecall(opts: FakeOpts = {}) {
         const b = JSON.parse(raw) as { container: string; source_id?: string }
         return send(res, 202, { id: "doc_1", container: b.container, status: "queued", sourceId: b.source_id ?? null, duplicate: false }), true
       }
-      if (url.pathname.startsWith("/v1/memories/") && req.method === "DELETE") {
+      if (url.pathname.startsWith("/v1/memories/") && (req.method === "DELETE" || req.method === "GET")) {
         const id = decodeURIComponent(url.pathname.split("/").pop() ?? "")
-        if (id !== "mem_1") return send(res, 404, { error: { type: "not_found", message: "no such memory" } }), true
-        return send(res, 200, { memory: { id, fact: "Old fact" } }), true
+        const home: Record<string, string> = { mem_1: "zaki", mem_2: "agent-chef" }
+        if (!home[id]) return send(res, 404, { error: { type: "not_found", message: "no such memory" } }), true
+        return send(res, 200, { memory: { id, fact: "Old fact", container: home[id] } }), true
       }
       return false
     },
@@ -168,6 +169,33 @@ describe("recall runtime", () => {
     }
   })
 
+  it("locks an agent's tools to its own container and its shared ones", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const running = await runtime.start(fakeCtx(cfg(f.base), { apiKey: KEY }))
+    try {
+      const tools = await running.tools!({ ...turn, agentId: "agt_chef", memory: { container: "agent-chef", read: ["kb-menu"], locked: true } })
+      // Tools recall adds later may reach other containers, so they're left out.
+      expect(Object.keys(tools).sort()).toEqual(["add_memory", "ask_memory", "forget_memory", "get_profile", "list_memories", "search_memories"])
+      await exec(tools.search_memories, { query: "sambal" })
+      await exec(tools.search_memories, { query: "sambal", container: "kb-menu" })
+      await exec(tools.add_memory, { content: "x" })
+      await expect(exec(tools.search_memories, { query: "x", container: "zaki" })).rejects.toThrow(/can't use recall container zaki/)
+      await expect(exec(tools.add_memory, { content: "x", container: "kb-menu" })).rejects.toThrow(/can write agent-chef/)
+      expect(f.toolArgs).toEqual([
+        { tool: "search_memories", query: "sambal", container: "agent-chef" },
+        { tool: "search_memories", query: "sambal", container: "kb-menu" },
+        { tool: "add_memory", content: "x", container: "agent-chef" },
+      ])
+      // Another container's memory looks missing and is never deleted.
+      expect(await exec(tools.forget_memory, { id: "mem_1" })).toMatchObject({ forgotten: false })
+      expect(await exec(tools.forget_memory, { id: "mem_2" })).toMatchObject({ forgotten: true })
+      expect(f.seen.filter((s) => s.method === "DELETE").map((s) => s.path)).toEqual(["/v1/memories/mem_2"])
+    } finally {
+      await running.stop()
+    }
+  })
+
   it("recall() returns the profile text for the configured container", async () => {
     const f = await fakeRecall()
     srv = f.server
@@ -216,6 +244,16 @@ describe("recall runtime", () => {
 })
 
 describe("helpers", () => {
+  it("resolveContainer fills the default and only unlocks for the owner", () => {
+    const locked = { container: "agent-chef", read: ["kb-menu"], locked: true }
+    expect(resolveContainer(undefined, "read", locked)).toBe("agent-chef")
+    expect(resolveContainer(" ", "write", locked)).toBe("agent-chef")
+    expect(resolveContainer("kb-menu", "read", locked)).toBe("kb-menu")
+    expect(() => resolveContainer("kb-menu", "write", locked)).toThrow()
+    expect(() => resolveContainer("zaki", "read", locked)).toThrow()
+    expect(resolveContainer("anything", "write", { container: "zaki", read: [], locked: false })).toBe("anything")
+  })
+
   it("shouldRecall skips commands and short messages", () => {
     expect(shouldRecall("/new")).toBe(false)
     expect(shouldRecall("apa kabar")).toBe(false)

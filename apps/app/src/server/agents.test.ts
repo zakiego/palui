@@ -1,4 +1,4 @@
-import { createAgent, getDefaultAgent } from "@palui/core/agents"
+import { chatContainer, createAgent, getDefaultAgent } from "@palui/core/agents"
 import { ensureChat } from "@palui/core/chats"
 import { upsertConnector } from "@palui/core/connectors/store"
 import { memoryDb, runs, toolCalls } from "@palui/db"
@@ -23,7 +23,22 @@ describe("agentMemory", () => {
   it("says there's no memory connector, with the container it would use", async () => {
     const db = memoryDb()
     const chef = createAgent(db, { slug: "chef", name: "Chef", persona: "p" })
-    expect(await agentMemory(db, chef)).toEqual({ connector: null, container: "agent-chef", stats: null, error: null })
+    expect(await agentMemory(db, chef)).toEqual({ connector: null, container: "agent-chef", perChat: false, reads: [], chatContainers: 0, stats: null, error: null })
+  })
+
+  it("adds up every chat's container when memory is per chat", async () => {
+    const db = withRecall("main")
+    const shop = createAgent(db, { slug: "shop", name: "Shop", persona: "p", recallPerChat: true, recallReadContainers: ["kb-shop"] })
+    const a = chatContainer("agent-shop", "cht_a")
+    const b = chatContainer("agent-shop", "cht_b")
+    const containers = [
+      { container: a, memories: 3, documents: 1, lastActivity: NOW - DAY },
+      { container: b, memories: 4, documents: 2, lastActivity: NOW },
+      { container: "agent-shopping", memories: 50, documents: 5, lastActivity: NOW },
+      { container: "kb-shop", memories: 9, documents: 1, lastActivity: NOW },
+    ]
+    setRuntime(upRuntime({ action: async () => ({ containers }) }))
+    expect(await agentMemory(db, shop)).toMatchObject({ container: "agent-shop", perChat: true, reads: ["kb-shop"], chatContainers: 2, stats: { memories: 7, documents: 3, lastActivity: NOW } })
   })
 
   it("reads the agent's container from recall; Palui uses the connector's", async () => {

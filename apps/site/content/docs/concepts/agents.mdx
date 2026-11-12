@@ -63,6 +63,12 @@ Each agent remembers in its own recall container, `agent-<slug>` unless you set 
 
 Auto-save stores what other people said too, labeled with their name and the chat, so a group agent remembers who's who. That means anyone in a chat you allowed can put text into that agent's memory. It can never reach Palui's memory. Turns that read untrusted tool output are still skipped. See [Memory](/docs/concepts/memory).
 
+Separate memory per chat gives each chat its own container (`agent-<slug>-c<hash>`), so what one customer says never comes up in another customer's chat. New agents start with it on. Turning it on or off later starts that agent from an empty memory, since the old container stays where it was.
+
+Shared containers are read only. List up to 5 on the Memory tab, like a `kb-shop` container you fill yourself with product facts or an FAQ. Auto-recall reads them next to the agent's own memory and labels them as reference, never instructions. Palui's container is your memory, so no other agent can use it, read only or not.
+
+An agent's recall tools follow the same rule. `search_memories` and the other read tools reach its own container and its shared ones, `add_memory` writes only to its own, and `forget_memory` only deletes a memory that's in its own container. Naming any other container is an error. Palui's tools can still name any container.
+
 ## Daily cap
 
 An agent with a daily token cap stops answering when it's used up, until midnight in your timezone. The chat gets one short notice that day. The global cap in Settings still applies on top.

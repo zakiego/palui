@@ -1,7 +1,7 @@
 // Agents page (PLAN 19.7): each agent's persona, shared-chat rules, daily cap,
 // recall container and Telegram bot. The runtime reads them at the start of
 // every turn, so writes go straight to the table.
-import { AgentError, AGENT_COLORS, AGENT_ICONS, MAX_AVATAR_IMAGE, assignAgent, getAgent, createAgent, setToolPermissions, deleteAgent, getAgentBySlug, listAgents, MAX_AGENT_NAME, MAX_PERSONA, updateAgent } from "@palui/core/agents"
+import { AgentError, AGENT_COLORS, AGENT_ICONS, MAX_AVATAR_IMAGE, assignAgent, getAgent, createAgent, setToolPermissions, deleteAgent, getAgentBySlug, listAgents, MAX_AGENT_NAME, MAX_PERSONA, MAX_READ_CONTAINERS, updateAgent } from "@palui/core/agents"
 import { rotateSession, setReplyMode } from "@palui/core/chats"
 import { setDeployNotice } from "@palui/core/deploy-notice"
 import { getSetting } from "@palui/core/settings"
@@ -80,6 +80,8 @@ const fields = z.object({
   guestTools: z.enum(["none", "safe"]),
   dailyTokenCap: z.number().int().min(0).max(100_000_000),
   recallContainer: z.string().trim().max(64).nullable(),
+  recallReadContainers: z.array(z.string().trim().max(64)).max(MAX_READ_CONTAINERS),
+  recallPerChat: z.boolean(),
   telegramConnectorId: z.string().min(1).max(64).nullable(),
   avatarImage: z.string().max(MAX_AVATAR_IMAGE).nullable(),
   avatarIcon: z.enum(AGENT_ICONS).nullable(),

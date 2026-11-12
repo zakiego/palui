@@ -147,6 +147,9 @@ function NewAgentSheet({ open, onClose }: { open: boolean; onClose: () => void }
           guestTools: "safe",
           dailyTokenCap: 0,
           recallContainer: null,
+          recallReadContainers: [],
+          // New agents keep each chat's memory apart; the Memory tab can share it.
+          recallPerChat: true,
           telegramConnectorId: null,
           avatarImage: null,
           avatarIcon: null,
