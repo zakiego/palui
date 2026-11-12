@@ -1,10 +1,15 @@
-// Home (PLAN 11.4): a first-run checklist until it's done, then a connector
-// summary, the next 3 reminders, the last 5 runs and tokens today.
+// Home (PLAN 11.4): a first-run checklist until it's done, then what needs a
+// look, tokens today, the next 3 reminders, the last 5 runs and the connector
+// map. Problems come first; the long map sits last on a phone.
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
 import { BellIcon, CircleCheckIcon, CircleIcon, HistoryIcon, ToggleRightIcon } from "lucide-react"
+import { Bar, BarChart, Cell, XAxis } from "recharts"
 import { toast } from "sonner"
 
 import { AppError } from "@/components/app-error"
+import { connectorIcon } from "@/components/connector-icon"
+import { ConnectorStatusBadge } from "@/components/connector-status"
+import { IconTile } from "@/components/icon-tile"
 import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending, SkeletonText, StatusTextSkeleton } from "@/components/page-pending"
 import { RuntimeAlert } from "@/components/runtime-alert"
@@ -14,13 +19,15 @@ import { Badge } from "@/components/ui/badge"
 import { StatusText } from "@/components/ui/status-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLiveRefresh } from "@/hooks/use-live-events"
 import { compact, duration, errorMessage, inOtherZone, inZone } from "@/lib/format"
 import { dismissChecklist, getHome } from "@/lib/fns/home"
-import { useCount, useLabel, useT, type Key } from "@/lib/i18n"
+import { useCount, useLabel, useLocale, useT, type Key } from "@/lib/i18n"
+import { manifestFor } from "@/lib/manifests"
 import { RUN_TONE, runTitle } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 
@@ -34,6 +41,9 @@ export const Route = createFileRoute("/_app/")({
 
 type HomeData = Awaited<ReturnType<typeof getHome>>
 
+// The same rule as the header status: an error, or a paused connector that's switched on.
+const needsLook = (c: { status: string; enabled: boolean }) => c.status === "error" || (c.enabled && c.status === "paused")
+
 function HomePage() {
   const data = Route.useLoaderData()
   const router = useRouter()
@@ -43,21 +53,23 @@ function HomePage() {
   const c = data.checklist
   const requiredDone = c.passkey && c.model && c.channel && c.hi
   const showChecklist = !requiredDone && !c.dismissed
+  const attention = data.connectors.filter(needsLook)
 
   return (
     <>
       <PageHeader title={t("home.title")} />
       {!data.runtimeUp && <RuntimeAlert />}
       {showChecklist && <Checklist checklist={c} />}
-      {/* Two independent columns, so a long connector list never stretches the cards beside it. */}
-      <div className="grid items-start gap-4 @3xl/main:grid-cols-2">
-        <ConnectorSummary connectors={data.connectors} />
-        <StatusAnnouncer items={data.connectors} />
-        <div className="grid min-w-0 content-start gap-4">
-          <TokensCard tokens={data.tokens} />
+      {attention.length > 0 && <AttentionCard connectors={attention} />}
+      {/* Two independent columns, so the long connector map never stretches the cards beside it. */}
+      <div className="grid items-start gap-6 @4xl/main:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <div className="grid min-w-0 content-start gap-6">
+          <TokensCard tokens={data.tokens} week={data.week} />
           <RemindersCard reminders={data.reminders} timezone={data.timezone} />
           <RunsCard runs={data.runs} timezone={data.timezone} />
         </div>
+        <ConnectorSummary connectors={data.connectors} />
+        <StatusAnnouncer items={data.connectors} />
       </div>
     </>
   )
@@ -121,6 +133,57 @@ function Checklist({ checklist }: { checklist: HomeData["checklist"] }) {
 
 type HomeConnector = HomeData["connectors"][number]
 
+const ATTENTION_SHOWN = 3
+// One column per problem shown, up to three, so a single problem gets the full row.
+const ATTENTION_COLS = ["", "", "@3xl/main:grid-cols-2", "@3xl/main:grid-cols-3"]
+
+// What's broken, first, one tap from its fix. Only rendered when something is.
+function AttentionCard({ connectors }: { connectors: HomeConnector[] }) {
+  const t = useT()
+  const shown = connectors.slice(0, ATTENTION_SHOWN)
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("home.attention")}</CardTitle>
+        <CardAction>
+          <Button variant="ghost" size="sm" render={<Link to="/connectors" />}>
+            {t("common.open")}
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <ItemGroup className={cn("gap-3 @3xl/main:grid", ATTENTION_COLS[shown.length])}>
+          {shown.map((c) => {
+            const Icon = connectorIcon(manifestFor(c.type)?.icon)
+            return (
+              <Item key={c.id} size="sm" variant="muted" className="items-start" render={<Link to="/connectors/$id" params={{ id: c.id }} />}>
+                <ItemMedia>
+                  <IconTile size="sm" className="border bg-card">
+                    <Icon />
+                  </IconTile>
+                </ItemMedia>
+                <ItemContent className="min-w-0">
+                  <ItemTitle className="w-full min-w-0">
+                    <span dir="auto" className="truncate text-start" title={c.label}>
+                      {c.label}
+                    </span>
+                  </ItemTitle>
+                  <ConnectorStatusBadge status={c.status} />
+                  {c.statusDetail && (
+                    <ItemDescription dir="auto" className="break-words text-start" title={c.statusDetail}>
+                      {c.statusDetail}
+                    </ItemDescription>
+                  )}
+                </ItemContent>
+              </Item>
+            )
+          })}
+        </ItemGroup>
+      </CardContent>
+    </Card>
+  )
+}
+
 function ConnectorSummary({ connectors }: { connectors: HomeConnector[] }) {
   const t = useT()
   const shown = connectors.filter((c) => c.status !== "not_set_up")
@@ -131,7 +194,7 @@ function ConnectorSummary({ connectors }: { connectors: HomeConnector[] }) {
         <CardTitle>{t("home.connectors")}</CardTitle>
         {shown.length > 0 && <CardDescription className="tabular-nums">{t("home.map.on", { n: on, total: shown.length })}</CardDescription>}
         <CardAction>
-          <Button variant="outline" size="sm" render={<Link to="/connectors" />}>
+          <Button variant="ghost" size="sm" render={<Link to="/connectors" />}>
             {t("common.open")}
           </Button>
         </CardAction>
@@ -160,32 +223,61 @@ function ConnectorSummary({ connectors }: { connectors: HomeConnector[] }) {
   )
 }
 
-function TokensCard({ tokens }: { tokens: { tokensIn: number; tokensOut: number; runs: number } }) {
+// An ISO date as a calendar day (no zone shift), in the UI language: "Thu", "Kam".
+const INTL_LOCALE = { en: "en-GB", id: "id-ID" } as const
+const dayName = (day: string, locale: keyof typeof INTL_LOCALE, opts: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat(INTL_LOCALE[locale], { ...opts, timeZone: "UTC" }).format(new Date(`${day}T00:00:00Z`))
+
+function TokensCard({ tokens, week }: { tokens: { tokensIn: number; tokensOut: number; runs: number }; week: HomeData["week"] }) {
   const t = useT()
   const count = useCount()
+  const locale = useLocale()
+  const days = week.map((d) => ({ day: d.day, tokens: d.tokensIn + d.tokensOut }))
+  // The svg isn't focusable (no accessibilityLayer), so the week's numbers go in the label.
+  const weekLabel = `${t("home.week")}: ${days.map((d) => `${dayName(d.day, locale, { weekday: "short" })} ${compact(d.tokens)}`).join(", ")}`
+  const config = { tokens: { label: t("activity.usage"), color: "var(--chart-1)" } } satisfies ChartConfig
   return (
     <Card>
       <CardHeader>
-        <CardDescription>{t("home.tokens")}</CardDescription>
-        <CardTitle className="font-mono text-display tabular-nums">{compact(tokens.tokensIn + tokens.tokensOut)}</CardTitle>
+        <CardTitle>{t("home.tokens")}</CardTitle>
         <CardAction>
           <Button variant="ghost" size="sm" render={<Link to="/activity" search={{ tab: "usage" }} />}>
             {t("activity.usage")}
           </Button>
         </CardAction>
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-caption text-muted-foreground tabular-nums">
-        <span>
-          {compact(tokens.tokensIn)} {t("home.tokensIn")}
-        </span>
-        <span>
-          {compact(tokens.tokensOut)} {t("home.tokensOut")}
-        </span>
-        <span>{count(tokens.runs, "count.run", "count.runs")}</span>
+      <CardContent className="flex flex-col gap-5 @xl/main:flex-row @xl/main:items-end @xl/main:justify-between">
+        <div className="flex min-w-0 flex-col gap-2">
+          <p className="font-mono text-display tabular-nums">{compact(tokens.tokensIn + tokens.tokensOut)}</p>
+          <p className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-caption text-muted-foreground tabular-nums">
+            <span>
+              <span className="text-foreground">{compact(tokens.tokensIn)}</span> {t("home.tokensIn")}
+            </span>
+            <span>
+              <span className="text-foreground">{compact(tokens.tokensOut)}</span> {t("home.tokensOut")}
+            </span>
+            <span>{count(tokens.runs, "count.run", "count.runs")}</span>
+          </p>
+        </div>
+        {/* Seven bars, today in ink and the rest muted, so today reads against the week. */}
+        <ChartContainer config={config} className="aspect-auto h-[4.5rem] w-full shrink-0 @xl/main:w-60" role="img" aria-label={weekLabel}>
+          <BarChart data={days} margin={{ top: 0, right: 0, bottom: 0, left: 0 }} barCategoryGap={4} accessibilityLayer={false}>
+            <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={4} height={22} interval={0} tickFormatter={(d: string) => dayName(d, locale, { weekday: "short" })} />
+            <ChartTooltip cursor={false} isAnimationActive={false} content={<ChartTooltipContent hideIndicator labelFormatter={(_, p) => dayName(String(p?.[0]?.payload?.day ?? ""), locale, { weekday: "short", day: "numeric", month: "short" })} />} />
+            <Bar dataKey="tokens" radius={[6, 6, 0, 0]} minPointSize={3} isAnimationActive={false}>
+              {days.map((d, i) => (
+                <Cell key={d.day} fill={i === days.length - 1 ? "var(--color-tokens)" : "var(--muted-foreground)"} fillOpacity={i === days.length - 1 ? 1 : 0.45} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ChartContainer>
       </CardContent>
     </Card>
   )
 }
+
+const DAY: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" }
+const CLOCK: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }
 
 function RemindersCard({ reminders, timezone }: { reminders: HomeData["reminders"]; timezone: string }) {
   const t = useT()
@@ -201,7 +293,7 @@ function RemindersCard({ reminders, timezone }: { reminders: HomeData["reminders
       </CardHeader>
       <CardContent>
         {reminders.length === 0 ? (
-          <Empty className="p-4">
+          <Empty className="border border-dashed p-6">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <BellIcon />
@@ -215,24 +307,31 @@ function RemindersCard({ reminders, timezone }: { reminders: HomeData["reminders
             </EmptyContent>
           </Empty>
         ) : (
-          <ItemGroup className="gap-0">
-            {reminders.map((r) => (
-              <Item key={r.id} size="sm" className="px-0">
-                <ItemContent className="min-w-0">
-                  <ItemTitle className="w-full min-w-0">
-                    <span dir="auto" className="line-clamp-2 break-words text-start" title={r.text}>
-                      {r.text}
-                    </span>
-                  </ItemTitle>
-                  {/* In the owner's zone, like every other time here; a reminder set elsewhere adds its own clock. */}
-                  <ItemDescription className="font-mono tabular-nums">
-                    {inZone(r.fireAt, timezone)}
-                    {inOtherZone(r.fireAt, r.tz, timezone) ? ` (${inOtherZone(r.fireAt, r.tz, timezone)})` : ""}
-                    {r.rrule ? ` · ${t("reminders.repeats")}` : ""}
-                  </ItemDescription>
-                </ItemContent>
-              </Item>
-            ))}
+          <ItemGroup className="gap-3">
+            {reminders.map((r) => {
+              const other = inOtherZone(r.fireAt, r.tz, timezone)
+              return (
+                <Item key={r.id} size="sm" variant="muted" className="items-start" render={<Link to="/reminders" search={{ tab: r.rrule ? "recurring" : "upcoming" }} />}>
+                  {/* An agenda: the time in the owner's zone on the left, what it says on the right. */}
+                  <ItemMedia className="w-16 flex-col items-start gap-0.5 font-mono tabular-nums">
+                    <span className="text-sm font-medium">{inZone(r.fireAt, timezone, CLOCK)}</span>
+                    <span className="text-caption text-muted-foreground">{inZone(r.fireAt, timezone, DAY)}</span>
+                  </ItemMedia>
+                  <ItemContent className="min-w-0">
+                    <ItemTitle className="w-full min-w-0">
+                      <span dir="auto" className="line-clamp-2 break-words text-start" title={r.text}>
+                        {r.text}
+                      </span>
+                    </ItemTitle>
+                    {(other || r.rrule) && (
+                      <ItemDescription className="font-mono tabular-nums">
+                        {[other, r.rrule ? t("reminders.repeats") : null].filter(Boolean).join(" · ")}
+                      </ItemDescription>
+                    )}
+                  </ItemContent>
+                </Item>
+              )
+            })}
           </ItemGroup>
         )}
       </CardContent>
@@ -249,13 +348,13 @@ function RunsCard({ runs, timezone }: { runs: HomeData["runs"]; timezone: string
         <CardTitle>{t("home.runs")}</CardTitle>
         <CardAction>
           <Button variant="ghost" size="sm" render={<Link to="/activity" search={{ tab: "runs" }} />}>
-            {t("activity.runs")}
+            {t("common.open")}
           </Button>
         </CardAction>
       </CardHeader>
       <CardContent>
         {runs.length === 0 ? (
-          <Empty className="p-4">
+          <Empty className="border border-dashed p-6">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <HistoryIcon />
@@ -269,9 +368,9 @@ function RunsCard({ runs, timezone }: { runs: HomeData["runs"]; timezone: string
             </EmptyContent>
           </Empty>
         ) : (
-          <ItemGroup className="gap-0">
+          <ItemGroup className="gap-1">
             {runs.map((r) => (
-              <Item key={r.id} size="sm" className="-mx-2 rounded-lg px-2" render={<Link to="/activity/runs/$id" params={{ id: r.id }} />}>
+              <Item key={r.id} size="sm" className="-mx-3 rounded-lg px-3" render={<Link to="/activity/runs/$id" params={{ id: r.id }} />}>
                 <ItemContent className="min-w-0">
                   <ItemTitle className="w-full min-w-0">
                     <span dir="auto" className="truncate text-start" title={runTitle(r, t, label)}>
@@ -279,13 +378,14 @@ function RunsCard({ runs, timezone }: { runs: HomeData["runs"]; timezone: string
                     </span>
                   </ItemTitle>
                   {/* The numbers wrap to a second line before they get cut; only the model name truncates. */}
-                  <div className="flex min-w-0 flex-wrap gap-x-2 font-mono text-sm text-muted-foreground tabular-nums">
+                  <div className="flex min-w-0 flex-wrap gap-x-3 font-mono text-caption text-muted-foreground tabular-nums">
                     <span className="shrink-0">{inZone(r.startedAt, timezone)}</span>
                     <span className="max-w-full min-w-0 truncate" title={r.model ?? undefined}>
                       {r.model ?? t("runs.noModel")}
                     </span>
                     <span className="shrink-0">
-                      {compact(r.tokensIn + r.tokensOut)} tok{r.ms != null ? ` · ${duration(r.ms)}` : ""}
+                      {t(r.tokensIn + r.tokensOut === 1 ? "home.tokOne" : "home.tokCount", { n: compact(r.tokensIn + r.tokensOut) })}
+                      {r.ms != null ? ` · ${duration(r.ms)}` : ""}
                     </span>
                   </div>
                 </ItemContent>
@@ -308,7 +408,31 @@ function HomeSkeleton() {
   return (
     <PagePending page="nav.home">
       <PageHeaderSkeleton title="w-24" />
-      <div className="grid items-start gap-4 @3xl/main:grid-cols-2">
+      <div className="grid items-start gap-6 @4xl/main:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <div className="grid min-w-0 content-start gap-6">
+          <Card>
+            <CardHeaderSkeleton title="w-28" action="w-16" />
+            <CardContent className="flex flex-col gap-5 @xl/main:flex-row @xl/main:items-end @xl/main:justify-between">
+              <div className="flex flex-col gap-2">
+                <SkeletonText className="text-display" width="w-24" />
+                <SkeletonText className="text-caption" width="w-48" />
+              </div>
+              <Skeleton className="h-[4.5rem] w-full rounded-md @xl/main:w-60" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeaderSkeleton title="w-32" action="w-14" />
+            <CardContent>
+              <ItemListSkeleton rows={3} agenda />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeaderSkeleton title="w-24" action="w-12" />
+            <CardContent>
+              <ItemListSkeleton rows={5} status />
+            </CardContent>
+          </Card>
+        </div>
         <Card>
           <CardHeaderSkeleton title="w-28" description="w-20" action="w-14" />
           <CardContent>
@@ -340,32 +464,6 @@ function HomeSkeleton() {
             </ul>
           </CardContent>
         </Card>
-        <div className="grid min-w-0 content-start gap-4">
-          <Card>
-            <CardHeader>
-              <SkeletonText className="text-sm" width="w-24" />
-              <SkeletonText className="text-display" width="w-24" />
-              <CardAction>
-                <Skeleton className="h-7 w-16 pointer-coarse:h-9" />
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              <SkeletonText className="text-caption" width="w-48" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeaderSkeleton title="w-32" action="w-14" />
-            <CardContent>
-              <ItemListSkeleton rows={3} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeaderSkeleton title="w-24" action="w-12" />
-            <CardContent>
-              <ItemListSkeleton rows={5} status />
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </PagePending>
   )
@@ -374,15 +472,22 @@ function HomeSkeleton() {
 const ITEM_WIDTHS = ["w-3/4", "w-1/2", "w-2/3", "w-3/5", "w-4/5"]
 const SUB_WIDTHS = ["w-56", "w-40", "w-48", "w-36", "w-52"]
 
-// Item rows as RemindersCard and RunsCard render them: a title, a mono line under it.
-function ItemListSkeleton({ rows, status }: { rows: number; status?: boolean }) {
+// Item rows as RemindersCard (agenda: muted rows, time on the left) and RunsCard
+// (a title, a mono line under it, a status) render them.
+function ItemListSkeleton({ rows, status, agenda }: { rows: number; status?: boolean; agenda?: boolean }) {
   return (
-    <ItemGroup className="gap-0">
+    <ItemGroup className={agenda ? "gap-3" : "gap-1"}>
       {Array.from({ length: rows }, (_, i) => (
-        <Item key={i} size="sm" className="px-0">
+        <Item key={i} size="sm" variant={agenda ? "muted" : "default"} className={agenda ? "items-start" : "px-0"}>
+          {agenda && (
+            <ItemMedia className="w-16 flex-col items-start gap-0.5">
+              <SkeletonText className="text-sm" width="w-11" />
+              <SkeletonText className="text-caption" width="w-12" />
+            </ItemMedia>
+          )}
           <ItemContent className="min-w-0">
             <SkeletonText className="text-sm" width={ITEM_WIDTHS[i % ITEM_WIDTHS.length]} />
-            <SkeletonText className="text-sm" width={SUB_WIDTHS[i % SUB_WIDTHS.length]} />
+            <SkeletonText className={agenda ? "text-sm" : "text-caption"} width={SUB_WIDTHS[i % SUB_WIDTHS.length]} />
           </ItemContent>
           {status && (
             <ItemActions>
