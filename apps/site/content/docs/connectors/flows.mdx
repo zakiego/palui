@@ -78,6 +78,7 @@ These are only offered in your own DMs and the web chat, never in a group or som
 - Telegram: the answer buttons.
 - WhatsApp: quote the question and reply with an answer.
 - Anywhere: just say it. Open check-ins are in the model's context, so "udah" answers the newest one.
+- Before it asks: a run that is still on its way to a check-in (waiting out a delay first, say) takes a closing answer early. When it reaches the check-in it records that answer, sends nothing, and follows the answer's branch. A non-closing answer like "belum" is refused until the question is asked. Open check-ins come first, so a bare "udah" only goes to a run that hasn't asked yet when nothing is open.
 
 ## Dashboard
 

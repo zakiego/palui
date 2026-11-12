@@ -29,7 +29,7 @@ import { stepData, STEP_TIMEOUT_MS, type FlowToolCaller } from "./call"
 import { evalCondition, evaluate, parseExpr, parsePath, explainTrace } from "./expr"
 import { defaultNext } from "./graph"
 import { createApproval, getApproval, preview } from "../approvals/store"
-import { checkinButtons, type CheckinWait } from "./checkin"
+import { checkinButtons, earlyAnswer, type CheckinWait } from "./checkin"
 import { engineClock } from "./diagnose"
 import { pruneFlows } from "./history"
 import { emitFlowEvent } from "./events"
@@ -673,6 +673,9 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
         return
       }
       const vars: RunVars = { steps: { ...c.vars.steps }, vars: { ...c.vars.vars, ...(tr.setVars ?? {}) }, ...(c.vars.item !== undefined ? { item: c.vars.item, index: c.vars.index } : {}) }
+      // An early answer lasts until the first check-in step: it takes it or drops it.
+      const pre = (fresh.vars as RunVars | null)?.preAnswer ?? c.vars.preAnswer
+      if (pre && step.kind !== "checkin") vars.preAnswer = pre
       if (tr.output !== undefined) vars.steps[step.id] = tr.output
       if (jsonBytes(vars) > LIMITS.varsBytes && tr.output !== undefined) vars.steps[step.id] = { $truncated: true, preview: compactJson(tr.output).slice(0, 2000) }
       let messagesSent = fresh.messagesSent
@@ -936,6 +939,19 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
       // Woken early (or paused): keep waiting.
       const wake = minOf(c.flow.enabled ? w.nextFollowUpAt : null, w.deadlineAt)
       return { row: { seq: w.seq, status: "waiting" }, then: { t: "wait", wait: w as unknown as Record<string, unknown>, wakeAt: wake } }
+    }
+    // Answered before it was asked: take that answer, send nothing, and go on.
+    const early = c.dry ? null : earlyAnswer(step, c.vars.preAnswer)
+    if (early) {
+      const { option, pre } = early
+      const output = { answer: option.id, label: option.label, text: pre.text ?? null, answeredAt: pre.at, answers: [{ answer: option.id, ...(pre.text ? { text: pre.text } : {}), at: pre.at }], followUps: 0, missed: false, early: true }
+      const has = !!step.on && Object.hasOwn(step.on, option.id)
+      return {
+        row: { status: "ok", input: { early: true, answeredAt: pre.at }, output, branch: has ? `on.${option.id}` : "next" },
+        output,
+        events: [{ name: "checkin.answered", data: { step: step.id, answer: option.id, early: true } }],
+        then: { t: "goto", to: has ? step.on![option.id]! : defaultNext(c.def, step.id) },
+      }
     }
     if (c.run.messagesSent >= LIMITS.messagesPerRun) return onError(c, step, `More than ${LIMITS.messagesPerRun} messages in one run.`, { status: "error" })
     const text = decorate(c, renderText(step.text, env, tc))

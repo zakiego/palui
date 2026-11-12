@@ -395,7 +395,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
       title: "Record a check-in answer",
       tool: tool({
         description:
-          'Record the owner\'s answer to a check-in. Use it when their message answers one ("udah", "belum", "skip hari ini"). Without runId it answers the newest open check-in in this chat; pass the run id from the system prompt or flow_history for another one, or to correct an earlier answer. answer is an answer id or its label.',
+          'Record the owner\'s answer to a check-in. Use it when their message answers one ("udah", "belum", "skip hari ini"). Without runId it answers the newest open check-in in this chat, or else the newest run that will ask one later. A run that has not asked yet keeps a closing answer (early: true) and skips the question when it gets there. Pass the run id from the system prompt or flow_history for another one, or to correct an earlier answer. answer is an answer id or its label.',
         inputSchema: z.object({
           answer: z.string().min(1).max(40),
           runId: z.string().optional().describe("A flow run id (flr_...)."),
@@ -405,7 +405,7 @@ export function flowTools(db: DB, turn: TurnInfo, deps: FlowToolDeps = {}): Reco
           const now = clock()
           try {
             const res = answerFlowCheckin(db, { chatId, runId, answer, text: note }, now)
-            return { ok: true as const, message: res.reply, runId: res.run.id, flow: res.flow.name, closed: res.closed }
+            return { ok: true as const, message: res.reply, runId: res.run.id, flow: res.flow.name, closed: res.closed, ...(res.early ? { early: true } : {}) }
           } catch (e) {
             return fail(e)
           }
