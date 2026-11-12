@@ -34,7 +34,7 @@ export const getConnectorsPage = createServerFn({ method: "GET" }).handler(async
     runtimeUp = false
   }
   // For the "Which agents" choice on a tool connector.
-  const agents = listAgents(db).map((a) => ({ id: a.id, name: a.name, isDefault: a.isDefault, avatarImage: a.avatarImage, avatarIcon: a.avatarIcon, avatarColor: a.avatarColor }))
+  const agents = listAgents(db).map((a) => ({ id: a.id, slug: a.slug, name: a.name, isDefault: a.isDefault, avatarImage: a.avatarImage, avatarIcon: a.avatarIcon, avatarColor: a.avatarColor }))
   return { items, live, runtimeUp, appUrl: config().appUrl, agents }
 })
 
