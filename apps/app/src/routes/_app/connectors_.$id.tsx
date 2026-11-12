@@ -65,7 +65,7 @@ function ConnectorPage() {
       </Empty>
     )
   }
-  return <ConnectorDetail key={target.id} target={target} manifest={m} appUrl={data.appUrl} agents={data.agents} />
+  return <ConnectorDetail key={target.id} target={target} manifest={m} appUrl={data.appUrl} agents={data.agents} fromAgent={data.agents.find((a) => a.id === agent)} />
 }
 
 function ConnectorPageSkeleton() {

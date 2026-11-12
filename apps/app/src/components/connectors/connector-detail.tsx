@@ -2,8 +2,8 @@
 // manifest's `setup` steps and zod schemas, Test, Connect, recent events, and
 // the danger area. Leaving the page with unsaved edits keeps them as a draft.
 import * as React from "react"
-import { Link, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon, BotIcon, GlobeIcon } from "lucide-react"
+import { useNavigate, useRouter } from "@tanstack/react-router"
+import { BotIcon, GlobeIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { ConnectorManifest, SetupStep } from "@palui/core/connectors/define"
 
@@ -11,6 +11,7 @@ import { ConnectorStatusBadge } from "@/components/connector-status"
 import { SimpleSelect } from "@/components/simple-select"
 import { CircleAlertIcon } from "lucide-react"
 import { RuntimeAlert } from "@/components/runtime-alert"
+import { ConnectorsBackLink } from "@/components/connectors/shared"
 import { WizardAction } from "@/components/connectors/wizard-actions"
 import { CopyButton } from "@/components/copy-button"
 import {
@@ -44,9 +45,22 @@ import { type FieldStep, type WizardField, wizardFieldInfo as fieldInfo, wizardI
 
 type ActionStep = Extract<SetupStep, { action: string }>
 
-type ScopeAgent = { id: string; name: string; isDefault: boolean; avatarImage: string | null; avatarIcon: string | null; avatarColor: string | null }
+type ScopeAgent = { id: string; slug: string; name: string; isDefault: boolean; avatarImage: string | null; avatarIcon: string | null; avatarColor: string | null }
 
-export function ConnectorDetail({ target, manifest: m, appUrl, agents }: { target: ConnectorTarget; manifest: ConnectorManifest; appUrl: string; agents: ScopeAgent[] }) {
+export function ConnectorDetail({
+  target,
+  manifest: m,
+  appUrl,
+  agents,
+  fromAgent,
+}: {
+  target: ConnectorTarget
+  manifest: ConnectorManifest
+  appUrl: string
+  agents: ScopeAgent[]
+  // Set when opened from an agent's Tools tab: the back link returns there.
+  fromAgent?: ScopeAgent
+}) {
   const t = useT()
   const router = useRouter()
   const navigate = useNavigate()
@@ -211,10 +225,7 @@ export function ConnectorDetail({ target, manifest: m, appUrl, agents }: { targe
   return (
     <>
       <div className="flex flex-col gap-3">
-        <Button variant="ghost" size="sm" className="-ms-2.5 self-start text-muted-foreground" render={<Link to="/connectors" />}>
-          <ArrowLeftIcon data-icon="inline-start" />
-          {t("nav.connectors")}
-        </Button>
+        <ConnectorsBackLink agent={fromAgent} />
         <div className="flex min-w-0 flex-col gap-1.5">
           <h1 className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 font-heading text-title">
             <span className="min-w-0 break-words">{label || m.name}</span>
