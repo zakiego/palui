@@ -5,7 +5,8 @@ import { decide, expireDue } from "../approvals/store"
 import { MIN } from "../reminders/test-helpers"
 import { fakePrayerTool } from "./test-helpers"
 import { flowActions } from "./actions"
-import { answerFlowCheckin, flowCheckinsPrompt, openFlowCheckins } from "./checkin"
+import { answerFlowCheckin, checkinWaitOf, flowCheckinsPrompt, openFlowCheckins } from "./checkin"
+import { checkinOf, decidingCheckin, summarizeRuns } from "./history"
 import { decideVersion, getRun, wakeFlowRun } from "./service"
 import { at, exampleConnectors, flowHarness, runsOf, sentTexts, stepLog } from "./test-harness"
 import { PR_MERGED, SHOLAT } from "./test-helpers"
@@ -417,5 +418,103 @@ describe("growing reminders up to 10 minutes before the next prayer", () => {
     await h.run(at("2026-11-10T15:20"))
     expect(texts(h)).toEqual(["🕌 Waktu Zuhur masuk (12.00). Udah sholat?"])
     expect(runsOf(h.db, flow.id).find((r) => r.id === run.id)!.status).toBe("done")
+  })
+})
+
+// The owner's "Sholat 5 waktu" shape (rpt_0mwd8hmpsapmfi9bvkb): an info message at
+// prayer time, a wait, then a chain of check-ins where each miss moves on to the
+// next reminder.
+const PRAYER_CHAIN = {
+  name: "Sholat",
+  tz: "Asia/Makassar",
+  triggers: [{ id: "main", kind: "schedule", start: "info", source: { kind: "times", times: [{ time: "15:30", label: "Ashar" }] } }],
+  steps: [
+    { id: "info", kind: "message", text: "🕌 Waktu {{trigger.label}} sudah masuk", next: "wait1" },
+    { id: "wait1", kind: "wait", minutes: 10, next: "ask1" },
+    {
+      id: "ask1",
+      kind: "checkin",
+      text: "Udah sholat {{trigger.label}}?",
+      answers: [
+        { id: "done", label: "Sudah", words: ["udah", "sudah"], closes: true },
+        { id: "not_yet", label: "Belum", words: ["belum"], closes: false },
+      ],
+      followUp: { everyMin: 5, max: 0 },
+      deadline: { kind: "after", minutes: 20 },
+      on: { done: "alhamdulillah" },
+      onMissed: "ask2",
+      next: null,
+    },
+    {
+      id: "ask2",
+      kind: "checkin",
+      text: "Pengingat: udah sholat {{trigger.label}}?",
+      answers: [
+        { id: "done", label: "Sudah", words: ["udah", "sudah"], closes: true },
+        { id: "not_yet", label: "Belum", words: ["belum"], closes: false },
+      ],
+      followUp: { everyMin: 5, max: 0 },
+      deadline: { kind: "after", minutes: 30 },
+      on: { done: "alhamdulillah" },
+      next: null,
+    },
+    { id: "alhamdulillah", kind: "message", text: "Alhamdulillah 🤲", next: null },
+  ],
+}
+
+// rpt_0mwd8hmpsapmfi9bvkb problem 2: a run with a chain of check-ins was read
+// from its first one, so "missed ask1, answered ask2" counted as missed.
+describe("the check-in that decides a run", () => {
+  it("counts an answer on a later reminder as answered", async () => {
+    const h = flowHarness()
+    h.setNow(at("2026-11-12T15:00"))
+    const { flow } = h.create(PRAYER_CHAIN)
+    await h.run(at("2026-11-12T15:30"))
+    await h.run(at("2026-11-12T15:40"))
+    await h.run(at("2026-11-12T16:00"))
+    const [run] = runsOf(h.db, flow.id)
+    expect(checkinWaitOf(getRun(h.db, run!.id)!)?.stepId).toBe("ask2")
+    answerFlowCheckin(h.db, { chatId: h.chatId, answer: "udah" }, at("2026-11-12T16:05"))
+    await h.run(at("2026-11-12T16:05"))
+    const done = getRun(h.db, run!.id)!
+    expect(checkinOf(done)).toMatchObject({ stepId: "ask2", answer: "done", missed: false })
+    expect(summarizeRuns([done])).toMatchObject({ byAnswer: { done: 1 }, missed: 0, missedLabels: [] })
+    // A correction goes to the same step the history reads.
+    answerFlowCheckin(h.db, { chatId: h.chatId, runId: run!.id, answer: "done" }, at("2026-11-12T16:10"))
+    const steps = (getRun(h.db, run!.id)!.vars as { steps: Record<string, { missed: boolean; answers: unknown[] }> }).steps
+    expect(steps.ask1).toMatchObject({ missed: true, answers: [] })
+    expect(steps.ask2!.answers).toHaveLength(2)
+  })
+
+  it("a 'not yet' then misses everywhere is missed, and a late answer turns it answered", async () => {
+    const h = flowHarness()
+    h.setNow(at("2026-11-12T15:00"))
+    const { flow } = h.create(PRAYER_CHAIN)
+    await h.run(at("2026-11-12T15:30"))
+    await h.run(at("2026-11-12T15:40"))
+    answerFlowCheckin(h.db, { chatId: h.chatId, answer: "belum" }, at("2026-11-12T15:45"))
+    await h.run(at("2026-11-12T16:00"))
+    await h.run(at("2026-11-12T16:30"))
+    const [run] = runsOf(h.db, flow.id)
+    const missed = getRun(h.db, run!.id)!
+    expect(missed.status).toBe("done")
+    expect(summarizeRuns([missed])).toMatchObject({ missed: 1, missedLabels: ["Ashar"], byAnswer: {} })
+    const res = answerFlowCheckin(h.db, { chatId: h.chatId, runId: run!.id, answer: "udah" }, at("2026-11-12T16:40"))
+    expect(res.reply).toBe("Oke, jawaban diganti: Sudah.")
+    expect(summarizeRuns([getRun(h.db, run!.id)!])).toMatchObject({ missed: 0, byAnswer: { done: 1 } })
+  })
+
+  it("reads the real Subuh run: a first missed step no longer hides the answer", () => {
+    const steps = {
+      ask0: { answer: null, answers: [], followUps: 0, missed: true },
+      g1: { result: true },
+      ask1: { answer: null, answers: [], followUps: 0, missed: true },
+      g2: { result: true },
+      ask2: { answer: "done", label: "Sudah", answeredAt: 1794432349652, answers: [{ answer: "done", at: 1794432349652 }], followUps: 0, missed: false },
+      alhamdulillah: { text: "Alhamdulillah 🤲" },
+    }
+    expect(decidingCheckin(steps)?.[0]).toBe("ask2")
+    expect(decidingCheckin({ a: { answer: null, answers: [], missed: true }, b: { answer: "not_yet", answers: [{}], missed: true } })?.[0]).toBe("b")
+    expect(decidingCheckin({ x: { text: "hi" } })).toBeNull()
   })
 })

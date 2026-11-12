@@ -9,6 +9,7 @@ import { formatClock, formatDate } from "../reminders/time"
 import { matchAnswer, type AnswerOption } from "./source-config"
 import { emitFlowEvent } from "./events"
 import { defaultNext } from "./graph"
+import { decidingCheckin } from "./history"
 import type { CheckinStep } from "./schema"
 import { scopeOf, type RunVars } from "./scope"
 import { definitionOf, FlowError, getFlow, getRun, getVersion, type FlowRow, type RunRow } from "./service"
@@ -127,10 +128,12 @@ export function answerFlowCheckin(db: DB, input: { chatId: string; runId?: strin
   return { run: updated, flow, option, closed: option.closes, reply: answerReply(updated, flow, option, now) }
 }
 
-// A late correction: the run already moved on, so only the logged answer changes.
+// A late correction: the run already moved on, so only the logged answer
+// changes. It goes to the check-in that decided the run (decidingCheckin), the
+// same one the history reads, so a run with a chain of reminders stays consistent.
 function correctAnswer(db: DB, run: RunRow, flow: FlowRow, input: { answer: string; text?: string }, now: number): FlowAnswerResult {
   const vars = (run.vars ?? { steps: {}, vars: {} }) as RunVars
-  const entry = Object.entries(vars.steps ?? {}).find(([, o]) => o && typeof o === "object" && "answers" in (o as object) && "missed" in (o as object))
+  const entry = decidingCheckin(vars.steps)
   if (!entry) throw new FlowError("That run has no check-in.")
   if (now - (run.scheduledAt ?? run.startedAt) > ANSWER_WINDOW_MS) throw new FlowError("That check-in is more than 48 hours old; its log is settled.")
   const step = stepOf(db, run, entry[0])

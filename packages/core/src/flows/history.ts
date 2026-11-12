@@ -38,15 +38,26 @@ export function listRuns(db: DB, q: RunQuery): RunRow[] {
   return q.until !== undefined ? rows.filter((r) => r.startedAt <= q.until!) : rows
 }
 
+type CheckinOutput = { answer?: string | null; missed?: boolean; answeredAt?: number | null }
+
+// The check-in output that decides a run. A run can hold several (a chain of
+// reminders, each its own check-in step that missed into the next): the one with
+// the latest answer wins, else the last one reached, which is a miss.
+export function decidingCheckin(steps: Record<string, unknown> | undefined): [string, CheckinOutput] | null {
+  const all = Object.entries(steps ?? {}).filter((e): e is [string, CheckinOutput] => !!e[1] && typeof e[1] === "object" && "answers" in e[1] && "missed" in e[1])
+  let best: [string, CheckinOutput] | null = null
+  for (const e of all) if (!e[1].missed && e[1].answer && (!best || (e[1].answeredAt ?? 0) >= (best[1].answeredAt ?? 0))) best = e
+  return best ?? all.at(-1) ?? null
+}
+
 // A check-in step's answer for a run, from its output (or its wait state while open).
 export function checkinOf(run: RunRow): { stepId: string; answer: string | null; missed: boolean; open: boolean; label: string } | null {
-  const vars = (run.vars ?? {}) as { steps?: Record<string, { answer?: string | null; missed?: boolean }> }
+  const vars = (run.vars ?? {}) as { steps?: Record<string, unknown> }
   const wait = run.wait as { kind?: string; stepId?: string; answers?: { answer: string }[] } | null
   const label = String((run.trigger as { label?: unknown })?.label ?? "")
   if (run.status === "waiting" && wait?.kind === "checkin" && wait.stepId) return { stepId: wait.stepId, answer: wait.answers?.at(-1)?.answer ?? null, missed: false, open: true, label }
-  for (const [stepId, out] of Object.entries(vars.steps ?? {})) {
-    if (out && typeof out === "object" && "answers" in out && "missed" in out) return { stepId, answer: out.answer ?? null, missed: !!out.missed, open: false, label }
-  }
+  const hit = decidingCheckin(vars.steps)
+  if (hit) return { stepId: hit[0], answer: hit[1].answer ?? null, missed: !!hit[1].missed, open: false, label }
   return null
 }
 
