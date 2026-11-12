@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { eq } from "drizzle-orm"
 import { chats, memoryDb, messages, newId, type DB, type MessageRole } from "@palui/db"
 import { ensureChat, readChatMessages, searchChats, type ChatRow } from "@palui/core/chats"
+import { assignAgent, createAgent, deleteAgent, getDefaultAgent } from "@palui/core/agents"
 import type { PaluiTool, TurnInfo } from "@palui/core/connectors/define"
 import manifest from "./manifest"
 import { chatTools, offersChatTools, parseTime, MESSAGE_MAX_CHARS } from "./runtime"
@@ -178,6 +179,75 @@ describe("read_chat", () => {
     expect(audio.text).toBe("[audio]")
     expect(quote.replyTo).toBe(`${"y".repeat(200)}… [dipotong, 500 karakter]`)
     expect(hook).toMatchObject({ role: "user", text: "build failed", hook: "GitHub" })
+  })
+})
+
+// The report: Palui in the owner's DM read the "Finansial" group, which the
+// finansial agent answers in. Each agent sees only its own chats.
+describe("chat tools per agent", () => {
+  function agents() {
+    const base = setup()
+    const { db, dm, family } = base
+    const palui = getDefaultAgent(db)
+    const fin = createAgent(db, { slug: "finansial", name: "Finansial", persona: "Catat keuangan." })
+    const finGroup = ensureChat(db, { channel: "whatsapp", externalId: "120363413215483666@g.us", title: "Finansial", kind: "group", agentId: fin.id }, NOW - 50 * MIN)
+    const finDm = ensureChat(db, { channel: "whatsapp", externalId: "6289999@s.whatsapp.net", title: "Owner ke Finansial", agentId: fin.id }, NOW - 40 * MIN)
+    addMessage(db, finGroup, "user", "laundry 43rb dari Jago", NOW - 20 * MIN)
+    addMessage(db, finGroup, "assistant", "Tercatat.", NOW - 19 * MIN)
+    addMessage(db, finDm, "user", "rekap bulan ini", NOW - 5 * MIN)
+    const paluiTurn: TurnInfo = { ...base.turn, agentId: palui.id }
+    const finTurn: TurnInfo = { ...base.turn, chatId: finDm.id, agentId: fin.id }
+    return { ...base, palui, fin, finGroup, finDm, paluiTools: chatTools(db, paluiTurn), finTools: chatTools(db, finTurn), dm, family }
+  }
+  const ids = (r: { chats: { id: string }[] }) => r.chats.map((c) => c.id).sort()
+
+  it("search_chats lists only the caller's chats, by title, JID or id", async () => {
+    const { dm, family, work, web, finGroup, finDm, paluiTools, finTools } = agents()
+    expect(ids(await call(paluiTools.search_chats, {}))).toEqual([dm.id, family.id, work.id, web.id].sort())
+    expect(ids(await call(finTools.search_chats, {}))).toEqual([finGroup.id, finDm.id].sort())
+    for (const query of ["Finansial", "120363413215483666", finGroup.id]) {
+      expect((await call(paluiTools.search_chats, { query })).count).toBe(0)
+    }
+    expect((await call(finTools.search_chats, { query: "Keluarga" })).count).toBe(0)
+  })
+
+  it("read_chat refuses another agent's chat by id or external id and leaks nothing", async () => {
+    const { finGroup, dm, paluiTools, finTools } = agents()
+    for (const chat of [finGroup.id, finGroup.externalId]) {
+      const res = await call(paluiTools.read_chat, { chat })
+      expect(res).toEqual({ ok: false, error: `Chat "${chat}" belongs to another agent. This agent can only read the chats it answers in.` })
+      expect(JSON.stringify(res)).not.toContain("laundry")
+    }
+    expect((await call(finTools.read_chat, { chat: dm.id })).ok).toBe(false)
+  })
+
+  it("read_chat still reads the caller's own chats", async () => {
+    const { finGroup, family, paluiTools, finTools } = agents()
+    expect((await call(finTools.read_chat, { chat: finGroup.externalId })).messages.map((m: { text: string }) => m.text)).toEqual(["laundry 43rb dari Jago", "Tercatat."])
+    expect((await call(paluiTools.read_chat, { chat: family.id })).messages.map((m: { text: string }) => m.text)).toEqual(["besok kumpul jam 7 ya", "Oke, aku catat."])
+  })
+
+  it("follows the chat's agent: reassigning moves the chat, deleting the agent hands it back to Palui", async () => {
+    const { db, fin, finGroup, family, palui } = agents()
+    const turn: TurnInfo = { runId: "run_1", chatId: family.id, channel: "whatsapp", trigger: "message", tz: WITA, now: NOW, agentId: palui.id }
+    assignAgent(db, family.id, fin.id)
+    expect((await call(chatTools(db, turn).read_chat, { chat: family.id })).ok).toBe(false)
+    deleteAgent(db, fin.id)
+    expect((await call(chatTools(db, turn).read_chat, { chat: finGroup.id })).ok).toBe(true)
+    expect((await call(chatTools(db, turn).read_chat, { chat: family.id })).ok).toBe(true)
+  })
+
+  it("without agentId on the turn, uses the agent of the turn's chat", async () => {
+    const { db, finDm, finGroup, dm } = agents()
+    const tools = chatTools(db, { runId: "run_1", chatId: finDm.id, channel: "whatsapp", trigger: "schedule", tz: WITA, now: NOW })
+    expect((await call(tools.read_chat, { chat: finGroup.id })).ok).toBe(true)
+    expect((await call(tools.read_chat, { chat: dm.id })).ok).toBe(false)
+  })
+
+  it("an unknown chat id on the turn sees nothing", async () => {
+    const { db } = agents()
+    const tools = chatTools(db, { runId: "source_1", chatId: "", channel: null, trigger: "schedule", tz: WITA, now: NOW })
+    expect((await call(tools.search_chats, {})).count).toBe(0)
   })
 })
 

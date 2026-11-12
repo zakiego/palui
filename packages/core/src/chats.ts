@@ -100,6 +100,8 @@ export type ChatSearch = {
   channel?: Channel
   kind?: "dm" | "group"
   limit?: number
+  // Extra filter on chats, like chatsServedBy() for an agent's tools.
+  scope?: SQL
 }
 
 export type ChatHit = ChatRow & { messageCount: number }
@@ -125,6 +127,7 @@ export function searchChats(db: DB, s: ChatSearch = {}): ChatHit[] {
   if (q) where.push(or(contains(chats.title, q), contains(chats.externalId, q), contains(chats.id, q))!)
   if (s.channel) where.push(eq(chats.channel, s.channel))
   if (s.kind) where.push(eq(chats.kind, s.kind))
+  if (s.scope) where.push(s.scope)
   const limit = Math.min(Math.max(1, s.limit ?? CHAT_SEARCH_MAX), CHAT_SEARCH_MAX)
   // Spelled out: drizzle drops the table name from columns in a single-table select,
   // which would turn the correlation into messages.chat_id = messages.id.

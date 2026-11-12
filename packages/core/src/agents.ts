@@ -2,7 +2,7 @@
 // container and daily cap. Exactly one is the default (Palui), the owner's
 // personal agent; it never answers in a shared chat.
 import { createHash } from "node:crypto"
-import { asc, desc, eq, isNull } from "drizzle-orm"
+import { asc, desc, eq, isNull, or, sql, type SQL } from "drizzle-orm"
 import { agents, chats, connectors, instructions, newId, type DB, type GuestTools, type OwnerPowers, type ToolPermission } from "@palui/db"
 import type { ChatRow } from "./chats"
 import { isOwner } from "./owner"
@@ -108,6 +108,21 @@ export function agentForTelegramConnector(db: DB, connectorId: string): AgentRow
 // The agent that answers in this chat. A chat whose agent was deleted falls back to the default.
 export function agentForChat(db: DB, chat: Pick<ChatRow, "agentId">): AgentRow {
   return (chat.agentId ? getAgent(db, chat.agentId) : undefined) ?? getDefaultAgent(db)
+}
+
+// Whether this agent answers in the chat: the same rule as agentForChat, so a
+// chat with no agent (or a deleted one) is the default agent's.
+export function servesChat(db: DB, agentId: string, chat: Pick<ChatRow, "agentId">): boolean {
+  return agentForChat(db, chat).id === agentId
+}
+
+// SQL filter for the chats this agent answers in, matching servesChat. The
+// chat history tools use it so an agent only ever sees its own chats.
+export function chatsServedBy(db: DB, agentId: string): SQL {
+  const agent = getAgent(db, agentId)
+  if (!agent) return sql`0`
+  if (!agent.isDefault) return eq(chats.agentId, agent.id)
+  return or(isNull(chats.agentId), eq(chats.agentId, agent.id), sql`${chats.agentId} not in (select "id" from "agents")`)!
 }
 
 // Where the agent's memory lives; undefined means the recall connector's own container.

@@ -11,7 +11,9 @@ Nothing to set up. Chat history is a built-in skill and is created on first boot
 
 ## What it can see
 
-Palui only reads what it stored for each chat:
+Each agent only sees the chats it answers in: the chats assigned to it, and for Palui every chat with no agent of its own. Palui can't find or read a group another agent answers in, and that agent can't read your DMs with Palui. Asking for another agent's chat by id or WhatsApp JID gets an error that says the chat belongs to another agent, with nothing from it. The dashboard's Chats page still shows every chat.
+
+Within its own chats, an agent only reads what was stored:
 
 - Your messages and Palui's replies.
 - The text of a message you quoted, as a short `replyTo` preview.
@@ -24,8 +26,8 @@ Messages other people send in a chat aren't stored, so they can't be read either
 
 | Tool | Class | What it does |
 |---|---|---|
-| `search_chats` | `read` | Find chats by title, WhatsApp JID, Telegram chat id or chat id, with an optional channel (`whatsapp`, `telegram`, `web`) and kind (`dm`, `group`) filter. Newest conversation first, at most 20. Each result has its channel, external id, title, kind, last message time and message count. |
-| `read_chat` | `read` | Read one chat by its chat id or an exact external id. The newest 30 messages by default (at most 100), returned oldest first. Optional `before` and `since` times and a text search. Each message is clipped at 500 characters. |
+| `search_chats` | `read` | Find this agent's chats by title, WhatsApp JID, Telegram chat id or chat id, with an optional channel (`whatsapp`, `telegram`, `web`) and kind (`dm`, `group`) filter. Newest conversation first, at most 20. Each result has its channel, external id, title, kind, last message time and message count. |
+| `read_chat` | `read` | Read one of this agent's chats by its chat id or an exact external id. The newest 30 messages by default (at most 100), returned oldest first. Optional `before` and `since` times and a text search. Each message is clipped at 500 characters. |
 
 Times in and out are in your zone (Settings, default `Asia/Makassar`). Each tool's class decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
 
