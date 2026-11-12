@@ -116,38 +116,40 @@ export function ToolRow({ x, props }: { x: ToolItem; props: ToolsViewProps }) {
   const used = props.data.used[x.name]
   const { agent } = props
   const off = props.permissions.tools[x.name] === "deny"
+  // Two fixed columns: the tool and its facts, then the permission select at
+  // the same spot on every row (under the text on a narrow screen).
   return (
-    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 py-3">
-      <div className="flex min-w-48 flex-1 flex-col gap-0.5">
+    <li className="grid grid-cols-1 items-center gap-x-4 gap-y-2 py-3 @md/main:grid-cols-[minmax(0,1fr)_10rem]">
+      <div className="flex min-w-0 flex-col gap-1">
         <span className="font-mono text-sm [overflow-wrap:anywhere]">{x.tool}</span>
         {x.title && (
           <span dir="auto" className="text-caption text-pretty text-muted-foreground">
             {x.title}
           </span>
         )}
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <StatusText tone={CLASS_TONE[x.class] ?? "destructive"} icon={null}>
+            {label("tool.class", x.class)}
+          </StatusText>
+          {x.untrusted && (
+            <StatusText tone="secondary" icon={<GlobeIcon aria-hidden="true" />}>
+              {t("agents.tools.outside")}
+            </StatusText>
+          )}
+          {x.guestSafe && !agent.isDefault && agent.guestTools === "safe" && (
+            <StatusText tone="secondary" icon={<UsersIcon aria-hidden="true" />}>
+              {t("agents.tools.guests")}
+            </StatusText>
+          )}
+          {off && (
+            <StatusText tone="secondary" icon={<CircleOffIcon aria-hidden="true" />}>
+              {t("agents.perm.off")}
+            </StatusText>
+          )}
+          {used ? <span className="text-caption text-muted-foreground tabular-nums">{t("agents.tools.used", { n: used.toLocaleString() })}</span> : null}
+        </span>
       </div>
-      <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
-        {off && (
-          <StatusText tone="secondary" icon={<CircleOffIcon aria-hidden="true" />}>
-            {t("agents.perm.off")}
-          </StatusText>
-        )}
-        {used ? <span className="text-caption text-muted-foreground tabular-nums">{t("agents.tools.used", { n: used.toLocaleString() })}</span> : null}
-        {x.untrusted && (
-          <StatusText tone="secondary" icon={<GlobeIcon aria-hidden="true" />}>
-            {t("agents.tools.outside")}
-          </StatusText>
-        )}
-        {x.guestSafe && !agent.isDefault && agent.guestTools === "safe" && (
-          <StatusText tone="secondary" icon={<UsersIcon aria-hidden="true" />}>
-            {t("agents.tools.guests")}
-          </StatusText>
-        )}
-        <StatusText tone={CLASS_TONE[x.class] ?? "destructive"} icon={null}>
-          {label("tool.class", x.class)}
-        </StatusText>
-        <PermissionSelect name={x.tool} value={props.permissions.tools[x.name] ?? null} allowAll={props.permissions.allowAll} onChange={(p) => props.setPermission(x.name, p)} />
-      </span>
+      <PermissionSelect name={x.tool} value={props.permissions.tools[x.name] ?? null} allowAll={props.permissions.allowAll} onChange={(p) => props.setPermission(x.name, p)} />
     </li>
   )
 }
@@ -164,7 +166,7 @@ export function PermissionSelect({ name, value, allowAll, onChange }: { name: st
   return (
     <SimpleSelect
       size="sm"
-      className="w-fit min-w-0"
+      className="w-40 max-w-full"
       aria-label={t("agents.perm.for", { name })}
       value={value ?? "default"}
       options={options}
