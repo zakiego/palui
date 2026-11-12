@@ -18,6 +18,8 @@ import { createSupervisor, type Supervisor } from "@palui/core/connectors/superv
 import { connectorFlowCaller } from "@palui/core/flows/call"
 import { connectorToolCaller } from "@palui/core/tools/call"
 import { getSetting } from "@palui/core/settings"
+import { announceDeploy } from "@palui/core/deploy-notice"
+import { PALUI_VERSION } from "@palui/core/version"
 import { createControlServer } from "./control"
 
 // Deps that need the engine (the job runner calls runTurn) are built by a factory
@@ -25,6 +27,8 @@ import { createControlServer } from "./control"
 export type DepsFactory = (ctx: { db: DB; engine: Engine; log: Logger; supervisor: Supervisor }) => EngineDeps
 
 export type RuntimeOptions = {
+  // The version to report as running (default: PALUI_VERSION). Tests set it.
+  version?: string
   deps?: EngineDeps | DepsFactory
   // Connector runtimes by manifest id (default: @palui/connectors/runtimes).
   registry?: Record<string, AnyRuntime>
@@ -106,6 +110,14 @@ export async function startRuntime(opts: RuntimeOptions = {}): Promise<Runtime> 
   await supervisor.start()
   await engine.start()
   await deps.scheduler?.start()
+  // After the worker and channels are up, so the notice goes out right away.
+  try {
+    const notice = announceDeploy(db, opts.version ?? PALUI_VERSION)
+    if (notice.sent) log.info("deploy notice queued", { chatId: notice.chatId })
+    else if (notice.reason === "chat-gone") log.warn("deploy notice skipped: its chat is gone or off")
+  } catch (e) {
+    log.error("deploy notice failed", { error: e })
+  }
 
   let stopping: Promise<void> | undefined
   async function stop() {
