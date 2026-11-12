@@ -275,7 +275,7 @@ Budget
 - Web fetch: fetch + readability behind the SSRF guard. Results taint the turn.
 - Inbound webhooks: `POST /api/hooks/:slug` with an HMAC secret per hook. It forwards the event to me as text. The "summarize" option runs with zero tools.
 - Calendar: D7 decides whether a Google Calendar read connector is in v1.
-- Attachments: `save_attachment`, `list_attachments`, `get_attachment`, `delete_attachment`. The model keeps only files that matter (ID cards, receipts, tickets) from the message being answered. Allowlisted types, 10 MB cap, stored encrypted with MASTER_KEY in `saved_attachments`, listed and downloaded (signed in only) on the Attachments page.
+- Attachments: `save_attachment`, `list_attachments`, `get_attachment`, `share_attachment`, `unshare_attachment`, `delete_attachment`. The model keeps only files that matter (ID cards, receipts, tickets) from the message being answered. Allowlisted types, 10 MB cap, stored encrypted with MASTER_KEY in `saved_attachments`, listed, previewed and downloaded (signed in only) on the Attachments page. Temporary share links (`attachment_shares`, token sha256 only, 7 days max) at `/api/share/<token>`: public for anyone with the link, private for the signed-in owner.
 
 ## 6. Reminders
 

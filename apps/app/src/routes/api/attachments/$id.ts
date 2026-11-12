@@ -1,10 +1,10 @@
-// GET /api/attachments/:id (auth): download a saved attachment. Always served
-// as a download (Content-Disposition: attachment) with nosniff and a sandbox
-// CSP, so a file can never render as a page on the dashboard's origin.
+// GET /api/attachments/:id (auth): a saved attachment. A download by default;
+// ?inline=1 shows previewable types in the browser. Headers: fileResponse.
 import { masterKey } from "@palui/core/config"
-import { downloadName, readAttachment } from "@palui/core/attachments/service"
+import { readAttachment } from "@palui/core/attachments/service"
 import type { DB } from "@palui/db"
 import { createFileRoute } from "@tanstack/react-router"
+import { fileResponse } from "@/server/file-response"
 import { requireUserFromRequest } from "@/server/session"
 
 export type AttachmentRouteDeps = {
@@ -20,18 +20,9 @@ export async function handleAttachmentRequest(request: Request, id: string, deps
   if (auth instanceof Response) return auth
   const found = /^att_[a-z0-9]+$/i.test(id) ? readAttachment(auth.db, id, deps.masterKey()) : undefined
   if (!found) return Response.json({ error: "NOT_FOUND" }, { status: 404 })
-  const name = downloadName(found.meta)
-  const ascii = name.replace(/[^\x20-\x7e]/g, "_")
-  return new Response(new Uint8Array(found.bytes), {
-    headers: {
-      "content-type": found.meta.mimeType,
-      "content-length": String(found.bytes.length),
-      "content-disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`,
-      "x-content-type-options": "nosniff",
-      "content-security-policy": "default-src 'none'; sandbox",
-      "cache-control": "private, no-store",
-    },
-  })
+  // ?inline=1 opens it in the browser (the preview and "Open in new tab"); anything else downloads.
+  const inline = new URL(request.url).searchParams.get("inline") === "1"
+  return fileResponse(found.meta, found.bytes, { inline })
 }
 
 export const Route = createFileRoute("/api/attachments/$id")({

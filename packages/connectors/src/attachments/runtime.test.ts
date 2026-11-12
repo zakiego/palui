@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { memoryDb, messages, newId, type DB } from "@palui/db"
 import { ensureChat } from "@palui/core/chats"
 import { readAttachment } from "@palui/core/attachments/service"
+import { resolveShare } from "@palui/core/attachments/shares"
 import type { PaluiTool, TurnInfo } from "@palui/core/connectors/define"
 import manifest from "./manifest"
 import { attachmentTools } from "./runtime"
@@ -38,12 +39,14 @@ describe("attachments manifest", () => {
 })
 
 describe("attachment tools", () => {
-  it("exposes four tools with classes and tells the model to save only what matters", () => {
+  it("exposes the tools with classes and tells the model to save only what matters", () => {
     const { tools } = setup()
     expect(Object.fromEntries(Object.entries(tools).map(([k, v]) => [k, v.class]))).toEqual({
       save_attachment: "write",
       list_attachments: "read",
       get_attachment: "read",
+      share_attachment: "write",
+      unshare_attachment: "write",
       delete_attachment: "destructive",
     })
     expect(tools.save_attachment!.tool.description).toMatch(/Only save files that are worth keeping/)
@@ -92,5 +95,25 @@ describe("attachment tools", () => {
     expect(await call(otherTools.delete_attachment, { id: attachment.id })).toMatchObject({ ok: false })
     expect(await call(tools.delete_attachment, { id: attachment.id })).toMatchObject({ ok: true })
     expect(await call(tools.list_attachments, {})).toMatchObject({ count: 0 })
+  })
+
+  it("shares a file as a private link by default, public on request, and turns them off", async () => {
+    const { db, chat, other, tools } = setup()
+    inbound(db, chat.id, "run_1", [{ kind: "image", mimeType: "image/jpeg", data: JPG }])
+    const { attachment } = await call(tools.save_attachment, { title: "Struk" })
+
+    const priv = await call(tools.share_attachment, { id: attachment.id })
+    expect(priv).toMatchObject({ ok: true, visibility: "private", expiresAt: new Date(NOW + 24 * 3600_000).toISOString() })
+    expect(priv.url).toMatch(/^https:\/\/palui\.test\/api\/share\/[A-Za-z0-9_-]{32}$/)
+    const pub = await call(tools.share_attachment, { id: attachment.id, visibility: "public", expires: "1h" })
+    const token = pub.url.split("/").pop()
+    expect(resolveShare(db, token, NOW)).toMatchObject({ ok: true, share: { visibility: "public", createdBy: chat.id } })
+
+    const otherTools = attachmentTools(db, { runId: "run_9", chatId: other.id, channel: "telegram", trigger: "message", tz: "Asia/Makassar", now: NOW }, { key: () => KEY })
+    expect(await call(otherTools.share_attachment, { id: attachment.id })).toMatchObject({ ok: false })
+    expect(await call(otherTools.unshare_attachment, { id: attachment.id })).toMatchObject({ ok: false })
+
+    expect(await call(tools.unshare_attachment, { id: attachment.id })).toMatchObject({ ok: true, revoked: 2 })
+    expect(resolveShare(db, token, NOW)).toEqual({ ok: false, reason: "revoked" })
   })
 })

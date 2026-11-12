@@ -365,6 +365,30 @@ export const savedAttachments = sqliteTable(
   (t) => [index("saved_attachments_chat_created").on(t.chatId, t.createdAt), index("saved_attachments_chat_sha").on(t.chatId, t.sha256)],
 )
 
+export type ShareVisibility = "public" | "private"
+
+// Temporary links to one saved attachment, served at GET /api/share/:token.
+// "public" opens for anyone holding the link, "private" also needs a dashboard
+// sign-in. Only the token's sha256 is stored, so a link is shown once, when it
+// is made. Rows go when the attachment is deleted.
+export const attachmentShares = sqliteTable(
+  "attachment_shares",
+  {
+    id: text("id").primaryKey(),
+    attachmentId: text("attachment_id").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    visibility: text("visibility").$type<ShareVisibility>().notNull(),
+    // "owner" from the dashboard, or the chat id the agent shared it in.
+    createdBy: text("created_by").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    revokedAt: integer("revoked_at"),
+    openCount: integer("open_count").notNull().default(0),
+    lastOpenedAt: integer("last_opened_at"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("attachment_shares_attachment").on(t.attachmentId, t.createdAt)],
+)
+
 // --- Reminders and jobs -----------------------------------------------------------
 
 export type ReminderStatus = "pending" | "firing" | "done" | "cancelled"
