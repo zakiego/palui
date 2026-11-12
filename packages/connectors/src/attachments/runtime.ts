@@ -25,7 +25,12 @@ import manifest from "./manifest"
 type Fail = { ok: false; error: string }
 
 const FILE_REF_HINT =
-  "To hand the file to another app's tool (for example to upload a receipt and attach it to a transaction there), pass `fileRef` as that tool's file argument where it asks for the file's contents or a base64 data URL; Palui fills in the file. Another app can't read this file's id, so never pass `id` as that app's own attachment id: upload the file there first and use the id that app returns."
+  "To hand a saved file to another app's tool (for example to upload a receipt and attach it to a transaction there), pass its `fileRef` as that tool's file argument where it asks for the file's contents or a base64 data URL; Palui fills in the file. Another app can't read Palui's ids, so never pass `id` as that app's own attachment id: upload the file there first and use the id that app returns. Check that app's size and type limits against `size` and `mimeType` first."
+
+// Next to the files in every result, so the rule is in front of the model when it
+// picks the next call, not only in a description it read earlier.
+const SEND_NOTE =
+  "To send a file to another app, pass its fileRef as that app's file or data URL argument (upload it there first), then use the id that app returns. Never pass `id` to another app."
 
 function fail(e: unknown): Fail {
   if (e instanceof AttachmentError) return { ok: false, error: e.message }
@@ -111,7 +116,7 @@ export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOpti
               clock(),
             )
             const message = deduped ? `File ini udah pernah disimpan sebagai "${row.title}".` : `Oke, "${row.title}" udah aku simpan.`
-            return { ok: true as const, deduped, message, attachment: view(row, appUrl()) }
+            return { ok: true as const, deduped, message, attachment: view(row, appUrl()), sendToOtherApp: SEND_NOTE }
           } catch (e) {
             return fail(e)
           }
@@ -123,14 +128,14 @@ export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOpti
       title: "List saved attachments",
       tool: tool({
         description:
-          "List files saved in this chat with save_attachment, newest first. Use `query` to search titles, descriptions and file names, e.g. when the owner asks where their KTP or a ticket is.",
+          "List files saved in this chat with save_attachment, newest first. Use `query` to search titles, descriptions and file names, e.g. when the owner asks where their KTP or a ticket is. " + FILE_REF_HINT,
         inputSchema: z.object({
           query: z.string().max(100).optional().describe("Words to look for, e.g. \"ktp\" or \"tiket\"."),
           limit: z.number().int().min(1).max(50).optional(),
         }),
         execute: async (input) => {
           const rows = listAttachments(db, { chatId, query: input.query, limit: input.limit ?? 20 })
-          return { ok: true as const, count: rows.length, attachments: rows.map((a) => view(a, appUrl())) }
+          return { ok: true as const, count: rows.length, attachments: rows.map((a) => view(a, appUrl())), ...(rows.length ? { sendToOtherApp: SEND_NOTE } : {}) }
         },
       }),
     },
@@ -144,7 +149,7 @@ export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOpti
         execute: async (input) => {
           const a = own(input.id)
           if ("ok" in a) return a
-          return { ok: true as const, attachment: view(a, appUrl()) }
+          return { ok: true as const, attachment: view(a, appUrl()), sendToOtherApp: SEND_NOTE }
         },
       }),
     },

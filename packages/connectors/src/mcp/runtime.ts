@@ -1,6 +1,6 @@
 import type { Tool } from "ai"
 import type { DB, ToolClass } from "@palui/db"
-import { AttachmentRefError, findAttachmentRefs, resolveAttachmentRefs } from "@palui/core/attachments/refs"
+import { AttachmentRefError, findAttachmentRefs, resolveFileRefs, scrubFileUrls } from "@palui/core/attachments/refs"
 import { masterKey } from "@palui/core/config"
 import { defineRuntime, type ConfigOf, type PaluiTool, type SecretsOf, type TurnInfo } from "@palui/core/connectors/define"
 import { publicOnlyFetch } from "@palui/core/net/ssrf"
@@ -65,7 +65,12 @@ export function selectTools(defs: McpToolDef[], prefs: ToolPrefs = {}): { def: M
 }
 
 // Saved files go out as `palui:attachment/<id>` refs, swapped for a data URL just
-// before the call. An external server never gets the owner's files.
+// before the call. An external server never gets the owner's files. A refused
+// ref comes back as an MCP error result, so turns and flow steps see a failure.
+function refused(text: string) {
+  return { isError: true, content: [{ type: "text", text }] }
+}
+
 function withFileRefs(t: Tool, db: DB, turn: TurnInfo | undefined, untrusted: boolean, key: () => string): Tool {
   const execute = t.execute
   if (!execute) return t
@@ -73,15 +78,16 @@ function withFileRefs(t: Tool, db: DB, turn: TurnInfo | undefined, untrusted: bo
     ...t,
     execute: async (input: unknown, options: Parameters<typeof execute>[1]) => {
       if (!findAttachmentRefs(input).length) return await execute(input, options)
-      if (untrusted || !turn) return { ok: false, error: "Saved files can only be sent to a server the owner marked as their own." }
-      let resolved: unknown
+      if (untrusted || !turn) return refused("Saved files can only be sent to a server the owner marked as their own.")
+      let resolved: ReturnType<typeof resolveFileRefs<unknown>>
       try {
-        resolved = resolveAttachmentRefs(db, input, { chatId: turn.chatId, masterKey: key() })
+        resolved = resolveFileRefs(db, input, { chatId: turn.chatId, masterKey: key() })
       } catch (err) {
-        if (err instanceof AttachmentRefError) return { ok: false, error: err.message }
+        if (err instanceof AttachmentRefError) return refused(err.message)
         throw err
       }
-      return await execute(resolved, options)
+      // A server that echoes its input would pour the base64 into the model's context.
+      return scrubFileUrls(await execute(resolved.value, options), resolved.files)
     },
   }
 }
