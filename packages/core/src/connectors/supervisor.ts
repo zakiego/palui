@@ -3,7 +3,7 @@
 // a control poke and every 30 s. Each connector is isolated: a throw never takes
 // the process down.
 import { and, eq, isNull, lte } from "drizzle-orm"
-import { connectors, type Channel, type DB } from "@palui/db"
+import { connectors, type Channel, type ConnectorStatus, type DB } from "@palui/db"
 import type { ConnectorLive } from "../control"
 import { logEvent } from "../events"
 import type { Logger } from "../log"
@@ -50,6 +50,9 @@ type Slot = {
   // 409), for the restart ladder. Reset after STABLE_RUN_MS of running.
   crashes: number
   startedAt: number
+  // The status this slot last wrote, so a Connect click on a running connector
+  // (which only rewrites the row to `connecting`) can be put back.
+  shown: { status: ConnectorStatus; detail: string | null } | null
 }
 
 export type SupervisorOptions = {
@@ -153,6 +156,7 @@ export function createSupervisor(opts: SupervisorOptions) {
         // Coming back after a crash: keep showing the error until it's really on,
         // so errorSince keeps counting toward the 5 minute alert.
         if (slot && slot.crashes > 0 && status === "connecting") return
+        if (slot) slot.shown = { status, detail: detail ?? null }
         try {
           setConnectorStatus(db, row.id, status, detail ?? null, clock())
         } catch (e) {
@@ -203,6 +207,7 @@ export function createSupervisor(opts: SupervisorOptions) {
       reported: false,
       crashes: prev?.crashes ?? 0,
       startedAt: clock(),
+      shown: null,
     }
     slots.set(row.id, slot)
     // While retrying after failures the row stays in `error`, so errorSince keeps
@@ -227,7 +232,10 @@ export function createSupervisor(opts: SupervisorOptions) {
       slot.failures = 0
       slot.startedAt = clock()
       // Keep a status the connector reported itself during start (e.g. waiting for pairing).
-      if (!slot.reported) setConnectorStatus(db, row.id, "on", null, clock())
+      if (!slot.reported) {
+        slot.shown = { status: "on", detail: null }
+        setConnectorStatus(db, row.id, "on", null, clock())
+      }
       log.info("connector started", { connector_id: row.id })
     } catch (e) {
       slot.starting = false
@@ -282,10 +290,20 @@ export function createSupervisor(opts: SupervisorOptions) {
         if (slot.configHash !== row.configHash) {
           await stopSlot(slot, "config changed")
           starts.push(startSlot(row))
+          return
         }
+        // Connect on a running connector with the same config rewrites the row to
+        // `connecting` and nothing restarts, so put back what it last reported.
+        if (row.status === "connecting" && slot.shown) setConnectorStatus(db, row.id, slot.shown.status, slot.shown.detail, clock())
         return
       }
-      if (slot && slot.nextRetryAt > clock()) return
+      if (slot && slot.nextRetryAt > clock()) {
+        // Waiting out the backoff. A Connect click or new config (a fixed token)
+        // retries now instead of up to 10 minutes later.
+        if (row.status !== "connecting" && slot.configHash === row.configHash) return
+        clearTimeout(retryTimers.get(row.id))
+        retryTimers.delete(row.id)
+      }
       starts.push(startSlot(row))
     } catch (e) {
       log.error("reconcile failed for connector", { connector_id: row.id, error: e })
