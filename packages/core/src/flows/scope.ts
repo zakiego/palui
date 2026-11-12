@@ -2,7 +2,11 @@
 import type { FlowRow, RunRow } from "./service"
 import { nowScope, type Scope } from "./values"
 
-export type RunVars = { steps: Record<string, unknown>; vars: Record<string, unknown>; item?: unknown; index?: number }
+// An answer the owner gave before the run reached its check-in (checkin.ts). The
+// next check-in step takes it instead of asking.
+export type PreAnswer = { stepId: string; answer: string; label: string; text?: string; at: number }
+
+export type RunVars = { steps: Record<string, unknown>; vars: Record<string, unknown>; item?: unknown; index?: number; preAnswer?: PreAnswer }
 
 export type ScopeInput = {
   run: Pick<RunRow, "id" | "trigger" | "wait">

@@ -462,6 +462,89 @@ const PRAYER_CHAIN = {
   ],
 }
 
+describe("early check-in answers", () => {
+  it("keeps an answer given during the wait and skips the question", async () => {
+    const h = flowHarness()
+    h.setNow(at("2026-11-12T15:00"))
+    const { flow } = h.create(PRAYER_CHAIN)
+    await h.run(at("2026-11-12T15:30"))
+    const [run] = runsOf(h.db, flow.id)
+    expect(run).toMatchObject({ status: "waiting", cursor: "wait1" })
+
+    // No runId: there's no open check-in, so it goes to the run that asks later.
+    const res = answerFlowCheckin(h.db, { chatId: h.chatId, answer: "udah", text: "Udah ashar" }, at("2026-11-12T15:33"))
+    expect(res).toMatchObject({ closed: true, early: true, reply: "Sip, dicatat duluan: Sudah (Ashar). Pertanyaannya nanti dilewati." })
+    expect(res.run.id).toBe(run!.id)
+
+    await h.run(at("2026-11-12T15:40"))
+    const done = getRun(h.db, run!.id)!
+    expect(done.status).toBe("done")
+    expect(sentTexts(h.db).map((s) => s.text)).toEqual(["🕌 Waktu Ashar sudah masuk", "Alhamdulillah 🤲"])
+    const vars = done.vars as { steps: Record<string, unknown>; preAnswer?: unknown }
+    expect(vars.steps.ask1).toMatchObject({ answer: "done", label: "Sudah", text: "Udah ashar", answeredAt: at("2026-11-12T15:33"), missed: false, early: true })
+    expect(vars.preAnswer).toBeUndefined()
+    expect(stepLog(h.db, run!.id).map((s) => [s.step, s.branch])).toEqual([
+      ["info", null],
+      ["wait1", null],
+      ["ask1", "on.done"],
+      ["alhamdulillah", null],
+    ])
+    expect(summarizeRuns([done])).toMatchObject({ byAnswer: { done: 1 }, missed: 0 })
+  })
+
+  it("works with the run id too, and a newer early answer replaces the older one", async () => {
+    const h = flowHarness()
+    h.setNow(at("2026-11-12T15:00"))
+    const { flow } = h.create(PRAYER_CHAIN)
+    await h.run(at("2026-11-12T15:30"))
+    const [run] = runsOf(h.db, flow.id)
+    answerFlowCheckin(h.db, { chatId: h.chatId, runId: run!.id, answer: "done" }, at("2026-11-12T15:33"))
+    answerFlowCheckin(h.db, { chatId: h.chatId, runId: run!.id, answer: "Sudah", text: "Aku udah sholat ashar" }, at("2026-11-12T15:35"))
+    expect((getRun(h.db, run!.id)!.vars as { preAnswer?: unknown }).preAnswer).toEqual({ stepId: "ask1", answer: "done", label: "Sudah", text: "Aku udah sholat ashar", at: at("2026-11-12T15:35") })
+    await h.run(at("2026-11-12T15:40"))
+    expect((getRun(h.db, run!.id)!.vars as { steps: Record<string, { answeredAt: number }> }).steps.ask1!.answeredAt).toBe(at("2026-11-12T15:35"))
+  })
+
+  it("refuses a non-closing answer before the question and still asks", async () => {
+    const h = flowHarness()
+    h.setNow(at("2026-11-12T15:00"))
+    const { flow } = h.create(PRAYER_CHAIN)
+    await h.run(at("2026-11-12T15:30"))
+    expect(() => answerFlowCheckin(h.db, { chatId: h.chatId, answer: "belum" }, at("2026-11-12T15:33"))).toThrow(/only a closing answer can be recorded early/)
+    await h.run(at("2026-11-12T15:40"))
+    expect(runsOf(h.db, flow.id)[0]).toMatchObject({ status: "waiting" })
+    expect(sentTexts(h.db).at(-1)!.text).toBe("Udah sholat Ashar?")
+  })
+
+  it("prefers an open check-in over a run that asks later, and lists both for the prompt", async () => {
+    const h = flowHarness()
+    h.setNow(at("2026-11-12T15:00"))
+    const medicine = h.create({ ...MEDICINE, triggers: [{ ...MEDICINE.triggers[0]!, source: { kind: "times", times: [{ time: "15:20", label: "sore" }] } }] }).flow
+    const sholat = h.create(PRAYER_CHAIN).flow
+    await h.run(at("2026-11-12T15:20"))
+    await h.run(at("2026-11-12T15:30"))
+    const [open] = runsOf(h.db, medicine.id)
+    const [waiting] = runsOf(h.db, sholat.id)
+    const prompt = flowCheckinsPrompt(h.db, h.chatId, at("2026-11-12T15:31"))!
+    expect(prompt).toContain(`- ${open!.id}: flow "Minum obat", item "sore", asked`)
+    expect(prompt).toContain(`- ${waiting!.id}: flow "Sholat", item "Ashar", not asked yet, next step Kamis 12 Nov 15.40; answers: done`)
+    expect(answerFlowCheckin(h.db, { chatId: h.chatId, answer: "udah" }, at("2026-11-12T15:31")).run.id).toBe(open!.id)
+  })
+
+  it("a run past its check-ins only takes corrections", async () => {
+    const h = flowHarness()
+    h.setNow(at("2026-11-12T15:00"))
+    const { flow } = h.create(PRAYER_CHAIN)
+    await h.run(at("2026-11-12T15:30"))
+    await h.run(at("2026-11-12T15:40"))
+    const [run] = runsOf(h.db, flow.id)
+    answerFlowCheckin(h.db, { chatId: h.chatId, answer: "udah" }, at("2026-11-12T15:41"))
+    await h.run(at("2026-11-12T15:41"))
+    expect(getRun(h.db, run!.id)!.status).toBe("done")
+    expect(answerFlowCheckin(h.db, { chatId: h.chatId, runId: run!.id, answer: "done" }, at("2026-11-12T15:50")).reply).toBe("Oke, jawaban diganti: Sudah.")
+  })
+})
+
 // rpt_0mwd8hmpsapmfi9bvkb problem 2: a run with a chain of check-ins was read
 // from its first one, so "missed ask1, answered ask2" counted as missed.
 describe("the check-in that decides a run", () => {

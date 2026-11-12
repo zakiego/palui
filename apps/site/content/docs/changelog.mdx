@@ -18,6 +18,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - Groups have a reply mode: mentions only (the default) or every message. Set it with `/reply all` and `/reply mention` in the group, or with the new select on the Chats page. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 - Setting up a WhatsApp group no longer needs the dashboard. Mention Palui in a new group and it replies with your agents and the `/agent <slug>` to send. Before, every message in a group that wasn't allowed yet was dropped, `/agent` included.
 - The Chats page marks chats whose "Answer here" is off as Off.
+- You can answer a flow check-in before it asks. While a run is still waiting before its check-in (like the 10 minutes after "Waktu Ashar sudah masuk"), "udah" is kept, and when the run gets there it skips the question and its reminders and follows that answer's branch. Only a closing answer counts early; a "belum" still waits for the question.
 
 ### Changed
 
