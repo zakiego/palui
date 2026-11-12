@@ -16,6 +16,8 @@ Nothing to set up. Attachments is a built-in skill and is created on first boot.
 | `save_attachment` | `write` | Save a file from the message being answered, with a title and a description. With several files, `nomor` picks one (1-based). |
 | `list_attachments` | `read` | List saved files in this chat, with an optional search over titles, descriptions and file names |
 | `get_attachment` | `read` | One file's details and its dashboard link |
+| `share_attachment` | `write` | Make a temporary link that opens the file itself. Private (the default) needs a dashboard sign-in, public opens for anyone with the link. Expires after 1h, 24h (the default) or 7d. |
+| `unshare_attachment` | `write` | Turn off every live link to a file |
 | `delete_attachment` | `destructive` | Delete a saved file. Always asks first. |
 
 Each tool's class decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
@@ -27,8 +29,10 @@ Each tool's class decides when it needs approval. See [Tool classes](/docs/conce
 - Up to 10 MB per file. The channel's own limits apply first: WhatsApp and Telegram documents are capped at 1 MB today.
 - Files are encrypted with `MASTER_KEY` (AES-256-GCM) inside the SQLite database, so they're included in backups. Losing `MASTER_KEY` means losing the files, the same as connector secrets.
 - Saving the same file twice in a chat keeps one copy.
-- Files are listed on the Attachments page of the dashboard. Downloads need a signed-in session and are always served as a download, never rendered inline.
-- Palui can't send a saved file back into the chat yet. It shares the dashboard link instead.
+- Files are listed on the Attachments page of the dashboard. Click a title or the eye icon to preview images, PDFs and text files, or open them in a new tab. HEIC and Office files only download.
+- Share links live at `/api/share/<token>`. They always expire (7 days at most), only the token's sha256 is stored, so a link is shown once, and turning a link off or deleting the file stops it right away. The Attachments page lists each file's live links with how often they were opened.
+- Inline files are served with `nosniff` and a strict CSP, and text is always sent as `text/plain`, so a file can't run as a page on the dashboard's origin.
+- Palui can't send a saved file back into the chat yet. It sends a share link instead.
 
 ## Pause and remove
 
