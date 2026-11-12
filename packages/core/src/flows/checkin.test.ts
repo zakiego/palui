@@ -601,3 +601,19 @@ describe("the check-in that decides a run", () => {
     expect(decidingCheckin({ x: { text: "hi" } })).toBeNull()
   })
 })
+
+describe("saved files in flow steps", () => {
+  it("never sends a saved file that untrusted data picked, even from a read step", async () => {
+    const h = flowHarness()
+    const { flow } = h.create({ name: "Kirim", steps: [{ id: "send", kind: "tool", tool: "mcp-keuangan__list_bills", args: { file: "{{trigger.args.file}}" } }] })
+    const { run } = h.engine.startRun({ flowId: flow.id, triggerKind: "webhook", runKey: "w1", payload: { args: { file: "palui:attachment/att_ktp" } }, taint: ["trigger"], now: h.now() })
+    await h.run(h.now())
+    expect(h.calls).toEqual([])
+    expect(stepLog(h.db, run!.id)[0]).toMatchObject({ step: "send", status: "error", error: expect.stringContaining("untrusted data") })
+
+    // The same arg from the flow's own trigger goes through.
+    h.engine.startRun({ flowId: flow.id, triggerKind: "manual", runKey: "m1", payload: { args: { file: "palui:attachment/att_ktp" } }, now: h.now() })
+    await h.run(h.now())
+    expect(h.calls.map((c) => c.args)).toEqual([{ file: "palui:attachment/att_ktp" }])
+  })
+})

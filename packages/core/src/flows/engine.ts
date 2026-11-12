@@ -29,6 +29,7 @@ import { stepData, STEP_TIMEOUT_MS, type FlowToolCaller } from "./call"
 import { evalCondition, evaluate, parseExpr, parsePath, explainTrace } from "./expr"
 import { defaultNext } from "./graph"
 import { createApproval, getApproval, preview } from "../approvals/store"
+import { findAttachmentRefs } from "../attachments/refs"
 import { checkinButtons, earlyAnswer, type CheckinWait } from "./checkin"
 import { engineClock } from "./diagnose"
 import { pruneFlows } from "./history"
@@ -1075,6 +1076,10 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
     }
     if (!info) return onError(c, step, `Tool ${step.tool} isn't available (connector off or tool removed).`, { status: "error", input, attempt })
     if (info.class === "destructive") return onError(c, step, `${info.name} is now destructive; flows never run destructive tools.`, { status: "error", input, attempt })
+    // Nobody watches a flow run: a saved file is only sent when the flow itself
+    // names it, never when untrusted data picked it.
+    if (argTaint.some((k) => findAttachmentRefs(args[k]).length))
+      return onError(c, step, "A saved file in this step's args comes from untrusted data, so it isn't sent.", { status: "error", input, attempt })
     const saved = (c.version.writeCalls as unknown as WriteCall[]).find((x) => x.stepId === step.id)
     if (info.class === "write") {
       if (c.dry) {
