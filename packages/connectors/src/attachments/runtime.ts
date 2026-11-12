@@ -1,5 +1,5 @@
 // Attachment tools for the model: save an important file from the current
-// message, list and look up saved ones, delete one. Every tool works on the
+// message, list and look up saved ones, share one as a temporary link, delete one. Every tool works on the
 // turn's chat only. The descriptions carry the "only what matters" rule, so the
 // model doesn't file every photo the owner sends.
 import { tool } from "ai"
@@ -19,6 +19,7 @@ import {
   type AttachmentMeta,
   type Candidate,
 } from "@palui/core/attachments/service"
+import { createShare, revokeShares, SHARE_DURATION_KEYS, shareUrl } from "@palui/core/attachments/shares"
 import manifest from "./manifest"
 
 type Fail = { ok: false; error: string }
@@ -44,7 +45,7 @@ function view(a: AttachmentMeta, appUrl: string) {
     filename: a.filename,
     size: formatBytes(a.size),
     savedAt: new Date(a.createdAt).toISOString(),
-    // Needs a dashboard sign-in; there's no public link.
+    // The dashboard page, which needs a sign-in. share_attachment makes a link that opens the file itself.
     url: `${appUrl}/app/attachments?id=${a.id}`,
   }
 }
@@ -133,12 +134,54 @@ export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOpti
       title: "Get a saved attachment",
       tool: tool({
         description:
-          "Get one saved file's details by id: title, description, type, size, when it was saved, and the dashboard link where the owner can open or download it after signing in. Files can't be sent back into the chat yet, so share the link.",
+          "Get one saved file's details by id: title, description, type, size, when it was saved, and the dashboard link where the owner can open or download it after signing in. Files can't be sent back into the chat yet; to give someone the file itself, call share_attachment.",
         inputSchema: z.object({ id: z.string().min(1).max(64) }),
         execute: async (input) => {
           const a = own(input.id)
           if ("ok" in a) return a
           return { ok: true as const, attachment: view(a, appUrl()) }
+        },
+      }),
+    },
+    share_attachment: {
+      class: "write",
+      title: "Share a saved attachment",
+      tool: tool({
+        description:
+          'Make a temporary link that opens a saved file directly (images and PDFs show in the browser, other files download). visibility "private" (the default) only opens for the owner signed in to the dashboard. visibility "public" opens for anyone who has the link, so only use it when the owner asks to share the file with someone else, and never for identity documents unless the owner says so explicitly. Links expire after `expires` (default 24h, at most 7d) and the owner can turn them off on the Attachments page. Each call makes a new link; send the url as it is.',
+        inputSchema: z.object({
+          id: z.string().min(1).max(64),
+          visibility: z.enum(["private", "public"]).optional(),
+          expires: z.enum(SHARE_DURATION_KEYS).optional().describe("How long the link works: 1h, 24h or 7d."),
+        }),
+        execute: async (input) => {
+          const a = own(input.id)
+          if ("ok" in a) return a
+          const visibility = input.visibility ?? "private"
+          const duration = input.expires ?? "24h"
+          const made = createShare(db, { attachmentId: a.id, visibility, duration, createdBy: chatId }, clock())
+          if (!made) return { ok: false as const, error: `No saved attachment ${input.id}.` }
+          return {
+            ok: true as const,
+            url: shareUrl(appUrl(), made.token),
+            visibility,
+            expiresAt: new Date(made.share.expiresAt).toISOString(),
+            note: visibility === "public" ? "Anyone with this link can open the file until it expires." : "Opens only after signing in to the dashboard.",
+          }
+        },
+      }),
+    },
+    unshare_attachment: {
+      class: "write",
+      title: "Turn off links to an attachment",
+      tool: tool({
+        description: "Turn off every live share link to a saved file, e.g. when the owner says a link shouldn't work anymore. The file itself stays saved.",
+        inputSchema: z.object({ id: z.string().min(1).max(64) }),
+        execute: async (input) => {
+          const a = own(input.id)
+          if ("ok" in a) return a
+          const n = revokeShares(db, a.id, clock())
+          return { ok: true as const, revoked: n, message: n ? `${n} tautan ke "${a.title}" udah dimatikan.` : `Nggak ada tautan aktif ke "${a.title}".` }
         },
       }),
     },
