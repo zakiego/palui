@@ -1,5 +1,7 @@
 // Manifests name a lucide icon as a string (they can't import React). This maps
-// the names in use to components, with a plug as the fallback.
+// the names in use to components, with a plug as the fallback. Third-party
+// services with a real logo (WhatsApp, Telegram) map to it instead of a lucide glyph.
+import type * as React from "react"
 import {
   BellIcon,
   BrainIcon,
@@ -22,12 +24,17 @@ import {
   SquareTerminalIcon,
   WebhookIcon,
   WorkflowIcon,
-  type LucideIcon,
 } from "lucide-react"
 
-const ICONS: Record<string, LucideIcon> = {
+import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
+
+type Icon = React.ComponentType<React.SVGProps<SVGSVGElement>>
+
+const ICONS: Record<string, Icon> = {
   send: SendIcon,
   "message-circle": MessageCircleIcon,
+  whatsapp: WhatsAppIcon,
+  telegram: TelegramIcon,
   "messages-square": MessagesSquareIcon,
   monitor: MonitorIcon,
   cpu: CpuIcon,
@@ -49,6 +56,6 @@ const ICONS: Record<string, LucideIcon> = {
   settings: SettingsIcon,
 }
 
-export function connectorIcon(name: string | undefined): LucideIcon {
+export function connectorIcon(name: string | undefined): Icon {
   return (name && ICONS[name]) || PlugIcon
 }

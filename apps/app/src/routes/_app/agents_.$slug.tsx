@@ -5,7 +5,8 @@
 // they do on Notes and Chats. Memory and Tools ask the runtime when opened.
 import * as React from "react"
 import { createFileRoute, Link, useBlocker, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon, AtSignIcon, BotIcon, BrainIcon, CircleAlertIcon, GlobeIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessageCircleIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, SendIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
+import { ArrowLeftIcon, AtSignIcon, BotIcon, BrainIcon, CircleAlertIcon, GlobeIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
+import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
 import { z } from "zod"
 import { toast } from "sonner"
 
@@ -73,8 +74,8 @@ const NAME_MAX = 40
 const PERSONA_MAX = 8000
 const CONTAINER_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/
 const CHANNEL = {
-  telegram: { Icon: SendIcon, label: "Telegram" },
-  whatsapp: { Icon: MessageCircleIcon, label: "WhatsApp" },
+  telegram: { Icon: TelegramIcon, label: "Telegram" },
+  whatsapp: { Icon: WhatsAppIcon, label: "WhatsApp" },
   web: { Icon: MonitorIcon, label: "Web" },
 } as const
 

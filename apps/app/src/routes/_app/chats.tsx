@@ -4,7 +4,8 @@
 // calls sit inline and collapsible; pending approvals show Approve/Deny.
 import * as React from "react"
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
-import { ArrowUpIcon, AtSignIcon, CircleAlertIcon, CircleDashedIcon, CopyIcon, HashIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SearchIcon, SendIcon, ShieldAlertIcon, SquareIcon, MessageCircleIcon, WebhookIcon } from "lucide-react"
+import { ArrowUpIcon, AtSignIcon, CircleAlertIcon, CircleDashedIcon, CopyIcon, HashIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SearchIcon, ShieldAlertIcon, SquareIcon, WebhookIcon } from "lucide-react"
+import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -60,7 +61,7 @@ type Data = Awaited<ReturnType<typeof getChats>> & { chatId: string; transcript:
 type ChatRow = Data["chats"][number]
 type Transcript = Awaited<ReturnType<typeof getTranscript>>
 
-const CHANNEL_ICON = { telegram: SendIcon, whatsapp: MessageCircleIcon, web: MonitorIcon } as const
+const CHANNEL_ICON = { telegram: TelegramIcon, whatsapp: WhatsAppIcon, web: MonitorIcon } as const
 
 // Both panes are a fixed height at every width, so the transcript scrolls
 // inside its card and opens at the newest message. Without a height on a phone

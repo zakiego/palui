@@ -8,7 +8,7 @@ export default defineManifest({
   ...telegram,
   id: "tgbot",
   name: "Agent bot (Telegram)",
-  icon: "bot",
+  icon: "telegram",
   summary: "A Telegram bot of its own for one agent.",
   description:
     "Give an agent its own Telegram bot so people can add it to a group and @mention it by name. Create the bot with @BotFather, paste its token here, then pick it on the agent's page. Chats with this bot belong to that agent.",

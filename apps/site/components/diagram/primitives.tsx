@@ -1,5 +1,4 @@
-import type { LucideIcon } from "lucide-react"
-import type { CSSProperties, ReactNode } from "react"
+import type { ComponentType, CSSProperties, ReactNode, SVGProps } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { cn } from "@/lib/cn"
@@ -44,7 +43,7 @@ export function Node({
   optional = false,
   className,
 }: {
-  icon: LucideIcon
+  icon: ComponentType<SVGProps<SVGSVGElement>>
   title: ReactNode
   /** The machine name (route, file, table). Rendered in Plex Mono. */
   detail?: ReactNode
@@ -95,7 +94,7 @@ export function Group({
   children,
   className,
 }: {
-  icon?: LucideIcon
+  icon?: ComponentType<SVGProps<SVGSVGElement>>
   label: string
   children: ReactNode
   className?: string

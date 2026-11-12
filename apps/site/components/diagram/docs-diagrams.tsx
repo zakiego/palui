@@ -28,7 +28,6 @@ import {
   PlugIcon,
   RouteIcon,
   ScaleIcon,
-  SendIcon,
   Server,
   ShieldAlertIcon,
   SparklesIcon,
@@ -36,6 +35,7 @@ import {
   WrenchIcon,
 } from "lucide-react"
 import type { ReactNode } from "react"
+import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
 import { Arrow, Diagram, Fork, Group, Join, Node } from "./primitives"
 
 // The docs diagrams, drawn as responsive graphs (TASTE.md: never ASCII). Labels
@@ -56,8 +56,8 @@ export function ArchitectureDiagram({ children }: Props) {
     <Diagram description={children}>
       <Join>
         {[
-          <Node key="wa" stack icon={MessageCircleIcon} title="WhatsApp" />,
-          <Node key="tg" stack icon={SendIcon} title="Telegram" />,
+          <Node key="wa" stack icon={WhatsAppIcon} title="WhatsApp" />,
+          <Node key="tg" stack icon={TelegramIcon} title="Telegram" />,
           <Node key="web" stack icon={LayoutDashboardIcon} title="Web chat" />,
         ]}
       </Join>
