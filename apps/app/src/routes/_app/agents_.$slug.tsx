@@ -5,7 +5,7 @@
 // they do on Notes and Chats. Memory and Tools ask the runtime when opened.
 import * as React from "react"
 import { createFileRoute, Link, useBlocker, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon, AtSignIcon, BotIcon, BrainIcon, CircleAlertIcon, GlobeIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
+import { ArrowLeftIcon, AtSignIcon, BrainIcon, CircleAlertIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
 import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -14,9 +14,9 @@ import { AgentAvatar } from "@/components/agent-avatar"
 import { AvatarPicker } from "@/components/agents/avatar-picker"
 import { AppError } from "@/components/app-error"
 import { ConnectorStatusBadge } from "@/components/connector-status"
-import { CLASS_TONE } from "@/components/tool-trace"
+import { ToolsByScope } from "@/components/agent-tools/by-scope"
+import { groupTools } from "@/components/agent-tools/shared"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -50,7 +50,7 @@ import { useLiveRefresh } from "@/hooks/use-live-events"
 import { setConnectorOwnerFn } from "@/lib/fns/connectors"
 import { deleteAgentFn, getAgentMemoryFn, getAgentPage, getAgentToolsFn, saveAgentFn, setChatAllowedFn, setChatReplyModeFn } from "@/lib/fns/agents"
 import { ago, errorMessage } from "@/lib/format"
-import { useLabel, useT } from "@/lib/i18n"
+import { useT } from "@/lib/i18n"
 
 const TABS = ["settings", "chats", "instructions", "memory", "tools"] as const
 type Tab = (typeof TABS)[number]
@@ -730,15 +730,12 @@ function MemoryStats({ agent }: { agent: Agent }) {
   )
 }
 
-type ToolsData = Awaited<ReturnType<typeof getAgentToolsFn>>
-type ToolItem = NonNullable<ToolsData["tools"]>[number]
-
 function ToolsTab({ agent }: { agent: Agent }) {
   const t = useT()
-  const label = useLabel()
   const [query, setQuery] = React.useState("")
   const { data, error } = useTabData(() => getAgentToolsFn({ data: { id: agent.id } }), agent.id)
-  // Owners changed here, on top of what the tab loaded; the list stays put.
+  // Owners changed here, on top of what the tab loaded. A changed server
+  // moves to the other part of the list.
   const [owners, setOwners] = React.useState<Record<string, string | null>>({})
   const ownerOf = (id: string) => (id in owners ? owners[id]! : (data?.scopes[id] ?? null))
 
@@ -758,13 +755,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
   const tools = data?.tools ?? null
   const guestSafe = tools?.filter((x) => x.guestSafe).length ?? 0
 
-  const groups = React.useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const hits = (tools ?? []).filter((x) => !q || x.tool.toLowerCase().includes(q) || (x.title ?? "").toLowerCase().includes(q) || x.connectorLabel.toLowerCase().includes(q))
-    const by = new Map<string, ToolItem[]>()
-    for (const x of hits) (by.get(x.connectorId) ?? by.set(x.connectorId, []).get(x.connectorId)!).push(x)
-    return [...by.values()]
-  }, [tools, query])
+  const groups = React.useMemo(() => groupTools(tools ?? [], query), [tools, query])
 
   // The count shows once the runtime said how many there are.
   const safe = tools ? t("agents.tools.safe", { n: guestSafe.toLocaleString() }) : t("agents.tools.safeOnly")
@@ -780,20 +771,14 @@ function ToolsTab({ agent }: { agent: Agent }) {
         <Rule icon={<MessagesSquareIcon />} label={t("agents.tools.others")} value={others} />
       </ItemGroup>
 
-      <div className="flex flex-wrap items-center gap-3">
-        {tools && tools.length > 12 && (
-          <InputGroup className="max-w-sm min-w-0 flex-1">
-            <InputGroupAddon>
-              <SearchIcon aria-hidden="true" />
-            </InputGroupAddon>
-            <InputGroupInput type="search" aria-label={t("agents.tools.search")} placeholder={t("agents.tools.search")} value={query} onChange={(e) => setQuery(e.target.value)} />
-          </InputGroup>
-        )}
-        <Button variant="outline" size="sm" className="ms-auto" render={<Link to="/connectors/new" search={{ agent: agent.id }} />}>
-          <PlusIcon data-icon="inline-start" />
-          {t("agents.tools.addMcp")}
-        </Button>
-      </div>
+      {tools && tools.length > 12 && (
+        <InputGroup className="max-w-sm min-w-0">
+          <InputGroupAddon>
+            <SearchIcon aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput type="search" aria-label={t("agents.tools.search")} placeholder={t("agents.tools.search")} value={query} onChange={(e) => setQuery(e.target.value)} />
+        </InputGroup>
+      )}
 
       {error && <LoadError message={error} />}
       {data?.error && <LoadError message={data.error} />}
@@ -813,79 +798,23 @@ function ToolsTab({ agent }: { agent: Agent }) {
             <EmptyTitle>{t("agents.tools.empty")}</EmptyTitle>
             <EmptyDescription>{t("agents.tools.emptyBody")}</EmptyDescription>
           </EmptyHeader>
-          <EmptyContent>
-            <Button variant="outline" size="sm" render={<Link to="/connectors" />}>
+          <EmptyContent className="flex-row flex-wrap justify-center">
+            <Button variant="outline" size="sm" render={<Link to="/connectors/new" search={{ agent: agent.id }} />}>
+              <PlusIcon data-icon="inline-start" />
+              {t("agents.tools.addMcp")}
+            </Button>
+            <Button variant="ghost" size="sm" render={<Link to="/connectors" />}>
               {t("nav.connectors")}
             </Button>
           </EmptyContent>
         </Empty>
       )}
-      {tools && tools.length > 0 && (
-        <div className="flex flex-col gap-6">
-          {groups.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">{t("agents.tools.searchEmpty")}</p>}
-          {groups.map((list) => {
-            const head = list[0]!
-            return (
-              <section key={head.connectorId} aria-labelledby={`tools-${head.connectorId}`} className="flex flex-col gap-2">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <Link id={`tools-${head.connectorId}`} to="/connectors/$id" params={{ id: head.connectorId }} dir="auto" className="min-w-0 text-heading [overflow-wrap:anywhere] underline-offset-4 hover:underline">
-                    {head.connectorLabel}
-                  </Link>
-                  {head.connectorType === "mcp" && <Badge variant="outline">MCP</Badge>}
-                  <span className="text-caption text-muted-foreground tabular-nums">{list.length.toLocaleString()}</span>
-                  {data && head.connectorId in data.scopes && (
-                    <ScopeSelect connectorLabel={head.connectorLabel} scope={ownerOf(head.connectorId)} onChange={(v) => void setScope(head.connectorId, v)} />
-                  )}
-                </div>
-                <ul className="flex flex-col divide-y">
-                  {list.map((x) => (
-                    <li key={x.name} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 py-3">
-                      <div className="flex min-w-48 flex-1 flex-col gap-0.5">
-                        <span className="font-mono text-sm [overflow-wrap:anywhere]">{x.tool}</span>
-                        {x.title && (
-                          <span dir="auto" className="text-caption text-pretty text-muted-foreground">
-                            {x.title}
-                          </span>
-                        )}
-                      </div>
-                      <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
-                        {data?.used[x.name] ? <span className="text-caption text-muted-foreground tabular-nums">{t("agents.tools.used", { n: data.used[x.name]!.toLocaleString() })}</span> : null}
-                        {x.untrusted && (
-                          <StatusText tone="secondary" icon={<GlobeIcon aria-hidden="true" />}>
-                            {t("agents.tools.outside")}
-                          </StatusText>
-                        )}
-                        {x.guestSafe && !agent.isDefault && agent.guestTools === "safe" && (
-                          <StatusText tone="secondary" icon={<UsersIcon aria-hidden="true" />}>
-                            {t("agents.tools.guests")}
-                          </StatusText>
-                        )}
-                        <StatusText tone={CLASS_TONE[x.class] ?? "destructive"} icon={null}>
-                          {label("tool.class", x.class)}
-                        </StatusText>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )
-          })}
-        </div>
+      {tools && tools.length > 0 && groups.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">{t("agents.tools.searchEmpty")}</p>}
+      {data && tools && groups.length > 0 && (
+        <ToolsByScope agent={agent} data={data} tools={tools} groups={groups} query={query} ownerOf={ownerOf} setScope={(id, scope) => void setScope(id, scope)} />
       )}
     </>
   )
-}
-
-// Whether an MCP server this agent can use is global or its own. A server
-// another agent owns never shows here: this agent doesn't get its tools.
-function ScopeSelect({ connectorLabel, scope, onChange }: { connectorLabel: string; scope: string | null; onChange: (v: string) => void }) {
-  const t = useT()
-  const value = scope === null ? "all" : "only"
-  const options = [
-    { value: "all", label: t("agents.tools.scopeAll"), icon: <GlobeIcon aria-hidden="true" /> },
-    { value: "only", label: t("agents.tools.scopeHere"), icon: <BotIcon aria-hidden="true" /> },
-  ]
-  return <SimpleSelect size="sm" className="ms-auto w-fit max-w-full min-w-0" aria-label={t("agents.tools.scopeFor", { name: connectorLabel })} value={value} options={options} onChange={onChange} />
 }
 
 function Rule({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
