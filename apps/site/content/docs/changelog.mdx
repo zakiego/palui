@@ -11,6 +11,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
+### Fixed
+
+- A photo or document you sent a few messages ago can still be saved. Before, `save_attachment` only took files from the message being answered, so when the agent showed a transaction preview first and you said "ya" later, the receipt couldn't be saved or attached anymore and the agent asked you to send it again. Now it can pick a file from this chat's last 24 hours (`earlier: true`), matched by caption and time.
+
 ### Changed
 
 - The new version notice also goes out when a deploy runs a new commit on the same version. It names the new and old short commit and lists up to 8 commit titles in between, like "Palui di-update ke commit abc1234 (sebelumnya def5678), versi 0.8.0". A version bump adds the short commit to the usual message. A restart on the same commit still sends nothing, and a build that doesn't know its commit (a local `docker build`) falls back to the version alone. The deploy's `scripts/pre-deploy.sh` writes the commit into `build-info.json`, which the image carries.

@@ -1,10 +1,11 @@
 // Saved attachments: files from a chat the agent decided to keep (KTP, receipts,
-// tickets, PDFs). Only files that came with the current turn's own messages can
-// be saved, never something from an older message or a URL. The bytes are
+// tickets, PDFs). Only files that came with this chat's own messages can be
+// saved: the current turn's, or a recent earlier one (an agent that previews
+// first saves after the owner says "ya"), never a URL. The bytes are
 // checked against an allowlist of types and a size cap, then stored encrypted
 // in SQLite (see savedAttachments in the schema).
 import { createHash } from "node:crypto"
-import { and, asc, count, desc, eq, or, sql, type Column } from "drizzle-orm"
+import { and, asc, count, desc, eq, gte, or, sql, type Column } from "drizzle-orm"
 import { attachmentShares, messages, newId, savedAttachments, type AttachmentKind, type DB } from "@palui/db"
 import { decryptBytes, encryptBytes } from "@palui/db/crypto"
 import type { StoredContent } from "../chat/context"
@@ -64,6 +65,14 @@ export type Candidate = {
   data: string
 }
 
+// A file from an earlier message in the chat, with what helps the model tell
+// several apart: when it was sent and the text that came with it.
+export type RecentCandidate = Candidate & { sentAt: number; caption: string }
+
+export const RECENT_FILES_WINDOW_MS = 24 * 3600_000
+export const RECENT_FILES_MAX = 10
+const CAPTION_MAX = 80
+
 export function normalizeMime(mime: string): string {
   return mime.split(";")[0]!.trim().toLowerCase()
 }
@@ -105,6 +114,39 @@ export function turnCandidates(db: DB, chatId: string, runId: string): Candidate
         filename: m.kind === "document" ? (m.filename ?? null) : null,
         size: Math.floor((m.data.length * 3) / 4),
         data: m.data,
+      })
+    }
+  }
+  return out
+}
+
+// Files with their bytes from this chat's user messages of the last
+// RECENT_FILES_WINDOW_MS, newest first (1 = the most recent), at most RECENT_FILES_MAX.
+export function recentCandidates(db: DB, chatId: string, now = Date.now()): RecentCandidate[] {
+  const rows = db
+    .select({ id: messages.id, content: messages.content, createdAt: messages.createdAt })
+    .from(messages)
+    .where(and(eq(messages.chatId, chatId), eq(messages.role, "user"), gte(messages.createdAt, now - RECENT_FILES_WINDOW_MS)))
+    .orderBy(desc(messages.createdAt), desc(messages.id))
+    .limit(200)
+    .all()
+  const out: RecentCandidate[] = []
+  for (const r of rows) {
+    const c = (r.content ?? {}) as StoredContent
+    const caption = (c.text ?? "").replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX)
+    for (const m of c.media ?? []) {
+      if (m.kind === "audio" || !m.data) continue
+      if (out.length >= RECENT_FILES_MAX) return out
+      out.push({
+        index: out.length + 1,
+        messageId: r.id,
+        kind: m.kind,
+        mimeType: normalizeMime(m.mimeType),
+        filename: m.kind === "document" ? (m.filename ?? null) : null,
+        size: Math.floor((m.data.length * 3) / 4),
+        data: m.data,
+        sentAt: r.createdAt,
+        caption,
       })
     }
   }

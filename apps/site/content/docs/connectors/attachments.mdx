@@ -13,7 +13,7 @@ Nothing to set up. Attachments is a built-in skill and is created on first boot.
 
 | Tool | Class | What it does |
 |---|---|---|
-| `save_attachment` | `write` | Save a file from the message being answered, with a title and a description. With several files, `nomor` picks one (1-based). |
+| `save_attachment` | `write` | Save a file from the message being answered, with a title and a description. With several files, `nomor` picks one (1-based). With `earlier: true` it saves a file from an earlier message in the same chat instead. |
 | `list_attachments` | `read` | List saved files in this chat, with an optional search over titles, descriptions and file names |
 | `get_attachment` | `read` | One file's details and its dashboard link |
 | `share_attachment` | `write` | Make a temporary link that opens the file itself. Private (the default) needs a dashboard sign-in, public opens for anyone with the link. Expires after 1h, 24h (the default) or 7d. |
@@ -24,7 +24,7 @@ Each tool's class decides when it needs approval. See [Tool classes](/docs/conce
 
 ## Limits and safety
 
-- Only files from the message being answered can be saved. An older message or a URL can't be.
+- Files from the message being answered can be saved, and so can files sent in the same chat in the last 24 hours (the 10 most recent). That way a receipt still gets saved when the agent shows a preview first and you answer "ya" in a later message. A URL or a file from another chat can't be.
 - Allowed types: JPEG, PNG, WebP, GIF, HEIC, PDF, plain text, CSV, Word, Excel and PowerPoint. The first bytes must match the type, so a renamed file is refused.
 - Up to 10 MB per file. The channel's own limits apply first: WhatsApp and Telegram documents are capped at 1 MB today.
 - Files are encrypted with `MASTER_KEY` (AES-256-GCM) inside the SQLite database, so they're included in backups. Losing `MASTER_KEY` means losing the files, the same as connector secrets.

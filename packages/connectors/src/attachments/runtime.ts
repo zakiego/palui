@@ -1,5 +1,5 @@
 // Attachment tools for the model: save an important file from the current
-// message, list and look up saved ones, share one as a temporary link, delete one. Every tool works on the
+// message (or a recent earlier one in the chat), list and look up saved ones, share one as a temporary link, delete one. Every tool works on the
 // turn's chat only. The descriptions carry the "only what matters" rule, so the
 // model doesn't file every photo the owner sends.
 import { tool } from "ai"
@@ -15,10 +15,13 @@ import {
   formatBytes,
   getAttachment,
   listAttachments,
+  RECENT_FILES_MAX,
+  recentCandidates,
   saveAttachment,
   turnCandidates,
   type AttachmentMeta,
   type Candidate,
+  type RecentCandidate,
 } from "@palui/core/attachments/service"
 import { createShare, revokeShares, SHARE_DURATION_KEYS, shareUrl } from "@palui/core/attachments/shares"
 import manifest from "./manifest"
@@ -65,6 +68,10 @@ function describe(c: Candidate) {
   return { nomor: c.index, kind: c.kind, mimeType: c.mimeType, filename: c.filename, size: formatBytes(c.size) }
 }
 
+function describeRecent(c: RecentCandidate) {
+  return { ...describe(c), sentAt: new Date(c.sentAt).toISOString(), caption: c.caption }
+}
+
 export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOptions = {}): Record<string, PaluiTool> {
   const chatId = turn.chatId
   const clock = opts.clock ?? Date.now
@@ -82,24 +89,43 @@ export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOpti
       title: "Save an attachment",
       tool: tool({
         description:
-          "Save a file the owner sent in the current message (photo, PDF, document) so it can be found later. Only save files that are worth keeping: identity documents (KTP, SIM, passport, KK), receipts and invoices, tickets and bookings, contracts, certificates, medical or school records, or anything the owner asks you to keep. Do NOT save casual photos, memes, screenshots of chats or files that are only needed for this one answer, unless the owner asks. When unsure, ask the owner first. Give it a clear title and a one-sentence description of what it is (dates, numbers, names that help find it later). Tell the owner it was saved. " + FILE_REF_HINT,
+          "Save a file the owner sent in this chat (photo, PDF, document) so it can be found later. Only save files that are worth keeping: identity documents (KTP, SIM, passport, KK), receipts and invoices, tickets and bookings, contracts, certificates, medical or school records, or anything the owner asks you to keep. Do NOT save casual photos, memes, screenshots of chats or files that are only needed for this one answer, unless the owner asks. When unsure, ask the owner first. By default it saves from the current message. A file from an earlier message (shown as [gambar dari sebelumnya]) can still be saved with `earlier: true`, for example a receipt sent before the owner confirmed: call it without `nomor` first to see the recent files with when they were sent and their caption, then again with the right `nomor`. Never tell the owner a file is saved unless this tool returned ok. Give it a clear title and a one-sentence description of what it is (dates, numbers, names that help find it later). Tell the owner it was saved. " + FILE_REF_HINT,
         inputSchema: z.object({
           nomor: z
             .number()
             .int()
             .min(1)
             .optional()
-            .describe("Which file in the current message, 1-based in the order they were sent. Omit when there is only one."),
+            .describe("Which file, 1-based. In the current message: in the order they were sent. With `earlier`: the number from the list, 1 being the most recent. Omit when there is only one."),
+          earlier: z
+            .boolean()
+            .optional()
+            .describe(`Save from an earlier message in this chat instead of the current one: the last 24 hours, at most ${RECENT_FILES_MAX} files, newest first.`),
           title: z.string().min(1).max(200).describe('Short title in the owner\'s language, e.g. "KTP Zaki" or "Tiket pesawat BDJ-CGK 12 Des".'),
           description: z.string().max(1000).optional().describe("One sentence on what the file is and what's in it."),
         }),
         execute: async (input) => {
-          const candidates = turnCandidates(db, chatId, turn.batchRunId ?? turn.runId)
-          if (!candidates.length) return { ok: false as const, error: "The current message has no image or document to save. Only files sent with the message being answered can be saved." }
-          if (input.nomor === undefined && candidates.length > 1)
-            return { ok: false as const, error: "The current message has more than one file. Call again with `nomor`.", files: candidates.map(describe) }
-          const c = candidates[(input.nomor ?? 1) - 1]
-          if (!c) return { ok: false as const, error: `There is no file number ${input.nomor}.`, files: candidates.map(describe) }
+          let c: Candidate | undefined
+          if (input.earlier) {
+            const recent = recentCandidates(db, chatId, clock())
+            if (!recent.length) return { ok: false as const, error: "No image or document was sent in this chat in the last 24 hours. Ask the owner to send it again." }
+            if (input.nomor === undefined && recent.length > 1)
+              return { ok: false as const, error: "Pick one: call again with `earlier: true` and its `nomor`. Match it by caption and time; ask the owner if it's still unclear.", files: recent.map(describeRecent) }
+            c = recent[(input.nomor ?? 1) - 1]
+            if (!c) return { ok: false as const, error: `There is no earlier file number ${input.nomor}.`, files: recent.map(describeRecent) }
+          } else {
+            const candidates = turnCandidates(db, chatId, turn.batchRunId ?? turn.runId)
+            if (!candidates.length) {
+              const recent = recentCandidates(db, chatId, clock())
+              return recent.length
+                ? { ok: false as const, error: "The current message has no file. To save one from an earlier message, call again with `earlier: true` and the `nomor` of the right file below.", files: recent.map(describeRecent) }
+                : { ok: false as const, error: "The current message has no image or document to save, and none was sent in this chat in the last 24 hours." }
+            }
+            if (input.nomor === undefined && candidates.length > 1)
+              return { ok: false as const, error: "The current message has more than one file. Call again with `nomor`.", files: candidates.map(describe) }
+            c = candidates[(input.nomor ?? 1) - 1]
+            if (!c) return { ok: false as const, error: `There is no file number ${input.nomor}.`, files: candidates.map(describe) }
+          }
           try {
             const { row, deduped } = saveAttachment(
               db,

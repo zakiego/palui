@@ -13,6 +13,8 @@ import {
   MAX_ATTACHMENT_BYTES,
   readAttachment,
   saveAttachment,
+  recentCandidates,
+  RECENT_FILES_MAX,
   turnCandidates,
 } from "./service"
 
@@ -81,6 +83,27 @@ describe("saved attachments", () => {
       [2, "document", "tiket.pdf"],
     ])
     expect(c[1]!.size).toBe(PDF.length)
+  })
+
+  it("finds recent files in the chat, newest first, within 24 hours and capped", () => {
+    const { db, chatId, otherChatId } = setup()
+    const add = (chat: string, text: string, media: unknown[], at: number, role: "user" | "assistant" = "user") =>
+      db.insert(messages).values({ id: newId("msg"), chatId: chat, role, content: { text, media }, runId: "run_x", createdAt: at }).run()
+    const png = { kind: "image", mimeType: "image/png", data: PNG.toString("base64") }
+    add(chatId, "lama", [png], NOW - 25 * 3600_000)
+    add(chatId, "Nasi   goreng", [png], NOW - 60_000)
+    add(chatId, "voice", [{ kind: "audio", mimeType: "audio/ogg", data: "AAAA" }], NOW - 50_000)
+    add(chatId, "Gorengan", [png, { kind: "document", mimeType: "application/pdf", filename: "a.pdf", data: PDF.toString("base64") }], NOW - 30_000)
+    add(chatId, "dari bot", [png], NOW - 20_000, "assistant")
+    add(otherChatId, "lain", [png], NOW - 10_000)
+    const c = recentCandidates(db, chatId, NOW)
+    expect(c.map((x) => [x.index, x.kind, x.caption])).toEqual([
+      [1, "image", "Gorengan"],
+      [2, "document", "Gorengan"],
+      [3, "image", "Nasi goreng"],
+    ])
+    for (let i = 0; i < RECENT_FILES_MAX; i++) add(chatId, `n${i}`, [png], NOW - 1000 + i)
+    expect(recentCandidates(db, chatId, NOW)).toHaveLength(RECENT_FILES_MAX)
   })
 
   it("makes safe download names", () => {

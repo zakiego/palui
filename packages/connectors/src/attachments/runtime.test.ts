@@ -21,8 +21,8 @@ function setup() {
   return { db, chat, other, turn, tools }
 }
 
-function inbound(db: DB, chatId: string, runId: string, media: unknown[]) {
-  db.insert(messages).values({ id: newId("msg"), chatId, role: "user", content: { text: "", media }, runId, createdAt: NOW }).run()
+function inbound(db: DB, chatId: string, runId: string, media: unknown[], at = NOW, text = "") {
+  db.insert(messages).values({ id: newId("msg"), chatId, role: "user", content: { text, media }, runId, createdAt: at }).run()
 }
 
 // biome-ignore lint: test helper calls the tool with loose input.
@@ -74,6 +74,33 @@ describe("attachment tools", () => {
     expect(saved.sendToOtherApp).toContain("fileRef")
     expect(readAttachment(db, saved.attachment.id, KEY)!.meta).toMatchObject({ chatId: chat.id, runId: "run_2" })
     expect(await call(tools.save_attachment, { nomor: 2, title: "lagi" })).toMatchObject({ ok: true, deduped: true })
+  })
+
+  it("saves a receipt from an earlier message after the owner confirms (rpt_0mwdxaorjuq9wfs1q4i)", async () => {
+    const { db, chat, other, tools } = setup()
+    const GORENG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1]).toString("base64")
+    // Photo, preview, "ya": the run that saves is not the one the photo came with.
+    inbound(db, chat.id, "run_a", [{ kind: "image", mimeType: "image/jpeg", data: JPG }], NOW - 60_000, "Nasi goreng")
+    inbound(db, chat.id, "run_b", [{ kind: "image", mimeType: "image/jpeg", data: GORENG }], NOW - 30_000, "Gorengan")
+    inbound(db, chat.id, "run_x", [{ kind: "image", mimeType: "image/jpeg", data: JPG }], NOW - 25 * 3600_000, "kemarin")
+    inbound(db, other.id, "run_y", [{ kind: "image", mimeType: "image/jpeg", data: JPG }], NOW - 1000, "chat lain")
+    inbound(db, chat.id, "run_1", [], NOW, "ya")
+
+    const hint = await call(tools.save_attachment, { title: "Struk" })
+    expect(hint).toMatchObject({ ok: false, error: expect.stringMatching(/earlier: true/), files: [{ nomor: 1, caption: "Gorengan" }, { nomor: 2, caption: "Nasi goreng" }] })
+    expect(hint.files).toHaveLength(2)
+
+    expect(await call(tools.save_attachment, { earlier: true, title: "Struk" })).toMatchObject({ ok: false, files: [{ nomor: 1 }, { nomor: 2 }] })
+    expect(await call(tools.save_attachment, { earlier: true, nomor: 3, title: "Struk" })).toMatchObject({ ok: false, error: "There is no earlier file number 3." })
+
+    const saved = await call(tools.save_attachment, { earlier: true, nomor: 2, title: "Struk nasi goreng" })
+    expect(saved).toMatchObject({ ok: true, deduped: false, attachment: { title: "Struk nasi goreng", kind: "image" } })
+    expect(readAttachment(db, saved.attachment.id, KEY)!.bytes.toString("base64")).toBe(JPG)
+  })
+
+  it("says so when nothing was sent recently", async () => {
+    const { tools } = setup()
+    expect(await call(tools.save_attachment, { earlier: true, title: "x" })).toMatchObject({ ok: false, error: expect.stringMatching(/last 24 hours/) })
   })
 
   it("refuses files that fail validation", async () => {
