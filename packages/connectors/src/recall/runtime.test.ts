@@ -382,6 +382,33 @@ describe("recall's default container (connector saved without one)", () => {
     }
   })
 
+  it("saves recall's default name in the config so the dashboard can reserve it", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const ctx = fakeCtx(savedWithoutContainer(f.base), { apiKey: KEY })
+    const running = await runtime.start(ctx)
+    try {
+      await running.tools!(palui)
+      expect(ctx.patches).toEqual([{ defaultContainer: "zaki" }])
+      expect(f.seen.filter(isDefaultProfile)).toHaveLength(1)
+    } finally {
+      await running.stop()
+    }
+    // A picked container needs no lookup.
+    const g = await fakeRecall()
+    await srv.close()
+    srv = g.server
+    const picked = fakeCtx(cfg(g.base), { apiKey: KEY })
+    const again = await runtime.start(picked)
+    try {
+      await again.tools!(turn)
+      expect(picked.patches).toEqual([])
+      expect(g.seen.filter(isDefaultProfile)).toHaveLength(0)
+    } finally {
+      await again.stop()
+    }
+  })
+
   it("forget tools refuse while recall won't say its default", async () => {
     const f = await fakeRecall({ profileDown: true })
     srv = f.server
@@ -404,7 +431,9 @@ describe("recall's default container (connector saved without one)", () => {
     try {
       await running.memory!.recall("what do I usually drink in the morning", { timeoutMs: 1500 })
       await running.memory!.save({ sourceId: "s:1", content: "Likes kopi susu" })
-      expect(f.seen.find((s) => s.path.startsWith("/v1/profile"))?.path).toBe("/v1/profile?q=what+do+I+usually+drink+in+the+morning")
+      const profiles = f.seen.filter((s) => s.path.startsWith("/v1/profile")).map((s) => s.path)
+      expect(profiles).toContain("/v1/profile?q=what+do+I+usually+drink+in+the+morning")
+      expect(profiles.some((p) => p.includes("undefined"))).toBe(false)
       expect(f.seen.find((s) => s.method === "POST" && s.path === "/v1/memories")?.body).toEqual({ content: "Likes kopi susu", source_id: "s:1" })
     } finally {
       await running.stop()

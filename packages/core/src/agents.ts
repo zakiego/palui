@@ -165,8 +165,17 @@ export function memoryScope(agent: AgentRow, chatId?: string | null): MemoryScop
 export function ownerContainers(db: DB): string[] {
   const out = new Set<string>()
   for (const c of db.select({ kind: connectors.kind, config: connectors.config }).from(connectors).where(eq(connectors.kind, "memory")).all()) {
-    const name = typeof c.config?.container === "string" && c.config.container ? c.config.container : "default"
-    out.add(name)
+    const picked = c.config?.container
+    if (typeof picked === "string" && picked) {
+      out.add(picked)
+      continue
+    }
+    // No container picked: the owner's memory is recall's own default. Its
+    // name is set on the server (often not "default"), so the runtime saves
+    // what recall answered as `defaultContainer`. Both names stay reserved.
+    out.add("default")
+    const learned = c.config?.defaultContainer
+    if (typeof learned === "string" && learned) out.add(learned)
   }
   const def = db.select({ recallContainer: agents.recallContainer }).from(agents).where(eq(agents.isDefault, true)).get()
   if (def?.recallContainer) out.add(def.recallContainer)

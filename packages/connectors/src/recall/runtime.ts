@@ -203,11 +203,22 @@ export default defineRuntime(manifest, {
     // so forget has to compare against that same name. Asked once, kept while it answers.
     let serverDefault: Promise<string> | null = null
     const defaultContainer = () => {
-      serverDefault ??= api.defaultContainer(AbortSignal.timeout(5000)).catch((err) => {
-        serverDefault = null
-        throw err
-      })
+      serverDefault ??= api
+        .defaultContainer(AbortSignal.timeout(5000))
+        .then((name) => {
+          // Kept in the config so the dashboard knows this name is the owner's
+          // memory too (ownerContainers in core) and no other agent can take it.
+          if (ctx.config.defaultContainer !== name) ctx.patchConfig({ defaultContainer: name })
+          return name
+        })
+        .catch((err) => {
+          serverDefault = null
+          throw err
+        })
       return serverDefault
+    }
+    if (!ctx.config.container) {
+      defaultContainer().catch((err) => ctx.log.warn("recall default container unknown for now", { error: err }))
     }
 
     return {

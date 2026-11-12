@@ -14,6 +14,9 @@ export default defineManifest({
     container: z.string().trim().min(1).max(100).default("default"),
     autoRecall: z.boolean().default(true),
     autoSave: z.boolean().default(true),
+    // Learned at runtime, not set by hand: what recall calls its default
+    // container, for a connector stored without `container`.
+    defaultContainer: z.string().trim().min(1).max(100).optional(),
   }),
   secrets: { apiKey: z.string().regex(/^rcl_[A-Za-z0-9_-]+$/, "recall keys start with rcl_") },
   setup: [

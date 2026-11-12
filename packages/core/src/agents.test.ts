@@ -64,6 +64,25 @@ describe("agents", () => {
     expect(memoryScope(palui)).toEqual({ container: undefined, read: ["kb-menu"], locked: true })
   })
 
+  // The report (2026-11-13): the recall connector has no container picked, so the
+  // owner's memory is recall's default (zaki on that server). The check only knew
+  // "default", so another agent could add zaki to its shared list.
+  it("reserves recall's default container when the connector has none picked", () => {
+    const db = memoryDb()
+    db.insert(connectors).values({ id: "recall", type: "recall", kind: "memory", label: "recall", enabled: true, status: "on", config: { url: "http://x" }, createdAt: 1, updatedAt: 1 }).run()
+    const shop = createAgent(db, { slug: "shop", name: "Shop", persona: "p" })
+    // Not learned yet: only "default" is known.
+    expect(() => updateAgent(db, shop.id, { recallReadContainers: ["default"] })).toThrow(/owner's memory/)
+    db.update(connectors).set({ config: { url: "http://x", defaultContainer: "zaki" } }).where(eq(connectors.id, "recall")).run()
+    expect(() => updateAgent(db, shop.id, { recallReadContainers: ["zaki"] })).toThrow(/zaki is the owner's memory/)
+    expect(() => updateAgent(db, shop.id, { recallContainer: "zaki" })).toThrow(/zaki is the owner's memory/)
+    expect(() => createAgent(db, { slug: "spy", name: "Spy", persona: "p", recallReadContainers: ["zaki"] })).toThrow(/owner's memory/)
+    expect(agentReadContainers(updateAgent(db, shop.id, { recallReadContainers: ["kb-menu"] }))).toEqual(["kb-menu"])
+    // A picked container wins over the learned default.
+    db.update(connectors).set({ config: { url: "http://x", container: "owner", defaultContainer: "zaki" } }).where(eq(connectors.id, "recall")).run()
+    expect(() => updateAgent(db, shop.id, { recallReadContainers: ["owner"] })).toThrow(/owner's memory/)
+  })
+
   it("keeps an avatar photo small and the icon and color to known names", () => {
     const db = memoryDb()
     const a = createAgent(db, { slug: "cs", name: "CS", persona: "p", avatarIcon: "headset", avatarColor: "teal" })
