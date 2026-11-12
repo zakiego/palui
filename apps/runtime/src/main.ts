@@ -18,6 +18,7 @@ import { createSupervisor, type Supervisor } from "@palui/core/connectors/superv
 import { connectorFlowCaller } from "@palui/core/flows/call"
 import { connectorToolCaller } from "@palui/core/tools/call"
 import { getSetting } from "@palui/core/settings"
+import { type BuildInfo, loadBuildInfo } from "@palui/core/build-info"
 import { announceDeploy } from "@palui/core/deploy-notice"
 import { PALUI_VERSION } from "@palui/core/version"
 import { createControlServer } from "./control"
@@ -29,6 +30,9 @@ export type DepsFactory = (ctx: { db: DB; engine: Engine; log: Logger; superviso
 export type RuntimeOptions = {
   // The version to report as running (default: PALUI_VERSION). Tests set it.
   version?: string
+  // The commit this build was made from (default: build-info.json via
+  // PALUI_BUILD_INFO, or none). Tests set it.
+  build?: BuildInfo | null
   deps?: EngineDeps | DepsFactory
   // Connector runtimes by manifest id (default: @palui/connectors/runtimes).
   registry?: Record<string, AnyRuntime>
@@ -112,8 +116,9 @@ export async function startRuntime(opts: RuntimeOptions = {}): Promise<Runtime> 
   await deps.scheduler?.start()
   // After the worker and channels are up, so the notice goes out right away.
   try {
-    const notice = announceDeploy(db, opts.version ?? PALUI_VERSION)
-    if (notice.sent) log.info("deploy notice queued", { chats: notice.chatIds.length, skipped: notice.skipped })
+    const build = opts.build === undefined ? loadBuildInfo() : opts.build
+    const notice = announceDeploy(db, opts.version ?? PALUI_VERSION, build)
+    if (notice.sent) log.info("deploy notice queued", { chats: notice.chatIds.length, skipped: notice.skipped, commit: build?.commit ?? null })
   } catch (e) {
     log.error("deploy notice failed", { error: e })
   }

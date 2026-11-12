@@ -644,7 +644,7 @@ export const id: Record<Key, string> = {
   "chats.allowedFor": "Jawab di {name}",
   "agents.deployNotice": "Kabar versi baru",
   "agents.deployNoticeFor": "Kabar versi baru di {name}",
-  "agents.deployNoticeHint": "Kabar versi baru mengirim satu pesan ke chat itu saat versi baru Palui mulai jalan.",
+  "agents.deployNoticeHint": "Kabar versi baru mengirim satu pesan ke chat itu saat versi atau commit baru Palui mulai jalan.",
   "chats.agentSaved": "Sekarang {name} yang jawab di sini",
   "chats.agentSavedNoMemory": "Sekarang {name} yang jawab di sini. Runtime mati, jadi sesi lama gak tersimpan ke memori.",
   "chats.botChat": "Masuk lewat bot {name}",

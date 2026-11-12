@@ -11,6 +11,10 @@
 #      deploy. Only a missing volume (first deploy) skips the backup.
 #   2. If scripts/backup.sh changed, reinstall the nightly backup agent so the
 #      installed copy in ~/selfhost/bin doesn't drift from the repo.
+#   3. Write build-info.json (the commit being deployed and the subjects before
+#      it) for the Dockerfile to copy into the image. The runtime reads it on
+#      start and tells the owner about a new commit. A failure only warns: the
+#      image then has no commit and the notice falls back to the version.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -89,4 +93,13 @@ if command -v launchctl >/dev/null && ! cmp -s scripts/backup.sh "$INSTALLED_BAC
   log "scripts/backup.sh differs from $INSTALLED_BACKUP, reinstalling the nightly backup"
   # A launchd hiccup shouldn't block the deploy, but it must be loud.
   "$INSTALL_BACKUP" || log "WARNING: install-backup.sh failed; the nightly backup still runs the old script"
+fi
+
+# A stale file from the last deploy would name the wrong commit, so it goes first.
+rm -f build-info.json
+if node scripts/build-info.ts; then
+  log "build-info.json: $(git rev-parse --short HEAD)"
+else
+  rm -f build-info.json
+  log "WARNING: couldn't write build-info.json; this image won't know its commit"
 fi

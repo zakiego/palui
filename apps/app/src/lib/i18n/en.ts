@@ -645,7 +645,7 @@ export const en = {
   "chats.allowedFor": "Answer in {name}",
   "agents.deployNotice": "New version notice",
   "agents.deployNoticeFor": "New version notice in {name}",
-  "agents.deployNoticeHint": "New version notice sends one message to that chat when a new version of Palui starts running.",
+  "agents.deployNoticeHint": "New version notice sends one message to that chat when a new version or a new commit of Palui starts running.",
   "chats.agentSaved": "{name} answers here now",
   "chats.agentSavedNoMemory": "{name} answers here now. The runtime is down, so the old session wasn't saved to memory.",
   "chats.botChat": "Came in on {name}'s bot",

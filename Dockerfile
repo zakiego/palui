@@ -44,6 +44,10 @@ COPY --from=build --chown=node:node /repo/apps/app/.output ./.output
 COPY --from=build --chown=node:node /out/runtime/dist ./runtime/dist
 COPY --from=build --chown=node:node /out/runtime/node_modules ./runtime/node_modules
 COPY --from=build --chown=node:node /out/runtime/package.json ./runtime/package.json
+# build-info.json names the commit (scripts/pre-deploy.sh writes it before the
+# build). Optional: the glob lets a local build without it still copy package.json.
+COPY --chown=node:node package.json build-info.jso[n] ./build/
+ENV PALUI_BUILD_INFO=/app/build/build-info.json
 EXPOSE 3000
 VOLUME ["/data"]
 CMD ["node", ".output/server/index.mjs"]

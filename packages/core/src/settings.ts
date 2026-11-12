@@ -35,6 +35,9 @@ export type Settings = {
   deployNoticeChats: string[]
   // The version the runtime last started with, so a deploy is noticed once.
   lastRunVersion: string | null
+  // The commit the runtime last started with (from build-info.json). Null until a
+  // build that knows its commit runs.
+  lastRunCommit: string | null
 }
 
 export const DEFAULT_PERSONA = `Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.
@@ -77,6 +80,7 @@ export const DEFAULT_SETTINGS: Settings = {
   firstRun: { saidHi: false, dismissed: false },
   deployNoticeChats: [],
   lastRunVersion: null,
+  lastRunCommit: null,
 }
 
 export function getSetting<K extends keyof Settings>(db: DB, key: K): Settings[K] {
