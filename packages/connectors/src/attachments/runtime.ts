@@ -7,6 +7,7 @@ import { z } from "zod"
 import type { DB } from "@palui/db"
 import { config, masterKey } from "@palui/core/config"
 import { defineRuntime, type PaluiTool, type TurnInfo } from "@palui/core/connectors/define"
+import { attachmentRef } from "@palui/core/attachments/refs"
 import {
   AttachmentError,
   countAttachments,
@@ -23,6 +24,9 @@ import { createShare, revokeShares, SHARE_DURATION_KEYS, shareUrl } from "@palui
 import manifest from "./manifest"
 
 type Fail = { ok: false; error: string }
+
+const FILE_REF_HINT =
+  "To hand the file to another app's tool (for example to upload a receipt and attach it to a transaction there), pass `fileRef` as that tool's file argument where it asks for the file's contents or a base64 data URL; Palui fills in the file. Another app can't read this file's id, so never pass `id` as that app's own attachment id: upload the file there first and use the id that app returns."
 
 function fail(e: unknown): Fail {
   if (e instanceof AttachmentError) return { ok: false, error: e.message }
@@ -47,6 +51,8 @@ function view(a: AttachmentMeta, appUrl: string) {
     savedAt: new Date(a.createdAt).toISOString(),
     // The dashboard page, which needs a sign-in. share_attachment makes a link that opens the file itself.
     url: `${appUrl}/app/attachments?id=${a.id}`,
+    // Pass as another tool's file argument; Palui swaps in the file's contents.
+    fileRef: attachmentRef(a.id),
   }
 }
 
@@ -71,7 +77,7 @@ export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOpti
       title: "Save an attachment",
       tool: tool({
         description:
-          "Save a file the owner sent in the current message (photo, PDF, document) so it can be found later. Only save files that are worth keeping: identity documents (KTP, SIM, passport, KK), receipts and invoices, tickets and bookings, contracts, certificates, medical or school records, or anything the owner asks you to keep. Do NOT save casual photos, memes, screenshots of chats or files that are only needed for this one answer, unless the owner asks. When unsure, ask the owner first. Give it a clear title and a one-sentence description of what it is (dates, numbers, names that help find it later). Tell the owner it was saved.",
+          "Save a file the owner sent in the current message (photo, PDF, document) so it can be found later. Only save files that are worth keeping: identity documents (KTP, SIM, passport, KK), receipts and invoices, tickets and bookings, contracts, certificates, medical or school records, or anything the owner asks you to keep. Do NOT save casual photos, memes, screenshots of chats or files that are only needed for this one answer, unless the owner asks. When unsure, ask the owner first. Give it a clear title and a one-sentence description of what it is (dates, numbers, names that help find it later). Tell the owner it was saved. " + FILE_REF_HINT,
         inputSchema: z.object({
           nomor: z
             .number()
@@ -134,7 +140,7 @@ export function attachmentTools(db: DB, turn: TurnInfo, opts: AttachmentToolOpti
       title: "Get a saved attachment",
       tool: tool({
         description:
-          "Get one saved file's details by id: title, description, type, size, when it was saved, and the dashboard link where the owner can open or download it after signing in. Files can't be sent back into the chat yet; to give someone the file itself, call share_attachment.",
+          "Get one saved file's details by id: title, description, type, size, when it was saved, and the dashboard link where the owner can open or download it after signing in. Files can't be sent back into the chat yet; to give someone the file itself, call share_attachment. " + FILE_REF_HINT,
         inputSchema: z.object({ id: z.string().min(1).max(64) }),
         execute: async (input) => {
           const a = own(input.id)

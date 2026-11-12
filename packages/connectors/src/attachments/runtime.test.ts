@@ -51,6 +51,7 @@ describe("attachment tools", () => {
     })
     expect(tools.save_attachment!.tool.description).toMatch(/Only save files that are worth keeping/)
     expect(tools.save_attachment!.tool.description).toMatch(/Do NOT save casual photos/)
+    expect(tools.save_attachment!.tool.description).toMatch(/pass `fileRef`/)
   })
 
   it("saves the file from the batch run, asks for nomor when there are several, and dedupes", async () => {
@@ -69,6 +70,7 @@ describe("attachment tools", () => {
     const saved = await call(tools.save_attachment, { nomor: 2, title: "Tiket BDJ-CGK", description: "Tiket pesawat 12 Des" })
     expect(saved).toMatchObject({ ok: true, deduped: false, message: 'Oke, "Tiket BDJ-CGK" udah aku simpan.', attachment: { title: "Tiket BDJ-CGK", kind: "document", filename: "tiket.pdf", mimeType: "application/pdf" } })
     expect(saved.attachment.url).toBe(`https://palui.test/app/attachments?id=${saved.attachment.id}`)
+    expect(saved.attachment.fileRef).toBe(`palui:attachment/${saved.attachment.id}`)
     expect(readAttachment(db, saved.attachment.id, KEY)!.meta).toMatchObject({ chatId: chat.id, runId: "run_2" })
     expect(await call(tools.save_attachment, { nomor: 2, title: "lagi" })).toMatchObject({ ok: true, deduped: true })
   })
