@@ -1,5 +1,8 @@
-import type { ToolClass } from "@palui/db"
-import { defineRuntime, type ConfigOf, type PaluiTool, type SecretsOf } from "@palui/core/connectors/define"
+import type { Tool } from "ai"
+import type { DB, ToolClass } from "@palui/db"
+import { AttachmentRefError, findAttachmentRefs, resolveAttachmentRefs } from "@palui/core/attachments/refs"
+import { masterKey } from "@palui/core/config"
+import { defineRuntime, type ConfigOf, type PaluiTool, type SecretsOf, type TurnInfo } from "@palui/core/connectors/define"
 import { publicOnlyFetch } from "@palui/core/net/ssrf"
 import { authHeaders, McpConnection, suggestClass, type McpEndpoint, type McpToolDef } from "./client"
 import manifest from "./manifest"
@@ -61,6 +64,28 @@ export function selectTools(defs: McpToolDef[], prefs: ToolPrefs = {}): { def: M
   return out
 }
 
+// Saved files go out as `palui:attachment/<id>` refs, swapped for a data URL just
+// before the call. An external server never gets the owner's files.
+function withFileRefs(t: Tool, db: DB, turn: TurnInfo | undefined, untrusted: boolean, key: () => string): Tool {
+  const execute = t.execute
+  if (!execute) return t
+  return {
+    ...t,
+    execute: async (input: unknown, options: Parameters<typeof execute>[1]) => {
+      if (!findAttachmentRefs(input).length) return await execute(input, options)
+      if (untrusted || !turn) return { ok: false, error: "Saved files can only be sent to a server the owner marked as their own." }
+      let resolved: unknown
+      try {
+        resolved = resolveAttachmentRefs(db, input, { chatId: turn.chatId, masterKey: key() })
+      } catch (err) {
+        if (err instanceof AttachmentRefError) return { ok: false, error: err.message }
+        throw err
+      }
+      return await execute(resolved, options)
+    },
+  }
+}
+
 function errorText(err: unknown): string {
   const msg = (err as Error)?.message ?? String(err)
   if (/401|unauthori[sz]ed/i.test(msg)) return `The server rejected the token (401): ${msg}`
@@ -102,7 +127,7 @@ export default defineRuntime(manifest, {
       async stop() {
         await conn.close()
       },
-      async tools() {
+      async tools(turn) {
         // A failed listing or connect marks the connector as errored (shown on the
         // Connectors page) instead of quietly offering no tools.
         let defs: McpToolDef[]
@@ -131,7 +156,7 @@ export default defineRuntime(manifest, {
         for (const p of picked) {
           const t = aiTools[p.def.name]
           if (!t) continue
-          out[p.def.name] = { tool: t, class: p.class, untrusted, flowApproval: p.flowApproval, title: p.def.title ?? p.def.annotations?.title ?? p.def.name }
+          out[p.def.name] = { tool: withFileRefs(t, ctx.db, turn, untrusted, masterKey), class: p.class, untrusted, flowApproval: p.flowApproval, title: p.def.title ?? p.def.annotations?.title ?? p.def.name }
         }
         return out
       },

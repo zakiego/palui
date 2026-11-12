@@ -2,6 +2,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { afterEach, describe, expect, it } from "vitest"
 import { z } from "zod"
 import type { ConfigOf, PaluiTool, TurnInfo } from "@palui/core/connectors/define"
+import { saveAttachment } from "@palui/core/attachments/service"
+import { masterKey } from "@palui/core/config"
+import { ensureChat } from "@palui/core/chats"
 import { suggestClass } from "./client"
 import manifest from "./manifest"
 import runtime from "./runtime"
@@ -183,5 +186,55 @@ describe("flow approval per tool (RFC flows 7.2)", () => {
       ["list", "version"],
     ])
     expect(listingFor(defs as never, prefs).map((t) => t.flowApproval)).toEqual(["every_run", "version"])
+  })
+})
+
+describe("saved files in tool args", () => {
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46])
+  const registerUpload = (server: McpServer) => {
+    server.registerTool("upload_attachment", { description: "Upload a file", inputSchema: { file: z.string() } }, async ({ file }) => ({
+      content: [{ type: "text", text: `got ${file}` }],
+    }))
+  }
+
+  async function setupFile(trust: "own" | "external") {
+    srv = await startMcpServer({ register: registerUpload })
+    const ctx = fakeCtx(config(srv.url, { authMode: "none" }), {}, { trust })
+    const chat = ensureChat(ctx.db, { channel: "whatsapp", externalId: "120363@g.us" }, 0)
+    const other = ensureChat(ctx.db, { channel: "telegram", externalId: "42" }, 0)
+    const { row } = saveAttachment(ctx.db, { chatId: chat.id, title: "Struk", mimeType: "image/jpeg", bytes: JPEG }, masterKey(), 0)
+    const running = await runtime.start(ctx)
+    const tools = await running.tools!({ ...turn, chatId: chat.id })
+    return { running, tools, id: row.id, otherChatId: other.id, chatId: chat.id }
+  }
+
+  it("sends the file's contents to an own server in place of its ref", async () => {
+    const { running, tools, id } = await setupFile("own")
+    try {
+      const out = (await exec(tools.upload_attachment, { file: `palui:attachment/${id}` })) as { content: { text: string }[] }
+      expect(out.content[0]?.text).toBe(`got data:image/jpeg;base64,${JPEG.toString("base64")}`)
+      // A plain id isn't a ref and goes through as is.
+      expect(((await exec(tools.upload_attachment, { file: id })) as { content: { text: string }[] }).content[0]?.text).toBe(`got ${id}`)
+    } finally {
+      await running.stop()
+    }
+  })
+
+  it("refuses a ref from another chat and never sends files to an external server", async () => {
+    const own = await setupFile("own")
+    try {
+      const other = await own.running.tools!({ ...turn, chatId: own.otherChatId })
+      expect(await exec(other.upload_attachment, { file: `palui:attachment/${own.id}` })).toMatchObject({ ok: false, error: expect.stringContaining("No saved attachment") })
+    } finally {
+      await own.running.stop()
+      await srv?.close()
+      srv = undefined
+    }
+    const ext = await setupFile("external")
+    try {
+      expect(await exec(ext.tools.upload_attachment, { file: `palui:attachment/${ext.id}` })).toMatchObject({ ok: false, error: expect.stringContaining("own") })
+    } finally {
+      await ext.running.stop()
+    }
   })
 })
