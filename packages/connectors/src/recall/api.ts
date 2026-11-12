@@ -92,10 +92,22 @@ export class RecallApi {
     return res.containers ?? []
   }
 
-  profile(container: string, q: string | undefined, signal?: AbortSignal) {
-    const params = new URLSearchParams({ container })
+  // No container means recall's own default (RECALL_DEFAULT_CONTAINER on the server).
+  profile(container: string | undefined, q: string | undefined, signal?: AbortSignal) {
+    const params = new URLSearchParams()
+    if (container) params.set("container", container)
     if (q) params.set("q", q.slice(0, 2000))
-    return this.call<RecallProfile>("GET", `/v1/profile?${params}`, { signal })
+    const query = params.toString() ? `?${params}` : ""
+    return this.call<RecallProfile>("GET", `/v1/profile${query}`, { signal })
+  }
+
+  // The name recall gives its default container: a profile asked for without
+  // a container answers with the one it used.
+  async defaultContainer(signal?: AbortSignal): Promise<string> {
+    const p = await this.profile(undefined, undefined, signal)
+    const name = typeof p?.container === "string" ? p.container.trim() : ""
+    if (!name) throw new RecallError(0, "recall didn't say which container is its default")
+    return name
   }
 
   search(container: string, q: string, limit = 10, signal?: AbortSignal) {
@@ -105,10 +117,10 @@ export class RecallApi {
     })
   }
 
-  addMemory(input: { container: string; content: string; title?: string; sourceId?: string }, signal?: AbortSignal) {
+  addMemory(input: { container?: string; content: string; title?: string; sourceId?: string }, signal?: AbortSignal) {
     return this.call<RecallAddResult>("POST", "/v1/memories", {
       body: {
-        container: input.container,
+        ...(input.container ? { container: input.container } : {}),
         content: input.content,
         ...(input.title ? { title: input.title.slice(0, 300) } : {}),
         ...(input.sourceId ? { source_id: normalizeSourceId(input.sourceId) } : {}),

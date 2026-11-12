@@ -34,7 +34,10 @@ function registerRecallTools(seenArgs: Record<string, unknown>[]) {
   }
 }
 
-type FakeOpts = { profileDelayMs?: number; profile?: Record<string, unknown> }
+type FakeOpts = { profileDelayMs?: number; profile?: Record<string, unknown>; profileDown?: boolean }
+
+// What the fake recall uses when a call names no container (RECALL_DEFAULT_CONTAINER).
+const SERVER_DEFAULT = "zaki"
 
 async function fakeRecall(opts: FakeOpts = {}) {
   const seen: Seen[] = []
@@ -57,12 +60,13 @@ async function fakeRecall(opts: FakeOpts = {}) {
       if (url.pathname === "/v1/profile") {
         if (opts.profileDelayMs) await new Promise((r) => setTimeout(r, opts.profileDelayMs))
         if (res.destroyed) return true
+        if (opts.profileDown) return send(res, 500, { error: { type: "internal", message: "boom" } }), true
         return (
           send(
             res,
             200,
             opts.profile ?? {
-              container: url.searchParams.get("container"),
+              container: url.searchParams.get("container") ?? SERVER_DEFAULT,
               static: "Zaki lives in Banjarbaru.",
               dynamic: "Building Palui.",
               updatedAt: 1,
@@ -76,7 +80,7 @@ async function fakeRecall(opts: FakeOpts = {}) {
       }
       if (url.pathname === "/v1/memories" && req.method === "POST") {
         const b = JSON.parse(raw) as { container: string; source_id?: string }
-        return send(res, 202, { id: "doc_1", container: b.container, status: "queued", sourceId: b.source_id ?? null, duplicate: false }), true
+        return send(res, 202, { id: "doc_1", container: b.container ?? SERVER_DEFAULT, status: "queued", sourceId: b.source_id ?? null, duplicate: false }), true
       }
       if (url.pathname.startsWith("/v1/documents/") && (req.method === "DELETE" || req.method === "GET")) {
         const id = decodeURIComponent(url.pathname.split("/").pop() ?? "")
@@ -100,6 +104,9 @@ async function fakeRecall(opts: FakeOpts = {}) {
 
 type Config = ConfigOf<typeof manifest>
 const cfg = (url: string, extra: Partial<Config> = {}): Config => manifest.config.parse({ url, container: "zaki", ...extra })
+// A config as the dashboard stores it when no container was picked: the
+// runtime gets it as is, without the manifest's defaults.
+const savedWithoutContainer = (url: string) => ({ url, autoRecall: true, autoSave: true }) as unknown as Config
 
 let srv: TestMcpServer | undefined
 afterEach(async () => {
@@ -308,6 +315,100 @@ describe("recall runtime", () => {
 
   it("start() fails when recall is unreachable", async () => {
     await expect(runtime.start(fakeCtx(cfg("http://127.0.0.1:1"), { apiKey: KEY }))).rejects.toThrow(/Can't reach recall/)
+  })
+})
+
+// The report (2026-11-13): the recall connector was saved without a container
+// and Palui has no override, so add_memory landed in recall's default (zaki)
+// while forget_memory and forget_document compared against an empty name and
+// answered "No memory with that id" for the fact Palui had just saved.
+describe("recall's default container (connector saved without one)", () => {
+  const palui = { ...turn, agentId: "agt_palui", memory: { container: undefined, read: [] as string[], locked: true } }
+  const isDefaultProfile = (s: Seen) => s.path === "/v1/profile"
+
+  it("add_memory, forget_memory (ids) and forget_document all use the same container", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const running = await runtime.start(fakeCtx(savedWithoutContainer(f.base), { apiKey: KEY }))
+    try {
+      const tools = await running.tools!(palui)
+      await exec(tools.add_memory, { content: "Kopi favorit Zaki adalah kopi susu" })
+      await exec(tools.search_memories, { query: "kopi susu" })
+      expect(f.toolArgs).toEqual([
+        { tool: "add_memory", content: "Kopi favorit Zaki adalah kopi susu", container: "zaki" },
+        { tool: "search_memories", query: "kopi susu", container: "zaki" },
+      ])
+      expect(await exec(tools.forget_memory, { ids: ["mem_1"] })).toEqual({ forgotten: 1, results: [{ forgotten: true, id: "mem_1", fact: "Old fact" }] })
+      expect(await exec(tools.forget_document, { id: "doc_1" })).toEqual({ deleted: true, id: "doc_1", title: "Old doc" })
+      expect(f.seen.filter((s) => s.method === "DELETE").map((s) => s.path)).toEqual(["/v1/memories/mem_1", "/v1/documents/doc_1"])
+
+      // Asked once, not on every turn.
+      await running.tools!(palui)
+      expect(f.seen.filter(isDefaultProfile)).toHaveLength(1)
+    } finally {
+      await running.stop()
+    }
+  })
+
+  it("still refuses another agent's ids without saying what they hold", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const running = await runtime.start(fakeCtx(savedWithoutContainer(f.base), { apiKey: KEY }))
+    try {
+      const paluiTools = await running.tools!(palui)
+      expect(await exec(paluiTools.forget_memory, { ids: ["mem_2"] })).toEqual({ forgotten: 0, results: [{ forgotten: false, id: "mem_2", error: "No memory with that id" }] })
+      expect(await exec(paluiTools.forget_document, { id: "doc_2" })).toEqual({ deleted: false, id: "doc_2", error: "No document with that id" })
+
+      // And the other way: an agent with its own container can't forget the owner's.
+      const chef = await running.tools!({ ...turn, agentId: "agt_chef", memory: { container: "agent-chef", read: [], locked: true } })
+      expect(await exec(chef.forget_memory, { ids: ["mem_1"] })).toEqual({ forgotten: 0, results: [{ forgotten: false, id: "mem_1", error: "No memory with that id" }] })
+      expect(await exec(chef.forget_document, { id: "doc_1" })).toEqual({ deleted: false, id: "doc_1", error: "No document with that id" })
+      expect(f.seen.filter((s) => s.method === "DELETE")).toEqual([])
+    } finally {
+      await running.stop()
+    }
+  })
+
+  it("names the containers an agent may use when it refuses one", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const running = await runtime.start(fakeCtx(savedWithoutContainer(f.base), { apiKey: KEY }))
+    try {
+      const tools = await running.tools!(palui)
+      await expect(exec(tools.search_memories, { query: "x", container: "agent-finansial" })).rejects.toThrow("This agent can't use recall container agent-finansial. It can read zaki.")
+      await expect(exec(tools.add_memory, { content: "x", container: "agent-finansial" })).rejects.toThrow("It can write zaki.")
+    } finally {
+      await running.stop()
+    }
+  })
+
+  it("forget tools refuse while recall won't say its default", async () => {
+    const f = await fakeRecall({ profileDown: true })
+    srv = f.server
+    const running = await runtime.start(fakeCtx(savedWithoutContainer(f.base), { apiKey: KEY }))
+    try {
+      const tools = await running.tools!(palui)
+      expect(await exec(tools.forget_memory, { ids: ["mem_1"] })).toMatchObject({ forgotten: 0, results: [{ forgotten: false, error: expect.stringMatching(/Can't tell which recall container/) }] })
+      expect(await exec(tools.forget_document, { id: "doc_1" })).toMatchObject({ deleted: false, error: expect.stringMatching(/Can't tell which recall container/) })
+      expect(f.seen.filter((s) => s.method === "DELETE")).toEqual([])
+      await expect(exec(tools.search_memories, { query: "x", container: "agent-finansial" })).rejects.toThrow("It can only use its own container.")
+    } finally {
+      await running.stop()
+    }
+  })
+
+  it("auto-recall and auto-save send no container instead of the word undefined", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const running = await runtime.start(fakeCtx(savedWithoutContainer(f.base), { apiKey: KEY }))
+    try {
+      await running.memory!.recall("what do I usually drink in the morning", { timeoutMs: 1500 })
+      await running.memory!.save({ sourceId: "s:1", content: "Likes kopi susu" })
+      expect(f.seen.find((s) => s.path.startsWith("/v1/profile"))?.path).toBe("/v1/profile?q=what+do+I+usually+drink+in+the+morning")
+      expect(f.seen.find((s) => s.method === "POST" && s.path === "/v1/memories")?.body).toEqual({ content: "Likes kopi susu", source_id: "s:1" })
+    } finally {
+      await running.stop()
+    }
   })
 })
 

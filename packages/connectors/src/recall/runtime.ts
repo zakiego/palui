@@ -42,7 +42,7 @@ export function createMemoryHandle(api: RecallApi, config: Config, stats: Recall
       }
       stats.calls++
       try {
-        const p = await api.profile(container ?? config.container, query, AbortSignal.timeout(timeoutMs))
+        const p = await api.profile(container || config.container || undefined, query, AbortSignal.timeout(timeoutMs))
         const text = profileText(p, about)
         if (text) stats.hits++
         else stats.empty++
@@ -56,7 +56,7 @@ export function createMemoryHandle(api: RecallApi, config: Config, stats: Recall
     },
     async save({ sourceId, content, title, container }) {
       if (!content.trim()) return
-      await api.addMemory({ container: container ?? config.container, content, title, sourceId })
+      await api.addMemory({ container: container || config.container || undefined, content, title, sourceId })
     },
   }
 }
@@ -65,10 +65,15 @@ export const FORGET_MAX = 20
 
 type ForgetScope = { container: string; locked: boolean }
 
+// A locked scope whose container is still unknown (recall didn't say what its
+// default is) touches nothing: comparing against "" would only ever say "not found".
+const UNKNOWN_CONTAINER = "Can't tell which recall container this agent uses right now. Try again in a moment."
+
 // REST tools: recall's MCP server has no forget, so they're DELETE calls. A
 // locked scope (every agent) may only touch its own container: the item is
 // looked up first, and any other container answers "not found".
 async function forgetOne(api: RecallApi, id: string, scope?: ForgetScope): Promise<{ forgotten: boolean; id: string; fact?: string; error?: string }> {
+  if (scope?.locked && !scope.container) return { forgotten: false, id, error: UNKNOWN_CONTAINER }
   try {
     if (scope?.locked) {
       const found = await api.getMemory(id)
@@ -108,6 +113,7 @@ export function forgetDocumentTool(api: RecallApi, scope?: ForgetScope): Tool {
     description: "Delete a document from recall by its id (doc_..., as add_memory returned it): its stored text stops showing up in searches. Facts already taken from it stay; forget those with forget_memory. Ask the owner first.",
     inputSchema: z.object({ id: z.string().min(1).describe("Document id, doc_...") }),
     execute: async ({ id }) => {
+      if (scope?.locked && !scope.container) return { deleted: false, id, error: UNKNOWN_CONTAINER }
       try {
         const found = await api.getDocument(id)
         if (scope?.locked && found.document?.container !== scope.container) return { deleted: false, id, error: "No document with that id" }
@@ -132,8 +138,9 @@ export function resolveContainer(asked: unknown, cls: ToolClass, scope: { contai
   if (!name || name === scope.container) return scope.container
   if (!scope.locked) return name
   if (cls === "read" && scope.read.includes(name)) return name
-  const allowed = cls === "read" ? [scope.container, ...scope.read] : [scope.container]
-  throw new ContainerError(`This agent can't use recall container ${name.slice(0, 64)}. It can ${cls === "read" ? "read" : "write"} ${allowed.join(", ")}.`)
+  const allowed = (cls === "read" ? [scope.container, ...scope.read] : [scope.container]).filter(Boolean)
+  const can = allowed.length ? `It can ${cls === "read" ? "read" : "write"} ${allowed.join(", ")}.` : "It can only use its own container."
+  throw new ContainerError(`This agent can't use recall container ${name.slice(0, 64)}. ${can}`)
 }
 
 function withContainer(t: Tool, cls: ToolClass, scope: { container: string; read: string[]; locked: boolean }): Tool {
@@ -151,9 +158,11 @@ function withContainer(t: Tool, cls: ToolClass, scope: { container: string; read
 // The turn's scope with the connector's container filled in. No scope (the
 // catalog, a caller that didn't say whose turn it is): the connector's own
 // container, locked, so nothing without a scope can name another container.
-export function turnScope(turn: Pick<TurnInfo, "memory"> | undefined, fallback: string): { container: string; read: string[]; locked: boolean } {
+// "" means neither names one, so it's recall's own default: the caller puts
+// that name in before any tool compares containers.
+export function turnScope(turn: Pick<TurnInfo, "memory"> | undefined, fallback: string | undefined): { container: string; read: string[]; locked: boolean } {
   const m = turn?.memory
-  return { container: m?.container || fallback, read: m?.read ?? [], locked: m ? m.locked : true }
+  return { container: m?.container || fallback || "", read: m?.read ?? [], locked: m ? m.locked : true }
 }
 
 function explain(err: unknown): string {
@@ -189,6 +198,17 @@ export default defineRuntime(manifest, {
     const mcp = new McpConnection({ url: api.mcpUrl, headers: { Authorization: `Bearer ${ctx.secrets.apiKey}` } })
     const stats: RecallStats = { calls: 0, hits: 0, empty: 0, skippedShort: 0, timeouts: 0, errors: 0 }
     let mcpError: string | null = null
+    // A connector saved without a container (and Palui with no override) uses
+    // recall's default. add_memory and search send no container and land there,
+    // so forget has to compare against that same name. Asked once, kept while it answers.
+    let serverDefault: Promise<string> | null = null
+    const defaultContainer = () => {
+      serverDefault ??= api.defaultContainer(AbortSignal.timeout(5000)).catch((err) => {
+        serverDefault = null
+        throw err
+      })
+      return serverDefault
+    }
 
     return {
       memory: createMemoryHandle(api, ctx.config, stats),
@@ -197,6 +217,13 @@ export default defineRuntime(manifest, {
       },
       async tools(turn) {
         const scope = turnScope(turn, ctx.config.container)
+        if (!scope.container) {
+          try {
+            scope.container = await defaultContainer()
+          } catch (err) {
+            ctx.log.warn("recall default container unknown, forget tools refuse until it answers", { error: err })
+          }
+        }
         const out: Record<string, PaluiTool> = {
           forget_memory: { tool: forgetTool(api, scope), class: "destructive", title: "Forget memory" },
           forget_document: { tool: forgetDocumentTool(api, scope), class: "destructive", title: "Delete document" },
