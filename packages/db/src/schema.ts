@@ -801,6 +801,11 @@ export const preferences = sqliteTable("preferences", {
 
 export type OwnerPowers = "off" | "approve"
 export type GuestTools = "none" | "safe"
+// Per-agent tool permissions, set by the owner on the agent page. `allow` runs
+// without asking in turns the owner started, `ask` always asks, `deny` hides the
+// tool from the agent. A tool with no entry follows `allowAll`, else its class rule.
+export type ToolPermission = "allow" | "ask" | "deny"
+export type ToolPermissions = { allowAll: boolean; tools: Record<string, ToolPermission> }
 
 // A named persona with its own instructions, memory container and daily cap.
 // Exactly one is the default (Palui, the owner's personal agent).
@@ -816,6 +821,8 @@ export const agents = sqliteTable("agents", {
   guestTools: text("guest_tools").$type<GuestTools>().notNull().default("safe"),
   // Tokens per day across all its chats; 0 means no cap of its own.
   dailyTokenCap: integer("daily_token_cap").notNull().default(0),
+  // null: no overrides, every tool follows its class rule.
+  toolPermissions: json<ToolPermissions>("tool_permissions"),
   telegramConnectorId: text("telegram_connector_id").unique(),
   // Avatar (PLAN 19.7): an uploaded photo wins, else an icon on a color, else the default.
   // The photo is a small data URL (resized in the browser, capped in core/agents.ts).
