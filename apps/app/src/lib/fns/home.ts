@@ -4,7 +4,7 @@ import { config, masterKey } from "@palui/core/config"
 import { getAllSettings, getSetting, setSetting } from "@palui/core/settings"
 import { createServerFn } from "@tanstack/react-start"
 import { statusSummary } from "@/server/events-stream"
-import { firstRunFacts, nextReminders, recentRuns, startOfDay, tokensSince } from "@/server/queries"
+import { firstRunFacts, nextReminders, recentRuns, startOfDay, tokensSince, usage } from "@/server/queries"
 import { runtime } from "@/server/runtime"
 import { listConnectorItems } from "@/server/connectors"
 import { requireUser, requireWriter } from "@/server/session"
@@ -56,6 +56,8 @@ export const getHome = createServerFn({ method: "GET" }).handler(async () => {
     reminders: nextReminders(db, 3),
     runs: recentRuns(db, 5),
     tokens: tokensSince(db, startOfDay(settings.timezone)),
+    // Tokens per day for the last 7 days, today last: the bars under today's total.
+    week: usage(db, settings.timezone, 7).days,
     timezone: settings.timezone,
     webChatId: ensureWebChat(db).id,
     runtimeUp,
