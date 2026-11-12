@@ -113,8 +113,7 @@ export async function startRuntime(opts: RuntimeOptions = {}): Promise<Runtime> 
   // After the worker and channels are up, so the notice goes out right away.
   try {
     const notice = announceDeploy(db, opts.version ?? PALUI_VERSION)
-    if (notice.sent) log.info("deploy notice queued", { chatId: notice.chatId })
-    else if (notice.reason === "chat-gone") log.warn("deploy notice skipped: its chat is gone or off")
+    if (notice.sent) log.info("deploy notice queued", { chats: notice.chatIds.length, skipped: notice.skipped })
   } catch (e) {
     log.error("deploy notice failed", { error: e })
   }

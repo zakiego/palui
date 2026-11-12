@@ -31,8 +31,8 @@ export type Settings = {
   turnsPausedUntil: number | null
   turnsPausedReason: string | null
   firstRun: { saidHi: boolean; dismissed: boolean }
-  // Message a chat when a new version starts running. Off by default.
-  deployNotice: { enabled: boolean; chatId: string | null }
+  // Chats that get a message when a new version starts running. Empty (off) by default.
+  deployNoticeChats: string[]
   // The version the runtime last started with, so a deploy is noticed once.
   lastRunVersion: string | null
 }
@@ -75,7 +75,7 @@ export const DEFAULT_SETTINGS: Settings = {
   turnsPausedUntil: null,
   turnsPausedReason: null,
   firstRun: { saidHi: false, dismissed: false },
-  deployNotice: { enabled: false, chatId: null },
+  deployNoticeChats: [],
   lastRunVersion: null,
 }
 

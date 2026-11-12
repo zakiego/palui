@@ -48,7 +48,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useLiveRefresh } from "@/hooks/use-live-events"
 import { setConnectorOwnerFn } from "@/lib/fns/connectors"
-import { deleteAgentFn, getAgentMemoryFn, getAgentPage, getAgentToolsFn, saveAgentFn, setChatAllowedFn, setChatReplyModeFn } from "@/lib/fns/agents"
+import { deleteAgentFn, getAgentMemoryFn, getAgentPage, getAgentToolsFn, saveAgentFn, setChatAllowedFn, setChatDeployNoticeFn, setChatReplyModeFn } from "@/lib/fns/agents"
 import { ago, errorMessage } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 
@@ -371,7 +371,9 @@ function AgentSettings({ data }: { data: Loaded }) {
 
         {tab === "chats" && (
           <div id="agent-panel-chats" className="flex w-full max-w-2xl flex-col gap-4">
-            <p className="text-sm text-pretty text-muted-foreground">{isDefault ? t("agents.chatsBodyDefault") : t("agents.chatsBody", { slug: agent.slug })}</p>
+            <p className="text-sm text-pretty text-muted-foreground">
+              {isDefault ? t("agents.chatsBodyDefault") : t("agents.chatsBody", { slug: agent.slug })} {t("agents.deployNoticeHint")}
+            </p>
             {data.chats.length === 0 ? (
               <Empty className="border border-dashed p-6">
                 <EmptyHeader>
@@ -562,6 +564,8 @@ function ChatRow({ chat }: { chat: AgentChat }) {
   const [replyMode, setReplyMode] = React.useState(chat.replyMode)
   React.useEffect(() => setAllowed(chat.allowed), [chat.allowed])
   React.useEffect(() => setReplyMode(chat.replyMode), [chat.replyMode])
+  const [notice, setNotice] = React.useState(chat.deployNotice)
+  React.useEffect(() => setNotice(chat.deployNotice), [chat.deployNotice])
   const { Icon, label } = CHANNEL[chat.channel]
 
   const changeMode = async (next: string) => {
@@ -588,6 +592,17 @@ function ChatRow({ chat }: { chat: AgentChat }) {
     }
   }
 
+  const toggleNotice = async (next: boolean) => {
+    setNotice(next)
+    try {
+      await setChatDeployNoticeFn({ data: { chatId: chat.id, on: next } })
+      void router.invalidate()
+    } catch (err) {
+      setNotice(!next)
+      toast.error(errorMessage(err))
+    }
+  }
+
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-3 py-4 first:pt-0 last:pb-0">
       <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
@@ -608,7 +623,7 @@ function ChatRow({ chat }: { chat: AgentChat }) {
         </span>
       </div>
       {chat.channel !== "web" && (
-        <div className="ms-7 flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 sm:ms-0">
+        <div className="ms-7 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 sm:ms-0">
           {chat.kind === "group" && (
             <SimpleSelect
               size="sm"
@@ -625,6 +640,10 @@ function ChatRow({ chat }: { chat: AgentChat }) {
           <label className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">{t("chats.allowed")}</span>
             <Switch checked={allowed} onCheckedChange={(v) => void toggle(v)} aria-label={t("chats.allowedFor", { name: chat.title })} />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">{t("agents.deployNotice")}</span>
+            <Switch checked={notice} onCheckedChange={(v) => void toggleNotice(v)} aria-label={t("agents.deployNoticeFor", { name: chat.title })} />
           </label>
         </div>
       )}

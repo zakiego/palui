@@ -22,7 +22,6 @@ export const getSettingsPage = createServerFn({ method: "GET" }).handler(async (
       modelRoles: s.modelRoles,
       budgets: s.budgets,
       fallbackChannel: s.fallbackChannel,
-      deployNotice: s.deployNotice,
     },
     models: listConnectors(db)
       .filter((c) => c.kind === "model")

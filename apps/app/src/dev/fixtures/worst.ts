@@ -75,8 +75,6 @@ export function worst(k: Kit) {
   k.setting("timezone", TZ_LONG)
   k.setting("persona", fill(`${DEFAULT_PERSONA}\nSelalu sebut sumber data, tanggal pengambilan, dan zona waktunya. Jangan pernah menghapus apa pun tanpa persetujuan.\n\n`, LIMITS.persona))
   k.setting("fallbackChannel", "none")
-  // On, pointing at a chat that was removed: the card says to pick another one.
-  k.setting("deployNotice", { enabled: true, chatId: "chat_0mhremoved0000000000" })
   k.setting("budgets", { maxSteps: 50, turnTimeoutMs: 600_000, maxTools: 128, dailyTokenCap: 100_000_000, maxRunsPerHour: 1000 })
   const sixSteps = [
     { connectorId: "cliproxy", model: within(MODEL_LONG, LIMITS.model), effort: "xhigh" as const },
@@ -497,6 +495,9 @@ export function worst(k: Kit) {
   k.passkey({ name: "هاتف نور الهدى", createdAt: now - 12 * D })
   k.passkey({ name: "YubiKey-5C-NFC-FIPS-serial-0123456789-office-backup-key-do-not-lose", deviceType: "singleDevice", backedUp: false, createdAt: now + 2 * H })
   k.passkey({ name: "   ", createdAt: 0 })
+
+  // New version notice on in two chats, plus one that was removed since.
+  k.setting("deployNoticeChats", [family.id, arabic.id, "chat_0mhremoved0000000000"])
 
   k.hook({ name: within("github-actions-deploy-notifications-northwind-industries-pro", LIMITS.hookName), chatId: family.id, mode: "summarize", lastAt: now - 20_000, slug: "9f8e7d6c5b4a4c3d" })
   k.hook({ name: "J", chatId: jo.id, lastAt: null })
