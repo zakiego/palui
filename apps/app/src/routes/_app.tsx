@@ -13,19 +13,22 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { LiveEventsProvider } from "@/hooks/use-live-events"
 import { authClient } from "@/lib/auth-client"
 import { getShell } from "@/lib/fns/home"
-import { getSession } from "@/lib/fns/session"
 import { LocaleProvider, useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import { currentViewer, forgetViewer, onViewerLost, seedViewer } from "@/lib/viewer"
 
 // Dev only: the fixture toggle (break-ui). The import is behind the dev check,
 // so a production build never loads or ships it.
 const FixtureToggle = import.meta.env.DEV ? React.lazy(() => import("@/components/dev/fixture-toggle")) : null
 
 export const Route = createFileRoute("/_app")({
+  // This runs before every page switch and every preload, and the page waits
+  // for it. So the viewer comes from the tab's memory (lib/viewer-cache.ts)
+  // instead of a round trip each time.
   beforeLoad: async ({ location }) => {
-    const session = await getSession()
-    if (!session.viewer) throw redirect({ to: "/login", search: { next: location.href } })
-    return { viewer: session.viewer }
+    const viewer = await currentViewer()
+    if (!viewer) throw redirect({ to: "/login", search: { next: location.href } })
+    return { viewer }
   },
   loader: () => getShell(),
   staleTime: 5_000,
@@ -110,8 +113,15 @@ function Shell() {
   const t = useT()
   const [commandOpen, setCommandOpen] = React.useState(false)
 
+  // The server rendered this page with a viewer it had just verified, so the
+  // first page switch doesn't need to ask again.
+  React.useEffect(() => seedViewer(viewer), [viewer])
+  // Signed out somewhere else: run the guard again, which sends this tab to /login.
+  React.useEffect(() => onViewerLost(() => void router.invalidate()), [router])
+
   const signOut = async () => {
     await authClient.signOut()
+    forgetViewer()
     await router.invalidate()
     await navigate({ to: "/login", search: {} })
   }

@@ -15,6 +15,7 @@ import { authClient, authErrorMessage, passkeyCancelled } from "@/lib/auth-clien
 import { errorMessage } from "@/lib/format"
 import { getSession } from "@/lib/fns/session"
 import { translate } from "@/lib/i18n"
+import { forgetViewer } from "@/lib/viewer"
 
 const t = (k: Parameters<typeof translate>[1]) => translate("en", k)
 
@@ -50,6 +51,7 @@ function LoginPage() {
         if (!passkeyCancelled(res.error)) setError(authErrorMessage(res.error, t("login.failed")))
         return
       }
+      forgetViewer()
       await router.invalidate()
       await router.navigate({ href: safeNext(next) })
     } catch (err) {
