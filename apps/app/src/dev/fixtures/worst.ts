@@ -496,6 +496,9 @@ export function worst(k: Kit) {
   k.passkey({ name: "YubiKey-5C-NFC-FIPS-serial-0123456789-office-backup-key-do-not-lose", deviceType: "singleDevice", backedUp: false, createdAt: now + 2 * H })
   k.passkey({ name: "   ", createdAt: 0 })
 
+  // New version notice on in two chats, plus one that was removed since.
+  k.setting("deployNoticeChats", [family.id, arabic.id, "chat_0mhremoved0000000000"])
+
   k.hook({ name: within("github-actions-deploy-notifications-northwind-industries-pro", LIMITS.hookName), chatId: family.id, mode: "summarize", lastAt: now - 20_000, slug: "9f8e7d6c5b4a4c3d" })
   k.hook({ name: "J", chatId: jo.id, lastAt: null })
   k.hook({ name: "تنبيهات النشر", chatId: arabic.id, lastAt: now - 3 * 365 * D })

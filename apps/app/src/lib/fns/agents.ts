@@ -3,6 +3,8 @@
 // every turn, so writes go straight to the table.
 import { AgentError, AGENT_COLORS, AGENT_ICONS, MAX_AVATAR_IMAGE, assignAgent, getAgent, createAgent, deleteAgent, getAgentBySlug, listAgents, MAX_AGENT_NAME, MAX_PERSONA, updateAgent } from "@palui/core/agents"
 import { rotateSession, setReplyMode } from "@palui/core/chats"
+import { setDeployNotice } from "@palui/core/deploy-notice"
+import { getSetting } from "@palui/core/settings"
 import { listInstructions } from "@palui/core/notes/service"
 import { chats, REPLY_MODES } from "@palui/db"
 import { createServerFn } from "@tanstack/react-start"
@@ -40,11 +42,12 @@ export const getAgentPage = createServerFn({ method: "GET" })
     const own = chatList(db, row.isDefault ? isNull(chats.agentId) : eq(chats.agentId, row.id))
     // A bot that belongs to another agent isn't offered.
     const taken = new Set(listAgents(db).filter((a) => a.id !== row.id && a.telegramConnectorId).map((a) => a.telegramConnectorId))
+    const notice = new Set(getSetting(db, "deployNoticeChats"))
     return {
       agent: agentView(db, row, own.length),
       bots: telegramBots(db).filter((b) => !taken.has(b.id)),
       instructions: listInstructions(db, { agentId: row.id }),
-      chats: own.slice(0, AGENT_CHATS_LIMIT).map((c) => ({ id: c.id, title: c.title, channel: c.channel, kind: c.kind, lastAt: c.lastAt, allowed: c.allowed, replyMode: c.replyMode })),
+      chats: own.slice(0, AGENT_CHATS_LIMIT).map((c) => ({ id: c.id, title: c.title, channel: c.channel, kind: c.kind, lastAt: c.lastAt, allowed: c.allowed, replyMode: c.replyMode, deployNotice: notice.has(c.id) })),
       chatsTotal: own.length,
     }
   })
@@ -144,5 +147,16 @@ export const setChatAllowedFn = createServerFn({ method: "POST" })
     const { db } = await requireWriter()
     const n = db.update(chats).set({ allowed: data.allowed }).where(eq(chats.id, data.chatId)).run().changes
     if (!n) throw new Error("That chat doesn't exist anymore.")
+    return { ok: true }
+  })
+
+// Off by default: a chat that has it on gets one message when a new version starts running.
+export const setChatDeployNoticeFn = createServerFn({ method: "POST" })
+  .validator(z.object({ chatId: z.string().min(1).max(100), on: z.boolean() }))
+  .handler(async ({ data }) => {
+    const { db } = await requireWriter()
+    const chat = db.select({ id: chats.id }).from(chats).where(eq(chats.id, data.chatId)).get()
+    if (!chat) throw new Error("That chat doesn't exist anymore.")
+    setDeployNotice(db, chat.id, data.on)
     return { ok: true }
   })
