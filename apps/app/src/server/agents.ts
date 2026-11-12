@@ -8,6 +8,7 @@ import { listInstructions } from "@palui/core/notes/service"
 import { runs, toolCalls, type DB } from "@palui/db"
 import { and, count, eq, gte } from "drizzle-orm"
 import type { CatalogTool } from "@palui/core/tools/catalog"
+import { readPermissions } from "@palui/core/tools/permissions"
 import { runtime, runtimeErrorMessage } from "@/server/runtime"
 
 export function agentView(db: DB, a: AgentRow, chatCount: number) {
@@ -20,6 +21,7 @@ export function agentView(db: DB, a: AgentRow, chatCount: number) {
     ownerPowers: a.ownerPowers,
     guestTools: a.guestTools,
     dailyTokenCap: a.dailyTokenCap,
+    toolPermissions: readPermissions(a.toolPermissions),
     recallContainer: a.recallContainer,
     container: agentContainer(a) ?? null,
     telegramConnectorId: a.telegramConnectorId,

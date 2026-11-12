@@ -1,11 +1,12 @@
 // Agents page (PLAN 19.7): each agent's persona, shared-chat rules, daily cap,
 // recall container and Telegram bot. The runtime reads them at the start of
 // every turn, so writes go straight to the table.
-import { AgentError, AGENT_COLORS, AGENT_ICONS, MAX_AVATAR_IMAGE, assignAgent, getAgent, createAgent, deleteAgent, getAgentBySlug, listAgents, MAX_AGENT_NAME, MAX_PERSONA, updateAgent } from "@palui/core/agents"
+import { AgentError, AGENT_COLORS, AGENT_ICONS, MAX_AVATAR_IMAGE, assignAgent, getAgent, createAgent, setToolPermissions, deleteAgent, getAgentBySlug, listAgents, MAX_AGENT_NAME, MAX_PERSONA, updateAgent } from "@palui/core/agents"
 import { rotateSession, setReplyMode } from "@palui/core/chats"
 import { setDeployNotice } from "@palui/core/deploy-notice"
 import { getSetting } from "@palui/core/settings"
 import { listInstructions } from "@palui/core/notes/service"
+import { readPermissions } from "@palui/core/tools/permissions"
 import { chats, REPLY_MODES } from "@palui/db"
 import { createServerFn } from "@tanstack/react-start"
 import { eq, isNull } from "drizzle-orm"
@@ -105,6 +106,26 @@ export const deleteAgentFn = createServerFn({ method: "POST" })
     try {
       if (!deleteAgent(db, data.id)) throw new Error("That agent doesn't exist anymore.")
       return { ok: true }
+    } catch (err) {
+      rethrow(err)
+    }
+  })
+
+// Tool permissions save at once from the Tools tab, like a server's scope. The
+// runtime reads the agent row at the start of every turn.
+export const setAgentToolPermissionsFn = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      id: z.string().min(1).max(100),
+      allowAll: z.boolean().optional(),
+      tools: z.record(z.string().max(64), z.enum(["allow", "ask", "deny"]).nullable()).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { db } = await requireWriter()
+    try {
+      const row = setToolPermissions(db, data.id, { allowAll: data.allowAll, tools: data.tools })
+      return { toolPermissions: readPermissions(row.toolPermissions) }
     } catch (err) {
       rethrow(err)
     }

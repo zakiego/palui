@@ -2,7 +2,7 @@
 // global-or-own select, and the open state that follows a search.
 import * as React from "react"
 import { Link } from "@tanstack/react-router"
-import { ArrowUpRightIcon, BotIcon, GlobeIcon, UsersIcon } from "lucide-react"
+import { ArrowUpRightIcon, BotIcon, CircleOffIcon, GlobeIcon, UsersIcon } from "lucide-react"
 
 import { connectorIcon } from "@/components/connector-icon"
 import { IconTile } from "@/components/icon-tile"
@@ -27,7 +27,12 @@ export type ToolsViewProps = {
   query: string
   ownerOf: (connectorId: string) => string | null
   setScope: (connectorId: string, scope: string) => void
+  // The agent's tool permissions, as changed on this tab. null: the default.
+  permissions: { allowAll: boolean; tools: Record<string, Permission> }
+  setPermission: (name: string, p: Permission | null) => void
 }
+
+export type Permission = "allow" | "ask" | "deny"
 
 // The tools that match a search, one list per connector, in catalog order.
 export function groupTools(tools: ToolItem[], query: string) {
@@ -110,6 +115,7 @@ export function ToolRow({ x, props }: { x: ToolItem; props: ToolsViewProps }) {
   const label = useLabel()
   const used = props.data.used[x.name]
   const { agent } = props
+  const off = props.permissions.tools[x.name] === "deny"
   return (
     <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 py-3">
       <div className="flex min-w-48 flex-1 flex-col gap-0.5">
@@ -121,6 +127,11 @@ export function ToolRow({ x, props }: { x: ToolItem; props: ToolsViewProps }) {
         )}
       </div>
       <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
+        {off && (
+          <StatusText tone="secondary" icon={<CircleOffIcon aria-hidden="true" />}>
+            {t("agents.perm.off")}
+          </StatusText>
+        )}
         {used ? <span className="text-caption text-muted-foreground tabular-nums">{t("agents.tools.used", { n: used.toLocaleString() })}</span> : null}
         {x.untrusted && (
           <StatusText tone="secondary" icon={<GlobeIcon aria-hidden="true" />}>
@@ -135,16 +146,40 @@ export function ToolRow({ x, props }: { x: ToolItem; props: ToolsViewProps }) {
         <StatusText tone={CLASS_TONE[x.class] ?? "destructive"} icon={null}>
           {label("tool.class", x.class)}
         </StatusText>
+        <PermissionSelect name={x.tool} value={props.permissions.tools[x.name] ?? null} allowAll={props.permissions.allowAll} onChange={(p) => props.setPermission(x.name, p)} />
       </span>
     </li>
   )
 }
 
+// Default (the class rule, or allow when allow-all is on), allow, ask or off.
+export function PermissionSelect({ name, value, allowAll, onChange }: { name: string; value: Permission | null; allowAll: boolean; onChange: (p: Permission | null) => void }) {
+  const t = useT()
+  const options = [
+    { value: "default", label: allowAll ? t("agents.perm.defaultAllow") : t("agents.perm.default") },
+    { value: "allow", label: t("agents.perm.allow") },
+    { value: "ask", label: t("agents.perm.ask") },
+    { value: "deny", label: t("agents.perm.deny") },
+  ]
+  return (
+    <SimpleSelect
+      size="sm"
+      className="w-fit min-w-0"
+      aria-label={t("agents.perm.for", { name })}
+      value={value ?? "default"}
+      options={options}
+      onChange={(v) => onChange(v === "allow" || v === "ask" || v === "deny" ? v : null)}
+    />
+  )
+}
+
 // How many tools a closed group holds, and how many are destructive.
-export function GroupMeta({ list, className }: { list: ToolItem[]; className?: string }) {
+export function GroupMeta({ list, permissions, className }: { list: ToolItem[]; permissions?: ToolsViewProps["permissions"]; className?: string }) {
   const t = useT()
   const count = useCount()
   const destructive = countClass(list, "destructive")
+  const allowed = permissions ? list.filter((x) => permissions.tools[x.name] === "allow").length : 0
+  const off = permissions ? list.filter((x) => permissions.tools[x.name] === "deny").length : 0
   return (
     <span className={cn("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-caption font-normal text-muted-foreground", className)}>
       <span className="tabular-nums">{count(list.length, "agents.tools.count.one", "agents.tools.count.many")}</span>
@@ -153,6 +188,8 @@ export function GroupMeta({ list, className }: { list: ToolItem[]; className?: s
           {t("agents.tools.destructiveCount", { n: destructive.toLocaleString() })}
         </StatusText>
       )}
+      {allowed > 0 && <span className="tabular-nums">{t("agents.perm.allowedCount", { n: allowed.toLocaleString() })}</span>}
+      {off > 0 && <span className="tabular-nums">{t("agents.perm.offCount", { n: off.toLocaleString() })}</span>}
     </span>
   )
 }

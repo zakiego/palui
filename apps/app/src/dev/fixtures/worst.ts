@@ -182,6 +182,8 @@ export function worst(k: Kit) {
     avatarColor: "violet",
     dailyTokenCap: 250_000,
     tokensToday: 312_481,
+    // Allow-all on, one tool of every other kind, so the Tools tab shows each select value and both group counts.
+    toolPermissions: { allowAll: true, tools: { "mcp-files__restart_service": "ask", "mcp-files__send_email_to_a_customer_with_a_long_tool_name": "deny", "mcp-files__list_deals": "allow" } },
     recallContainer: "agent-arisan-keluarga-bani-abdurrahman-siddiq-banjarmasin-2026",
     telegramConnectorId: "tgbot-arisan",
   })
