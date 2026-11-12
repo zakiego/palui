@@ -25,6 +25,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Changed
 
+- Home shows what needs attention first: a connector with an error, or one that's on but paused, sits at the top with its reason and a link to fix it. Tokens today has a bar for each of the last 7 days, the next reminders read like an agenda with the time first, and on a phone the connector map moves to the bottom.
 - Switching pages in the dashboard is close to instant. Every sidebar page loads in the background once you're in, and a page you've already seen shows right away and refreshes behind it. Before, each switch waited on the server twice.
 - A flow's page is split into Steps, Runs and Versions tabs, and lines up at one width with its header.
 - An agent's Tools tab is split into "Only this agent" and "Global", two cards you click between. Each server is one closed row with its tool count and how many are destructive, so the list fits on a screen. Open a row to see its tools. Changing a server's scope moves it to the other card. Searching opens every row with a match.
