@@ -16,6 +16,7 @@ import { authClient, passkeyCancelled } from "@/lib/auth-client"
 import { clockTime, errorMessage } from "@/lib/format"
 import { acceptInvite, getInvite } from "@/lib/fns/session"
 import { translate } from "@/lib/i18n"
+import { forgetViewer } from "@/lib/viewer"
 import { toast } from "sonner"
 
 const t = (k: Parameters<typeof translate>[1], v?: Record<string, string>) => translate("en", k, v)
@@ -49,6 +50,7 @@ function InvitePage() {
   const [error, setError] = React.useState<string>()
 
   const enter = async () => {
+    forgetViewer()
     await router.invalidate()
     await router.navigate({ to: "/" })
   }

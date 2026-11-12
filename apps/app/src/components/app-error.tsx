@@ -6,6 +6,7 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { errorMessage } from "@/lib/format"
 import { useT } from "@/lib/i18n"
+import { forgetViewer } from "@/lib/viewer"
 
 // Route error boundary. An expired session goes to login; anything else shows
 // what failed with a retry, inside the shell.
@@ -16,7 +17,10 @@ export function AppError({ error, reset }: ErrorComponentProps) {
   const expired = errorMessage(error).includes("UNAUTHORIZED")
 
   React.useEffect(() => {
-    if (expired) void navigate({ to: "/login", search: {} })
+    if (!expired) return
+    // The server said no, so the remembered viewer is wrong.
+    forgetViewer()
+    void navigate({ to: "/login", search: {} })
   }, [expired, navigate])
 
   if (expired) return null

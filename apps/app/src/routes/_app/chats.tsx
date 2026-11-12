@@ -46,9 +46,12 @@ export const Route = createFileRoute("/_app/chats")({
   validateSearch: z.object({ chat: z.string().max(100).optional() }),
   loaderDeps: ({ search }) => ({ chat: search.chat }),
   loader: async ({ deps }) => {
+    const read = (chatId: string) => getTranscript({ data: { chatId } }).catch((err: unknown) => ({ error: errorMessage(err) }))
+    // With a chat in the URL the transcript doesn't depend on the list, so both go out together.
+    const asked = deps.chat ? read(deps.chat) : undefined
     const list = await getChats()
     const chatId = deps.chat ?? list.webChatId
-    const transcript = await getTranscript({ data: { chatId } }).catch((err: unknown) => ({ error: errorMessage(err) }))
+    const transcript = await (asked ?? read(chatId))
     return { ...list, chatId, transcript }
   },
   head: () => ({ meta: [{ title: "Chats · Palui" }] }),
