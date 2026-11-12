@@ -3,7 +3,7 @@
 import { eq, sql } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { chats, memoryDb, messages, outbox, pendingApprovals, reports, runs, type DB } from "@palui/db"
-import { createAgent, getDefaultAgent, updateAgent } from "../agents"
+import { createAgent, getDefaultAgent, setToolPermissions, updateAgent } from "../agents"
 import { setReplyMode } from "../chats"
 import { setConnectorOwner } from "../connectors/store"
 import { listEvents } from "../events"
@@ -278,6 +278,19 @@ describe("agents: tools and approvals", () => {
     const reply = outboxRows(h.db).at(-1)!
     expect(reply).toMatchObject({ chatId: group.id })
     expect(reply.payload.text).toBe("dicatat")
+  })
+
+  it("allow-all with owner powers runs the owner's write in the group without asking", async () => {
+    const ran: string[] = []
+    const h = await world([callTool("alpha__note", {}, "c1"), say("dicatat")], { registry: registry(ran), rows: { web: "tools", alpha: "tools" } })
+    updateAgent(h.db, h.chef.id, { ownerPowers: "approve" })
+    setToolPermissions(h.db, h.chef.id, { allowAll: true })
+    await h.engine.inbound(ownerInGroup("/agent chef"))
+    await h.engine.idle()
+    await h.engine.inbound(ownerInGroup("@bot catat ini", { addressed: true }))
+    await h.engine.idle()
+    expect(ran).toEqual(["note"])
+    expect(h.db.select().from(pendingApprovals).all()).toHaveLength(0)
   })
 
   it("owner powers off: the owner in the group is a guest too", async () => {

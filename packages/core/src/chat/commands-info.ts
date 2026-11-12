@@ -8,6 +8,7 @@ import { getSession, type ChatRow } from "../chats"
 import { currentVersion, definitionOf, listFlows } from "../flows/service"
 import { getSetting } from "../settings"
 import { collectTools, SEARCH_TOOL, type ToolMeta } from "../tools/collect"
+import { deniedTools } from "../tools/permissions"
 import type { CommandMessage } from "./commands"
 import type { EngineCtx } from "./turn"
 
@@ -189,6 +190,7 @@ export async function toolsText(ctx: EngineCtx, chat: ChatRow, args: string[]): 
     turn: { runId: "", chatId: chat.id, channel: chat.channel, trigger: "message", tz: getSetting(db, "timezone"), now: ctx.clock(), agentId: agent.id },
     maxTools: getSetting(db, "budgets").maxTools,
     sticky: session?.loadedTools,
+    deny: deniedTools(agent.toolPermissions),
     log: ctx.log,
     onUntrustedResult: () => {},
   })
@@ -209,6 +211,6 @@ export async function toolsText(ctx: EngineCtx, chat: ChatRow, args: string[]): 
     const counts = CLASSES.map((c) => [c, own.filter((m) => m.class === c).length] as const).filter(([, n]) => n)
     lines.push(`• ${connectorId} (${own.length}): ${counts.map(([c, n]) => `${c} ${n}`).join(", ")}`)
   }
-  lines.push("", "Detail: /tools <id>. Destructive selalu minta izin, write minta izin kalau turn-nya kena data dari luar.")
+  lines.push("", agent.toolPermissions?.allowAll ? "Detail: /tools <id>. Semua tool jalan tanpa minta izin di chat kamu, kecuali yang diatur minta izin." : "Detail: /tools <id>. Destructive selalu minta izin, write minta izin kalau turn-nya kena data dari luar.")
   return lines.join("\n")
 }

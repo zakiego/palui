@@ -67,6 +67,8 @@ export type CollectOptions = {
   only?: string[] | null
   // Jobs and hooks never get destructive tools (PLAN 7, 10).
   excludeDestructive?: boolean
+  // Namespaced names the agent's owner turned off (tools/permissions.ts).
+  deny?: string[] | null
   // Names loaded earlier in the session, most recent first. Active before the rest.
   sticky?: string[] | null
   // Called with the names a search just loaded, to keep them for the session.
@@ -103,6 +105,7 @@ export async function collectTools(running: RunningEntry[], opts: CollectOptions
       if (opts.guestOnly && !pt.guestSafe) continue
       const name = namespaced(e.id, toolName)
       if (opts.only && !opts.only.includes("*") && !opts.only.includes(name)) continue
+      if (opts.deny?.includes(name)) continue
       const meta: ToolMeta = { name, connectorId: e.id, tool: toolName, class: cls, untrusted: !!pt.untrusted || e.row.trust === "external", title: pt.title, label: e.row.label, guestSafe: !!pt.guestSafe }
       out.tools[name] = wrapTool(pt.tool, meta, opts)
       out.meta[name] = meta

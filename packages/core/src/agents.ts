@@ -2,10 +2,11 @@
 // container and daily cap. Exactly one is the default (Palui), the owner's
 // personal agent; it never answers in a shared chat.
 import { asc, desc, eq, isNull } from "drizzle-orm"
-import { agents, chats, connectors, instructions, newId, type DB, type GuestTools, type OwnerPowers } from "@palui/db"
+import { agents, chats, connectors, instructions, newId, type DB, type GuestTools, type OwnerPowers, type ToolPermission } from "@palui/db"
 import type { ChatRow } from "./chats"
 import { isOwner } from "./owner"
 import { getSetting } from "./settings"
+import { MAX_TOOL_PERMISSIONS, readPermissions, TOOL_NAME, TOOL_PERMISSIONS } from "./tools/permissions"
 
 export type AgentRow = typeof agents.$inferSelect
 
@@ -220,6 +221,27 @@ export function updateAgent(db: DB, id: string, patch: Partial<Omit<AgentInput, 
   if (fields.avatarIcon !== undefined) set.avatarIcon = fields.avatarIcon || null
   if (fields.avatarColor !== undefined) set.avatarColor = fields.avatarColor || null
   return db.update(agents).set(set).where(eq(agents.id, id)).returning().get()
+}
+
+// Tool permissions from the agent page (tools/permissions.ts). `allowAll`
+// changes the default; `tools` sets one tool, null putting it back to the default.
+export type ToolPermissionsPatch = { allowAll?: boolean; tools?: Record<string, ToolPermission | null> }
+
+export function setToolPermissions(db: DB, id: string, patch: ToolPermissionsPatch, now = Date.now()): AgentRow {
+  const row = getAgent(db, id)
+  if (!row) throw new AgentError(`No agent ${id}.`)
+  const next = readPermissions(row.toolPermissions)
+  const tools = { ...next.tools }
+  for (const [name, p] of Object.entries(patch.tools ?? {})) {
+    if (!TOOL_NAME.test(name)) throw new AgentError(`Unknown tool name ${name}.`)
+    if (p === null) delete tools[name]
+    else if ((TOOL_PERMISSIONS as readonly string[]).includes(p)) tools[name] = p
+    else throw new AgentError("A tool permission is allow, ask or deny.")
+  }
+  if (Object.keys(tools).length > MAX_TOOL_PERMISSIONS) throw new AgentError(`At most ${MAX_TOOL_PERMISSIONS} tool permissions.`)
+  const allowAll = patch.allowAll ?? next.allowAll
+  const toolPermissions = allowAll || Object.keys(tools).length ? { allowAll, tools } : null
+  return db.update(agents).set({ toolPermissions, updatedAt: now }).where(eq(agents.id, id)).returning().get()
 }
 
 // Chats it served go back to the default agent and stop answering guests.

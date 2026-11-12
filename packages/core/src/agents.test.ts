@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { eq } from "drizzle-orm"
 import { chats, connectors, memoryDb } from "@palui/db"
-import { AgentError, agentContainer, assignAgent, createAgent, deleteAgent, getDefaultAgent, listAgents, updateAgent } from "./agents"
+import { AgentError, agentContainer, assignAgent, createAgent, deleteAgent, getDefaultAgent, listAgents, setToolPermissions, updateAgent } from "./agents"
 import { ensureChat, getChat } from "./chats"
 import { createInstruction, listInstructions } from "./notes/service"
 import { setSetting } from "./settings"
@@ -85,5 +85,18 @@ describe("agents", () => {
     const chat = ensureChat(db, { channel: "telegram", externalId: "42", connectorId: "tgbot-chef", agentId: chef.id })
     expect(() => assignAgent(db, chat.id, cs.id)).toThrow(AgentError)
     expect(() => createAgent(db, { slug: "x2", name: "x", persona: "p", telegramConnectorId: "tgbot-chef" })).toThrow(AgentError)
+  })
+
+  it("saves tool permissions one tool at a time, and clears to null when nothing is set", () => {
+    const db = memoryDb()
+    const palui = getDefaultAgent(db)
+    expect(palui.toolPermissions).toBeNull()
+    expect(setToolPermissions(db, palui.id, { allowAll: true }).toolPermissions).toEqual({ allowAll: true, tools: {} })
+    expect(setToolPermissions(db, palui.id, { tools: { mcp__whoami: "ask", mcp__drop: "deny" } }).toolPermissions).toEqual({ allowAll: true, tools: { mcp__whoami: "ask", mcp__drop: "deny" } })
+    expect(setToolPermissions(db, palui.id, { tools: { mcp__whoami: null } }).toolPermissions).toEqual({ allowAll: true, tools: { mcp__drop: "deny" } })
+    expect(setToolPermissions(db, palui.id, { allowAll: false, tools: { mcp__drop: null } }).toolPermissions).toBeNull()
+    expect(() => setToolPermissions(db, palui.id, { tools: { "no spaces": "allow" } })).toThrow(AgentError)
+    expect(() => setToolPermissions(db, palui.id, { tools: { mcp__x: "sure" as never } })).toThrow(AgentError)
+    expect(() => setToolPermissions(db, "agt_nope", { allowAll: true })).toThrow(AgentError)
   })
 })
