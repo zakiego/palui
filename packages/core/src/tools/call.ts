@@ -19,7 +19,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
 }
 
 export function connectorToolCaller(running: () => RunningEntry[], opts: { tz: () => string; timeoutMs?: number } = { tz: () => "UTC" }): ToolCaller {
-  return async (connectorId, toolName, args) => {
+  return async (connectorId, toolName, args, scope) => {
     const entry = running().find((e) => e.id === connectorId)
     if (!entry) throw new ToolCallError(`Connector ${connectorId} isn't running. Turn it on in Connectors.`)
     const what = `${connectorId}.${toolName}`
@@ -39,7 +39,7 @@ export function connectorToolCaller(running: () => RunningEntry[], opts: { tz: (
     }
     if (!entry.handle.tools) throw new ToolCallError(`Connector ${connectorId} has no tools.`)
     const now = Date.now()
-    const tools = await entry.handle.tools({ runId: `source_${now}`, chatId: "", channel: null, trigger: "schedule", tz: opts.tz(), now })
+    const tools = await entry.handle.tools({ runId: `source_${now}`, chatId: "", channel: null, trigger: "schedule", tz: opts.tz(), now, ...scope })
     const pt = tools[toolName]
     if (!pt?.tool.execute) throw new ToolCallError(`${what} doesn't exist or is turned off.`)
     ensureRead(pt.class)

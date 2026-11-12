@@ -150,13 +150,14 @@ export function agentReadContainers(agent: Pick<AgentRow, "recallReadContainers"
   return Array.isArray(agent.recallReadContainers) ? agent.recallReadContainers.filter((c) => typeof c === "string" && RECALL_CONTAINER.test(c)) : []
 }
 
-// What a turn of this agent may touch in recall (PLAN 19.5). The default agent
-// is the owner's: its tools may name any container. Every other agent is
-// locked to its own container for writes, plus its read list for reads.
+// What a turn of this agent may touch in recall (PLAN 19.5). Every agent,
+// Palui included, is locked to its own container for writes, plus its read
+// list for reads, so no agent reads another agent's memory unless the owner
+// adds that container to its shared list.
 export type MemoryScope = { container: string | undefined; read: string[]; locked: boolean }
 
 export function memoryScope(agent: AgentRow, chatId?: string | null): MemoryScope {
-  return { container: agentContainer(agent, chatId), read: agentReadContainers(agent), locked: !agent.isDefault }
+  return { container: agentContainer(agent, chatId), read: agentReadContainers(agent), locked: true }
 }
 
 // The owner's own memory: the memory connector's container and the default

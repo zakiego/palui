@@ -62,7 +62,7 @@ export function createMemoryHandle(api: RecallApi, config: Config, stats: Recall
 }
 
 // The one REST tool: recall's MCP server has no forget, so it's DELETE /v1/memories/:id.
-// A locked scope (an agent other than Palui) may only forget its own container's
+// A locked scope (every agent) may only forget its own container's
 // memories: the id is looked up first, and any other container answers "no memory".
 export function forgetTool(api: RecallApi, scope?: { container: string; locked: boolean }): Tool {
   return tool({
@@ -88,7 +88,7 @@ export class ContainerError extends Error {}
 
 // The container a recall tool call runs against. An empty `container` argument
 // becomes the turn's own container, so the model never writes into recall's
-// server default. A locked scope (any agent but Palui) can't reach past its own
+// server default. A locked scope (every agent) can't reach past its own
 // container, and its read list for read tools: the owner's memory stays the owner's.
 export function resolveContainer(asked: unknown, cls: ToolClass, scope: { container: string; read: string[]; locked: boolean }): string {
   const name = typeof asked === "string" ? asked.trim() : ""
@@ -111,11 +111,12 @@ function withContainer(t: Tool, cls: ToolClass, scope: { container: string; read
   }
 }
 
-// The turn's scope with the connector's container filled in. No scope (a flow
-// step, the catalog): the owner's, unlocked.
+// The turn's scope with the connector's container filled in. No scope (the
+// catalog, a caller that didn't say whose turn it is): the connector's own
+// container, locked, so nothing without a scope can name another container.
 export function turnScope(turn: Pick<TurnInfo, "memory"> | undefined, fallback: string): { container: string; read: string[]; locked: boolean } {
   const m = turn?.memory
-  return { container: m?.container || fallback, read: m?.read ?? [], locked: !!m?.locked }
+  return { container: m?.container || fallback, read: m?.read ?? [], locked: m ? m.locked : true }
 }
 
 function explain(err: unknown): string {

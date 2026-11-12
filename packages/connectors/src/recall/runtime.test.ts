@@ -135,7 +135,7 @@ describe("recall test()", () => {
 })
 
 describe("recall runtime", () => {
-  it("classes MCP tools, adds forget_memory, and defaults the container", async () => {
+  it("classes MCP tools, adds forget_memory, and locks a turn without a scope to the connector's container", async () => {
     const f = await fakeRecall()
     srv = f.server
     const running = await runtime.start(fakeCtx(cfg(f.base), { apiKey: KEY }))
@@ -148,22 +148,43 @@ describe("recall runtime", () => {
         ask_memory: "read",
         get_profile: "read",
         list_memories: "read",
-        purge_container: "destructive",
       })
       expect(Object.values(tools).every((t) => !t.untrusted)).toBe(true)
 
       await exec(tools.search_memories, { query: "kopi" })
-      await exec(tools.add_memory, { content: "x", container: "other" })
-      expect(f.toolArgs).toEqual([
-        { tool: "search_memories", query: "kopi", container: "zaki" },
-        { tool: "add_memory", content: "x", container: "other" },
-      ])
+      await expect(exec(tools.add_memory, { content: "x", container: "other" })).rejects.toThrow(/can't use recall container other/)
+      expect(f.toolArgs).toEqual([{ tool: "search_memories", query: "kopi", container: "zaki" }])
 
       expect(await exec(tools.forget_memory, { id: "mem_1" })).toEqual({ forgotten: true, id: "mem_1", fact: "Old fact" })
+      expect(await exec(tools.forget_memory, { id: "mem_2" })).toMatchObject({ forgotten: false })
       expect(await exec(tools.forget_memory, { id: "nope" })).toMatchObject({ forgotten: false })
-      expect(f.seen.filter((s) => s.method === "DELETE").map((s) => s.path)).toEqual(["/v1/memories/mem_1", "/v1/memories/nope"])
+      expect(f.seen.filter((s) => s.method === "DELETE").map((s) => s.path)).toEqual(["/v1/memories/mem_1"])
 
       expect(await running.action!("listContainers", {})).toMatchObject({ containers: [{ container: "default" }, { container: "zaki" }] })
+    } finally {
+      await running.stop()
+    }
+  })
+
+  // The report: Palui in the owner's DM must not read or write the finansial
+  // agent's memory either. Palui's scope comes from memoryScope(), locked too.
+  it("locks Palui to the owner's container and its shared list", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const running = await runtime.start(fakeCtx(cfg(f.base), { apiKey: KEY }))
+    try {
+      const tools = await running.tools!({ ...turn, agentId: "agt_palui", memory: { container: undefined, read: ["kb-home"], locked: true } })
+      expect(tools.purge_container).toBeUndefined()
+      await exec(tools.search_memories, { query: "laundry" })
+      await exec(tools.search_memories, { query: "laundry", container: "kb-home" })
+      await expect(exec(tools.search_memories, { query: "laundry", container: "agent-finansial" })).rejects.toThrow(/can't use recall container agent-finansial/)
+      await expect(exec(tools.add_memory, { content: "x", container: "agent-finansial" })).rejects.toThrow(/can write zaki/)
+      expect(f.toolArgs).toEqual([
+        { tool: "search_memories", query: "laundry", container: "zaki" },
+        { tool: "search_memories", query: "laundry", container: "kb-home" },
+      ])
+      expect(await exec(tools.forget_memory, { id: "mem_2" })).toMatchObject({ forgotten: false })
+      expect(f.seen.filter((s) => s.method === "DELETE")).toEqual([])
     } finally {
       await running.stop()
     }

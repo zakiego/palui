@@ -59,9 +59,9 @@ describe("agents", () => {
     expect(() => updateAgent(db, shop.id, { recallReadContainers: ["a", "b", "c", "d", "e", "f"] })).toThrow(/At most 5/)
     expect(() => updateAgent(db, shop.id, { recallReadContainers: ["no spaces!"] })).toThrow(AgentError)
     expect(agentReadContainers(updateAgent(db, shop.id, { recallReadContainers: [] }))).toEqual([])
-    // Palui is the owner's agent: unlocked, and it may read anything.
+    // Palui is locked too: the owner's container plus its own shared list, never another agent's.
     const palui = updateAgent(db, getDefaultAgent(db).id, { recallReadContainers: ["kb-menu"] })
-    expect(memoryScope(palui)).toEqual({ container: undefined, read: ["kb-menu"], locked: false })
+    expect(memoryScope(palui)).toEqual({ container: undefined, read: ["kb-menu"], locked: true })
   })
 
   it("keeps an avatar photo small and the icon and color to known names", () => {

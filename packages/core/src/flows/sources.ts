@@ -13,6 +13,7 @@ import { DateTime } from "luxon"
 import type { SourceCursor, SourceState } from "@palui/db"
 import { localToUtc, occurrencesAfter, utcToLocal } from "../reminders/time"
 import { DAY_CODES, type DayCode, type ScheduleSource, type ToolSource } from "./source-config"
+import type { TurnInfo } from "../connectors/define"
 
 export type Occurrence = { at: number; key: string; label: string; fallback?: boolean }
 
@@ -288,7 +289,8 @@ export function renderArgs(args: Record<string, unknown>, date: string, tz: stri
   return fill(args) as Record<string, unknown>
 }
 
-export type ToolCaller = (connectorId: string, tool: string, args: Record<string, unknown>) => Promise<unknown>
+// `scope`: the flow's agent and recall scope, handed to the connector's tools.
+export type ToolCaller = (connectorId: string, tool: string, args: Record<string, unknown>, scope?: Pick<TurnInfo, "agentId" | "memory">) => Promise<unknown>
 
 export type RefreshResult = { state: SourceState; error: string | null }
 

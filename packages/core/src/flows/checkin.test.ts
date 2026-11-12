@@ -1,7 +1,9 @@
 import { eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { outbox, pendingApprovals } from "@palui/db"
+import { getDefaultAgent } from "../agents"
 import { decide, expireDue } from "../approvals/store"
+import type { ToolCaller } from "./sources"
 import { MIN } from "../reminders/test-helpers"
 import { fakePrayerTool } from "./test-helpers"
 import { flowActions } from "./actions"
@@ -126,6 +128,20 @@ describe("check-in steps", () => {
     expect(sentTexts(h.db)[0]!.text).toBe("Udah sholat Zuhur (12.00)?")
     const wait = run!.wait as { deadlineAt: number }
     expect(wait.deadlineAt).toBe(at("2026-11-10T15:25"))
+  })
+
+  it("a tool source is called with the flow agent's locked recall scope", async () => {
+    const prayer = fakePrayerTool()
+    const scopes: unknown[] = []
+    const readSource: ToolCaller = (connectorId, tool, args, scope) => {
+      scopes.push(scope)
+      return prayer(connectorId, tool, args)
+    }
+    const h = flowHarness({ engine: { readSource } })
+    h.create(SHOLAT)
+    await h.run(at("2026-11-10T10:00"))
+    expect(scopes.length).toBeGreaterThan(0)
+    expect(scopes[0]).toEqual({ agentId: getDefaultAgent(h.db).id, memory: { container: undefined, read: [], locked: true } })
   })
 
   it("deadline next with plusMin stops 10 minutes before the next prayer", async () => {

@@ -67,7 +67,7 @@ Separate memory per chat gives each chat its own container (`agent-<slug>-c<hash
 
 Shared containers are read only. List up to 5 on the Memory tab, like a `kb-shop` container you fill yourself with product facts or an FAQ. Auto-recall reads them next to the agent's own memory and labels them as reference, never instructions. Palui's container is your memory, so no other agent can use it, read only or not.
 
-An agent's recall tools follow the same rule. `search_memories` and the other read tools reach its own container and its shared ones, `add_memory` writes only to its own, and `forget_memory` only deletes a memory that's in its own container. Naming any other container is an error. Palui's tools can still name any container.
+An agent's recall tools follow the same rule. `search_memories` and the other read tools reach its own container and its shared ones, `add_memory` writes only to its own, and `forget_memory` only deletes a memory that's in its own container. Naming any other container is an error. Palui is locked the same way: its tools reach your memory and the shared containers on its Memory tab, never another agent's. To let Palui read an agent's memory, add that agent's container (like `agent-finansial`) to Palui's shared list. Flow steps and flow sources run with the flow's agent, so a flow gets the same limits.
 
 ## Daily cap
 

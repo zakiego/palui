@@ -13,7 +13,7 @@
 // A step finishes in one transaction: its step row, its output into vars, any
 // outbox row, any flow state write and the cursor move. Nothing lives in memory,
 // so a restart only delays the next sweep.
-import { getDefaultAgent } from "../agents"
+import { getAgent, getDefaultAgent, memoryScope } from "../agents"
 import { and, desc, eq, inArray, isNotNull, isNull, lte, max, min, or, sql } from "drizzle-orm"
 import { flowRuns, flows, flowStepRuns, flowTriggers, newId, runs, toolCalls, type DB, type FlowPollState, type FlowRunStatus, type FlowSkipReason, type OutboxPayload } from "@palui/db"
 import { addUsage, budgetTokens, dayKey, getUsage } from "../budget"
@@ -277,6 +277,13 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
     return { def, spec: def.triggers.find((t) => t.id === row.triggerId) }
   }
 
+  // The flow's agent (null means Palui) and its recall scope, so a flow's tool
+  // calls reach only what that agent may use, memory included.
+  function flowAgent(flow: { id: string; chatId: string; agentId: string | null }): Pick<TurnInfo, "flowId" | "agentId" | "memory"> {
+    const agent = (flow.agentId ? getAgent(db, flow.agentId) : undefined) ?? getDefaultAgent(db)
+    return { flowId: flow.id, agentId: agent.id, memory: memoryScope(agent, flow.chatId) }
+  }
+
   async function refresh(rowId: string, now: number) {
     const row = db.select().from(flowTriggers).where(eq(flowTriggers.id, rowId)).get()
     const flow = row ? getFlow(db, row.flowId) : undefined
@@ -287,11 +294,13 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
       return
     }
     const src = spec.source
-    const call: ToolCaller =
-      opts.readSource ??
-      (async () => {
-        throw new Error("No tool caller is wired in this process.")
-      })
+    const read = opts.readSource
+    const scope = flowAgent(flow)
+    const call: ToolCaller = read
+      ? (connectorId, tool, args) => read(connectorId, tool, args, { agentId: scope.agentId, memory: scope.memory })
+      : async () => {
+          throw new Error("No tool caller is wired in this process.")
+        }
     const res = await refreshToolSource(src, flow.tz, row.sourceState ?? {}, call, now)
     const fresh = db.select().from(flowTriggers).where(eq(flowTriggers.id, rowId)).get()
     const freshFlow = getFlow(db, flow.id)
@@ -483,7 +492,7 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
     const spec = definitionOf(version).triggers.find((t) => t.id === row.triggerId)
     if (spec?.kind !== "poll") return
     const prev: FlowPollState = row.pollState ?? {}
-    const turn: TurnInfo = { runId: `poll_${row.id}`, chatId: flow.chatId, channel: getChat(db, flow.chatId)?.channel ?? null, trigger: "flow", tz: flow.tz, now, flowId: flow.id, agentId: flow.agentId ?? getDefaultAgent(db).id }
+    const turn: TurnInfo = { runId: `poll_${row.id}`, chatId: flow.chatId, channel: getChat(db, flow.chatId)?.channel ?? null, trigger: "flow", tz: flow.tz, now, ...flowAgent(flow) }
     let state: FlowPollState
     let untrusted = false
     let value: unknown = null
@@ -843,7 +852,7 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
 
   function turnInfo(c: RunContext): TurnInfo {
     // The flow's agent (null means Palui), so a step only reaches tools that agent may use.
-    return { runId: c.run.id, chatId: c.flow.chatId, channel: getChat(db, c.flow.chatId)?.channel ?? null, trigger: "flow", tz: c.flow.tz, now: c.now, flowId: c.flow.id, agentId: c.flow.agentId ?? getDefaultAgent(db).id }
+    return { runId: c.run.id, chatId: c.flow.chatId, channel: getChat(db, c.flow.chatId)?.channel ?? null, trigger: "flow", tz: c.flow.tz, now: c.now, ...flowAgent(c.flow) }
   }
 
   function stepIf(c: RunContext, step: Extract<FlowStep, { kind: "if" }>): Transition {
