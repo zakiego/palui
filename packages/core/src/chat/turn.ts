@@ -5,6 +5,7 @@ import { and, asc, eq, inArray, like } from "drizzle-orm"
 import { isStepCount, streamText, type ModelMessage, type SystemModelMessage, type ToolApprovalResponse } from "ai"
 import { events, jobs, messages, newId, pendingApprovals, runs, sessions, toolCalls, type DB, type RunStatus, type RunTrigger } from "@palui/db"
 import { agentForChat, getAgent, isSharedChat, type AgentRow } from "../agents"
+import { findAttachmentRefs, labelFileRefs } from "../attachments/refs"
 import { approvalsForRun, createApproval, preview, supersedeSameCall, type ApprovalRow, type ResumeContext, type TurnMode } from "../approvals/store"
 import { agentOverCap, budgetTokens, checkGlobalBudget, firstAgentNoticeToday, jobOverCap, pausedNotice, recordAgentTokens, recordRunStart, recordRunTokens } from "../budget"
 import { getChat, getSession, type ChatRow } from "../chats"
@@ -363,6 +364,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
           ownerTurn,
           tainted: state.tainted,
           strict,
+          sendsFile: findAttachmentRefs(toolCall.input).length > 0,
         })
         return ask ? "user-approval" : undefined
       },
@@ -496,7 +498,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
             toolCallId: r.toolCallId,
             tool: r.toolName,
             toolClass: meta?.class ?? "destructive",
-            argsPreview: preview(r.input, 300),
+            argsPreview: preview(labelFileRefs(db, r.input), 300),
             messages: [...modelMessages, ...response],
             context,
           },

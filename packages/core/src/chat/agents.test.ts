@@ -2,7 +2,11 @@
 // approvals in the owner's DM, per-agent memory and caps.
 import { eq, sql } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
-import { chats, memoryDb, messages, outbox, pendingApprovals, reports, runs, type DB } from "@palui/db"
+import { chats, memoryDb, messages, outbox, pendingApprovals, reports, runs, savedAttachments, type DB } from "@palui/db"
+import { resolveAttachmentRefs } from "../attachments/refs"
+import { saveAttachment } from "../attachments/service"
+import { masterKey } from "../config"
+import type { TurnInfo } from "../connectors/define"
 import { createAgent, getDefaultAgent, setToolPermissions, updateAgent } from "../agents"
 import { setReplyMode } from "../chats"
 import { setConnectorOwner } from "../connectors/store"
@@ -278,6 +282,56 @@ describe("agents: tools and approvals", () => {
     const reply = outboxRows(h.db).at(-1)!
     expect(reply).toMatchObject({ chatId: group.id })
     expect(reply.payload.text).toBe("dicatat")
+  })
+
+  it("a file sent from a group is named in the DM's approval prompt and still resolves in the group after the ya", async () => {
+    const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46])
+    const sent: string[] = []
+    // Stands in for the MCP connector: resolves refs in the turn's chat.
+    const finance = toolsRuntime("finance", () => ({}), "tools", {
+      tools: async (turn: TurnInfo) => ({
+        upload: {
+          class: "write" as const,
+          tool: fnTool("upload a file", (input: unknown) => {
+            sent.push((resolveAttachmentRefs(h.db, input, { chatId: turn.chatId, masterKey: masterKey() }) as { file: string }).file)
+            return "ok"
+          }),
+        },
+      }),
+    })
+    const h = await world([callTool("finance__upload", { file: "palui:attachment/att_struk" }, "c1"), say("terlampir")], { registry: { finance }, rows: { finance: "tools" } })
+    updateAgent(h.db, h.chef.id, { ownerPowers: "approve" })
+    await h.engine.inbound(ownerInGroup("/agent chef"))
+    await h.engine.idle()
+    const group = h.db.select().from(chats).where(eq(chats.externalId, GROUP)).get()!
+    const { row } = saveAttachment(h.db, { chatId: group.id, title: "Struk laundry", mimeType: "image/jpeg", bytes: JPEG }, masterKey(), 3)
+    h.db.update(savedAttachments).set({ id: "att_struk" }).where(eq(savedAttachments.id, row.id)).run()
+
+    await h.engine.inbound(ownerInGroup("@bot tempel struknya", { addressed: true }))
+    await h.engine.idle()
+    const apr = h.db.select().from(pendingApprovals).get()!
+    expect(apr.argsPreview).toBe('{"file":"[file: Struk laundry, 10 B]"}')
+    expect(outboxRows(h.db).find((r) => r.source === `approval:${apr.id}`)!.payload.text).toContain("[file: Struk laundry, 10 B]")
+    expect(sent).toEqual([])
+
+    await h.engine.inbound(tgMessage("ya"))
+    await h.engine.idle()
+    expect(sent).toEqual([`data:image/jpeg;base64,${JPEG.toString("base64")}`])
+    expect(outboxRows(h.db).at(-1)).toMatchObject({ chatId: group.id, payload: { text: "terlampir" } })
+  })
+
+  it("after reading untrusted text, sending a saved file asks even with allow-all", async () => {
+    const ran: string[] = []
+    const files = toolsRuntime("files", () => ({ send: { tool: fnTool("send a file", () => (ran.push("send"), "ok")), class: "read" } }))
+    const h = await world([callTool("web__fetch", {}, "c1"), callTool("files__send", { file: "palui:attachment/att_ktp" }, "c2"), say("done")], {
+      registry: { ...registry(ran), files },
+      rows: { web: "tools", alpha: "tools", files: "tools" },
+    })
+    setToolPermissions(h.db, getDefaultAgent(h.db)!.id, { allowAll: true })
+    await h.engine.inbound(tgMessage("ringkas halaman ini"))
+    await h.engine.idle()
+    expect(ran).toEqual(["fetch"])
+    expect(h.db.select().from(pendingApprovals).get()).toMatchObject({ tool: "files__send" })
   })
 
   it("allow-all with owner powers runs the owner's write in the group without asking", async () => {

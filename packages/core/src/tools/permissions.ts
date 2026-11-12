@@ -48,11 +48,16 @@ export type ApprovalInput = {
   tainted: boolean
   // Jobs, flows, hooks and shared chats: every write asks.
   strict: boolean
+  // The call carries a saved file (a palui:attachment ref).
+  sendsFile?: boolean
 }
 
 // Whether a call waits for the owner's yes.
 export function needsApproval(i: ApprovalInput): boolean {
   if (i.permission === "ask") return true
+  // A turn that read something untrusted never sends a saved file on its own:
+  // injected text could pick the owner's KTP and an innocent-looking tool.
+  if (i.sendsFile && i.tainted) return true
   if (i.permission === "allow" && i.ownerTurn) return false
   if (i.class === "destructive") return true
   return i.class === "write" && (i.tainted || i.strict)

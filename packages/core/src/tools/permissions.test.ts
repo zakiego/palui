@@ -40,4 +40,13 @@ describe("tool permissions", () => {
     expect(needsApproval({ ...i, class: "write", tainted: false, strict: false })).toBe(false)
     expect(needsApproval({ ...i, class: "write", tainted: true, strict: false })).toBe(true)
   })
+
+  it("a tainted turn always asks before sending a saved file, even a read or an allowed tool", () => {
+    const i = { ownerTurn: true, strict: false, sendsFile: true }
+    expect(needsApproval({ ...i, class: "read", permission: null, tainted: true })).toBe(true)
+    expect(needsApproval({ ...i, class: "write", permission: "allow", tainted: true })).toBe(true)
+    // Untainted, a file changes nothing.
+    expect(needsApproval({ ...i, class: "read", permission: null, tainted: false })).toBe(false)
+    expect(needsApproval({ ...i, class: "write", permission: "allow", tainted: false })).toBe(false)
+  })
 })
