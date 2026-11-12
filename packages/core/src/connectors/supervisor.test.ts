@@ -7,7 +7,7 @@ import { listEvents } from "../events"
 import { silentLogger } from "../log"
 import { claimOwner, createClaim } from "../owner"
 import { defineManifest, defineRuntime, type ConnectorServices, type RunningConnector } from "./define"
-import { getConnector, pauseConnector, resumeConnector, upsertConnector } from "./store"
+import { connectConnector, getConnector, pauseConnector, resumeConnector, upsertConnector } from "./store"
 import { createSupervisor, ERROR_ALERT_AFTER_MS } from "./supervisor"
 
 const services: ConnectorServices = { inbound: async () => {}, claimOwner: () => Promise.resolve(false), isOwner: () => false }
@@ -67,6 +67,47 @@ describe("connector supervisor", () => {
     expect(t.sup.channel("whatsapp")).toBeDefined()
     await t.sup.reconcile()
     expect(a.starts).toHaveLength(1)
+  })
+
+  it("puts back the running status after Connect on a running connector with the same config", async () => {
+    const a = fakeRuntime("alpha", "tools")
+    const wa = fakeRuntime("whatsapp", "channel", { reportStatus: "connecting", channel: fakeChannel("whatsapp") })
+    const t = setup({ alpha: a, whatsapp: wa })
+    seedConnector(t.db, "alpha", "tools")
+    seedConnector(t.db, "whatsapp", "channel")
+    await t.sup.reconcile()
+    connectConnector(t.db, "alpha")
+    connectConnector(t.db, "whatsapp")
+    expect(getConnector(t.db, "alpha")!.status).toBe("connecting")
+    await t.sup.reconcile()
+    expect(getConnector(t.db, "alpha")!.status).toBe("on")
+    // A status the connector reported itself comes back with its detail.
+    expect(getConnector(t.db, "whatsapp")).toMatchObject({ status: "connecting", statusDetail: "waiting for pairing" })
+    expect(a.starts).toHaveLength(1)
+    expect(wa.starts).toHaveLength(1)
+  })
+
+  it("retries now instead of after the backoff on Connect or a config change", async () => {
+    let failing = true
+    const bad = fakeRuntime("bad", "tools", { fail: () => failing })
+    const t = setup({ bad })
+    seedConnector(t.db, "bad", "tools")
+    await t.sup.reconcile()
+    t.advance(5_000)
+    await t.sup.reconcile()
+    expect(bad.starts).toHaveLength(2)
+    // Now 30 s into the ladder. A reconcile on its own still waits.
+    await t.sup.reconcile()
+    expect(bad.starts).toHaveLength(2)
+    connectConnector(t.db, "bad")
+    await t.sup.reconcile()
+    expect(bad.starts).toHaveLength(3)
+    expect(getConnector(t.db, "bad")!.status).toBe("error")
+    failing = false
+    upsertConnector(t.db, { id: "bad", manifest: bad.manifest, config: { fixed: true } }, TEST_KEY)
+    await t.sup.reconcile()
+    expect(bad.starts).toHaveLength(4)
+    expect(getConnector(t.db, "bad")!.status).toBe("on")
   })
 
   it("stops a paused connector and keeps it paused, restarts on resume and on config change", async () => {
