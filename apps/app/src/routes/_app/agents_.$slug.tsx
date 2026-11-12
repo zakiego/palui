@@ -19,7 +19,7 @@ import { groupTools } from "@/components/agent-tools/shared"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { InstructionList, InstructionSheet, useInstructionSheet } from "@/components/instructions"
 import { ListCapNote } from "@/components/list-cap-note"
 import { PagePending } from "@/components/page-pending"
@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldTitle } from "@/components/ui/field"
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
@@ -234,143 +234,140 @@ function AgentSettings({ data }: { data: Loaded }) {
 
   return (
     <>
-      <div className="flex flex-col gap-3">
-        <BackButton />
-        <div className="flex min-w-0 items-center gap-3">
-          <AgentAvatar agent={{ isDefault, avatarImage: form.avatarImage, avatarIcon: form.avatarIcon, avatarColor: form.avatarColor }} />
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <h1 dir="auto" className="min-w-0 text-left font-heading text-title [overflow-wrap:anywhere]">
-              {name}
-            </h1>
-            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-mono text-caption break-all text-muted-foreground">{agent.slug}</span>
-              {isDefault && <StatusText tone="secondary">{t("agents.default")}</StatusText>}
-              {over && <StatusText tone="warning">{t("agents.capHit")}</StatusText>}
-            </span>
+      {/* One width for the header, the tabs and every panel. */}
+      <div className="flex w-full max-w-3xl flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <BackButton />
+          <div className="flex min-w-0 items-center gap-3">
+            <AgentAvatar agent={{ isDefault, avatarImage: form.avatarImage, avatarIcon: form.avatarIcon, avatarColor: form.avatarColor }} />
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <h1 dir="auto" className="min-w-0 text-left font-heading text-title [overflow-wrap:anywhere]">
+                {name}
+              </h1>
+              <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="font-mono text-caption break-all text-muted-foreground">{agent.slug}</span>
+                {isDefault && <StatusText tone="secondary">{t("agents.default")}</StatusText>}
+                {over && <StatusText tone="warning">{t("agents.capHit")}</StatusText>}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <SectionPicker
-        value={tab}
-        onChange={(v) => void navigate({ search: { tab: v }, replace: true })}
-        counts={{ chats: data.chatsTotal, instructions: data.instructions.length }}
-      />
+        <Tabs value={tab} onValueChange={(v) => void navigate({ search: { tab: v as Tab }, replace: true, resetScroll: false })} className="gap-6">
+          <SectionTabs counts={{ chats: data.chatsTotal, instructions: data.instructions.length }} />
 
-      <div className="flex flex-col gap-6">
-        {/* Settings and Memory stay mounted (hidden) so unsaved edits survive a switch. */}
-        <div id="agent-panel-settings" hidden={tab !== "settings"} className="flex w-full max-w-2xl flex-col gap-6">
-          <Section id="profile" first title={t("agents.section.profile")}>
-            <FieldGroup>
-              <AvatarPicker
-                agent={{ isDefault, avatarImage: form.avatarImage, avatarIcon: form.avatarIcon, avatarColor: form.avatarColor }}
-                onImage={(v) => set("avatarImage", v)}
-                onIcon={(v) => set("avatarIcon", v)}
-                onColor={(v) => set("avatarColor", v)}
-              />
-              <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2">
-                <Field data-invalid={!!errors.name}>
-                  <FieldLabel htmlFor="agent-name">{t("agents.field.name")}</FieldLabel>
-                  <Input id="agent-name" value={form.name} maxLength={NAME_MAX} aria-invalid={!!errors.name} onChange={(e) => set("name", e.target.value)} />
-                  {errors.name && <FieldError>{errors.name}</FieldError>}
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="agent-slug">{t("agents.field.slug")}</FieldLabel>
-                  <Input id="agent-slug" className="font-mono" readOnly value={agent.slug} aria-describedby="agent-slug-hint" />
-                  <FieldDescription id="agent-slug-hint" className="[overflow-wrap:anywhere]">
-                    {t("agents.slugHint", { slug: agent.slug })}
-                  </FieldDescription>
-                </Field>
-              </div>
-              <Field data-invalid={!!errors.persona}>
-                <FieldLabel htmlFor="agent-persona">{t("agents.field.persona")}</FieldLabel>
-                {/* It grows with its text up to half the screen, then scrolls. */}
-                <Textarea id="agent-persona" rows={8} maxLength={PERSONA_MAX} className="max-h-[50svh]" value={form.persona} aria-invalid={!!errors.persona} onChange={(e) => set("persona", e.target.value)} />
-                <FieldDescription className="tabular-nums">{t("notes.chars", { n: form.persona.length.toLocaleString(), max: PERSONA_MAX.toLocaleString() })}</FieldDescription>
-                {errors.persona && <FieldError>{errors.persona}</FieldError>}
-              </Field>
-              {isDefault && <p className="text-sm text-pretty text-muted-foreground">{t("agents.defaultNote")}</p>}
-            </FieldGroup>
-          </Section>
-
-          {!isDefault && (
-            <Section id="shared" title={t("agents.shared")} description={t("agents.sharedBody")}>
+          {/* Settings and Memory stay mounted (hidden) so unsaved edits survive a switch. */}
+          <TabsContent value="settings" keepMounted className="flex flex-col gap-6 text-base">
+            <Section id="profile" first title={t("agents.section.profile")}>
               <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="agent-guests">{t("agents.field.guestTools")}</FieldLabel>
-                  <SimpleSelect
-                    id="agent-guests"
-                    value={form.guestTools}
-                    onChange={(v) => set("guestTools", v as Form["guestTools"])}
-                    options={[
-                      { value: "safe", label: t("agents.guestTools.safe") },
-                      { value: "none", label: t("agents.guestTools.none") },
-                    ]}
-                  />
+                <AvatarPicker
+                  agent={{ isDefault, avatarImage: form.avatarImage, avatarIcon: form.avatarIcon, avatarColor: form.avatarColor }}
+                  onImage={(v) => set("avatarImage", v)}
+                  onIcon={(v) => set("avatarIcon", v)}
+                  onColor={(v) => set("avatarColor", v)}
+                />
+                <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2">
+                  <Field data-invalid={!!errors.name}>
+                    <FieldLabel htmlFor="agent-name">{t("agents.field.name")}</FieldLabel>
+                    <Input id="agent-name" value={form.name} maxLength={NAME_MAX} aria-invalid={!!errors.name} onChange={(e) => set("name", e.target.value)} />
+                    {errors.name && <FieldError>{errors.name}</FieldError>}
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="agent-slug">{t("agents.field.slug")}</FieldLabel>
+                    <Input id="agent-slug" className="font-mono" readOnly value={agent.slug} aria-describedby="agent-slug-hint" />
+                    <FieldDescription id="agent-slug-hint" className="[overflow-wrap:anywhere]">
+                      {t("agents.slugHint", { slug: agent.slug })}
+                    </FieldDescription>
+                  </Field>
+                </div>
+                <Field data-invalid={!!errors.persona}>
+                  <FieldLabel htmlFor="agent-persona">{t("agents.field.persona")}</FieldLabel>
+                  {/* It grows with its text up to half the screen, then scrolls. */}
+                  <Textarea id="agent-persona" rows={8} maxLength={PERSONA_MAX} className="max-h-[50svh]" value={form.persona} aria-invalid={!!errors.persona} onChange={(e) => set("persona", e.target.value)} />
+                  <FieldDescription className="tabular-nums">{t("notes.chars", { n: form.persona.length.toLocaleString(), max: PERSONA_MAX.toLocaleString() })}</FieldDescription>
+                  {errors.persona && <FieldError>{errors.persona}</FieldError>}
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor="agent-owner">{t("agents.field.ownerPowers")}</FieldLabel>
-                  <SimpleSelect
-                    id="agent-owner"
-                    value={form.ownerPowers}
-                    onChange={(v) => set("ownerPowers", v as Form["ownerPowers"])}
-                    options={[
-                      { value: "off", label: t("agents.ownerPowers.off") },
-                      { value: "approve", label: t("agents.ownerPowers.approve") },
-                    ]}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="agent-bot">{t("agents.field.bot")}</FieldLabel>
-                  <SimpleSelect id="agent-bot" value={form.bot} onChange={(v) => set("bot", v)} options={botOptions} />
-                  <FieldDescription>
-                    {t("agents.botHint")}{" "}
-                    <Link to="/connectors/new" className="underline underline-offset-4">
-                      {t("agents.botAdd")}
-                    </Link>
-                  </FieldDescription>
+                {isDefault && <p className="text-sm text-pretty text-muted-foreground">{t("agents.defaultNote")}</p>}
+              </FieldGroup>
+            </Section>
+
+            {!isDefault && (
+              <Section id="shared" title={t("agents.shared")} description={t("agents.sharedBody")}>
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="agent-guests">{t("agents.field.guestTools")}</FieldLabel>
+                    <SimpleSelect
+                      id="agent-guests"
+                      value={form.guestTools}
+                      onChange={(v) => set("guestTools", v as Form["guestTools"])}
+                      options={[
+                        { value: "safe", label: t("agents.guestTools.safe") },
+                        { value: "none", label: t("agents.guestTools.none") },
+                      ]}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="agent-owner">{t("agents.field.ownerPowers")}</FieldLabel>
+                    <SimpleSelect
+                      id="agent-owner"
+                      value={form.ownerPowers}
+                      onChange={(v) => set("ownerPowers", v as Form["ownerPowers"])}
+                      options={[
+                        { value: "off", label: t("agents.ownerPowers.off") },
+                        { value: "approve", label: t("agents.ownerPowers.approve") },
+                      ]}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="agent-bot">{t("agents.field.bot")}</FieldLabel>
+                    <SimpleSelect id="agent-bot" value={form.bot} onChange={(v) => set("bot", v)} options={botOptions} />
+                    <FieldDescription>
+                      {t("agents.botHint")}{" "}
+                      <Link to="/connectors/new" className="underline underline-offset-4">
+                        {t("agents.botAdd")}
+                      </Link>
+                    </FieldDescription>
+                  </Field>
+                </FieldGroup>
+              </Section>
+            )}
+
+            <Section id="limits" title={t("agents.section.limits")} description={t("agents.limitsBody")}>
+              <FieldGroup>
+                <TokensToday agent={agent} over={over} />
+                <Field data-invalid={!!errors.cap} className="@xl/main:max-w-[calc(50%-0.5rem)]">
+                  <FieldLabel htmlFor="agent-cap">{t("agents.field.cap")}</FieldLabel>
+                  <Input id="agent-cap" inputMode="numeric" className="tabular-nums" value={form.cap} aria-invalid={!!errors.cap} onChange={(e) => set("cap", e.target.value)} />
+                  {errors.cap ? <FieldError>{errors.cap}</FieldError> : <FieldDescription>{t("agents.capHint")}</FieldDescription>}
                 </Field>
               </FieldGroup>
             </Section>
-          )}
 
-          <Section id="limits" title={t("agents.section.limits")} description={t("agents.limitsBody")}>
-            <FieldGroup>
-              <TokensToday agent={agent} over={over} />
-              <Field data-invalid={!!errors.cap} className="@xl/main:max-w-[calc(50%-0.5rem)]">
-                <FieldLabel htmlFor="agent-cap">{t("agents.field.cap")}</FieldLabel>
-                <Input id="agent-cap" inputMode="numeric" className="tabular-nums" value={form.cap} aria-invalid={!!errors.cap} onChange={(e) => set("cap", e.target.value)} />
-                {errors.cap ? <FieldError>{errors.cap}</FieldError> : <FieldDescription>{t("agents.capHint")}</FieldDescription>}
-              </Field>
-            </FieldGroup>
-          </Section>
+            {!isDefault && (
+              <Section id="delete" title={t("agents.delete")} description={t("agents.deleteBody")}>
+                <AlertDialog>
+                  <AlertDialogTrigger render={<Button variant="destructive" className="max-w-full self-start" disabled={busy !== null} />}>
+                    {busy === "delete" && <Spinner data-icon="inline-start" />}
+                    <span className="truncate">{t("agents.deleteNamed", { name: agent.name })}</span>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="[overflow-wrap:anywhere]">{t("agents.deleteTitle", { name: agent.name })}</AlertDialogTitle>
+                      <AlertDialogDescription>{t("agents.deleteBody")}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                      <AlertDialogAction variant="danger" onClick={() => void remove()}>
+                        {t("common.delete")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </Section>
+            )}
+          </TabsContent>
 
-          {!isDefault && (
-            <Section id="delete" title={t("agents.delete")} description={t("agents.deleteBody")}>
-              <AlertDialog>
-                <AlertDialogTrigger render={<Button variant="destructive" className="max-w-full self-start" disabled={busy !== null} />}>
-                  {busy === "delete" && <Spinner data-icon="inline-start" />}
-                  <span className="truncate">{t("agents.deleteNamed", { name: agent.name })}</span>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="[overflow-wrap:anywhere]">{t("agents.deleteTitle", { name: agent.name })}</AlertDialogTitle>
-                    <AlertDialogDescription>{t("agents.deleteBody")}</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                    <AlertDialogAction variant="danger" onClick={() => void remove()}>
-                      {t("common.delete")}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </Section>
-          )}
-        </div>
-
-        {tab === "chats" && (
-          <div id="agent-panel-chats" className="flex w-full max-w-2xl flex-col gap-4">
+          <TabsContent value="chats" className="flex flex-col gap-4 text-base">
             <p className="text-sm text-pretty text-muted-foreground">
               {isDefault ? t("agents.chatsBodyDefault") : t("agents.chatsBody", { slug: agent.slug })} {t("agents.deployNoticeHint")}
             </p>
@@ -394,11 +391,9 @@ function AgentSettings({ data }: { data: Loaded }) {
                 <ListCapNote shown={data.chats.length} total={data.chatsTotal} />
               </div>
             )}
-          </div>
-        )}
+          </TabsContent>
 
-        {tab === "instructions" && (
-          <div id="agent-panel-instructions" className="flex w-full max-w-2xl flex-col gap-4">
+          <TabsContent value="instructions" className="flex flex-col gap-4 text-base">
             <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
               <p className="max-w-[65ch] min-w-0 flex-1 text-sm text-pretty text-muted-foreground">{isDefault ? t("agents.instructionsBodyDefault") : t("agents.instructionsBody")}</p>
               <Button variant="outline" size="sm" onClick={() => instructionSheet.edit("new")}>
@@ -407,43 +402,41 @@ function AgentSettings({ data }: { data: Loaded }) {
               </Button>
             </div>
             <InstructionList items={data.instructions} onEdit={instructionSheet.edit} />
-          </div>
-        )}
+          </TabsContent>
 
-        <div id="agent-panel-memory" hidden={tab !== "memory"} className="flex w-full max-w-2xl flex-col gap-6">
-          {tab === "memory" && <MemoryStats agent={agent} />}
-          <Field data-invalid={!!errors.container}>
-            <FieldLabel htmlFor="agent-container">{t("agents.field.container")}</FieldLabel>
-            <Input
-              id="agent-container"
-              className="font-mono"
-              spellCheck={false}
-              autoCapitalize="none"
-              autoComplete="off"
-              maxLength={64}
-              placeholder={isDefault ? t("agents.containerConnector") : `agent-${agent.slug}`}
-              value={form.container}
-              aria-invalid={!!errors.container}
-              onChange={(e) => set("container", e.target.value)}
-            />
-            {errors.container ? (
-              <FieldError>{errors.container}</FieldError>
-            ) : (
-              <FieldDescription>{t("agents.containerHint")}</FieldDescription>
-            )}
-          </Field>
-        </div>
+          <TabsContent value="memory" keepMounted className="flex flex-col gap-6 text-base">
+            {tab === "memory" && <MemoryStats agent={agent} />}
+            <Field data-invalid={!!errors.container}>
+              <FieldLabel htmlFor="agent-container">{t("agents.field.container")}</FieldLabel>
+              <Input
+                id="agent-container"
+                className="font-mono"
+                spellCheck={false}
+                autoCapitalize="none"
+                autoComplete="off"
+                maxLength={64}
+                placeholder={isDefault ? t("agents.containerConnector") : `agent-${agent.slug}`}
+                value={form.container}
+                aria-invalid={!!errors.container}
+                onChange={(e) => set("container", e.target.value)}
+              />
+              {errors.container ? (
+                <FieldError>{errors.container}</FieldError>
+              ) : (
+                <FieldDescription>{t("agents.containerHint")}</FieldDescription>
+              )}
+            </Field>
+          </TabsContent>
 
-        {tab === "tools" && (
-          <div id="agent-panel-tools" className="flex w-full max-w-3xl flex-col gap-6">
+          <TabsContent value="tools" className="flex flex-col gap-6 text-base">
             <ToolsTab agent={agent} />
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {(tab === "settings" || tab === "memory" || dirty) && (
       <div className="sticky bottom-0 z-10 -mx-4 -mb-10 border-t bg-background/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex w-full max-w-2xl items-center gap-3">
+        <div className="flex w-full max-w-3xl items-center gap-3">
           {dirty && (
             <StatusText tone="secondary" icon={<CircleDotIcon aria-hidden="true" />} className="min-w-0 truncate" role="status">
               {t("agents.unsaved")}
@@ -477,8 +470,7 @@ function AgentSettings({ data }: { data: Loaded }) {
   )
 }
 
-// The page's sections as big labelled choice cards (icon, name, a radio), not a
-// small tab strip: picking one changes what the page shows.
+// The page's sections as Geist-style line tabs (icon, name, count), kept in ?tab=.
 const SECTIONS = [
   { value: "settings", Icon: SlidersHorizontalIcon, title: "agents.tab.settings" },
   { value: "chats", Icon: MessagesSquareIcon, title: "agents.tab.chats" },
@@ -487,30 +479,18 @@ const SECTIONS = [
   { value: "tools", Icon: WrenchIcon, title: "agents.tab.tools" },
 ] as const
 
-function SectionPicker({ value, onChange, counts }: { value: Tab; onChange: (v: Tab) => void; counts: Partial<Record<Tab, number>> }) {
+function SectionTabs({ counts }: { counts: Partial<Record<Tab, number>> }) {
   const t = useT()
   return (
-    <RadioGroup
-      value={value}
-      onValueChange={(v) => onChange(v as Tab)}
-      aria-label={t("agents.sections")}
-      className="grid max-w-5xl grid-cols-2 gap-3 @2xl/main:grid-cols-3 @4xl/main:grid-cols-5"
-    >
+    <TabsList variant="line" aria-label={t("agents.sections")}>
       {SECTIONS.map(({ value: v, Icon, title }) => (
-        <FieldLabel key={v} htmlFor={`agent-section-pick-${v}`} className="min-w-0">
-          <Field orientation="horizontal" className="items-center gap-3">
-            <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-            <FieldContent className="min-w-0">
-              <FieldTitle className="flex-wrap">
-                {t(title)}
-                {counts[v] !== undefined && <span className="font-normal text-muted-foreground tabular-nums">{counts[v]!.toLocaleString()}</span>}
-              </FieldTitle>
-            </FieldContent>
-            <RadioGroupItem value={v} id={`agent-section-pick-${v}`} aria-controls={`agent-panel-${v}`} />
-          </Field>
-        </FieldLabel>
+        <TabsTrigger key={v} value={v}>
+          <Icon aria-hidden="true" className="hidden @xl/main:block" />
+          {t(title)}
+          {counts[v] !== undefined && <span className="font-normal text-muted-foreground tabular-nums">{counts[v]!.toLocaleString()}</span>}
+        </TabsTrigger>
       ))}
-    </RadioGroup>
+    </TabsList>
   )
 }
 
@@ -851,18 +831,21 @@ function Rule({ icon, label, value }: { icon: React.ReactNode; label: string; va
 function AgentPageSkeleton() {
   return (
     <PagePending page="nav.agents">
-      <Skeleton className="h-7 w-24" />
-      <div className="flex items-center gap-3">
-        <Skeleton className="size-10 rounded-lg" />
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-7 w-48" />
-          <Skeleton className="h-4 w-24" />
+      <div className="flex w-full max-w-3xl flex-col gap-6">
+        <Skeleton className="h-7 w-24" />
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-10 rounded-lg" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-24" />
+          </div>
         </div>
-      </div>
-      <div className="flex w-full max-w-2xl flex-col gap-4">
-        <Skeleton className="h-40" />
-        <Skeleton className="h-24" />
-        <Skeleton className="h-24" />
+        <Skeleton className="h-10" />
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-40" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
       </div>
     </PagePending>
   )
