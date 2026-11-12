@@ -36,6 +36,8 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Fixed
 
+- Sending a saved file to an MCP tool is safer and clearer. After the agent reads something untrusted (a web page, an external server), a call that carries a saved file always waits for your yes, even with "Allow every tool without asking". The approval message names the file and its size instead of an id. Flows never send a file that outside data picked. A server that repeats the file back no longer fills the agent's context, and one call carries at most 15 MB of files.
+- The agent is told right in the attachment results how to hand a file to another app (upload it there with its `fileRef`, then use that app's id), so it stops passing Palui's own file id and getting "File not found".
 - A photo or document saved in chat can now go to another app's MCP tool, like uploading a receipt to a finance app and attaching it to a transaction. Before, the agent passed Palui's own file id, the app answered "File not found", and the receipt stayed in Palui only. Files only go to MCP servers marked as your own, never to external ones.
 - Clicking Connect on a connector that's already running no longer leaves it stuck on Connecting. It goes back to On (or its error) right away. On a connector waiting to retry after an error, Connect or a saved fix like a new token now retries at once instead of up to 10 minutes later.
 - Adding a connector from an agent's Tools tab now has a back link to that agent, not to the Connectors page.
