@@ -5,7 +5,7 @@
 // in SQLite (see savedAttachments in the schema).
 import { createHash } from "node:crypto"
 import { and, asc, count, desc, eq, or, sql, type Column } from "drizzle-orm"
-import { messages, newId, savedAttachments, type AttachmentKind, type DB } from "@palui/db"
+import { attachmentShares, messages, newId, savedAttachments, type AttachmentKind, type DB } from "@palui/db"
 import { decryptBytes, encryptBytes } from "@palui/db/crypto"
 import type { StoredContent } from "../chat/context"
 
@@ -203,8 +203,22 @@ export function readAttachment(db: DB, id: string, masterKey: string): { meta: A
   return { meta, bytes: decryptBytes(data, masterKey) }
 }
 
+// Deleting a file also kills every link to it.
 export function deleteAttachment(db: DB, id: string): boolean {
-  return db.delete(savedAttachments).where(eq(savedAttachments.id, id)).run().changes > 0
+  return db.transaction((tx) => {
+    tx.delete(attachmentShares).where(eq(attachmentShares.attachmentId, id)).run()
+    return tx.delete(savedAttachments).where(eq(savedAttachments.id, id)).run().changes > 0
+  })
+}
+
+export type PreviewKind = "image" | "pdf" | "text"
+
+// What a browser can show inline. HEIC, HEIF and the Office formats only download.
+export function previewKind(mimeType: string): PreviewKind | null {
+  if (mimeType === "application/pdf") return "pdf"
+  if (mimeType === "text/plain" || mimeType === "text/csv") return "text"
+  if (["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mimeType)) return "image"
+  return null
 }
 
 // Safe for a Content-Disposition header and a file system: no paths, quotes or control characters.
