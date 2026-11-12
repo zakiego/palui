@@ -15,6 +15,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 - Agents can keep a separate memory per chat. On an agent's Memory tab, "Separate memory per chat" gives each chat its own recall container, so what one customer said never comes up in another customer's chat. New agents start with it on; existing ones keep their single container until you turn it on. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 - Shared containers on an agent's Memory tab: up to 5 recall containers it reads but never writes, like a `kb-shop` you fill with product facts. Auto-recall shows them next to the agent's own memory, labeled as reference only. Palui can use them too.
+- Activity > Usage splits tokens per agent. A new "Per agent" card next to Per model shows each agent's tokens and runs over the last 14 days. Runs from before agents count toward Palui, and runs of a deleted agent group under "Deleted agent".
 
 ### Fixed
 

@@ -436,6 +436,8 @@ export function worst(k: Kit) {
     for (let i = 0; i < 3; i++) {
       k.run({
         chatId: [aleksandra.id, family.id, cjk.id, christopher.id][(day + i) % 4]!,
+        // Every agent kind for the per-agent breakdown: the longest name, a short one, a deleted one, and none (runs from before agents).
+        agentId: [arisan, cs, "agt_deleted", null][(day + i) % 4],
         trigger: "message",
         model: `model-${String((day * 3 + i) % 26).padStart(2, "0")}-preview`,
         tokensIn: day === 2 ? 40_000_000 : 3000 + day * 700 + i * 200,

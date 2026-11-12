@@ -2,8 +2,9 @@
 // SQLite file; writes go through @palui/core or the bridge modules.
 import fs from "node:fs"
 import path from "node:path"
-import { chats, events, jobs, messages, pendingApprovals, reminders, runs, schema, toolCalls, type DB, type EventLevel } from "@palui/db"
+import { agents, chats, events, jobs, messages, pendingApprovals, reminders, runs, schema, toolCalls, type DB, type EventLevel } from "@palui/db"
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, sql, type SQL } from "drizzle-orm"
+import { DEFAULT_AGENT_NAME } from "@palui/core/agents"
 import { budgetTokens } from "@palui/core/budget/index"
 import { DateTime } from "luxon"
 import { clip } from "@/lib/format"
@@ -293,7 +294,7 @@ export function tokensSince(db: DB, since: number) {
   return { tokensIn: Number(row?.tin ?? 0), tokensOut: Number(row?.tout ?? 0), runs: Number(row?.n ?? 0) }
 }
 
-// Tokens per day (in the owner's zone), per model, per chat and per job over
+// Tokens per day (in the owner's zone), per model, per agent, per chat and per job over
 // the last `days` days. No money: subscriptions don't bill per token.
 export function usage(db: DB, tz: string, days = 14, now = Date.now()) {
   const since = DateTime.fromMillis(now, { zone: tz }).startOf("day").minus({ days: days - 1 }).toMillis()
@@ -305,6 +306,10 @@ export function usage(db: DB, tz: string, days = 14, now = Date.now()) {
   }
   const titles = chatTitles(db)
   const jobNames = new Map(db.select({ id: jobs.id, name: jobs.name }).from(jobs).all().map((j) => [j.id, j.name]))
+  const agentRows = db.select({ id: agents.id, name: agents.name, isDefault: agents.isDefault }).from(agents).all()
+  const agentNames = new Map(agentRows.map((a) => [a.id, a.name]))
+  // Runs from before agents (agent_id null) were all the default agent's.
+  const defaultAgent = agentRows.find((a) => a.isDefault)?.name ?? DEFAULT_AGENT_NAME
   const bump = (m: Map<string, { key: string; tokens: number; runs: number }>, key: string, tokens: number) => {
     const cur = m.get(key) ?? { key, tokens: 0, runs: 0 }
     cur.tokens += tokens
@@ -312,6 +317,7 @@ export function usage(db: DB, tz: string, days = 14, now = Date.now()) {
     m.set(key, cur)
   }
   const perModel = new Map<string, { key: string; tokens: number; runs: number }>()
+  const perAgent = new Map<string, { key: string; tokens: number; runs: number }>()
   const perChat = new Map<string, { key: string; tokens: number; runs: number }>()
   const perJob = new Map<string, { key: string; tokens: number; runs: number }>()
   for (const r of rows) {
@@ -323,13 +329,14 @@ export function usage(db: DB, tz: string, days = 14, now = Date.now()) {
     }
     const total = r.tokensIn + r.tokensOut
     bump(perModel, r.model ?? "unknown", total)
-    // A chat or job deleted since groups under "", which the page shows as "Deleted chat".
+    bump(perAgent, r.agentId ? (agentNames.get(r.agentId) ?? "") : defaultAgent, total)
+    // An agent, chat or job deleted since groups under "", which the page shows as "Deleted chat".
     if (r.chatId) bump(perChat, titles.get(r.chatId) ?? "", total)
     if (r.jobId) bump(perJob, jobNames.get(r.jobId) ?? "", total)
   }
   // The top 20 of each, with how many there were in all so the page can say so.
   const sorted = (m: Map<string, { key: string; tokens: number; runs: number }>) => ({ rows: [...m.values()].sort((a, b) => b.tokens - a.tokens).slice(0, 20), total: m.size })
-  return { days: [...perDay.values()], perModel: sorted(perModel), perChat: sorted(perChat), perJob: sorted(perJob) }
+  return { days: [...perDay.values()], perModel: sorted(perModel), perAgent: sorted(perAgent), perChat: sorted(perChat), perJob: sorted(perJob) }
 }
 
 // --- events -----------------------------------------------------------------------

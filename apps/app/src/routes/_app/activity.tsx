@@ -297,7 +297,8 @@ function UsageTab({ usage }: { usage: Awaited<ReturnType<typeof getUsage>> }) {
           )}
         </CardContent>
       </Card>
-      <div className="grid gap-4 @4xl/main:grid-cols-3">
+      <div className="grid gap-4 @4xl/main:grid-cols-2">
+        <Breakdown title={t("activity.perAgent")} list={usage.perAgent} unnamed={t("runs.deletedAgent")} />
         <Breakdown title={t("activity.perModel")} list={usage.perModel} mono />
         <Breakdown title={t("activity.perChat")} list={usage.perChat} unnamed={t("runs.deletedChat")} />
         <Breakdown title={t("activity.perJob")} list={usage.perJob} unnamed={t("runs.deletedJob")} />
@@ -306,7 +307,7 @@ function UsageTab({ usage }: { usage: Awaited<ReturnType<typeof getUsage>> }) {
   )
 }
 
-// `unnamed` is what a row with an empty key is called: runs whose chat or job
+// `unnamed` is what a row with an empty key is called: runs whose agent, chat or job
 // was deleted since group under one.
 function Breakdown({ title, list, mono, unnamed }: { title: string; list: { rows: { key: string; tokens: number; runs: number }[]; total: number }; mono?: boolean; unnamed?: string }) {
   const t = useT()
