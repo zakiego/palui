@@ -22,6 +22,8 @@ import { getAllSettings, type ModelRole } from "../settings"
 import { collectTools, emptyTools, SEARCH_TOOL, STICKY_MAX, type CollectedTools } from "../tools/collect"
 import type { TurnBus } from "./bus"
 import { limitNotice, shouldWrapUp, stepClock, WRAP_UP_NOTE, type RanTool, type WrapUpReason } from "./turn-limits"
+import { config } from "../config"
+import { dashboardPrompt } from "./dashboard"
 import { buildSystem, buildTurnContext, hasImages, loadHistory, loadToolCalls, markStaleReads, quotesOutsider, systemBlocks, toModelMessages, withTurnContext, type StoredContent } from "./context"
 import type { EngineDeps } from "./deps"
 
@@ -293,6 +295,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
           notes: notesPrompt(db, agent),
           trigger: origin,
           shared: shared ? { kind: chat.kind, guest } : null,
+          dashboard: origin === "message" ? dashboardPrompt(config().appUrl, agent.slug) : null,
         }),
         input.trigger === "message" ? session?.summary : null,
       )
