@@ -61,23 +61,60 @@ export function createMemoryHandle(api: RecallApi, config: Config, stats: Recall
   }
 }
 
-// The one REST tool: recall's MCP server has no forget, so it's DELETE /v1/memories/:id.
-// A locked scope (every agent) may only forget its own container's
-// memories: the id is looked up first, and any other container answers "no memory".
-export function forgetTool(api: RecallApi, scope?: { container: string; locked: boolean }): Tool {
+export const FORGET_MAX = 20
+
+type ForgetScope = { container: string; locked: boolean }
+
+// REST tools: recall's MCP server has no forget, so they're DELETE calls. A
+// locked scope (every agent) may only touch its own container: the item is
+// looked up first, and any other container answers "not found".
+async function forgetOne(api: RecallApi, id: string, scope?: ForgetScope): Promise<{ forgotten: boolean; id: string; fact?: string; error?: string }> {
+  try {
+    if (scope?.locked) {
+      const found = await api.getMemory(id)
+      if (found.memory?.container !== scope.container) return { forgotten: false, id, error: "No memory with that id" }
+    }
+    const res = await api.forget(id)
+    return { forgotten: true, id, fact: res.memory?.fact }
+  } catch (err) {
+    if (err instanceof RecallError && err.status === 404) return { forgotten: false, id, error: "No memory with that id" }
+    throw err
+  }
+}
+
+// One call takes every id, so forgetting several facts asks the owner once.
+export function forgetTool(api: RecallApi, scope?: ForgetScope): Tool {
   return tool({
-    description: "Forget one memory in recall by its id (from search_memories or list_memories). The fact stops being recalled. Ask the owner first.",
-    inputSchema: z.object({ id: z.string().min(1).describe("Memory id") }),
+    description: `Forget memories in recall by id (from search_memories or list_memories). The facts stop being recalled. Pass every id in one call, at most ${FORGET_MAX}: each call asks the owner first.`,
+    inputSchema: z.object({
+      ids: z.array(z.string().min(1)).min(1).max(FORGET_MAX).optional().describe("Memory ids"),
+      id: z.string().min(1).optional().describe("One memory id (older form; prefer ids)"),
+    }),
+    execute: async ({ ids, id }) => {
+      const all = [...new Set([...(ids ?? []), ...(id ? [id] : [])])].slice(0, FORGET_MAX)
+      if (!all.length) return { forgotten: 0, results: [], error: "Pass ids." }
+      const results = []
+      for (const one of all) results.push(await forgetOne(api, one, scope))
+      if (!ids && id) return results[0]!
+      return { forgotten: results.filter((r) => r.forgotten).length, results }
+    },
+  })
+}
+
+// Deletes a document's stored text (the doc_ id add_memory returned, or a
+// search hit's document). Facts taken from it stay: forget those with forget_memory.
+export function forgetDocumentTool(api: RecallApi, scope?: ForgetScope): Tool {
+  return tool({
+    description: "Delete a document from recall by its id (doc_..., as add_memory returned it): its stored text stops showing up in searches. Facts already taken from it stay; forget those with forget_memory. Ask the owner first.",
+    inputSchema: z.object({ id: z.string().min(1).describe("Document id, doc_...") }),
     execute: async ({ id }) => {
       try {
-        if (scope?.locked) {
-          const found = await api.getMemory(id)
-          if (found.memory?.container !== scope.container) return { forgotten: false, id, error: "No memory with that id" }
-        }
-        const res = await api.forget(id)
-        return { forgotten: true, id, fact: res.memory?.fact }
+        const found = await api.getDocument(id)
+        if (scope?.locked && found.document?.container !== scope.container) return { deleted: false, id, error: "No document with that id" }
+        await api.deleteDocument(id)
+        return { deleted: true, id, title: found.document?.title ?? null }
       } catch (err) {
-        if (err instanceof RecallError && err.status === 404) return { forgotten: false, id, error: "No memory with that id" }
+        if (err instanceof RecallError && err.status === 404) return { deleted: false, id, error: "No document with that id" }
         throw err
       }
     },
@@ -162,6 +199,7 @@ export default defineRuntime(manifest, {
         const scope = turnScope(turn, ctx.config.container)
         const out: Record<string, PaluiTool> = {
           forget_memory: { tool: forgetTool(api, scope), class: "destructive", title: "Forget memory" },
+          forget_document: { tool: forgetDocumentTool(api, scope), class: "destructive", title: "Delete document" },
         }
         try {
           const { tools: defs } = await mcp.listTools()

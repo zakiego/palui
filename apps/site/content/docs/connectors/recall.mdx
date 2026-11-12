@@ -27,7 +27,7 @@ Kind: `memory`. recall is a self-hosted memory service. Palui uses it for long-t
 
 recall's own `/mcp` endpoint is mounted the same way as an [MCP server](/docs/connectors/mcp), which gives the model `add_memory`, `search_memories`, `ask_memory`, `get_profile` and `list_memories`. Their classes and switches work like any MCP tool's.
 
-On top of those, forgetting a memory is one REST tool (`DELETE /v1/memories/:id`) classed `destructive`, so it always asks first.
+On top of those, two REST tools are classed `destructive`, so they always ask first. `forget_memory` takes up to 20 memory ids in one call (`DELETE /v1/memories/:id` for each), so forgetting several facts is one approval, not one per fact. `forget_document` deletes a document's stored text (`DELETE /v1/documents/:id`), so a saved note stops showing up in searches. Facts already taken from that document stay until `forget_memory` removes them. Both only touch the agent's own container.
 
 The model sees the tools namespaced, for example `recall__search_memories`.
 

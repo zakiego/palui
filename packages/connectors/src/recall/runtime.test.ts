@@ -78,6 +78,13 @@ async function fakeRecall(opts: FakeOpts = {}) {
         const b = JSON.parse(raw) as { container: string; source_id?: string }
         return send(res, 202, { id: "doc_1", container: b.container, status: "queued", sourceId: b.source_id ?? null, duplicate: false }), true
       }
+      if (url.pathname.startsWith("/v1/documents/") && (req.method === "DELETE" || req.method === "GET")) {
+        const id = decodeURIComponent(url.pathname.split("/").pop() ?? "")
+        const home: Record<string, string> = { doc_1: "zaki", doc_2: "agent-chef" }
+        if (!home[id]) return send(res, 404, { error: { type: "not_found", message: "no such document" } }), true
+        if (req.method === "DELETE") return send(res, 200, { deleted: true }), true
+        return send(res, 200, { document: { id, container: home[id], title: "Old doc" } }), true
+      }
       if (url.pathname.startsWith("/v1/memories/") && (req.method === "DELETE" || req.method === "GET")) {
         const id = decodeURIComponent(url.pathname.split("/").pop() ?? "")
         const home: Record<string, string> = { mem_1: "zaki", mem_2: "agent-chef" }
@@ -143,6 +150,7 @@ describe("recall runtime", () => {
       const tools = await running.tools!(turn)
       expect(Object.fromEntries(Object.entries(tools).map(([k, v]) => [k, v.class]))).toEqual({
         forget_memory: "destructive",
+        forget_document: "destructive",
         add_memory: "write",
         search_memories: "read",
         ask_memory: "read",
@@ -190,6 +198,45 @@ describe("recall runtime", () => {
     }
   })
 
+  // The report: five forget_memory calls meant five approval prompts. One call
+  // with every id asks once.
+  it("forget_memory takes many ids in one call and still checks each container", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const running = await runtime.start(fakeCtx(cfg(f.base), { apiKey: KEY }))
+    try {
+      const tools = await running.tools!({ ...turn, memory: { container: "zaki", read: [], locked: true } })
+      expect(await exec(tools.forget_memory, { ids: ["mem_1", "mem_2", "nope", "mem_1"] })).toEqual({
+        forgotten: 1,
+        results: [
+          { forgotten: true, id: "mem_1", fact: "Old fact" },
+          { forgotten: false, id: "mem_2", error: "No memory with that id" },
+          { forgotten: false, id: "nope", error: "No memory with that id" },
+        ],
+      })
+      expect(f.seen.filter((s) => s.method === "DELETE").map((s) => s.path)).toEqual(["/v1/memories/mem_1"])
+      expect(await exec(tools.forget_memory, { id: "mem_1" })).toEqual({ forgotten: true, id: "mem_1", fact: "Old fact" })
+      expect(await exec(tools.forget_memory, {})).toMatchObject({ forgotten: 0, error: "Pass ids." })
+    } finally {
+      await running.stop()
+    }
+  })
+
+  it("forget_document deletes only a document in the turn's own container", async () => {
+    const f = await fakeRecall()
+    srv = f.server
+    const running = await runtime.start(fakeCtx(cfg(f.base), { apiKey: KEY }))
+    try {
+      const tools = await running.tools!({ ...turn, memory: { container: "zaki", read: [], locked: true } })
+      expect(await exec(tools.forget_document, { id: "doc_1" })).toEqual({ deleted: true, id: "doc_1", title: "Old doc" })
+      expect(await exec(tools.forget_document, { id: "doc_2" })).toEqual({ deleted: false, id: "doc_2", error: "No document with that id" })
+      expect(await exec(tools.forget_document, { id: "doc_9" })).toEqual({ deleted: false, id: "doc_9", error: "No document with that id" })
+      expect(f.seen.filter((s) => s.method === "DELETE").map((s) => s.path)).toEqual(["/v1/documents/doc_1"])
+    } finally {
+      await running.stop()
+    }
+  })
+
   it("locks an agent's tools to its own container and its shared ones", async () => {
     const f = await fakeRecall()
     srv = f.server
@@ -197,7 +244,7 @@ describe("recall runtime", () => {
     try {
       const tools = await running.tools!({ ...turn, agentId: "agt_chef", memory: { container: "agent-chef", read: ["kb-menu"], locked: true } })
       // Tools recall adds later may reach other containers, so they're left out.
-      expect(Object.keys(tools).sort()).toEqual(["add_memory", "ask_memory", "forget_memory", "get_profile", "list_memories", "search_memories"])
+      expect(Object.keys(tools).sort()).toEqual(["add_memory", "ask_memory", "forget_document", "forget_memory", "get_profile", "list_memories", "search_memories"])
       await exec(tools.search_memories, { query: "sambal" })
       await exec(tools.search_memories, { query: "sambal", container: "kb-menu" })
       await exec(tools.add_memory, { content: "x" })

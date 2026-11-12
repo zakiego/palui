@@ -26,7 +26,7 @@ export default defineManifest({
   removeWarning: "This removes the recall key from Palui. Your memories stay in recall.",
   docs: {
     notes: [
-      "Tools: add_memory (write), search_memories, ask_memory, get_profile, list_memories (read), forget_memory (destructive).",
+      "Tools: add_memory (write), search_memories, ask_memory, get_profile, list_memories (read), forget_memory and forget_document (destructive).",
       "Auto-save uses source_id <session>:<range>, so saving the same slice twice is a no-op.",
     ],
   },

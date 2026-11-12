@@ -124,6 +124,16 @@ export class RecallApi {
   forget(id: string, signal?: AbortSignal) {
     return this.call<{ memory: RecallMemory }>("DELETE", `/v1/memories/${encodeURIComponent(id)}`, { signal })
   }
+
+  getDocument(id: string, signal?: AbortSignal) {
+    return this.call<{ document: { id: string; container: string; title?: string | null } }>("GET", `/v1/documents/${encodeURIComponent(id)}`, { signal })
+  }
+
+  // Deletes the stored text and its chunks. Facts already taken from it stay
+  // until they're forgotten one by one.
+  deleteDocument(id: string, signal?: AbortSignal) {
+    return this.call<{ deleted: boolean }>("DELETE", `/v1/documents/${encodeURIComponent(id)}`, { signal })
+  }
 }
 
 const MAX_PROFILE_CHARS = 4000
