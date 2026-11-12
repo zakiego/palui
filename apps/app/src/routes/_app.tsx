@@ -11,6 +11,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { LiveEventsProvider } from "@/hooks/use-live-events"
+import { useWarmPages } from "@/hooks/use-warm-pages"
 import { authClient } from "@/lib/auth-client"
 import { getShell } from "@/lib/fns/home"
 import { LocaleProvider, useT } from "@/lib/i18n"
@@ -112,6 +113,8 @@ function Shell() {
   const navigate = useNavigate()
   const t = useT()
   const [commandOpen, setCommandOpen] = React.useState(false)
+
+  useWarmPages()
 
   // The server rendered this page with a viewer it had just verified, so the
   // first page switch doesn't need to ask again.
