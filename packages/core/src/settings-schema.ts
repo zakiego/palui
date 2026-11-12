@@ -32,6 +32,11 @@ export const languageSchema = z.enum(["auto", "id", "en"])
 export const uiLanguageSchema = z.enum(["en", "id"])
 export const fallbackChannelSchema = z.enum(["telegram", "whatsapp", "none"])
 
+// On needs a chat to send to.
+export const deployNoticeSchema = z
+  .object({ enabled: z.boolean(), chatId: z.string().min(1).max(100).nullable() })
+  .refine((v) => !v.enabled || v.chatId !== null, { message: "Pick a chat for the deploy notice.", path: ["chatId"] })
+
 // A patch of the Settings page keys. Every key is optional; objects are whole.
 export const settingsPatchSchema = z.object({
   timezone: timezoneSchema.optional(),
@@ -40,6 +45,7 @@ export const settingsPatchSchema = z.object({
   modelRoles: z.object({ default: modelChainSchema, fast: modelChainSchema, vision: modelChainSchema }).optional(),
   budgets: budgetsSchema.optional(),
   fallbackChannel: fallbackChannelSchema.optional(),
+  deployNotice: deployNoticeSchema.optional(),
 })
 
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>
