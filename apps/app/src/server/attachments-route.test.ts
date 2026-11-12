@@ -37,6 +37,13 @@ describe("GET /api/attachments/:id", () => {
     expect(res.headers.get("cache-control")).toBe("private, no-store")
   })
 
+  it("shows previewable files inline with ?inline=1", async () => {
+    const { id, deps } = setup()
+    const res = await handleAttachmentRequest(get(`${id}?inline=1`), id, deps)
+    expect(res.headers.get("content-disposition")).toMatch(/^inline; filename="tiket BDJ.pdf"/)
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff")
+  })
+
   it("404s on unknown or malformed ids", async () => {
     const { deps } = setup()
     expect((await handleAttachmentRequest(get("att_nope"), "att_nope", deps)).status).toBe(404)

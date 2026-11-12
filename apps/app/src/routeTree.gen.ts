@@ -33,6 +33,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiChatStreamRouteImport } from './routes/api/chat/stream'
 import { Route as ApiEventsStreamRouteImport } from './routes/api/events/stream'
 import { Route as ApiHooksSlugRouteImport } from './routes/api/hooks/$slug'
+import { Route as ApiShareTokenRouteImport } from './routes/api/share/$token'
 import { Route as AppActivityRunsIdRouteImport } from './routes/_app/activity_.runs.$id'
 import { Route as ApiOauthGoogleCallbackRouteImport } from './routes/api/oauth/google/callback'
 
@@ -155,6 +156,11 @@ const ApiHooksSlugRoute = ApiHooksSlugRouteImport.update({
   path: '/api/hooks/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiShareTokenRoute = ApiShareTokenRouteImport.update({
+  id: '/api/share/$token',
+  path: '/api/share/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppActivityRunsIdRoute = AppActivityRunsIdRouteImport.update({
   id: '/activity_/runs/$id',
   path: '/activity/runs/$id',
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/events/stream': typeof ApiEventsStreamRoute
   '/api/hooks/$slug': typeof ApiHooksSlugRoute
+  '/api/share/$token': typeof ApiShareTokenRoute
   '/activity/runs/$id': typeof AppActivityRunsIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
 }
@@ -217,6 +224,7 @@ export interface FileRoutesByTo {
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/events/stream': typeof ApiEventsStreamRoute
   '/api/hooks/$slug': typeof ApiHooksSlugRoute
+  '/api/share/$token': typeof ApiShareTokenRoute
   '/activity/runs/$id': typeof AppActivityRunsIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
 }
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/events/stream': typeof ApiEventsStreamRoute
   '/api/hooks/$slug': typeof ApiHooksSlugRoute
+  '/api/share/$token': typeof ApiShareTokenRoute
   '/_app/activity_/runs/$id': typeof AppActivityRunsIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
 }
@@ -275,6 +284,7 @@ export interface FileRouteTypes {
     | '/api/chat/stream'
     | '/api/events/stream'
     | '/api/hooks/$slug'
+    | '/api/share/$token'
     | '/activity/runs/$id'
     | '/api/oauth/google/callback'
   fileRoutesByTo: FileRoutesByTo
@@ -302,6 +312,7 @@ export interface FileRouteTypes {
     | '/api/chat/stream'
     | '/api/events/stream'
     | '/api/hooks/$slug'
+    | '/api/share/$token'
     | '/activity/runs/$id'
     | '/api/oauth/google/callback'
   id:
@@ -330,6 +341,7 @@ export interface FileRouteTypes {
     | '/api/chat/stream'
     | '/api/events/stream'
     | '/api/hooks/$slug'
+    | '/api/share/$token'
     | '/_app/activity_/runs/$id'
     | '/api/oauth/google/callback'
   fileRoutesById: FileRoutesById
@@ -344,6 +356,7 @@ export interface RootRouteChildren {
   ApiChatStreamRoute: typeof ApiChatStreamRoute
   ApiEventsStreamRoute: typeof ApiEventsStreamRoute
   ApiHooksSlugRoute: typeof ApiHooksSlugRoute
+  ApiShareTokenRoute: typeof ApiShareTokenRoute
   ApiOauthGoogleCallbackRoute: typeof ApiOauthGoogleCallbackRoute
 }
 
@@ -517,6 +530,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHooksSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/share/$token': {
+      id: '/api/share/$token'
+      path: '/api/share/$token'
+      fullPath: '/api/share/$token'
+      preLoaderRoute: typeof ApiShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/activity_/runs/$id': {
       id: '/_app/activity_/runs/$id'
       path: '/activity/runs/$id'
@@ -584,6 +604,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatStreamRoute: ApiChatStreamRoute,
   ApiEventsStreamRoute: ApiEventsStreamRoute,
   ApiHooksSlugRoute: ApiHooksSlugRoute,
+  ApiShareTokenRoute: ApiShareTokenRoute,
   ApiOauthGoogleCallbackRoute: ApiOauthGoogleCallbackRoute,
 }
 export const routeTree = rootRouteImport
