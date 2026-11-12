@@ -4,6 +4,7 @@
 import { ensureChat, ensureWebChat, type ChatRow } from "@palui/core/chats"
 import { masterKey } from "@palui/core/config"
 import { saveAttachment } from "@palui/core/attachments/service"
+import { createShare } from "@palui/core/attachments/shares"
 import { setConnectorStatus, upsertConnector } from "@palui/core/connectors/store"
 import { getSetting, type Settings, setSetting } from "@palui/core/settings"
 import { addUsage, usageKeys } from "@palui/core/budget/index"
@@ -11,6 +12,7 @@ import { createFlow, updateFlow } from "@palui/core/flows/service"
 import { localToUtc, utcToLocal } from "@palui/core/reminders/time"
 import {
   agents,
+  attachmentShares,
   chats,
   connectors,
   events,
@@ -222,13 +224,24 @@ export function createKit(db: DB, now = Date.now()) {
     },
 
     // Fake bytes behind the right magic number, so the type check passes.
-    attachment(values: { chatId: string; title: string; description?: string; kind: "pdf" | "jpeg"; filename?: string | null; size?: number; createdAt?: number }) {
+    attachment(values: { chatId: string; title: string; description?: string; kind: "pdf" | "jpeg" | "png"; filename?: string | null; size?: number; createdAt?: number }) {
+      // A real image, so the thumbnail and the preview have something to show.
+      if (values.kind === "png") {
+        const bytes = Buffer.from(gradientAvatar(320).split(",")[1]!, "base64")
+        return saveAttachment(db, { chatId: values.chatId, title: values.title, description: values.description, mimeType: "image/png", filename: values.filename, bytes }, key, values.createdAt ?? now).row.id
+      }
       const magic = values.kind === "pdf" ? Buffer.from("%PDF-1.7\n") : Buffer.from([0xff, 0xd8, 0xff, 0xe0])
       const bytes = Buffer.alloc(Math.max(values.size ?? 2048, magic.length + 8))
       magic.copy(bytes)
       bytes.write(newId("fx"), magic.length)
       const mimeType = values.kind === "pdf" ? "application/pdf" : "image/jpeg"
-      saveAttachment(db, { chatId: values.chatId, title: values.title, description: values.description, mimeType, filename: values.filename, bytes }, key, values.createdAt ?? now)
+      return saveAttachment(db, { chatId: values.chatId, title: values.title, description: values.description, mimeType, filename: values.filename, bytes }, key, values.createdAt ?? now).row.id
+    },
+
+    // A share link with forced counters (the token is thrown away).
+    share(attachmentId: string, values: { visibility: "public" | "private"; duration?: "1h" | "24h" | "7d"; createdBy?: string; openCount?: number; createdAt?: number }) {
+      const made = createShare(db, { attachmentId, visibility: values.visibility, duration: values.duration ?? "24h", createdBy: values.createdBy ?? "owner" }, values.createdAt ?? now)
+      if (made && values.openCount) db.update(attachmentShares).set({ openCount: values.openCount, lastOpenedAt: now }).where(eq(attachmentShares.id, made.share.id)).run()
     },
 
     // A flow through the real store (validated, triggers derived), then the

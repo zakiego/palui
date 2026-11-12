@@ -510,7 +510,7 @@ export function worst(k: Kit) {
   k.hook({ name: "Uptime", chatId: aleksandra.id, lastAt: now - 12 * D })
 
   // --- saved attachments: the longest title, description and file name the tools allow ---
-  k.attachment({
+  const longest = k.attachment({
     chatId: aleksandra.id,
     title: within(fill("Umowa najmu mieszkania Wiśniewska-Kowalczyk, aneks nr 3 z podpisami obu stron i pieczęcią notariusza ", LIMITS.attachmentTitle), LIMITS.attachmentTitle),
     description: within(fill(PARAGRAPH, LIMITS.attachmentDescription), LIMITS.attachmentDescription),
@@ -519,7 +519,11 @@ export function worst(k: Kit) {
     size: 10 * 1024 * 1024,
     createdAt: now - 20_000,
   })
+  // Many live links: one about to expire, one opened a huge number of times, some made by the agent.
+  k.share(longest, { visibility: "public", duration: "1h", createdAt: now - 59 * 60_000 })
+  k.share(longest, { visibility: "public", duration: "7d", openCount: 1_234_567, createdBy: aleksandra.id })
+  for (let i = 0; i < 38; i++) k.share(longest, { visibility: i % 2 ? "private" : "public", duration: "24h", openCount: i, createdAt: now - i * 60_000 })
   k.attachment({ chatId: arabic.id, title: "بطاقة الهوية", description: "", kind: "jpeg", size: 1, createdAt: now - 3 * 365 * D })
   k.attachment({ chatId: "chat_0mhremoved0000000000", title: "J", kind: "jpeg", filename: null, size: 999_999, createdAt: now + 2 * H })
-  k.attachment({ chatId: cjk.id, title: "身份证 王秀英 正反面", description: "身份证正反面照片，有效期至2036年。", kind: "jpeg", filename: "身份证_王秀英.jpg", size: 1536, createdAt: now - 12 * D })
+  k.attachment({ chatId: cjk.id, title: "身份证 王秀英 正反面", description: "身份证正反面照片，有效期至2036年。", kind: "png", filename: "身份证_王秀英.png", size: 1536, createdAt: now - 12 * D })
 }
