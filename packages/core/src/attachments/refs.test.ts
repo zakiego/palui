@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { setup, NOW } from "../reminders/test-helpers"
-import { AttachmentRefError, attachmentRef, findAttachmentRefs, resolveAttachmentRefs } from "./refs"
+import { AttachmentRefError, attachmentRef, findAttachmentRefs, labelFileRefs, resolveAttachmentRefs, resolveFileRefs, scrubFileUrls } from "./refs"
 import { saveAttachment } from "./service"
 
 const KEY = "test-master-key-0123456789abcdef0123456789"
@@ -32,5 +32,24 @@ describe("attachment refs", () => {
     const { row } = saveAttachment(db, { chatId: otherChatId, title: "KTP", mimeType: "image/jpeg", bytes: JPEG }, KEY, NOW)
     expect(() => resolveAttachmentRefs(db, { file: attachmentRef(row.id) }, { chatId, masterKey: KEY })).toThrow(AttachmentRefError)
     expect(() => resolveAttachmentRefs(db, { file: attachmentRef("att_missing") }, { chatId, masterKey: KEY })).toThrow(/No saved attachment att_missing/)
+  })
+
+  it("refuses files that add up to more than one call may carry", () => {
+    const { db, chatId } = setup()
+    const a = saveAttachment(db, { chatId, title: "a", mimeType: "image/jpeg", bytes: JPEG }, KEY, NOW).row
+    const b = saveAttachment(db, { chatId, title: "b", mimeType: "image/jpeg", bytes: Buffer.concat([JPEG, Buffer.from("x")]) }, KEY, NOW).row
+    const args = { files: [attachmentRef(a.id), attachmentRef(b.id)] }
+    expect(() => resolveAttachmentRefs(db, args, { chatId, masterKey: KEY, maxBytes: JPEG.length * 2 })).toThrow(/over the/)
+    expect(resolveFileRefs(db, args, { chatId, masterKey: KEY, maxBytes: JPEG.length * 2 + 1 }).files).toHaveLength(2)
+  })
+
+  it("puts refs back where a result echoes the file, and labels refs for approval prompts", () => {
+    const { db, chatId } = setup()
+    const { row } = saveAttachment(db, { chatId, title: "Struk laundry", mimeType: "image/jpeg", bytes: JPEG }, KEY, NOW)
+    const ref = attachmentRef(row.id)
+    const { files } = resolveFileRefs(db, { file: ref }, { chatId, masterKey: KEY })
+    const url = files[0]!.url
+    expect(scrubFileUrls({ content: [{ type: "text", text: `bad file: ${url}` }], n: 1 }, files)).toEqual({ content: [{ type: "text", text: `bad file: ${ref}` }], n: 1 })
+    expect(labelFileRefs(db, { file: ref, transactionId: "txn_1" })).toEqual({ file: "[file: Struk laundry, 10 B]", transactionId: "txn_1" })
   })
 })
