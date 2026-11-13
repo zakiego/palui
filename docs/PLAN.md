@@ -451,7 +451,7 @@ I pick one, and it's recorded in the repo's `DESIGN.md ## Decisions`. The Home m
 
 Follows the TASTE.md lines.
 
-- Landing: a short headline, one sentence, one call to action ("Read the docs"), one strong visual. No feature grid, no screenshots.
+- Landing: a short headline, one sentence and the mascot acting out what you ask, then one box per thing Palui does, each a working demo, and a closing call to action ("Read the docs"). No screenshots, no icon-and-paragraph feature grid. `apps/site/DESIGN.md` holds the contract and how it got there.
 - Hero visual (Explore at M6, 3 variants):
   - (a) Graph: a message travels from a WhatsApp or Telegram node into Palui, out to recall, reminders, MCP and model nodes, and back.
   - (b) Chat replay: "ingetin bayar listrik besok jam 9", then the reminder firing the next morning.
