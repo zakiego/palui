@@ -1,0 +1,637 @@
+/* The docs theme: Linear's docs, with the dashboard's values
+   (apps/app/DESIGN.md and src/styles/app.css on the Linear redesign).
+   Inter for prose at 510 and 590, Geist Mono for code, the dashboard's
+   neutrals, radius steps of 4, 6, 8 and 12px, and one indigo that only marks
+   focus and selection.
+
+   Everything is scoped to a page that holds the docs layout, so the landing
+   (scoped under .lp-root) and the shared tokens in app/global.css stay as
+   they are. `:root:has()` instead of a wrapper class, because the search
+   dialog and popovers render outside the layout.
+
+   Plain CSS on purpose: no @apply, so this file doesn't need Tailwind. Rules
+   are unlayered, which puts them above Fumadocs' and Tailwind's layers. */
+
+/* ------------------------------------------------------------- tokens */
+:root:has(#nd-docs-layout) {
+  --docs-page: #fcfcfd;
+  --docs-raised: #ffffff;
+  --docs-fill: #f2f2f4;
+  --docs-hover: #ebebee;
+  --docs-line: #e6e6e9;
+  --docs-line-strong: #d6d6da;
+  --docs-text: #1f2023;
+  --docs-text-2: #3c4149;
+  --docs-text-3: #6f6e77;
+  --docs-faint: #888790;
+  --docs-indigo: #5e6ad2;
+  --docs-red: #c2383a;
+  --docs-green: #1a7f37;
+  --docs-amber: #8a6100;
+  --docs-code-edge: rgb(0 0 0 / 0.06);
+  --docs-shadow-pop: 0 0 0 1px rgb(0 0 0 / 0.08), 0 4px 24px rgb(0 0 0 / 0.1);
+
+  /* The shared shadcn names Fumadocs reads (fumadocs-ui/css/shadcn.css). */
+  --radius: 0.5rem;
+  --background: var(--docs-page);
+  --foreground: var(--docs-text);
+  --foreground-secondary: var(--docs-text-2);
+  --card: var(--docs-raised);
+  --card-foreground: var(--docs-text);
+  --popover: var(--docs-raised);
+  --popover-foreground: var(--docs-text);
+  --primary: var(--docs-text);
+  --primary-foreground: #ffffff;
+  --primary-subtle: rgb(94 106 210 / 0.14);
+  --secondary: var(--docs-fill);
+  --secondary-foreground: var(--docs-text);
+  --muted: var(--docs-fill);
+  --muted-foreground: var(--docs-text-3);
+  --accent: var(--docs-hover);
+  --accent-foreground: var(--docs-text);
+  --border: var(--docs-line);
+  --border-strong: var(--docs-line-strong);
+  --input: var(--docs-faint);
+  --ring: var(--docs-indigo);
+  --focus-ring: var(--docs-indigo);
+  --code: var(--docs-fill);
+  --sidebar: var(--docs-page);
+  --sidebar-foreground: var(--docs-text-3);
+  --sidebar-accent: var(--docs-hover);
+  --sidebar-accent-foreground: var(--docs-text);
+  --sidebar-border: var(--docs-line);
+  --sidebar-ring: var(--docs-indigo);
+  --shadow-border: 0 0 0 1px rgb(0 0 0 / 0.07), 0 1px 2px rgb(0 0 0 / 0.03);
+  --shadow-elevated: var(--docs-shadow-pop);
+  --color-fd-overlay: rgb(0 0 0 / 0.2);
+
+  /* Callout and status hues: icon and text only, never a fill. */
+  --color-fd-info: var(--docs-text-3);
+  --color-fd-idea: var(--docs-text-3);
+  --color-fd-warning: var(--docs-amber);
+  --color-fd-error: var(--docs-red);
+  --color-fd-success: var(--docs-green);
+
+  /* Linear's weights: 510 and 590, never 700. */
+  --font-weight-medium: 510;
+  --font-weight-semibold: 590;
+  --font-weight-bold: 590;
+
+  /* Fumadocs' layout: a 268px sidebar and TOC, an article of about 680px. */
+  --fd-layout-width: 1400px;
+
+  font-family: var(--docs-sans), -apple-system, system-ui, "Segoe UI", sans-serif;
+  font-feature-settings: "cv01", "ss03";
+  caret-color: var(--docs-indigo);
+  color-scheme: light;
+}
+
+:root.dark:has(#nd-docs-layout) {
+  --docs-page: #08090a;
+  --docs-raised: #0f1011;
+  --docs-fill: #1c1c1f;
+  --docs-hover: #232326;
+  --docs-line: #23252a;
+  --docs-line-strong: #34343a;
+  --docs-text: #f7f8f8;
+  --docs-text-2: #d0d6e0;
+  --docs-text-3: #8a8f98;
+  --docs-faint: #62666d;
+  --docs-red: #f08484;
+  --docs-green: #4cb782;
+  --docs-amber: #f2c94c;
+  --docs-code-edge: rgb(255 255 255 / 0.05);
+  --docs-shadow-pop: 0 0 0 1px #23252a, 0 7px 32px rgb(0 0 0 / 0.45);
+
+  --popover: #141516;
+  --primary-foreground: #08090a;
+  --primary-subtle: rgb(113 112 255 / 0.18);
+  --shadow-border: 0 0 0 1px rgb(255 255 255 / 0.06);
+  --color-fd-overlay: rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+:root:has(#nd-docs-layout) ::selection {
+  background-color: var(--primary-subtle);
+  color: var(--foreground);
+}
+
+:root:has(#nd-docs-layout) :is(code, kbd, pre, samp, .font-mono) {
+  font-family: var(--docs-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  font-feature-settings: normal;
+}
+
+/* -------------------------------------------------------------- sidebar
+   Linear's docs sidebar: 32px rows, 14px at 510 in muted text, hover only
+   lifts the text, the active page is full-strength text with no plate and
+   no bar. Section labels are 12px muted. */
+#nd-sidebar,
+#nd-sidebar-mobile {
+  background-color: var(--docs-page);
+  border-color: var(--docs-line);
+}
+:is(#nd-sidebar, #nd-sidebar-mobile) :is(a[data-active], [data-open] > button, [data-closed] > button) {
+  min-height: 2rem;
+  padding-block: 0.375rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 510;
+  color: var(--docs-text-3);
+  background: transparent;
+  transition: color 150ms ease-out;
+}
+:is(#nd-sidebar, #nd-sidebar-mobile) :is(a[data-active], [data-open] > button, [data-closed] > button):hover {
+  background: transparent;
+  color: var(--docs-text-2);
+  transition-duration: 0ms;
+}
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active="true"],
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active="true"]:hover {
+  background: transparent;
+  color: var(--docs-text);
+}
+/* No active bar, and the folder's guide line goes quiet. */
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active="true"]::before {
+  display: none;
+}
+:is(#nd-sidebar, #nd-sidebar-mobile) [data-open] > [id]::before {
+  background-color: var(--docs-line);
+}
+/* Folder chevrons: 16px, faint. */
+:is(#nd-sidebar, #nd-sidebar-mobile) :is([data-open], [data-closed]) > button > svg {
+  color: var(--docs-faint);
+}
+/* Section labels ("Reference"). */
+:is(#nd-sidebar, #nd-sidebar-mobile) p.inline-flex:not(:first-child) {
+  margin-top: 1.75rem;
+  font-size: 0.75rem;
+  font-weight: 510;
+  color: var(--docs-text-3);
+}
+/* The brand row. */
+#nd-sidebar > div:first-child a[href="/"] {
+  font-size: 0.875rem;
+  font-weight: 590;
+}
+
+/* Search trigger: Linear's search pill. A level-2 fill held by an inner
+   edge, "Search" in muted text and ⌘K in faint text with no key chips. */
+:root:has(#nd-docs-layout) button[data-search-full] {
+  height: 2rem;
+  padding-inline: 0.75rem 0.625rem;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: 9999px;
+  background-color: var(--docs-fill);
+  box-shadow: inset 0 0 0 1px var(--docs-code-edge);
+  font-size: 0.8125rem;
+  color: var(--docs-text-3);
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root:has(#nd-docs-layout) button[data-search-full]:hover {
+    background-color: var(--docs-hover);
+    color: var(--docs-text-2);
+  }
+}
+:root:has(#nd-docs-layout) button[data-search-full] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+:root:has(#nd-docs-layout) button[data-search-full] kbd {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+  font-size: 0.75rem;
+  color: var(--docs-text-3);
+}
+
+/* The theme switch and icon links at the foot of the sidebar: a pill. */
+#nd-sidebar > div:last-child > div.rounded-lg {
+  border-radius: 9999px;
+  border-color: var(--docs-line);
+  background: transparent;
+}
+#nd-sidebar [data-theme-toggle] > * {
+  border-radius: 9999px;
+}
+
+/* ----------------------------------------------------- mobile top bar */
+#nd-subnav {
+  background-color: color-mix(in srgb, var(--docs-page) 80%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: var(--docs-line);
+}
+
+/* -------------------------------------------------------------- page */
+#nd-page {
+  max-width: 760px;
+  gap: 0;
+}
+@media (min-width: 1280px) {
+  #nd-page {
+    padding-top: 4rem;
+  }
+}
+/* Breadcrumb above the title: muted, not the primary ink. */
+#nd-page > div:first-child:has(> span),
+#nd-page > div:first-child {
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--docs-text-3);
+}
+#nd-page > div:first-child .text-fd-primary {
+  color: var(--docs-text-3);
+  font-weight: 510;
+}
+#nd-page > h1 {
+  font-size: 2rem;
+  line-height: 1.125;
+  font-weight: 590;
+  letter-spacing: -0.022em;
+  color: var(--docs-text);
+  text-wrap: balance;
+}
+#nd-page > h1 + p {
+  margin-top: 0.75rem;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  letter-spacing: -0.011em;
+  color: var(--docs-text-3);
+  text-wrap: pretty;
+}
+
+/* -------------------------------------------------------------- prose
+   15px body in the secondary text tier, headings in full ink, generous room
+   above every section. */
+#nd-page .prose {
+  --tw-prose-body: var(--docs-text-2);
+  --tw-prose-headings: var(--docs-text);
+  --tw-prose-links: var(--docs-text);
+  --tw-prose-bold: var(--docs-text);
+  --tw-prose-counters: var(--docs-text-3);
+  --tw-prose-bullets: var(--docs-faint);
+  --tw-prose-hr: var(--docs-line);
+  --tw-prose-quote-borders: var(--docs-line-strong);
+  --tw-prose-code: var(--docs-text);
+  --tw-prose-th-borders: var(--docs-line);
+  --tw-prose-td-borders: var(--docs-line);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  letter-spacing: -0.009em;
+  margin-top: 2.5rem;
+}
+#nd-page .prose :where(p):not(.not-prose *, [data-card] *) {
+  margin-block: 1.25rem;
+}
+#nd-page .prose :where(ul, ol):not(.not-prose *, [data-card] *) {
+  margin-block: 0.75rem 1.25rem;
+}
+#nd-page .prose :where(li):not(.not-prose *, [data-card] *) {
+  margin-block: 0.5rem;
+}
+#nd-page .prose :where(h2):not(.not-prose *, [data-card] *) {
+  margin-top: 3.5rem;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  line-height: 1.33;
+  font-weight: 590;
+  letter-spacing: -0.012em;
+}
+#nd-page .prose :where(h3):not(.not-prose *, [data-card] *) {
+  margin-top: 2.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 590;
+  letter-spacing: -0.011em;
+}
+#nd-page .prose :where(h4):not(.not-prose *, [data-card] *) {
+  margin-top: 1.75rem;
+  font-size: 0.9375rem;
+  font-weight: 590;
+}
+#nd-page .prose :where(strong) {
+  font-weight: 590;
+}
+#nd-page .prose > :first-child {
+  margin-top: 0;
+}
+
+/* Links in prose: full ink, a faint underline that lights up on hover. */
+#nd-page .prose a:not([data-card]) {
+  font-weight: inherit;
+  color: var(--docs-text);
+  text-decoration-line: underline;
+  text-decoration-color: var(--docs-faint);
+  text-decoration-thickness: from-font;
+  text-underline-offset: clamp(2px, 0.2em, 4px);
+  border-bottom: 0;
+  transition: text-decoration-color 200ms ease-out;
+}
+#nd-page .prose a:not([data-card]):hover {
+  text-decoration-color: var(--docs-text);
+}
+
+/* Heading anchors: the heading itself stays plain text. */
+#nd-page .prose :is(h2, h3, h4) > a[data-card] {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Inline code: a quiet chip, no border. */
+#nd-page .prose :where(:not(pre) > code):not(.not-prose *) {
+  padding: 0.0625rem 0.3125rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background-color: var(--docs-fill);
+  font-size: 0.85em;
+  font-weight: 400;
+  color: var(--docs-text);
+  overflow-wrap: break-word;
+}
+
+/* Code blocks: the fill step, a white-at-5% hairline, radius 8, Geist Mono
+   13/21. The copy button fades in on hover. */
+#nd-page figure.shiki {
+  margin-block: 1.5rem;
+  border: 1px solid var(--docs-code-edge);
+  border-radius: 0.5rem;
+  background-color: var(--docs-fill);
+}
+#nd-page figure.shiki div:has(> pre) {
+  padding-block: 1rem;
+}
+#nd-page figure.shiki pre {
+  padding-block: 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+#nd-page figure.shiki > div:first-child:has(> button) {
+  top: 0.5rem;
+  right: 0.5rem;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+#nd-page figure.shiki > div:first-child > button {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  background-color: var(--docs-hover);
+  color: var(--docs-text-3);
+}
+#nd-page figure.shiki > div:first-child > button:hover {
+  color: var(--docs-text);
+}
+@media (hover: hover) and (pointer: fine) {
+  #nd-page figure.shiki > div:first-child > button {
+    opacity: 0;
+    transition: opacity 200ms ease-out, color 150ms ease-out;
+  }
+  #nd-page figure.shiki:is(:hover, :focus-within) > div:first-child > button {
+    opacity: 1;
+  }
+}
+/* A titled block (```ts title="x"): the title bar stays in the same fill. */
+#nd-page figure.shiki > div:first-child:not(:has(> button)) {
+  border-color: var(--docs-code-edge);
+  background: transparent;
+  color: var(--docs-text-3);
+  font-size: 0.8125rem;
+}
+
+/* Tables: no card, no vertical rules. Head in 590 ink over a hairline, rows
+   split by quieter hairlines, 14/21. */
+#nd-page .prose table {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+#nd-page .prose :is(th, td) {
+  border-inline-start: 0 !important;
+  padding: 0.625rem 1rem 0.625rem 0;
+  vertical-align: top;
+}
+#nd-page .prose :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+#nd-page .prose th {
+  background: transparent;
+  font-weight: 590;
+  color: var(--docs-text);
+  border-bottom: 1px solid var(--docs-line-strong) !important;
+}
+#nd-page .prose td {
+  color: var(--docs-text-2);
+  border-bottom: 1px solid var(--docs-line) !important;
+}
+#nd-page .prose tr:last-child > td {
+  border-bottom: 0 !important;
+}
+/* A wide table scrolls inside its own box instead of the page. */
+#nd-page .prose div:has(> table) {
+  overflow-x: auto;
+}
+
+/* Blockquote: a hairline, no italics. */
+#nd-page .prose blockquote {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--docs-text-2);
+  border-inline-start-width: 2px;
+}
+#nd-page .prose blockquote p::before,
+#nd-page .prose blockquote p::after {
+  content: none;
+}
+
+/* Steps: a hairline rail and plain numbers, no filled discs. */
+#nd-page .fd-steps {
+  border-color: var(--docs-line);
+}
+#nd-page .fd-step::before {
+  background-color: var(--docs-page);
+  border: 1px solid var(--docs-line-strong);
+  color: var(--docs-text-2);
+  font-size: 0.75rem;
+  font-weight: 510;
+}
+
+/* Cards in MDX (<Cards>): hairline tiles with no fill, a quiet lift on
+   hover and a small press. */
+#nd-page .prose a[data-card]:not(:is(h2, h3, h4) > a) {
+  border-color: var(--docs-line);
+  border-radius: 0.75rem;
+  background: transparent;
+  padding: 1rem 1.25rem;
+  box-shadow: none;
+  transition: background-color 150ms ease-out, transform 150ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) {
+  #nd-page .prose a[data-card]:not(:is(h2, h3, h4) > a):hover {
+    background-color: color-mix(in srgb, var(--docs-fill) 60%, transparent);
+  }
+}
+#nd-page .prose a[data-card]:not(:is(h2, h3, h4) > a):active {
+  transform: scale(0.98);
+}
+#nd-page .prose a[data-card] h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 590;
+}
+#nd-page .prose a[data-card] p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--docs-text-3);
+}
+
+/* Tabs in MDX: a line tab bar (the dashboard's Geist-style tabs). */
+#nd-page .prose [role="tablist"] {
+  gap: 1rem;
+  border-bottom: 1px solid var(--docs-line);
+  background: transparent;
+}
+#nd-page .prose [role="tab"] {
+  font-size: 0.8125rem;
+  font-weight: 510;
+  color: var(--docs-text-3);
+}
+#nd-page .prose [role="tab"][aria-selected="true"] {
+  color: var(--docs-text);
+}
+
+/* ----------------------------------------------- page actions and footer */
+/* Copy Markdown and Open: Linear's compact secondary pills. */
+#nd-page .docs-actions > button {
+  height: 1.75rem;
+  padding-inline: 0.75rem;
+  border: 0;
+  border-radius: 9999px;
+  background-color: var(--docs-fill);
+  box-shadow: inset 0 0 0 1px var(--docs-code-edge);
+  font-size: 0.75rem;
+  font-weight: 510;
+  color: var(--docs-text-2);
+  transition: background-color 150ms ease-out, transform 150ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) {
+  #nd-page .docs-actions > button:hover {
+    background-color: var(--docs-hover);
+    color: var(--docs-text);
+  }
+}
+#nd-page .docs-actions > button:focus-visible {
+  box-shadow: 0 0 0 2px var(--docs-indigo);
+}
+#nd-page .docs-actions > button:active {
+  transform: scale(0.97);
+}
+
+/* Previous and next: hairline cards, a quiet lift on hover, a small press. */
+#nd-page > div:last-child:has(> a) {
+  margin-top: 4rem;
+}
+#nd-page > div:last-child > a {
+  border-color: var(--docs-line);
+  border-radius: 0.75rem;
+  background: transparent;
+  transition: background-color 150ms ease-out, transform 150ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) {
+  #nd-page > div:last-child > a:hover {
+    background-color: color-mix(in srgb, var(--docs-fill) 60%, transparent);
+  }
+}
+#nd-page > div:last-child > a:active {
+  transform: scale(0.98);
+}
+#nd-page > div:last-child > a > div > p {
+  font-weight: 510;
+  color: var(--docs-text);
+}
+
+/* --------------------------------------------------------------- TOC
+   Plain links: 13px muted, the current section in ink. The title loses its
+   icon. */
+#nd-toc {
+  padding-top: 4rem;
+}
+#nd-toc > h3 {
+  font-size: 0.75rem;
+  font-weight: 510;
+  color: var(--docs-text-3);
+}
+#nd-toc > h3 > svg {
+  display: none;
+}
+#nd-toc a {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--docs-text-3);
+  transition: color 150ms ease-out;
+}
+#nd-toc a:hover {
+  color: var(--docs-text-2);
+}
+#nd-toc a[data-active="true"] {
+  color: var(--docs-text);
+}
+#nd-toc [class*="bg-fd-primary"] {
+  background-color: var(--docs-text);
+}
+
+/* ---------------------------------------------------- search dialog
+   Linear's command dialog: 12px radius, a hairline and a deep shadow, an
+   indigo caret and no focus ring on the input (the dialog is the focus),
+   rows with an 8px highlight plate. Scoped to docs pages, since docs.css
+   stays loaded after a client-side visit to the landing. */
+:root:has(#nd-docs-layout) #fd-search-dialog-content {
+  border-color: var(--docs-line);
+  border-radius: 0.75rem;
+  background-color: var(--popover);
+  box-shadow: var(--docs-shadow-pop);
+}
+/* Opened from the keyboard many times a visit, so the dialog and its
+   backdrop appear and leave at once, like the dashboard's ⌘K menu.
+   Fumadocs scales it in from 1.06 and fades the backdrop over 300ms. */
+:root:has(#nd-docs-layout) :is(#fd-search-dialog-content, .docs-search-overlay) {
+  animation: none !important;
+}
+:root:has(#nd-docs-layout) #fd-search-dialog-content input {
+  font-size: 0.9375rem;
+  caret-color: var(--docs-indigo);
+}
+:root:has(#nd-docs-layout) #fd-search-dialog-content input:focus-visible {
+  outline: none;
+}
+:root:has(#nd-docs-layout) #fd-search-dialog-content [role="option"] {
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+}
+:root:has(#nd-docs-layout) #fd-search-dialog-content [role="option"][aria-selected="true"] {
+  background-color: var(--docs-fill);
+}
+
+/* ---------------------------------------------------- touch
+   On a phone the drawer rows and page actions grow to 40px targets. */
+@media (pointer: coarse) {
+  :is(#nd-sidebar, #nd-sidebar-mobile) :is(a[data-active], [data-open] > button, [data-closed] > button),
+  :root:has(#nd-docs-layout) button[data-search-full] {
+    min-height: 2.5rem;
+  }
+  #nd-page figure.shiki > div:first-child > button {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+  #nd-page .docs-actions > button {
+    height: 2.5rem;
+    padding-inline: 1rem;
+    font-size: 0.8125rem;
+  }
+}

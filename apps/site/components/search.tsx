@@ -20,7 +20,7 @@ export default function DefaultSearchDialog(props: SharedProps) {
 
   return (
     <SearchDialog {...search} {...props}>
-      <SearchDialogOverlay />
+      <SearchDialogOverlay className="docs-search-overlay" />
       <SearchDialogContent>
         <SearchDialogHeader>
           <SearchDialogIcon />
