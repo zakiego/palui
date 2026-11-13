@@ -1,35 +1,41 @@
-import { Progress as ProgressPrimitive } from "@base-ui/react/progress"
-import { cn } from "@/lib/utils"
+import * as React from "react"
+import {
+  Progress as ProgressPrimitive,
+  ProgressIndicator as ProgressIndicatorPrimitive,
+  ProgressLabel as ProgressLabelPrimitive,
+  ProgressTrack as ProgressTrackPrimitive,
+  ProgressValue as ProgressValuePrimitive,
+} from "@ui-sdk/react/progress"
+
+import { cnState } from "@/lib/utils"
 
 function Progress({
   className,
   children,
-  value,
   ...props
-}: ProgressPrimitive.Root.Props) {
+}: Omit<React.ComponentProps<typeof ProgressPrimitive>, "children"> & {
+  children?: React.ReactNode
+}) {
   return (
-    <ProgressPrimitive.Root
-      value={value}
-      data-slot="progress"
-      className={cn("flex flex-wrap gap-3", className)}
-      {...props}
-    >
+    <ProgressPrimitive className={cnState("flex flex-wrap gap-3", className)} {...props}>
       {children}
       <ProgressTrack>
         <ProgressIndicator />
       </ProgressTrack>
-    </ProgressPrimitive.Root>
+    </ProgressPrimitive>
   )
 }
 
-function ProgressTrack({ className, ...props }: ProgressPrimitive.Track.Props) {
+function ProgressTrack({
+  className,
+  ...props
+}: React.ComponentProps<typeof ProgressTrackPrimitive>) {
   return (
-    <ProgressPrimitive.Track
-      className={cn(
+    <ProgressTrackPrimitive
+      className={cnState(
         "relative flex h-1 w-full items-center overflow-x-hidden rounded-full bg-muted",
         className
       )}
-      data-slot="progress-track"
       {...props}
     />
   )
@@ -38,34 +44,31 @@ function ProgressTrack({ className, ...props }: ProgressPrimitive.Track.Props) {
 function ProgressIndicator({
   className,
   ...props
-}: ProgressPrimitive.Indicator.Props) {
+}: React.ComponentProps<typeof ProgressIndicatorPrimitive>) {
   return (
-    <ProgressPrimitive.Indicator
-      data-slot="progress-indicator"
-      className={cn("h-full bg-primary transition-all", className)}
+    <ProgressIndicatorPrimitive
+      className={cnState("h-full bg-primary transition-all", className)}
       {...props}
     />
   )
 }
 
-function ProgressLabel({ className, ...props }: ProgressPrimitive.Label.Props) {
+function ProgressLabel({
+  className,
+  ...props
+}: React.ComponentProps<typeof ProgressLabelPrimitive>) {
   return (
-    <ProgressPrimitive.Label
-      className={cn("text-sm font-medium", className)}
-      data-slot="progress-label"
-      {...props}
-    />
+    <ProgressLabelPrimitive className={cnState("text-sm font-medium", className)} {...props} />
   )
 }
 
-function ProgressValue({ className, ...props }: ProgressPrimitive.Value.Props) {
+function ProgressValue({
+  className,
+  ...props
+}: React.ComponentProps<typeof ProgressValuePrimitive>) {
   return (
-    <ProgressPrimitive.Value
-      className={cn(
-        "ml-auto text-sm text-muted-foreground tabular-nums",
-        className
-      )}
-      data-slot="progress-value"
+    <ProgressValuePrimitive
+      className={cnState("ml-auto text-sm text-muted-foreground tabular-nums", className)}
       {...props}
     />
   )

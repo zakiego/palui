@@ -18,3 +18,5 @@ minimumReleaseAgeExclude:
   - ai@7.0.166
   - fumadocs-core@16.18.3
   - fumadocs-mdx@15.5.3
+  - "@ui-sdk/core@0.1.0-beta.1"
+  - "@ui-sdk/react@0.1.0-beta.1"

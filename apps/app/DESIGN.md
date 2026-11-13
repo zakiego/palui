@@ -13,8 +13,8 @@ The contract is `docs/PLAN.md` section 11. This file records how the build meets
 
 ## Foundations
 
-- Sibling of recall: shadcn `base-nova`, `baseColor: neutral`, recall's oklch token file (`src/styles/app.css`), Geist and Geist Mono, `--radius: 0.625rem`, the `emphasized` and `drawer` easings.
-- Shell: shadcn `sidebar-07` (collapses to icons, a Sheet on a phone), sticky header with the page title, the global status and ⌘K.
+- Sibling of recall: ui-sdk components (`src/components/ui`) styled with recall's look (`baseColor: neutral`), recall's oklch token file (`src/styles/app.css`), Geist and Geist Mono, `--radius: 0.625rem`, the `emphasized` and `drawer` easings.
+- Shell: the `sidebar-07` layout (collapses to icons, a Sheet on a phone), sticky header with the page title, the global status and ⌘K.
 - Machine-written values (ids, model names, token counts, RRULEs, times) are Geist Mono with tabular numbers.
 - Status is always a word plus an icon: on = green + check, paused = zinc + pause, error = red + alert, connecting = Spinner, not set up = dashed circle. See `src/components/connector-status.tsx`.
 - Copy: English UI strings through `src/lib/i18n` (`en`, `id`). No em dashes anywhere.
@@ -23,9 +23,9 @@ The contract is `docs/PLAN.md` section 11. This file records how the build meets
 
 | Element | Decision |
 |---|---|
-| Connector Switch | shadcn default thumb slide only |
+| Connector Switch | default thumb slide only |
 | Status change | `.status-tone`: 150 ms color crossfade, no movement |
-| Sheet / Drawer | shadcn defaults; Drawer drags to dismiss. `ResponsiveSheet` opens one commit after mount so a sheet that mounts open still slides in, and pages keep the last content while it closes so the exit plays |
+| Sheet / Drawer | Sheet slides 2.5rem and fades; Drawer is ui-sdk's, drags to dismiss and moves itself. `ResponsiveSheet` opens one commit after mount so a sheet that mounts open still slides in, and pages keep the last content while it closes so the exit plays |
 | Home connector map | `.map-trunk` / `.map-branch`: the wires draw once ever behind a localStorage flag (40 ms linear trunk per row, chained, then a 120 ms branch), then static. Busy means a Spinner badge, no pulses |
 | Rows chevron | 150 ms rotate on the emphasized curve, a CSS transition so it retargets |
 | Accordion panel | height 200 ms open, 150 ms close, emphasized curve, a CSS transition so a quick second tap turns it around; chevron as Rows. Used by the agent Tools tab |
@@ -62,3 +62,4 @@ The contract is `docs/PLAN.md` section 11. This file records how the build meets
 - 2026-11-12, flow page: the same line tabs, in `?tab=`: Steps (triggers, the graph, the changes it may make), Runs (then the saved state) and Versions, under the header and the last-error alert, all at `max-w-3xl`. Runs shows no count because the list is capped at 30. Card titles that repeated the tab name are gone.
 - 2026-11-12, agent Tools tab: the flat list of every tool (about 4,500 px on the worst fixture) is now two parts, "Only this agent" and "Global", because the owner asked to split the tools by who can use them. The owner then asked for them left and right behind a click, so the two parts are big choice cards side by side (icon, title, count, a radio; same style as the section cards above), with Add MCP at the end of that row. Each server is one closed accordion row (icon tile, name, tool count, destructive count) that opens in place to its scope select, an Open link and the tool rows. Changing the select moves the server to the other part, switches the cards to it, keeps it open and puts focus back on the select. A search opens every group with a hit, and shows the other part when the picked one has none and clearing it restores what was open. An Explore with three variants (Rows, Split as list plus detail pane, Risk grouped by destructive, write, read) ran first; the owner answered with this split instead of picking one.
 - 2026-11-12, Home layout: problems first. A "Needs attention" card (only when something is in error, or switched on but paused) shows up to three of them with their reason, each linking to its connector page. Under it, the left column has Tokens today (the number, in/out/runs, and a bar per day for the last 7 days, today in ink), Next reminders as an agenda (time and date on the left) and Last runs. The connector map is the right column, and it comes last on a phone, where it used to take the first screen. The owner asked for a better, more beautiful Home and approved this plan in chat, so no Explore ran. The chart doesn't animate on mount and isn't a Tab stop, since Home is opened many times a day and refreshes live.
+- 2026-11-13, component library: the dashboard moved from shadcn (Base UI, cmdk, vaul, `@shadcn/react`) to ui-sdk, keeping every class and token so the look doesn't change. The wrappers in `src/components/ui` keep their names and props. Popups now render where they're declared (no portals), so parent child-selectors must skip `[popover]`. A trigger's `render={<Button />}` renders a plain styled button so agents see each control once. The 2026-11-10 Drawer and chat-primitive decisions above are superseded: the Drawer is ui-sdk's, and the transcript scrolls with ui-sdk's ScrollArea `stickToEnd`.

@@ -298,7 +298,7 @@ function ModelsTab({ data }: { data: Data }) {
     }
   }, [usedConnectors])
 
-  // Remove unmounts the row that holds the open menu's trigger, so Base UI has nowhere to return focus. Move it by hand, after Base UI's own attempt.
+  // Remove unmounts the row that holds the open menu's trigger, so the menu has nowhere to return focus. Move it by hand, after the menu's own attempt.
   const focusAfterRemove = React.useRef<string | null>(null)
   React.useEffect(() => {
     const key = focusAfterRemove.current
@@ -365,11 +365,11 @@ function ModelsTab({ data }: { data: Data }) {
                           <EllipsisIcon aria-hidden="true" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-auto min-w-40">
-                          <DropdownMenuItem className="pointer-coarse:py-2.5" disabled={i === 0} onClick={() => setChain(role, swap(chain, i, i - 1))}>
+                          <DropdownMenuItem className="pointer-coarse:py-2.5" disabled={i === 0} onSelect={() => setChain(role, swap(chain, i, i - 1))}>
                             <ArrowUpIcon aria-hidden="true" />
                             {t("settings.models.up")}
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="pointer-coarse:py-2.5" disabled={i === chain.length - 1} onClick={() => setChain(role, swap(chain, i, i + 1))}>
+                          <DropdownMenuItem className="pointer-coarse:py-2.5" disabled={i === chain.length - 1} onSelect={() => setChain(role, swap(chain, i, i + 1))}>
                             <ArrowDownIcon aria-hidden="true" />
                             {t("settings.models.down")}
                           </DropdownMenuItem>
@@ -378,7 +378,7 @@ function ModelsTab({ data }: { data: Data }) {
                             className="pointer-coarse:py-2.5"
                             variant="destructive"
                             disabled={chain.length === 1}
-                            onClick={() => {
+                            onSelect={() => {
                               focusAfterRemove.current = (chain[i + 1] ?? chain[i - 1])?.key ?? null
                               setChain(role, chain.filter((_, j) => j !== i))
                             }}

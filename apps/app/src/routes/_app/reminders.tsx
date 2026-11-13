@@ -234,13 +234,13 @@ function RowActions({ row, timezone }: { row: Row; timezone: string }) {
         <DropdownMenuContent align="end" className="min-w-48">
           <DropdownMenuGroup>
             <DropdownMenuLabel>{t("reminders.snooze")}</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => void snooze("10m")}>{t("reminders.snooze10m")}</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void snooze("1h")}>{t("reminders.snooze1h")}</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void snooze("tomorrow")}>{t("reminders.snoozeTomorrow")}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void snooze("10m")}>{t("reminders.snooze10m")}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void snooze("1h")}>{t("reminders.snooze1h")}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void snooze("tomorrow")}>{t("reminders.snoozeTomorrow")}</DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem variant="destructive" onClick={() => setConfirm(true)}>
+            <DropdownMenuItem variant="destructive" onSelect={() => setConfirm(true)}>
               {t("reminders.cancel")}
             </DropdownMenuItem>
           </DropdownMenuGroup>

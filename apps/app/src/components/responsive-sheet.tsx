@@ -33,7 +33,7 @@ export function ResponsiveSheet({
     return (
       <Drawer open={open} onOpenChange={onOpenChange} showSwipeHandle>
         <DrawerContent>
-          <DrawerHeader className="group-data-[swipe-axis=y]/drawer-popup:text-start">
+          <DrawerHeader className="group-data-[side=bottom]/drawer-popup:text-start">
             <DrawerTitle className="min-w-0 break-words">{title}</DrawerTitle>
             {description && <DrawerDescription>{description}</DrawerDescription>}
           </DrawerHeader>

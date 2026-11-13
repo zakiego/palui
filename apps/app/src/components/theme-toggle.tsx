@@ -31,7 +31,6 @@ export function ThemeToggle({ className }: { className?: string }) {
             variant="ghost"
             size="icon"
             className={className}
-            aria-label={label}
             onClick={() => setTheme(dark ? "light" : "dark")}
           />
         }

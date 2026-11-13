@@ -1,6 +1,5 @@
 import * as React from "react"
-import { mergeProps } from "@base-ui/react/merge-props"
-import { useRender } from "@base-ui/react/use-render"
+import { mergeProps, renderElement, type PartProps } from "@ui-sdk/react/primitive"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
@@ -62,22 +61,20 @@ function Item({
   size = "default",
   render,
   ...props
-}: useRender.ComponentProps<"div"> & VariantProps<typeof itemVariants>) {
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(
+}: PartProps<"div"> & VariantProps<typeof itemVariants>) {
+  return renderElement(
+    "div",
+    mergeProps(
       {
+        "data-slot": "item",
+        "data-variant": variant,
+        "data-size": size,
         className: cn(itemVariants({ variant, size, className })),
       },
       props
     ),
-    render,
-    state: {
-      slot: "item",
-      variant,
-      size,
-    },
-  })
+    render
+  )
 }
 
 const itemMediaVariants = cva(

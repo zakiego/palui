@@ -3,7 +3,7 @@ import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon
 
 import { useTheme } from "@/components/theme-provider"
 
-// shadcn's Sonner, reading the theme from this app's provider instead of next-themes.
+// Sonner's Toaster, reading the theme from this app's provider instead of next-themes.
 const Toaster = ({ ...props }: ToasterProps) => {
   const { resolvedTheme } = useTheme()
 

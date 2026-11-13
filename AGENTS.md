@@ -36,6 +36,7 @@ packages/connectors  One folder per connector: <type>/manifest.ts (zod + UI meta
 
 - Node 24, pnpm 12, TypeScript 7 (`tsc` is tsgo), ESM, `moduleResolution: bundler`, workspace packages are consumed as TS source (no build step) except the two apps.
 - Tests: vitest, `src/**/*.test.ts` next to the code. Use `memoryDb()` from `@palui/db` for a migrated in-memory DB. Fake clocks: pass `now` explicitly; functions take `now = Date.now()` as a last parameter.
+- Dashboard UI is ui-sdk (`@ui-sdk/react`, `@ui-sdk/core`), wrapped and styled in `apps/app/src/components/ui`. Before touching it, follow the `ui-sdk` skill if it's installed and read `apps/app/node_modules/@ui-sdk/react/docs/llms.txt`. Don't add shadcn, Base UI or Radix. Component tests are `*.test.tsx` with `// @vitest-environment jsdom` at the top.
 - Run checks per package with `npx tsc --noEmit` and `npx vitest run` (pnpm 12 has no `-s`). Root: `pnpm typecheck`, `pnpm test`, `pnpm build`.
 - English only in code, comments, commits and docs. Bot-facing copy is casual Indonesian. No em dashes anywhere.
 - Conventional Commits, one logical change per commit, tests passing at every commit.

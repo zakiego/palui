@@ -1,5 +1,5 @@
 /**
- * The button, from shadcn's base-nova, retuned for this dashboard.
+ * The button, on ui-sdk's Button, styled for this dashboard.
  *
  * Every variant presses to 0.96 on a transition, so a release mid-press eases
  * back instead of snapping. `static` turns that off where motion would
@@ -10,10 +10,12 @@
  * needs; a mouse keeps the denser 32px.
  */
 
-import { Button as ButtonPrimitive } from "@base-ui/react/button"
+import * as React from "react"
+import { Button as ButtonPrimitive } from "@ui-sdk/react/button"
+import { renderElement } from "@ui-sdk/react/primitive"
 import { cva, type VariantProps } from "class-variance-authority"
 
-import { cn } from "@/lib/utils"
+import { cn, cnState } from "@/lib/utils"
 
 const buttonVariants = cva(
   "group/button inline-flex shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-[scale,background-color,color,box-shadow,opacity] duration-150 ease-out outline-none select-none disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -58,25 +60,58 @@ const buttonVariants = cva(
   }
 )
 
+type ButtonVariant = VariantProps<typeof buttonVariants>
+
+function buttonClass(
+  variant: ButtonVariant["variant"],
+  size: ButtonVariant["size"],
+  isStatic: boolean
+) {
+  return cn(
+    buttonVariants({ variant, size }),
+    !isStatic && variant !== "link" && "active:not-disabled:scale-[0.96]"
+  )
+}
+
 function Button({
   className,
   variant = "default",
   size = "default",
   static: isStatic = false,
   ...props
-}: ButtonPrimitive.Props &
+}: React.ComponentProps<typeof ButtonPrimitive> &
   VariantProps<typeof buttonVariants> & { static?: boolean }) {
   return (
     <ButtonPrimitive
-      data-slot="button"
-      className={cn(
-        buttonVariants({ variant, size }),
-        !isStatic && variant !== "link" && "active:not-disabled:scale-[0.96]",
-        className
-      )}
+      className={cnState(buttonClass(variant, size, isStatic), className)}
       {...props}
     />
   )
 }
 
-export { Button, buttonVariants }
+type ButtonProps = React.ComponentProps<typeof Button>
+
+// A trigger's render={<Button />} becomes a plain styled button: the trigger
+// already owns the behavior, and a second ui-sdk Button on the same element
+// would show up twice to agents.
+function partRender<R>(render: R): R {
+  if (!React.isValidElement<ButtonProps>(render) || render.type !== Button) return render
+  const { className, variant = "default", size = "default", static: isStatic = false, render: inner, ...rest } =
+    render.props
+  return (
+    <PlainButton
+      {...(rest as React.ComponentProps<"button">)}
+      inner={inner}
+      className={cn(buttonClass(variant, size, isStatic), className as string | undefined)}
+    />
+  ) as R
+}
+
+function PlainButton({
+  inner,
+  ...props
+}: React.ComponentProps<"button"> & { inner?: ButtonProps["render"] }) {
+  return renderElement("button", { type: "button", ...props }, inner as Parameters<typeof renderElement>[2])
+}
+
+export { Button, buttonVariants, partRender }

@@ -73,7 +73,7 @@ function ConnectorRow({ item, live, onOpen }: { item: ConnectorItem; live: Conne
             render={<Button variant="ghost" size="icon" className="group/chevron size-11" aria-controls={panelId} />}
             aria-label={t("connectors.details", { name: item.label })}
           >
-            <ChevronDownIcon aria-hidden="true" className="transition-transform duration-150 ease-emphasized group-data-panel-open/chevron:rotate-180" />
+            <ChevronDownIcon aria-hidden="true" className="transition-transform duration-150 ease-emphasized group-data-open/chevron:rotate-180" />
           </CollapsibleTrigger>
         </ItemActions>
       </Item>

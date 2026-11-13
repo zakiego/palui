@@ -52,7 +52,7 @@ export function NavUser({ username, onLogout }: { username: string; onLogout: ()
                 <Settings2Icon aria-hidden="true" />
                 {t("nav.settings")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onLogout}>
+              <DropdownMenuItem onSelect={onLogout}>
                 <LogOutIcon aria-hidden="true" />
                 {t("nav.logout")}
               </DropdownMenuItem>

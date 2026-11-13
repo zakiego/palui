@@ -25,7 +25,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, InputGroupTextarea } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { Message, MessageContent, MessageFooter } from "@/components/ui/message"
-import { MessageScroller, MessageScrollerProvider, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerViewport } from "@/components/ui/message-scroller"
+import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerViewport } from "@/components/ui/message-scroller"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
@@ -121,7 +121,7 @@ function ChatsPage() {
       </div>
       <Drawer open={listOpen} onOpenChange={setListOpen} showSwipeHandle>
         <DrawerContent>
-          <DrawerHeader className="group-data-[swipe-axis=y]/drawer-popup:text-start">
+          <DrawerHeader className="group-data-[side=bottom]/drawer-popup:text-start">
             <DrawerTitle>{t("chats.list")}</DrawerTitle>
           </DrawerHeader>
           <div className="min-h-0 flex-1 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">{list}</div>
@@ -297,7 +297,6 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
       </header>
       {transcript.chat.channel !== "web" && <AgentBar transcript={transcript} />}
       {isWeb && down && <RuntimeAlert className="m-3 w-auto" />}
-      <MessageScrollerProvider autoScroll defaultScrollPosition="end">
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport>
           <MessageScrollerContent className="gap-4 p-4">
@@ -312,18 +311,18 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
               </Empty>
             )}
             {transcript.messages.map((m) => (
-              <MessageScrollerItem key={m.id} messageId={m.id}>
+              <MessageScrollerItem key={m.id}>
                 {m.role === "assistant" && m.tools.length > 0 && <ToolTrace className="mb-2" tools={m.tools.map((x) => ({ id: x.id, tool: x.tool, class: x.class, status: x.status as LiveTool["status"], ms: x.ms ?? undefined, preview: x.result ?? undefined, args: x.args }))} />}
                 <ChatMessage role={m.role} source={m.source} sender={m.sender} text={m.text} at={m.createdAt} />
               </MessageScrollerItem>
             ))}
             {optimistic.map((text, i) => (
-              <MessageScrollerItem key={`opt-${i}`} messageId={`opt-${i}`}>
+              <MessageScrollerItem key={`opt-${i}`}>
                 <ChatMessage role="user" text={text} pending />
               </MessageScrollerItem>
             ))}
             {turn && (
-              <MessageScrollerItem messageId={`live-${turn.runId}`}>
+              <MessageScrollerItem>
                 {turn.tools.length > 0 && <ToolTrace className="mb-2" tools={turn.tools} />}
                 {turn.text ? (
                   <ChatMessage role="assistant" text={turn.text} streaming />
@@ -337,7 +336,7 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
             )}
             {transcript.approvals.map((a) => (
               // content-visibility clips paint at the item box; the padding keeps the card's ring.
-              <MessageScrollerItem key={a.id} messageId={`approval-${a.id}`} className="p-px">
+              <MessageScrollerItem key={a.id} className="p-px">
                 <ApprovalCard approval={{ id: a.id, tool: a.tool, class: a.class, argsPreview: a.argsPreview ?? "" }} onDone={refresh} />
               </MessageScrollerItem>
             ))}
@@ -345,7 +344,6 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
         </MessageScrollerViewport>
         <MessageScrollerButton />
       </MessageScroller>
-      </MessageScrollerProvider>
       {isWeb && (
         <Composer
           busy={!!turn}
@@ -490,11 +488,11 @@ function CopyMenu({ transcript }: { transcript: Transcript }) {
         <CopyIcon aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
-        <DropdownMenuItem disabled={transcript.messages.length === 0} onClick={() => void copy(transcriptToMarkdown(transcript), t("chats.copiedConversation"))}>
+        <DropdownMenuItem disabled={transcript.messages.length === 0} onSelect={() => void copy(transcriptToMarkdown(transcript), t("chats.copiedConversation"))}>
           <MessagesSquareIcon aria-hidden="true" />
           {t("chats.copyConversation")}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => void copy(transcript.chat.id, t("chats.copiedId"))}>
+        <DropdownMenuItem onSelect={() => void copy(transcript.chat.id, t("chats.copiedId"))}>
           <HashIcon aria-hidden="true" />
           {t("chats.copyId")}
         </DropdownMenuItem>

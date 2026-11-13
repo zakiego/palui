@@ -1,5 +1,5 @@
 // A connector's icon on a small square tile, so a node reads at a glance
-// (TASTE.md: an icon on every node). shadcn has no tile (ItemMedia's icon
+// (TASTE.md: an icon on every node). There's no tile part (ItemMedia's icon
 // variant is a bare glyph), so this is the one place it's drawn. Palui itself
 // is PaluiMark, which brings its own tile.
 import type * as React from "react"

@@ -37,8 +37,8 @@ export function CommandMenu({ open, onOpenChange, connectors }: { open: boolean;
     <CommandDialog open={open} onOpenChange={onOpenChange} title={t("command.button")} description={t("command.placeholder")}>
       <Command>
       <CommandInput placeholder={t("command.placeholder")} />
+      <CommandEmpty>{t("command.empty")}</CommandEmpty>
       <CommandList>
-        <CommandEmpty>{t("command.empty")}</CommandEmpty>
         <CommandGroup heading={t("command.actions")}>
           <CommandItem value="new reminder" onSelect={() => run(() => void navigate({ to: "/reminders", search: { new: true } }))}>
             <BellPlusIcon aria-hidden="true" />

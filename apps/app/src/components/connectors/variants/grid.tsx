@@ -1,5 +1,5 @@
 // Connectors page layout 1, "Cards": a card grid grouped by kind, a Switch per card
-// (PLAN 11.7 variant 1, the closest to TASTE.md and shadcn). The card isn't a
+// (PLAN 11.7 variant 1, the closest to TASTE.md). The card isn't a
 // button; the Switch and "Open" are its two controls.
 import { connectorIcon } from "@/components/connector-icon"
 import { ConnectorStatusBadge } from "@/components/connector-status"

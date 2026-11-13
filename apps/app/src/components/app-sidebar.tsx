@@ -1,4 +1,4 @@
-// The shell sidebar, from shadcn's sidebar-07 block: collapses to icons on a
+// The shell sidebar, from the sidebar-07 layout: collapses to icons on a
 // desktop (rail or ⌘B), becomes a Sheet on a phone.
 import * as React from "react"
 import { Link, useRouterState } from "@tanstack/react-router"

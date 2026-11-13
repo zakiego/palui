@@ -57,22 +57,22 @@ export function ModelPicker({
         <ChevronDownIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-(--anchor-width) min-w-72 gap-0 p-0">
-        <Command loop>
-          <CommandInput value={search} onValueChange={setSearch} placeholder={t("settings.models.search")} autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+        <Command loop query={search} onQueryChange={setSearch}>
+          <CommandInput placeholder={t("settings.models.search")} autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+          {catalog?.state === "loading" && (
+            <div className="flex items-center gap-2 px-2 py-3 text-caption text-muted-foreground">
+              <Spinner />
+              {t("settings.models.loading")}
+            </div>
+          )}
+          {catalog?.state === "error" && (
+            <p className="flex items-start gap-1.5 px-2 py-3 text-caption text-muted-foreground">
+              <CircleAlertIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+              <span className="min-w-0 break-words">{t("settings.models.listFailed", { error: catalog.error })}</span>
+            </p>
+          )}
+          {catalog?.state === "ok" && !typed && <CommandEmpty>{t("settings.models.noneListed")}</CommandEmpty>}
           <CommandList>
-            {catalog?.state === "loading" && (
-              <div className="flex items-center gap-2 px-2 py-3 text-caption text-muted-foreground">
-                <Spinner />
-                {t("settings.models.loading")}
-              </div>
-            )}
-            {catalog?.state === "error" && (
-              <p className="flex items-start gap-1.5 px-2 py-3 text-caption text-muted-foreground">
-                <CircleAlertIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-                <span className="min-w-0 break-words">{t("settings.models.listFailed", { error: catalog.error })}</span>
-              </p>
-            )}
-            {catalog?.state === "ok" && !typed && <CommandEmpty>{t("settings.models.noneListed")}</CommandEmpty>}
             {models.length > 0 && (
               <CommandGroup>
                 {models.map((m) => (
@@ -84,8 +84,8 @@ export function ModelPicker({
               </CommandGroup>
             )}
             {typed && !models.includes(typed) && (
-              <CommandGroup forceMount>
-                <CommandItem forceMount value={`custom:${typed}`} onSelect={() => pick(typed)}>
+              <CommandGroup>
+                <CommandItem value={`custom:${typed}`} keywords={[typed]} onSelect={() => pick(typed)}>
                   <ModelIcon model={typed} />
                   <span className="min-w-0 flex-1 truncate">{t("settings.models.useCustom", { id: typed })}</span>
                 </CommandItem>

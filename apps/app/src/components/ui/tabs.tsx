@@ -1,19 +1,18 @@
 import * as React from "react"
-import { Tabs as TabsPrimitive } from "@base-ui/react/tabs"
+import {
+  Tabs as TabsPrimitive,
+  TabsList as TabsListPrimitive,
+  TabsPanel,
+  TabsTab,
+} from "@ui-sdk/react/tabs"
 import { cva, type VariantProps } from "class-variance-authority"
 
-import { cn } from "@/lib/utils"
+import { cn, cnState } from "@/lib/utils"
 
-function Tabs({
-  className,
-  orientation = "horizontal",
-  ...props
-}: TabsPrimitive.Root.Props) {
+function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive>) {
   return (
-    <TabsPrimitive.Root
-      data-slot="tabs"
-      data-orientation={orientation}
-      className={cn(
+    <TabsPrimitive
+      className={cnState(
         "group/tabs flex gap-2 data-horizontal:flex-col",
         className
       )}
@@ -62,7 +61,7 @@ function useLineOverflow(enabled: boolean) {
           : ""
     }
     const reveal = () => {
-      const tab = list.querySelector<HTMLElement>("[data-active]")
+      const tab = list.querySelector<HTMLElement>("[data-selected]")
       if (!tab) return
       const box = list.getBoundingClientRect()
       const r = tab.getBoundingClientRect()
@@ -76,7 +75,7 @@ function useLineOverflow(enabled: boolean) {
     const resize = new ResizeObserver(update)
     resize.observe(list)
     const active = new MutationObserver(reveal)
-    active.observe(list, { subtree: true, attributes: true, attributeFilter: ["data-active"] })
+    active.observe(list, { subtree: true, attributes: true, attributeFilter: ["data-selected"] })
     return () => {
       list.removeEventListener("scroll", update)
       resize.disconnect()
@@ -90,14 +89,13 @@ function TabsList({
   className,
   variant = "default",
   ...props
-}: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
+}: React.ComponentProps<typeof TabsListPrimitive> & VariantProps<typeof tabsListVariants>) {
   const ref = useLineOverflow(variant === "line")
   return (
-    <TabsPrimitive.List
+    <TabsListPrimitive
       ref={ref}
-      data-slot="tabs-list"
       data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
+      className={cnState(tabsListVariants({ variant }), className)}
       {...props}
     />
   )
@@ -109,15 +107,16 @@ function TabsList({
 // one (as wide as its label, a border so it survives forced colors), and
 // color only on hover. Nothing slides. The global focus outline is pulled
 // inside the trigger, since the scrolling list would clip it.
-function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
+function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsTab>) {
   return (
-    <TabsPrimitive.Tab
-      data-slot="tabs-trigger"
-      className={cn(
+    <TabsTab
+      className={cnState(
+        cn(
         "relative inline-flex h-full flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[calc(var(--radius-lg)-3px)] px-2.5 text-[0.8125rem] font-medium whitespace-nowrap text-muted-foreground transition-[background-color,color,box-shadow] duration-150 outline-none group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        "data-active:bg-card data-active:text-foreground data-active:shadow-(--shadow-border)",
-        "group-data-[variant=line]/tabs-list:h-10 group-data-[variant=line]/tabs-list:flex-none group-data-[variant=line]/tabs-list:rounded-md group-data-[variant=line]/tabs-list:px-1.5 group-data-[variant=line]/tabs-list:text-sm group-data-[variant=line]/tabs-list:focus-visible:-outline-offset-2! group-data-[variant=line]/tabs-list:data-active:bg-transparent group-data-[variant=line]/tabs-list:data-active:shadow-none",
-        "group-data-[variant=line]/tabs-list:after:absolute group-data-[variant=line]/tabs-list:after:inset-x-1.5 group-data-[variant=line]/tabs-list:after:bottom-0 group-data-[variant=line]/tabs-list:after:border-b-2 group-data-[variant=line]/tabs-list:after:border-foreground group-data-[variant=line]/tabs-list:after:opacity-0 group-data-[variant=line]/tabs-list:data-active:after:opacity-100",
+        "data-selected:bg-card data-selected:text-foreground data-selected:shadow-(--shadow-border)",
+        "group-data-[variant=line]/tabs-list:h-10 group-data-[variant=line]/tabs-list:flex-none group-data-[variant=line]/tabs-list:rounded-md group-data-[variant=line]/tabs-list:px-1.5 group-data-[variant=line]/tabs-list:text-sm group-data-[variant=line]/tabs-list:focus-visible:-outline-offset-2! group-data-[variant=line]/tabs-list:data-selected:bg-transparent group-data-[variant=line]/tabs-list:data-selected:shadow-none",
+        "group-data-[variant=line]/tabs-list:after:absolute group-data-[variant=line]/tabs-list:after:inset-x-1.5 group-data-[variant=line]/tabs-list:after:bottom-0 group-data-[variant=line]/tabs-list:after:border-b-2 group-data-[variant=line]/tabs-list:after:border-foreground group-data-[variant=line]/tabs-list:after:opacity-0 group-data-[variant=line]/tabs-list:data-selected:after:opacity-100"
+        ),
         className
       )}
       {...props}
@@ -125,11 +124,10 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
   )
 }
 
-function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
+function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPanel>) {
   return (
-    <TabsPrimitive.Panel
-      data-slot="tabs-content"
-      className={cn("flex-1 text-sm", className)}
+    <TabsPanel
+      className={cnState("flex-1 text-sm", className)}
       {...props}
     />
   )

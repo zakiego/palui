@@ -119,7 +119,7 @@ Connector code is split so the app never bundles Baileys:
 | DB | SQLite, better-sqlite3 + Drizzle, WAL, `busy_timeout` |
 | Time | Luxon (or Temporal if Node 24 ships it stable) for wall-clock math in the stored zone |
 | Auth | Better Auth, passkeys, `disableSignUp: true` from boot |
-| Dashboard | React 19, Tailwind 4, shadcn `base-nova`, `sidebar-07`, Sonner, lucide |
+| Dashboard | React 19, Tailwind 4, ui-sdk, `sidebar-07` layout, Sonner, lucide |
 | Site | Next 16 static export + Fumadocs on Pages |
 | Edge | Worker on `palui.zakiego.com`, copied from recall's `apps/edge/src/routing.ts` |
 
