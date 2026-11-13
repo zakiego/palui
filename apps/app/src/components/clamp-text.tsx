@@ -9,7 +9,9 @@ import { cn } from "@/lib/utils"
 // Static class names, so Tailwind sees them.
 const CLAMP = { 1: "line-clamp-1", 2: "line-clamp-2", 3: "line-clamp-3" } as const
 
-export function ClampText({ text, lines = 2, className }: { text: string; lines?: keyof typeof CLAMP; className?: string }) {
+// `children` renders the text differently (say, with highlights); `text` is
+// still what it is measured by.
+export function ClampText({ text, lines = 2, className, children }: { text: string; lines?: keyof typeof CLAMP; className?: string; children?: React.ReactNode }) {
   const t = useT()
   const ref = React.useRef<HTMLSpanElement>(null)
   const [open, setOpen] = React.useState(false)
@@ -29,7 +31,7 @@ export function ClampText({ text, lines = 2, className }: { text: string; lines?
     <>
       {/* Line breaks in the text are kept: a three-line reminder or a stack trace reads as written. */}
       <span ref={ref} dir="auto" className={cn("block text-left break-words whitespace-pre-line", !open && CLAMP[lines], className)}>
-        {text}
+        {children ?? text}
       </span>
       {(cut || open) && (
         <button

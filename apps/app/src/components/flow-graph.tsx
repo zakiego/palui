@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 
 import { ClampText } from "@/components/clamp-text"
+import { TemplateText } from "@/components/template-text"
 import { Badge } from "@/components/ui/badge"
 import { StatusText } from "@/components/ui/status-text"
 import { layoutFlow, stepKey, type EdgeTone, type LaidEdge, type LaidNode } from "@/lib/flow-graph"
@@ -221,7 +222,7 @@ function StepNode({
         {step.name || step.id}
       </span>
       <span dir="auto" className={cn("truncate text-xs text-muted-foreground", MONO.has(step.kind) && "font-mono")}>
-        {step.summary}
+        <TemplateText text={step.summary} />
       </span>
     </button>
   )
@@ -245,7 +246,7 @@ function TriggerNode({ node, triggers }: { node: LaidNode; triggers: GraphFlowTr
         <>
           <span className="shrink-0 font-medium text-foreground">{kinds}</span>
           <span dir="auto" className="min-w-0 truncate">
-            {first.summary}
+            <TemplateText text={first.summary} />
           </span>
         </>
       ) : (
@@ -274,7 +275,9 @@ function StepDetail({ step, label, onPick }: { step: GraphFlowStep; label: Retur
           {step.name}
         </span>
       )}
-      <ClampText key={step.id} text={step.summary} lines={3} className={cn("text-sm break-words whitespace-pre-wrap text-muted-foreground", MONO.has(step.kind) && "font-mono text-xs")} />
+      <ClampText key={step.id} text={step.summary} lines={3} className={cn("text-sm break-words whitespace-pre-wrap text-muted-foreground", MONO.has(step.kind) && "font-mono text-xs")}>
+        <TemplateText text={step.summary} />
+      </ClampText>
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-muted-foreground">
         {step.edges.map((e) =>
           e.to ? (
