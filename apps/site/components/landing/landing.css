@@ -1,12 +1,16 @@
 /* The landing page. Everything is scoped under .lp-root, which is always dark
-   whatever theme the docs are set to. Palette: mono. Neutral black and grays
-   with no hue, and white as the only accent (the same as the docs' dark
-   --primary). Every text color clears WCAG AA on the page:
-   text 16.9:1, dim 7.7:1, faint 5.7:1, accent 19.8:1. */
+   whatever theme the docs are set to. Neutrals do all the work: black and
+   grays with no hue, and white for anything you press. There is no accent
+   color, no colored glow and no gradient text. A gradient only ever fades a
+   hairline or lights the top of the hero's frame, in white at a low alpha.
+   Text is never darker than --lp-faint: text 16.9:1, dim 7.7:1, faint 5.7:1.
+   Panels take their radius from the site's steps (6, 8, 10, 14px); buttons
+   and the nav link are pills. */
 
 .lp-root {
   --lp-bg: #0a0a0a;
   --lp-surface: #111111;
+  --lp-raise: #1a1a1a;
   --lp-bar: #0d0d0d;
   --lp-line: #272727;
   --lp-line-soft: #1c1c1c;
@@ -16,6 +20,11 @@
   --lp-accent: #ffffff;
   --lp-accent-hover: #d9d9d9;
   --lp-accent-ink: #0a0a0a;
+  /* The landing's buttons rest a step under white and go white on hover. */
+  --lp-btn: #e6e6e6;
+  /* Hairlines, as white at an alpha. */
+  --lp-hair: rgb(255 255 255 / 0.08);
+  --lp-hair-strong: rgb(255 255 255 / 0.14);
   --lp-ease: cubic-bezier(0.23, 1, 0.32, 1);
   /* easeInOutSine, for things that swing back and forth. */
   --lp-sine: cubic-bezier(0.37, 0, 0.63, 1);
@@ -38,11 +47,15 @@
   font-family: var(--lp-sans);
 }
 
-/* No light band when a phone overscrolls past the landing. */
+/* No light band when a phone overscrolls past the landing, and a focused
+   link never ends up under the bar. */
 html:has(.lp-root),
 html:has(.lp-root) body {
   background: #0a0a0a;
   color-scheme: dark;
+}
+html:has(.lp-root) {
+  scroll-padding-top: 80px;
 }
 
 .lp-root ::selection {
@@ -50,27 +63,45 @@ html:has(.lp-root) body {
   color: var(--lp-text);
 }
 
-/* ------------------------------------------------------------- header */
-.lp-header,
+/* ------------------------------------------------------------- header
+   A glass bar that stays at the top: the page blurs through it. */
+.lp-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  width: 100%;
+  border-bottom: 1px solid var(--lp-hair);
+  background: rgb(10 10 10 / 0.8);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .lp-header {
+    background: var(--lp-bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+.lp-header-in,
 .lp-footer,
-.lp-main {
+.lp-wrap {
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding-left: 16px;
   padding-right: 16px;
 }
-.lp-header {
+.lp-header-in {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 14px;
-  padding-bottom: 14px;
+  height: 56px;
 }
 .lp-brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  min-height: 32px;
   border-radius: 6px;
   font-size: 15px;
   font-weight: 600;
@@ -87,16 +118,21 @@ html:has(.lp-root) body {
   fill: var(--lp-accent-ink);
 }
 .lp-nav {
-  margin-right: -10px;
-  padding: 6px 10px;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  margin-right: -12px;
+  padding: 0 12px;
+  border-radius: 9999px;
   color: var(--lp-dim);
-  font-family: var(--lp-mono);
-  font-size: 14px;
-  transition: color 160ms var(--lp-ease);
+  font-size: 13px;
+  transition:
+    color 120ms var(--lp-ease),
+    background-color 120ms var(--lp-ease);
 }
 @media (hover: hover) and (pointer: fine) {
   .lp-nav:hover {
+    background: var(--lp-hair);
     color: var(--lp-text);
   }
 }
@@ -106,16 +142,33 @@ html:has(.lp-root) body {
   color: var(--lp-text);
   text-decoration-color: currentColor;
 }
+.lp-nav:active {
+  background: var(--lp-hair);
+}
 
-/* --------------------------------------------------------------- main
-   Stacked on a phone (copy, then the mascot), two columns from 1024px. */
+/* --------------------------------------------------------------- main */
 .lp-main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding-top: 8px;
-  padding-bottom: 24px;
+}
+/* A full-width hairline between the page's parts. */
+.lp-rule {
+  flex: none;
+  width: 100%;
+  height: 1px;
+  margin: 0;
+  border: 0;
+  background: var(--lp-hair);
+}
+
+/* --------------------------------------------------------------- hero
+   Copy on the left, then the stage across the full width. */
+.lp-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding-top: 32px;
 }
 .lp-intro {
   display: flex;
@@ -123,64 +176,257 @@ html:has(.lp-root) body {
   align-items: flex-start;
 }
 .lp-h1 {
-  margin: 0;
+  /* 17ch holds "you host yourself" and breaks the line before it. */
+  max-width: 17ch;
+  /* Pulled 2px left, so the A's stem lines up with the text under it. */
+  margin: 0 0 0 -2px;
   font-family: var(--lp-mono);
-  font-size: clamp(2rem, 1.4rem + 2.4vw, 3.25rem);
-  font-weight: 600;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+  font-size: clamp(2.125rem, 1.2rem + 4vw, 4rem);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+}
+.lp-word {
+  display: inline-block;
 }
 .lp-lede {
-  margin: 14px 0 0;
-  max-width: 40ch;
+  margin: 16px 0 0;
+  max-width: 34ch;
   color: var(--lp-dim);
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.6;
 }
 .lp-cta-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 16px;
+  gap: 8px;
   margin-top: 20px;
 }
 .lp-cta {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 14px 0 16px;
-  border-radius: 8px;
-  background: var(--lp-accent);
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  background: var(--lp-btn);
   color: var(--lp-accent-ink);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   transition:
     transform 140ms var(--lp-ease),
-    background-color 160ms var(--lp-ease);
+    background-color 120ms var(--lp-ease);
 }
-.lp-cta svg {
-  width: 16px;
-  height: 16px;
-  transition: transform 180ms var(--lp-ease);
+.lp-cta-ghost {
+  background: rgb(255 255 255 / 0.05);
+  box-shadow: inset 0 0 0 1px var(--lp-hair-strong);
+  color: var(--lp-text);
+}
+/* The closing pair is the one place a button is this big. */
+.lp-cta-big {
+  height: 44px;
+  padding: 0 20px;
+  font-size: 16px;
 }
 @media (hover: hover) and (pointer: fine) {
   .lp-cta:hover {
-    background: var(--lp-accent-hover);
+    background: #ffffff;
   }
-  .lp-cta:hover svg {
-    transform: translateX(2px);
+  .lp-cta-ghost:hover {
+    background: rgb(255 255 255 / 0.1);
   }
 }
 .lp-cta:active {
   transform: scale(0.97);
 }
 
+/* -------------------------------------------------------------- stage
+   The hero's visual (hero-stage.tsx), in a frame that is lit from the top
+   and runs off into the hairline under it: the box an ask types into,
+   Palui's answer, then Palui itself with its tools around it. */
+.lp-stagebox {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 20px 16px 8px;
+  border-radius: 14px 14px 0 0;
+  background: radial-gradient(80% 60% at 50% 0%, rgb(255 255 255 / 0.055), transparent 72%);
+}
+/* The frame's hairline: a ring cut out of a filled box with a mask, bright
+   at the top and nearly gone where it meets the rule. */
+.lp-stagebox::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px 1px 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0.05) 60%, rgb(255 255 255 / 0.02));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+.lp-composer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 6px 0 14px;
+  border: 1px solid var(--lp-line);
+  border-radius: 8px;
+  background: var(--lp-bg);
+  font-size: 14px;
+}
+.lp-composer-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lp-composer-text[data-empty] {
+  color: var(--lp-faint);
+}
+.lp-composer-text[data-sent] {
+  color: var(--lp-dim);
+}
+.lp-send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--lp-line-soft);
+  color: var(--lp-faint);
+  transition:
+    background-color 160ms var(--lp-ease),
+    color 160ms var(--lp-ease);
+}
+.lp-send[data-ready] {
+  background: var(--lp-btn);
+  color: var(--lp-accent-ink);
+}
+.lp-send svg {
+  width: 16px;
+  height: 16px;
+}
+.lp-ask {
+  width: 100%;
+  max-width: 440px;
+  height: 48px;
+  border-color: var(--lp-hair-strong);
+  border-radius: 10px;
+  background: var(--lp-surface);
+  font-size: 15px;
+}
+.lp-agent-mark {
+  flex: none;
+}
+.lp-reply {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 20px;
+  margin: 14px 0 0;
+  font-family: var(--lp-mono);
+  font-size: 13px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 240ms var(--lp-ease),
+    transform 240ms var(--lp-ease);
+}
+.lp-reply[data-show] {
+  opacity: 1;
+  transform: none;
+}
+.lp-orbit {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 6px;
+}
+/* Tools and their lines, in a fixed box centered on Palui. Shown from 940px. */
+.lp-art {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  display: none;
+  translate: -50% 0;
+}
+.lp-wires {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+}
+.lp-wire {
+  stroke: rgb(255 255 255 / 0.1);
+  stroke-width: 1;
+  transition: stroke 300ms var(--lp-ease);
+}
+.lp-wires [data-on] .lp-wire {
+  stroke: rgb(255 255 255 / 0.4);
+}
+/* A short light that runs down the line of the tool in use, toward Palui. */
+.lp-beam {
+  stroke: #ffffff;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 7 100;
+  stroke-dashoffset: 107;
+  opacity: 0;
+}
+.lp-tile {
+  position: absolute;
+  translate: -50% -50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 78px;
+  height: 68px;
+  border: 1px solid var(--lp-line);
+  border-radius: 14px;
+  background: var(--lp-surface);
+  color: var(--lp-faint);
+  font-family: var(--lp-mono);
+  font-size: 11px;
+  white-space: nowrap;
+  transition:
+    color 300ms var(--lp-ease),
+    border-color 300ms var(--lp-ease),
+    background-color 300ms var(--lp-ease);
+}
+.lp-tile svg {
+  width: 18px;
+  height: 18px;
+}
+/* The tool the ask on stage needs. */
+.lp-tile[data-on] {
+  border-color: rgb(255 255 255 / 0.55);
+  background: var(--lp-raise);
+  color: var(--lp-text);
+}
+
 /* ------------------------------------------------------------- mascot
-   The one visual: Palui and the three things it keeps (mascot-scene.tsx).
-   Every few seconds one of them has the stage (`data-acting`, from
+   Palui and the three things it keeps (mascot-scene.tsx). When an ask is
+   written, the matching thing has the stage (`data-acting`, from
    lib/mascot.ts) and does its bit, while Palui leans its head that way. */
 .lp-mascot {
+  position: relative;
   display: flex;
   justify-content: center;
   width: 100%;
@@ -189,7 +435,7 @@ html:has(.lp-root) body {
 .lp-mascot > svg {
   display: block;
   width: 100%;
-  max-width: 350px;
+  max-width: 280px;
   height: auto;
   overflow: visible;
 }
@@ -280,19 +526,511 @@ html:has(.lp-root) body {
   transform-origin: 50% 100%;
 }
 
+/* ----------------------------------------------------------- sections */
+.lp-section {
+  padding-top: 56px;
+  padding-bottom: 56px;
+}
+.lp-h2 {
+  margin: 0 0 28px;
+  font-family: var(--lp-mono);
+  font-size: clamp(1.625rem, 1.1rem + 2.2vw, 2.75rem);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+/* Two-tone, in place of a subtitle. */
+.lp-h2-dim {
+  color: var(--lp-faint);
+}
+
+/* -------------------------------------------------------------- bento
+   One box per thing Palui does (bento.tsx). The boxes are cells of one
+   frame, split by hairlines: the grid's 1px gaps show the frame's color. */
+.lp-bento {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--lp-line);
+  border-radius: 14px;
+  background: var(--lp-line);
+}
+.lp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  padding: 20px;
+  background: var(--lp-bg);
+}
+.lp-card-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.lp-card-text {
+  margin: 6px 0 0;
+  color: var(--lp-dim);
+  font-size: 14px;
+  line-height: 1.5;
+}
+/* Demos sit on the cell's floor, so a row lines up along the bottom. */
+.lp-card-demo {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+}
+/* A framed demo grows to fill its cell, so a short one never floats under a gap. */
+.lp-card-demo > .lp-inset {
+  flex: 1;
+}
+
+/* -------------------------------------------------------------- demos
+   The parts the demos share (demo-parts.tsx, demos.tsx). */
+.lp-inset {
+  width: 100%;
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  background: var(--lp-surface);
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: left;
+}
+/* A demo's content fades out before its next round starts from empty. */
+.lp-thread-body,
+.lp-run-body,
+.lp-reminder-body,
+.lp-term-body {
+  transition: opacity 240ms var(--lp-ease);
+}
+.lp-root [data-clearing] {
+  opacity: 0;
+}
+/* A ring while a step waits or works, a check once it's done. */
+.lp-status {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #6a6a6a;
+  border-radius: 50%;
+}
+.lp-status[data-state="active"] {
+  border-color: #3a3a3a;
+  border-top-color: var(--lp-text);
+}
+.lp-status-done {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--lp-text);
+}
+.lp-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition:
+    transform 140ms var(--lp-ease),
+    background-color 140ms var(--lp-ease);
+}
+.lp-btn-yes {
+  background: var(--lp-btn);
+  color: var(--lp-accent-ink);
+}
+.lp-btn-no {
+  box-shadow: inset 0 0 0 1px #3a3a3a;
+  color: var(--lp-dim);
+}
+.lp-btn[data-pressed] {
+  transform: scale(0.97);
+}
+.lp-btn-yes[data-pressed] {
+  background: #ffffff;
+}
+.lp-btn-no[data-pressed] {
+  background: var(--lp-line);
+  color: var(--lp-text);
+}
+
+/* Thread: a chat with Palui. */
+.lp-thread {
+  display: flex;
+  flex-direction: column;
+}
+.lp-thread-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--lp-line);
+  font-weight: 500;
+}
+/* A fixed height, filled from the top, so nothing already on screen moves
+   when the next message arrives. */
+.lp-thread-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 232px;
+  padding: 16px 14px 0;
+}
+.lp-bubble {
+  margin: 0;
+  max-width: 86%;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+.lp-bubble-me {
+  align-self: flex-end;
+  background: var(--lp-text);
+  color: var(--lp-accent-ink);
+}
+.lp-bubble-agent {
+  align-self: flex-start;
+  background: #1f1f1f;
+}
+.lp-step {
+  align-self: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--lp-line);
+  border-radius: 8px;
+  color: var(--lp-dim);
+  font-family: var(--lp-mono);
+  font-size: 13px;
+}
+.lp-step > svg:first-child {
+  width: 14px;
+  height: 14px;
+}
+.lp-step-tool {
+  color: var(--lp-text);
+}
+/* The approve and deny pair takes a line of its own under the tool. */
+.lp-step .lp-actions {
+  width: 100%;
+  padding: 2px 0 4px;
+}
+.lp-thread .lp-composer {
+  margin: 12px 10px 10px;
+}
+
+/* Run: one task, step by step. */
+.lp-run-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--lp-line);
+}
+.lp-run-title {
+  font-weight: 500;
+}
+.lp-run-meta,
+.lp-run-kind,
+.lp-run-gate {
+  color: var(--lp-faint);
+  font-family: var(--lp-mono);
+  font-size: 12px;
+}
+.lp-run-meta {
+  flex: none;
+}
+.lp-run-list {
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+}
+.lp-run-row {
+  display: grid;
+  grid-template-columns: 14px 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 9px 14px;
+  color: var(--lp-faint);
+  transition: color 200ms var(--lp-ease);
+}
+.lp-run-row[data-state="active"],
+.lp-run-row[data-state="done"] {
+  color: var(--lp-dim);
+}
+.lp-run-icon {
+  width: 16px;
+  height: 16px;
+}
+.lp-run-text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  min-width: 0;
+}
+.lp-run-row[data-state="active"] .lp-run-name,
+.lp-run-row[data-state="done"] .lp-run-name,
+/* The message you get back reads as the payoff, not as one more log line. */
+.lp-run-row[data-kind="reply"][data-state="done"] .lp-run-text {
+  color: var(--lp-text);
+}
+/* What a writing tool is waiting for: its own line, always there, so the row
+   keeps its height through waiting, asking and approved. */
+.lp-run-gate {
+  grid-column: 3 / -1;
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+
+/* Memory: things it was told once. */
+.lp-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  background: var(--lp-surface);
+  color: var(--lp-dim);
+  font-size: 14px;
+  transition:
+    color 300ms var(--lp-ease),
+    border-color 300ms var(--lp-ease),
+    background-color 300ms var(--lp-ease);
+}
+.lp-note svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.lp-note[data-on] {
+  border-color: rgb(255 255 255 / 0.4);
+  background: var(--lp-raise);
+  color: var(--lp-text);
+}
+
+/* Reminder: one that just landed, with its buttons. */
+.lp-reminder {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 14px;
+}
+.lp-reminder-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lp-bell {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #1f1f1f;
+}
+.lp-bell svg {
+  width: 16px;
+  height: 16px;
+  transform-origin: 50% 10%;
+}
+.lp-reminder-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+.lp-reminder-time {
+  color: var(--lp-dim);
+  font-family: var(--lp-mono);
+  font-size: 13px;
+}
+.lp-reminder-actions,
+.lp-reminder-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 14px 0 0;
+}
+.lp-reminder-note {
+  color: var(--lp-dim);
+  font-family: var(--lp-mono);
+  font-size: 13px;
+}
+.lp-reminder-note svg {
+  width: 14px;
+  height: 14px;
+  color: var(--lp-text);
+}
+
+/* Connectors: the five kinds and their switches. */
+.lp-kinds {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-kind {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  color: var(--lp-faint);
+  font-size: 14px;
+  transition: color 240ms var(--lp-ease);
+}
+.lp-kind + .lp-kind {
+  border-top: 1px solid var(--lp-line);
+}
+.lp-kind > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.lp-kind-name {
+  flex: 1;
+  min-width: 0;
+}
+.lp-kind[data-on] {
+  color: var(--lp-text);
+}
+/* Off is a gray track with the thumb on the left, on is a white track with
+   the thumb on the right. */
+.lp-switch {
+  flex: none;
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border-radius: 10px;
+  background: #2a2a2a;
+  /* The ring gives the off track an edge you can see against the page. */
+  box-shadow: inset 0 0 0 1px #6a6a6a;
+  transition: background-color 200ms var(--lp-ease);
+}
+.lp-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--lp-faint);
+  transition:
+    transform 240ms var(--lp-ease),
+    background-color 200ms var(--lp-ease);
+}
+.lp-kind[data-on] .lp-switch {
+  background: var(--lp-btn);
+  box-shadow: none;
+}
+.lp-kind[data-on] .lp-switch::after {
+  transform: translateX(12px);
+  background: var(--lp-accent-ink);
+}
+
+/* Terminal: the two commands. Tall enough for the second one to wrap on a
+   phone, so the box never changes height. */
+.lp-term {
+  padding: 14px;
+  font-family: var(--lp-mono);
+  font-size: 12px;
+}
+.lp-term-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 130px;
+}
+.lp-term-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 18px;
+  margin: 0;
+}
+.lp-term-cmd {
+  flex: 1;
+  min-width: 0;
+}
+.lp-term-prompt {
+  color: var(--lp-faint);
+}
+.lp-term-out {
+  align-items: center;
+  color: var(--lp-dim);
+}
+.lp-term-out svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--lp-text);
+}
+.lp-term-ok {
+  margin-left: auto;
+  color: var(--lp-text);
+}
+
+/* -------------------------------------------------------------- close
+   One line and two buttons, centered. */
+.lp-close {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 72px;
+  padding-bottom: 72px;
+  text-align: center;
+}
+.lp-close .lp-close-title {
+  margin: 0;
+  font-size: clamp(2rem, 1.2rem + 3.6vw, 4rem);
+}
+.lp-close .lp-cta-row {
+  justify-content: center;
+  gap: 10px;
+  margin-top: 28px;
+}
+
 /* ------------------------------------------------------------- footer */
 .lp-footer {
-  padding-top: 16px;
-  padding-bottom: 20px;
+  padding-top: 12px;
+  padding-bottom: 16px;
   color: var(--lp-faint);
   font-family: var(--lp-mono);
   font-size: 13px;
 }
 .lp-footer a {
+  display: inline-block;
+  padding: 6px 0;
   border-radius: 6px;
   color: var(--lp-dim);
   text-decoration: underline;
-  text-decoration-color: var(--lp-line);
+  text-decoration-color: var(--lp-faint);
   text-underline-offset: 4px;
   transition:
     color 160ms var(--lp-ease),
@@ -305,21 +1043,21 @@ html:has(.lp-root) body {
   }
 }
 
-/* ------------------------------------------------------------ entrance
-   Played once on load. The copy settles in, then Palui and its slab as one
-   piece, then the three things land one after another, each a little sooner
-   and from a little lower than the one before. After that Palui blinks while
-   the loop runs (data-idle), and the things take turns acting. Reduced motion
-   skips all of it, and global.css cuts every other transition short. */
+/* ------------------------------------------------------------- motion
+   All of it sits behind prefers-reduced-motion: no-preference. Without it
+   the page is the same picture, standing still, and every demo shows one
+   finished step (usePlayer's `still`).
+
+   Two kinds of motion, and nothing else: the headline comes into focus once
+   on load, a word at a time, and the demos loop. Nothing reveals on scroll
+   and nothing moves on hover. In the hero, Palui and its slab rise as one
+   piece, the three things land after it, and from then on the loop in
+   lib/mascot.ts runs. Everything moves transform and opacity only, except
+   the one-time blur on the headline, the `clip-path` wipe for the written
+   lines and the dash offset of the one line whose tool is in use. */
 @media (prefers-reduced-motion: no-preference) {
-  .lp-intro > * {
-    animation: lp-rise 280ms var(--lp-ease) backwards;
-  }
-  .lp-intro > :nth-child(2) {
-    animation-delay: 40ms;
-  }
-  .lp-intro > :nth-child(3) {
-    animation-delay: 80ms;
+  .lp-word {
+    animation: lp-word 1000ms cubic-bezier(0.25, 0.1, 0.25, 1) backwards;
   }
   .lp-stage {
     animation: lp-rise 260ms var(--lp-ease) 120ms backwards;
@@ -350,6 +1088,27 @@ html:has(.lp-root) body {
   }
   .lp-keep[data-acting] .lp-hammer-swing {
     animation: lp-tap 720ms var(--lp-sine) 620ms;
+  }
+  .lp-wires [data-on] .lp-beam {
+    opacity: 1;
+    animation: lp-beam 1200ms linear infinite;
+  }
+
+  .lp-bubble,
+  .lp-step,
+  .lp-term-out,
+  .lp-reminder-note {
+    animation: lp-rise 240ms var(--lp-ease) backwards;
+  }
+  .lp-status[data-state="active"] {
+    animation: lp-spin 700ms linear infinite;
+  }
+  .lp-status-done,
+  .lp-actions {
+    animation: lp-pop 200ms var(--lp-ease) backwards;
+  }
+  .lp-bell[data-ringing] svg {
+    animation: lp-chime 1200ms var(--lp-sine) infinite;
   }
 }
 @keyframes lp-rise {
@@ -442,50 +1201,162 @@ html:has(.lp-root) body {
   }
 }
 
+@keyframes lp-word {
+  from {
+    opacity: 0;
+    transform: translateY(20%);
+    filter: blur(10px);
+  }
+}
+@keyframes lp-beam {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes lp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes lp-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+@keyframes lp-chime {
+  0%,
+  50%,
+  100% {
+    transform: rotate(0);
+  }
+  10%,
+  30% {
+    transform: rotate(-14deg);
+  }
+  20%,
+  40% {
+    transform: rotate(14deg);
+  }
+}
+
 /* ------------------------------------------------------- larger screens */
 @media (min-width: 640px) {
-  .lp-header,
+  .lp-header-in,
   .lp-footer,
-  .lp-main {
+  .lp-wrap {
     padding-left: 24px;
     padding-right: 24px;
   }
+  .lp-header-in {
+    height: 64px;
+  }
+  .lp-hero {
+    gap: 36px;
+    padding-top: 48px;
+  }
+  .lp-stagebox {
+    padding-top: 28px;
+  }
   .lp-mascot > svg {
-    max-width: 400px;
+    max-width: 300px;
+  }
+  .lp-section {
+    padding-top: 80px;
+    padding-bottom: 80px;
+  }
+  .lp-h2 {
+    margin-bottom: 36px;
+  }
+  .lp-bento {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .lp-card {
+    grid-column: span 6;
+    padding: 24px;
+  }
+  .lp-card[data-area="memory"],
+  .lp-card[data-area="remind"] {
+    grid-column: span 3;
+  }
+  .lp-term {
+    font-size: 13px;
+  }
+  .lp-close {
+    padding-top: 104px;
+    padding-bottom: 104px;
+  }
+}
+
+/* Room for the tools on both sides of Palui. */
+@media (min-width: 940px) {
+  .lp-art {
+    display: block;
   }
 }
 
 @media (min-width: 1024px) {
-  .lp-header,
+  .lp-header-in,
   .lp-footer,
-  .lp-main {
+  .lp-wrap {
     padding-left: 32px;
     padding-right: 32px;
   }
-  .lp-header {
-    padding-top: 20px;
-    padding-bottom: 20px;
+  .lp-hero {
+    gap: 40px;
+    padding-top: 56px;
   }
-  .lp-main {
-    display: grid;
-    grid-template-columns: minmax(0, 6fr) minmax(0, 7fr);
-    align-items: center;
-    gap: 56px;
-    padding-bottom: 48px;
+  /* The headline on the left, the sentence and the buttons low on the right. */
+  .lp-intro {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 48px;
   }
   .lp-lede {
-    margin-top: 22px;
-    font-size: 18px;
+    margin-top: 0;
+    font-size: 16px;
   }
-  .lp-cta-row {
-    margin-top: 30px;
-  }
-  .lp-cta {
-    height: 44px;
-    padding: 0 16px 0 18px;
+  .lp-stagebox {
+    padding-top: 32px;
   }
   .lp-mascot > svg {
-    max-width: 440px;
+    max-width: 320px;
+  }
+  .lp-section {
+    padding-top: 112px;
+    padding-bottom: 112px;
+  }
+  .lp-bento {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .lp-card {
+    padding: 28px;
+  }
+  .lp-card-title {
+    font-size: 18px;
+  }
+  .lp-card-text {
+    font-size: 15px;
+  }
+  .lp-card[data-area="chat"] {
+    grid-column: span 7;
+  }
+  .lp-card[data-area="ask"] {
+    grid-column: span 5;
+  }
+  .lp-card[data-area="memory"],
+  .lp-card[data-area="remind"],
+  .lp-card[data-area="connect"] {
+    grid-column: span 4;
+  }
+  .lp-card[data-area="jobs"],
+  .lp-card[data-area="host"] {
+    grid-column: span 6;
+  }
+  .lp-close {
+    padding-top: 136px;
+    padding-bottom: 136px;
   }
 }
 
