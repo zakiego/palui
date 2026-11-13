@@ -25,7 +25,7 @@ The WhatsApp connector is a linked device of `pairPhone` (saved as `linkedNumber
 
 What that means:
 
-- The recipient sees a number they may not have saved. The text has to say who it's from ("Halo, ini asisten Zaki. Zaki lagi otw ya"). The tool tells the model so, and a configurable signature line can be appended.
+- The recipient sees a number they may not have saved. The text has to say who it's from ("Halo, ini asisten Zaki. Zaki lagi otw ya"). The tool tells the model so, and Palui appends the owner's signature to every message (section 12).
 - No impersonation of Zaki's own account is possible, which is good.
 - A brand new number messaging strangers is the classic WhatsApp ban pattern. Low limits and the allowlist matter for that, not only for safety.
 - A recipient's reply goes to Palui's number. Their chat is not allowed, so the router drops it. Forwarding contact replies to the owner is a follow-up (section 10).
@@ -39,7 +39,7 @@ The draft holds up. Changes and additions:
    - The tool is offered only when the turn's origin is an owner message (`trigger` message, or an approval resume of one) in an owner-mode chat. Schedule, reminder, flow, hook and guest/shared turns don't get it, and `execute` refuses again if called anyway.
    - A tainted turn always asks, whatever the contact's policy. The prompt shows the exact text, so injected content can't send without the owner reading it.
    - `allow` skips approval only when the turn is untainted and the owner's own messages in this batch mention the contact (name, alias or number). Text the owner never typed (recall, notes, history) can't pick an `allow` contact. This closes the auto-recall gap without touching recall.
-3. **Exact text.** Approval shows the full text (a tool-specific preview, not the 300-character JSON cut). The approved call is replayed as stored, so what was shown is what goes out. The signature, if set, is shown in the preview too. For `allow` sends there is no preview, so the owner gets a notice with the exact text and a cancel button, and the 15-second hold applies.
+3. **Exact text.** Approval shows the full text (a tool-specific preview, not the 300-character JSON cut). The approved call is replayed as stored, so what was shown is what goes out. The signature is shown in the preview and in the cancel notice too. For `allow` sends there is no preview, so the owner gets a notice with the exact text and a cancel button, and the 15-second hold applies.
 4. **`allow` can't be set from chat.** Raising trust is a dashboard action (passkey login). That way no chat content, injected or not, can widen what runs without approval.
 5. **Approval on a different channel.** Already handled: an answer only counts from the chat that was asked (`decideApproval`), or from the dashboard. Nothing new.
 6. **Scheduled sends after a contact is removed.** Removing a contact cancels its scheduled sends and its held sends. A flow version whose `contact` points at a removed contact fails that step with a clear error.
@@ -101,7 +101,9 @@ outbound: {
   perContactPerDay: number    // default 5
   perDay: number              // default 20
   holdSeconds: number         // undo window, default 15
-  signature: string           // appended on its own line when set, default ""
+  signatureOn: boolean        // default true
+  signature: string           // default: a dash line, then the italic "sent automatically" line
+  pastSignatures: string[]    // earlier texts, so a message carrying one isn't signed twice
 }
 ```
 
@@ -203,7 +205,19 @@ Built on branch `feat/outbound-messages` following section 9, plus per-agent sco
 ## 11. Open questions for Zaki
 
 1. Rate limits: 5 per contact and 20 total per day OK?
-2. Signature: append "(dikirim asisten Zaki)" by default, or leave it to the model's wording?
+2. Signature: decided, see section 12.
 3. Replies from contacts are dropped today. Forward them to you ("Zaki bales: ...")?
 4. Quiet hours for flow-triggered sends?
 5. Telegram contacts only from existing chats. Fine?
+
+## 12. Signature
+
+Every message to a contact ends with the owner's signature, added in code, not by the model.
+
+- Where: `finalText` in `packages/core/src/outbound/service.ts`, used by `send_message` (now, scheduled, repeating), its approval preview, and flow message steps with `contact`. The text goes after the body with one blank line between.
+- Settings: `outbound.signatureOn` (default on) and `outbound.signature` (up to 150 characters), edited under "Limits and signature" on the Outbound page. The owner's name isn't a setting, so the text is stored as typed, not templated. Rows saved before the switch existed (signature `""`) are read as on with the default text.
+- Opt-out: `send_message` takes `signature: false`, and a flow message step with `contact` can set `signature: false`. The tool tells the model to use it only when the owner explicitly asks. The approval preview says "Tanpa tanda tangan".
+- No double signature: a body that already ends with a known signature is left alone. Known means the current text, the owner's earlier texts (`pastSignatures`, kept when the text is edited), the current default and the earlier defaults. The match ignores case, whitespace and WhatsApp markup, and also accepts just the signature's last line, for when the model typed it without the dash line.
+- Scheduled and repeating sends are signed when they're created, so the stored text is the one the owner approved, and the scheduler sends it as is at every fire. Rows saved before this change keep their text (most already carry the old signature from the standing instruction).
+- Length: the `send_message` body stays at 1800 characters and the signature is capped at 150, so body, blank line and signature always fit `MAX_OUTBOUND_TEXT` (2000), which `finalText` checks with the signature included. WhatsApp allows 4096.
+- Flows: a contact message is signed at send time with the current signature, and a signature edit doesn't ask for a new version approval. The approval guards what the flow (written by the model) sends and when. The signature is fixed text the owner typed on the dashboard behind a passkey login, it is the same for every message, and it can't carry run data. Re-approving every flow after a wording tweak would only train the owner to tap yes. Dropping the signature from a step (`signature: false`) does change the version's write calls, so that needs approval, and the version prompt says "(tanpa tanda tangan)". When the signature is on, the prompt also says contact messages go out with it.
