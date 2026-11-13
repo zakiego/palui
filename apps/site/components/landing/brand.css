@@ -16,11 +16,10 @@
 }
 .br-h1 {
   margin: 0;
-  font-family: var(--lp-mono);
-  font-size: clamp(2rem, 1.4rem + 2.4vw, 3.25rem);
-  font-weight: 600;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+  font-size: clamp(2.375rem, 1.6rem + 2.4vw, 3.5rem);
+  font-weight: 510;
+  line-height: 1.1;
+  letter-spacing: -0.022em;
 }
 .br-lede {
   margin: 14px 0 0;
@@ -38,15 +37,14 @@
 }
 .br-h2 {
   margin: 0;
-  font-family: var(--lp-mono);
   font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 590;
+  letter-spacing: -0.012em;
 }
 .br-h3 {
   margin: 0;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 590;
 }
 .br-text {
   margin: 0;
@@ -72,7 +70,7 @@
 .br-avatars {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 20px;
 }
 .br-card {
   display: flex;
@@ -135,14 +133,14 @@
 .br-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 8px;
-  background: var(--lp-accent);
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  background: var(--lp-btn);
   color: var(--lp-accent-ink);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 510;
   touch-action: manipulation;
   transition:
     transform 140ms var(--lp-ease),
@@ -150,8 +148,8 @@
     border-color 160ms var(--lp-ease);
 }
 .br-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
 }
 .br-btn-quiet {
@@ -165,7 +163,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .br-btn:hover {
-    background: var(--lp-accent-hover);
+    background: var(--lp-accent);
   }
   .br-btn-quiet:hover {
     border-color: var(--lp-dim);
@@ -193,7 +191,7 @@
   color: var(--lp-text);
   font-family: var(--lp-mono);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 590;
 }
 .br-steps a,
 .br-rules a {
@@ -215,7 +213,7 @@
 .br-marks {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 20px;
 }
 .br-mark {
   display: flex;
@@ -238,7 +236,7 @@
 .br-colors {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 20px;
 }
 .br-color {
   display: flex;
@@ -255,7 +253,7 @@
 }
 .br-color-name {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 590;
 }
 .br-color-hex {
   color: var(--lp-dim);
@@ -282,14 +280,14 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+.br-specimen-head {
+  font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem);
+  font-weight: 510;
+  line-height: 1.1;
+  letter-spacing: -0.022em;
+}
 .br-specimen-mono {
   font-family: var(--lp-mono);
-  font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem);
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.04em;
-}
-.br-specimen-sans {
   font-size: clamp(1.125rem, 1rem + 0.6vw, 1.5rem);
   line-height: 1.35;
 }
