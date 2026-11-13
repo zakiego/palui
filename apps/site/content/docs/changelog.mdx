@@ -13,6 +13,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Added
 
+- Add a contact from chat. Say "tambah kontak Ana 0822 0000 1002" and Palui shows you the name and the cleaned-up number to approve before it's saved to that agent's contacts. It always asks, even when the agent may run every tool without asking. New contacts start at Always ask, and only the Outbound page can switch one to Always allow. A number that's already saved comes back as the existing contact instead of a duplicate. Flows, webhooks and guests can't add contacts.
 - Pick the reaction per WhatsApp chat. Palui puts ⏳ on your message while it writes a reply, and now each chat can turn that off or use another emoji. Send `/ack off`, `/ack on` or `/ack 👀` in the chat, or pick it under "Reaction" on the Chats page or an agent's Chats tab. Typing still shows when it's off. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 - Palui can delete a saved document from recall with `forget_document`, so the full text of a note it saved stops showing up in searches. Before, it could only forget the facts taken from a document, and the text itself had to be deleted on the recall dashboard. It asks you first and only touches the agent's own container.
 - Agents can keep a separate memory per chat. On an agent's Memory tab, "Separate memory per chat" gives each chat its own recall container, so what one customer said never comes up in another customer's chat. New agents start with it on; existing ones keep their single container until you turn it on. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
@@ -30,6 +31,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Changed
 
+- The Messages to contacts tools have English names now: `outbound__send_message`, `outbound__cancel_message`, `outbound__list_contacts` and `outbound__list_outbound_messages` (they were `kirim_pesan`, `batal_pesan`, `daftar_kontak` and `daftar_pesan_keluar`). Palui still answers in Indonesian. If you set a per-tool permission for one of the old names on an agent's Tools tab, set it again.
 - The landing page at palui.zakiego.com is redesigned. Asks type themselves in above Palui, which acts each one out, and seven boxes below show what it does as live demos: chatting, asking before it acts, remembering, reminders, connectors, scheduled jobs and the install commands. It stands still when your system asks for reduced motion.
 - The landing page now matches the dashboard: Inter instead of IBM Plex, the dashboard's dark neutrals and corner radii, an indigo focus ring, and demos that show a finished step as a green check and a connector that's on as an indigo switch. The share card for links to the site has the same look.
 - Forgetting several memories asks you once. `forget_memory` takes up to 20 ids in one call, so cleaning up a batch of facts is one "ya" instead of one prompt per fact.

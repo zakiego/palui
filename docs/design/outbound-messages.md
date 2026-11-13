@@ -4,7 +4,7 @@ Status: reviewed and built, 2026-11-13. Author: Palui agent session. Reviewer: Z
 
 ## TL;DR
 
-- One tool, `outbound__kirim_pesan`: recipient (saved contact name, or a number plus a name), the exact text, and an optional time or RRULE. No time sends now, held 15 seconds so it can be cancelled.
+- One tool, `outbound__send_message`: recipient (saved contact name, or a number plus a name), the exact text, and an optional time or RRULE. No time sends now, held 15 seconds so it can be cancelled.
 - Contacts are a small table, scoped per agent like instructions (PLAN 19): each agent has its own list, and a turn or flow only sees its own agent's contacts. Each contact has a send policy: `ask` (default, approval every time) or `allow` (skip approval for messages the owner asked for himself). `allow` can only be set from the dashboard.
 - Guards live in code: the tool only exists in owner turns started by an owner message, a new number always needs approval, approval shows the recipient, the exact text and the time, tainted turns always ask, and `allow` only skips approval when the owner's own message names the contact. Rate limits and a global kill switch are checked when the tool runs, when a scheduled send fires, and again in the outbox worker.
 - Scheduled and repeating sends get their own small table swept by the existing scheduler (a `SchedulerExtension`, like flows). They reuse the reminders' time and RRULE code and the outbox. They don't reuse the `reminders` table.
@@ -34,7 +34,7 @@ What that means:
 
 The draft holds up. Changes and additions:
 
-1. **One tool, yes. Add contacts inline instead of a separate "add contact" step.** "chat Zaki (082200001001) sekarang" should be one approval, not two. `kirim_pesan` accepts a number plus a name. When the number isn't saved, the call always needs approval, and the prompt says "kontak baru". Approving saves the contact (policy `ask`) and sends. Contacts can also be added on the dashboard.
+1. **One tool, yes. Add contacts inline instead of a separate "add contact" step.** "chat Zaki (082200001001) sekarang" should be one approval, not two. `send_message` accepts a number plus a name. When the number isn't saved, the call always needs approval, and the prompt says "kontak baru". Approving saves the contact (policy `ask`) and sends. Contacts can also be added on the dashboard.
 2. **"Owner-origin only" needs a precise rule.** A turn started by the owner can still read a web page mid-turn. The rule in code:
    - The tool is offered only when the turn's origin is an owner message (`trigger` message, or an approval resume of one) in an owner-mode chat. Schedule, reminder, flow, hook and guest/shared turns don't get it, and `execute` refuses again if called anyway.
    - A tainted turn always asks, whatever the contact's policy. The prompt shows the exact text, so injected content can't send without the owner reading it.
@@ -116,12 +116,13 @@ outbound: {
 
 | Tool | Class | What it does |
 | --- | --- | --- |
-| `kirim_pesan({ to, name?, text, localDateTime?, rrule?, tz? })` | write, custom approval | Send now (held), at a time, or on a repeat. `to` is a contact name or a number. A new number needs `name`. |
-| `daftar_kontak()` | read | Contacts with their policy and note. |
-| `daftar_pesan_keluar({ filter })` | read | Scheduled series and recent sends with status. |
-| `batal_pesan({ id })` | write | Cancel a scheduled send or series, or a held "now" send. |
+| `send_message({ to, name?, text, localDateTime?, rrule?, tz? })` | write, custom approval | Send now (held), at a time, or on a repeat. `to` is a contact name or a number. A new number needs `name`. |
+| `list_contacts()` | read | Contacts with their policy and note. |
+| `add_contact({ name, phone, note? })` | write, always asks | Save a WhatsApp contact the owner named in chat ("tambah kontak Ana +62 822..."). Added after v0.8.0. |
+| `list_outbound_messages({ filter })` | read | Scheduled series and recent sends with status. |
+| `cancel_message({ id })` | write | Cancel a scheduled send or series, or a held "now" send. |
 
-Approval rule for `kirim_pesan` (in addition to the turn's own rule):
+Approval rule for `send_message` (in addition to the turn's own rule):
 
 ```
 ask unless all of:
@@ -142,6 +143,16 @@ TurnInfo.mode?: "owner" | "guest" | "sharedOwner"
 TurnInfo.tainted?: () => boolean
 TurnInfo.ownerText?: string                             // the owner's messages in this batch
 ```
+
+`add_contact` has no policy argument, so a new contact always starts at `ask`. "Always allow" stays dashboard-only, and there's no tool to change a contact's policy. Its rule:
+
+```
+ask whenever the call would save something (new number, free name)
+no ask when nothing gets saved: the number is already a contact (returns it, "sudah ada"),
+  the name belongs to another number, or the number is invalid (execute refuses with the reason)
+```
+
+`needsApproval` runs before the agent's tool permissions, so "allow all tools" or an `allow` entry for it can't skip the ask. `execute` saves only in the run the approval resumed (`trigger == "approval"`), and only in turns the owner started in his own chat. Flows, hooks, schedules and guests never see the tool, the same gate as `send_message`, so a flow step can't add contacts.
 
 Router: a callback `ob:cancel:<id>` and a reply "batal" quoting the hold notice cancel a held send. A bare "batal" with no approval waiting cancels the newest held send in that chat.
 

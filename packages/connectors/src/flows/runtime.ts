@@ -64,7 +64,7 @@ Names: trigger ids, step ids and set value names are lowercase letters, digits a
 Steps (each has id, kind, optional next (step id or null to end; default the next in the array), name, onError: "fail"|"continue"|<step id>, timeoutSec):
 - tool: { tool: "<connectorId>__<tool>" (as palui__search_tools shows), args, parse?: {field:"text", as:"json"}, retry?: {max, backoffSec} }. Output steps.<id>.data (or .error with onError).
 - if: { when: "<expression>", then: <id|null>, else: <id|null> }.
-- message: { text, to?: <another chat id the owner allowed>, contact?: <a saved contact name from outbound__daftar_kontak> }. A contact message is approved once per version, must use fixed text (no tool or webhook data), and is how conditional "kabarin X kalau ..." sends work.
+- message: { text, to?: <another chat id the owner allowed>, contact?: <a saved contact name from outbound__list_contacts> }. A contact message is approved once per version, must use fixed text (no tool or webhook data), and is how conditional "kabarin X kalau ..." sends work.
 - checkin: { text, answers: [{id, label, words?, closes}], followUp: {everyMin, max, text?}, deadline, missedText?, on?: {<answer id>: <step id>}, onMissed? }. Output answer, label, missed (skipped too when the deadline had already passed).
   deadline (default next, max 7 days): {kind:"next", plusMin?} the schedule's next occurrence (plusMin:-10 = 10 min before it) | {kind:"after", minutes: N or "{{template}}"} | {kind:"at", at: "<template or ISO>", plusMin?} a computed time, e.g. {kind:"at", at:"{{steps.nextp.data.next.timestamp}}", plusMin:-10}. A deadline already past skips the ask silently and goes onMissed. Re-asks stop at the deadline.
 - wait: { minutes } or { until: "<template>", plusMin? } (max 7 days).
