@@ -29,6 +29,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Changed
 
+- The landing page at palui.zakiego.com is redesigned. Asks type themselves in above Palui, which acts each one out, and seven boxes below show what it does as live demos: chatting, asking before it acts, remembering, reminders, connectors, scheduled jobs and the install commands. It stands still when your system asks for reduced motion.
 - Forgetting several memories asks you once. `forget_memory` takes up to 20 ids in one call, so cleaning up a batch of facts is one "ya" instead of one prompt per fact.
 - The new version notice also goes out when a deploy runs a new commit on the same version. It names the new and old short commit and lists up to 8 commit titles in between, like "Palui di-update ke commit abc1234 (sebelumnya def5678), versi 0.8.0". A version bump adds the short commit to the usual message. A restart on the same commit still sends nothing, and a build that doesn't know its commit (a local `docker build`) falls back to the version alone. The deploy's `scripts/pre-deploy.sh` writes the commit into `build-info.json`, which the image carries.
 
