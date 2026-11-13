@@ -112,6 +112,8 @@ export const messageStepSchema = z.object({
   // A saved contact (docs/design/outbound-messages.md), by name or id. Literal,
   // fixed when the version is approved. Not together with `to`.
   contact: text(80).optional(),
+  // Only with `contact`: false sends it without the Outbound page's signature.
+  signature: z.boolean().optional(),
 })
 
 // When a check-in stops waiting, up to a week out:

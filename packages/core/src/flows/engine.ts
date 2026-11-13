@@ -13,7 +13,7 @@
 // A step finishes in one transaction: its step row, its output into vars, any
 // outbox row, any flow state write and the cursor move. Nothing lives in memory,
 // so a restart only delays the next sweep.
-import { assertCanSend, finalText, getContact, OutboundError, sendNow } from "../outbound/service"
+import { assertCanSend, finalText, getContact, OutboundError, outboundSettings, sendNow, withSignature } from "../outbound/service"
 import { getAgent, getDefaultAgent, memoryScope } from "../agents"
 import { and, desc, eq, inArray, isNotNull, isNull, lte, max, min, or, sql } from "drizzle-orm"
 import { flowRuns, flows, flowStepRuns, flowTriggers, newId, runs, toolCalls, type DB, type FlowPollState, type FlowRunStatus, type FlowSkipReason, type OutboxPayload } from "@palui/db"
@@ -123,7 +123,8 @@ type Transition = {
   taint?: string[]
   // `extra`: a re-ask or a missed note, which doesn't count toward the per-run message cap.
   // `contactId`: a message to a saved contact, sent through the outbound service (its log and limits).
-  messages?: { chatId: string; payload: OutboxPayload; expiresAt?: number; extra?: boolean; contactId?: string }[]
+  // `signature`: false sends a contact message without the signature.
+  messages?: { chatId: string; payload: OutboxPayload; expiresAt?: number; extra?: boolean; contactId?: string; signature?: boolean }[]
   // An each step's child runs, inserted with the step (RFC 5.8).
   children?: { body: string; items: { item: unknown; index: number; key: string | null }[]; tainted: boolean }
   events?: { name: string; data: Record<string, unknown> }[]
@@ -696,7 +697,7 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
         if (m.contactId) {
           const contact = getContact(db, m.contactId)
           if (!contact) continue
-          const sent = sendNow(db, contact, m.payload.text, { origin: "flow", originRef: c.run.id, approvedBy: "flow_version", ownerChatId: c.flow.chatId, holdMs: 0 }, now)
+          const sent = sendNow(db, contact, m.payload.text, { origin: "flow", originRef: c.run.id, approvedBy: "flow_version", ownerChatId: c.flow.chatId, holdMs: 0, signature: m.signature }, now)
           outboxIds.push(sent.outboxId)
           if (!m.extra) messagesSent++
           continue
@@ -921,19 +922,26 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
     // Tool output or webhook data never goes to someone else.
     if (valueTainted(c.run.taint ?? [], step.text)) return onError(c, step, "A message to a contact can't include data from tools or webhooks (tainted). Use fixed text.", { status: "error" })
     const text = renderText(step.text, envOf(c), taintCheck(c))
-    const output = { text, contact: call.label ?? step.contact }
-    if (c.dry) return { row: { status: "stubbed", input: { contact: step.contact }, output }, output, then: { t: "goto", to: defaultNext(c.def, step.id) } }
+    // The signature is the owner's own fixed text from the Outbound page, so it
+    // isn't part of what the version approved: it's added at send time.
+    const signature = step.signature === false ? false : undefined
+    if (c.dry) {
+      const output = { text: withSignature(text, outboundSettings(db), { signature }), contact: call.label ?? step.contact }
+      return { row: { status: "stubbed", input: { contact: step.contact }, output }, output, then: { t: "goto", to: defaultNext(c.def, step.id) } }
+    }
+    let full: string
     try {
       assertCanSend(db, contact!, c.now)
-      finalText(db, text)
+      full = finalText(db, text, { signature })
     } catch (e) {
       if (e instanceof OutboundError) return onError(c, step, e.message, { status: "error" })
       throw e
     }
+    const output = { text: full, contact: call.label ?? step.contact }
     return {
       row: { status: "ok", input: { contact: step.contact }, output },
       output,
-      messages: [{ chatId: contact!.chatId, payload: { text, format: "plain" }, contactId }],
+      messages: [{ chatId: contact!.chatId, payload: { text, format: "plain" }, contactId, signature }],
       then: { t: "goto", to: defaultNext(c.def, step.id) },
     }
   }
