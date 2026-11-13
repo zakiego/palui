@@ -56,7 +56,11 @@ pnpm release check       # package.json version and changelog agree
 pnpm release suggest     # the bump Unreleased calls for
 pnpm release open minor  # cut the release on release/vX.Y.Z and push it (nightly task opens the PR)
 pnpm release tag-merged  # tag the merged release on main
+bash scripts/setup-worktree.sh   # new worktree: copy local env files, install (T3 runs it on create)
+bash scripts/clean-worktree.sh   # settled worktree: drop node_modules and build output (T3 runs it on settle)
 ```
+
+`t3.json` declares these T3 Code actions. T3 doesn't run them from the file alone: import them in Settings > Projects > Actions.
 
 ## Versions and changelog
 
