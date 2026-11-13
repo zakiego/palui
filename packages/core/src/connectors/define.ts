@@ -181,7 +181,9 @@ export type SendResult = { channelMsgId?: string }
 export type ChannelHandle = {
   channel: Channel
   send(chatExternalId: string, payload: OutboxPayload): Promise<SendResult>
-  typing?(chatExternalId: string, on: boolean): Promise<void>
+  // `reaction`: the emoji a channel puts on the message while thinking
+  // (WhatsApp), "" for none, unset for the channel's default. The chat's `ack`.
+  typing?(chatExternalId: string, on: boolean, opts?: { reaction?: string }): Promise<void>
   // Whether the socket is up right now (used by the 4.3 "another channel reachable" rule).
   reachable(): boolean
   answerCallback?(callbackId: string, text?: string): Promise<void>

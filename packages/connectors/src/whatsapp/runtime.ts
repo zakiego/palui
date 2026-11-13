@@ -504,11 +504,12 @@ async function startWhatsApp(ctx: Ctx, deps: WhatsAppDeps): Promise<RunningConne
       return { channelMsgId: lastId }
     },
 
-    async typing(chatExternalId, on) {
+    async typing(chatExternalId, on, opts) {
       if (!on) return stopThinking(chatExternalId)
       const s = sock
       if (!s || live.connection !== "open" || thinking.has(chatExternalId)) return
-      const key = lastInbound.get(chatExternalId)
+      const reaction = opts?.reaction ?? THINKING_REACTION
+      const key = reaction ? lastInbound.get(chatExternalId) : undefined
       const compose = () => {
         const cur = sock
         if (!cur) return
@@ -529,7 +530,7 @@ async function startWhatsApp(ctx: Ctx, deps: WhatsAppDeps): Promise<RunningConne
       }
       if (!key) return startTyping()
       // The reaction goes first and typing follows once it has landed (see reactionLeadMs).
-      await s.sendMessage(chatExternalId, { react: { text: THINKING_REACTION, key } }).catch((err: unknown) => log.debug("reaction failed", { err: String(err) }))
+      await s.sendMessage(chatExternalId, { react: { text: reaction, key } }).catch((err: unknown) => log.debug("reaction failed", { err: String(err) }))
       if (thinking.get(chatExternalId) !== t) return
       t.lead = setTimeout(startTyping, deps.reactionLeadMs)
       t.lead.unref?.()

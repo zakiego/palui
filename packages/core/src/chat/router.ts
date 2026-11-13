@@ -133,7 +133,7 @@ export type RouteInput = {
 }
 
 // The commands that work in a chat that's off (PLAN 19.2).
-const SETUP_COMMANDS = new Set<CommandName>(["agent", "reply", "help", "id"])
+const SETUP_COMMANDS = new Set<CommandName>(["agent", "reply", "ack", "help", "id"])
 
 export async function route(i: RouteInput): Promise<Route> {
   const blocked = chatCheck(i.chat)

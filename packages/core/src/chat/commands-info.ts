@@ -30,6 +30,7 @@ const HELP: [string, string][] = [
   ["/connectors [on|off <id>]", "lihat, nyalakan atau matikan konektor"],
   ["/agent [slug|off]", "lihat atau ganti agent di chat ini"],
   ["/reply [all|mention]", "di grup: jawab semua pesan atau cuma mention"],
+  ["/ack [on|off|emoji]", "reaksi pas lagi mikir di chat ini: nyalakan, matikan, atau ganti emoji"],
   ["/id", "id chat, sesi dan pesan. Quote sebuah pesan buat lihat id-nya"],
   ["/report [catatan]", "snapshot debug chat ini buat ditempel ke coding agent"],
 ]

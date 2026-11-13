@@ -134,6 +134,39 @@ describe("agents: who gets answered", () => {
   })
 })
 
+describe("agents: /ack", () => {
+  const groupChat = (db: DB) => db.select().from(chats).where(eq(chats.externalId, GROUP)).get()!
+
+  it("turns the thinking reaction off and on for one chat", async () => {
+    const h = await world()
+    await h.engine.inbound(ownerInGroup("/ack"))
+    await h.engine.idle()
+    expect(outboxRows(h.db).at(-1)!.payload.text).toContain("/ack off")
+    await h.engine.inbound(ownerInGroup("/ack off"))
+    await h.engine.idle()
+    expect(groupChat(h.db).ack).toBe(false)
+    await h.engine.inbound(ownerInGroup("/ack on"))
+    await h.engine.idle()
+    expect(groupChat(h.db).ack).toBe(true)
+    await h.engine.inbound(ownerInGroup("/ack maybe"))
+    await h.engine.idle()
+    expect(outboxRows(h.db).at(-1)!.payload.text).toContain("Pilih /ack on, /ack off")
+  })
+
+  it("picks the emoji and turns the reaction back on", async () => {
+    const h = await world()
+    await h.engine.inbound(ownerInGroup("/ack off"))
+    await h.engine.idle()
+    await h.engine.inbound(ownerInGroup("/ack 👀"))
+    await h.engine.idle()
+    expect(groupChat(h.db)).toMatchObject({ ack: true, ackEmoji: "👀" })
+    expect(outboxRows(h.db).at(-1)!.payload.text).toContain("👀")
+    await h.engine.inbound(ownerInGroup("/ack 👀👀"))
+    await h.engine.idle()
+    expect(groupChat(h.db).ackEmoji).toBe("👀")
+  })
+})
+
 describe("agents: reply mode in groups", () => {
   const groupChat = (db: DB) => db.select().from(chats).where(eq(chats.externalId, GROUP)).get()!
 

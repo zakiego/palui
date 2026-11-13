@@ -452,6 +452,30 @@ describe("whatsapp typing and send", () => {
     expect(sock().presence.at(-1)).toEqual({ type: "paused", jid: OWNER_JID })
   })
 
+  it("reacts with the chat's own emoji", async () => {
+    const { r, sock, ctx } = await openRunning({ deps: { reactionLeadMs: 30 } })
+    sock().message(dm("IN1"))
+    await until(() => ctx.inbound.length === 1)
+    await r.channel?.typing?.(OWNER_JID, true, { reaction: "👀" })
+    expect(sock().sent.at(-1)).toMatchObject({ jid: OWNER_JID, content: { react: { text: "👀", key: { id: "IN1" } } } })
+    await r.channel?.typing?.(OWNER_JID, false)
+    expect(sock().sent.at(-1)).toMatchObject({ content: { react: { text: "", key: { id: "IN1" } } } })
+  })
+
+  it("types right away without a reaction when the chat has ack off", async () => {
+    const { r, sock, ctx } = await openRunning({ deps: { reactionLeadMs: 30 } })
+    sock().message(dm("IN1"))
+    await until(() => ctx.inbound.length === 1)
+    const before = sock().sent.length
+    await r.channel?.typing?.(OWNER_JID, true, { reaction: "" })
+    await settle()
+    expect(sock().sent.length).toBe(before)
+    expect(sock().presence).toContainEqual({ type: "composing", jid: OWNER_JID })
+    await r.channel?.typing?.(OWNER_JID, false)
+    expect(sock().sent.length).toBe(before)
+    expect(sock().presence.at(-1)).toEqual({ type: "paused", jid: OWNER_JID })
+  })
+
   it("never starts typing when the reply comes before the reaction lead", async () => {
     const { r, sock, ctx } = await openRunning({ deps: { reactionLeadMs: 30 } })
     sock().message(dm("IN1"))

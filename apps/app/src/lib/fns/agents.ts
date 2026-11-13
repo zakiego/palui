@@ -2,8 +2,9 @@
 // recall container and Telegram bot. The runtime reads them at the start of
 // every turn, so writes go straight to the table.
 import { AgentError, AGENT_COLORS, AGENT_ICONS, MAX_AVATAR_IMAGE, assignAgent, getAgent, createAgent, setToolPermissions, deleteAgent, getAgentBySlug, listAgents, MAX_AGENT_NAME, MAX_PERSONA, MAX_READ_CONTAINERS, updateAgent } from "@palui/core/agents"
-import { rotateSession, setReplyMode } from "@palui/core/chats"
+import { rotateSession, setAck, setReplyMode } from "@palui/core/chats"
 import { setDeployNotice } from "@palui/core/deploy-notice"
+import { parseAckEmoji } from "@palui/core/ack"
 import { getSetting } from "@palui/core/settings"
 import { listInstructions } from "@palui/core/notes/service"
 import { readPermissions } from "@palui/core/tools/permissions"
@@ -48,7 +49,7 @@ export const getAgentPage = createServerFn({ method: "GET" })
       agent: agentView(db, row, own.length),
       bots: telegramBots(db).filter((b) => !taken.has(b.id)),
       instructions: listInstructions(db, { agentId: row.id }),
-      chats: own.slice(0, AGENT_CHATS_LIMIT).map((c) => ({ id: c.id, title: c.title, channel: c.channel, kind: c.kind, lastAt: c.lastAt, allowed: c.allowed, replyMode: c.replyMode, deployNotice: notice.has(c.id) })),
+      chats: own.slice(0, AGENT_CHATS_LIMIT).map((c) => ({ id: c.id, title: c.title, channel: c.channel, kind: c.kind, lastAt: c.lastAt, allowed: c.allowed, replyMode: c.replyMode, ack: c.ack, ackEmoji: c.ackEmoji, deployNotice: notice.has(c.id) })),
       chatsTotal: own.length,
     }
   })
@@ -161,6 +162,21 @@ export const setChatReplyModeFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { db } = await requireWriter()
     if (!setReplyMode(db, data.chatId, data.mode)) throw new Error("That chat doesn't exist anymore.")
+    return { ok: true }
+  })
+
+// WhatsApp's reaction while a reply is being written: on or off, and which
+// emoji. Typing stays either way.
+export const setChatAckFn = createServerFn({ method: "POST" })
+  .validator(z.object({ chatId: z.string().min(1).max(100), on: z.boolean().optional(), emoji: z.string().max(32).optional() }))
+  .handler(async ({ data }) => {
+    const { db } = await requireWriter()
+    let emoji: string | undefined
+    if (data.emoji !== undefined) {
+      emoji = parseAckEmoji(data.emoji) ?? undefined
+      if (!emoji) throw new Error("Pick a single emoji.")
+    }
+    if (!setAck(db, data.chatId, { on: data.on, emoji })) throw new Error("That chat doesn't exist anymore.")
     return { ok: true }
   })
 

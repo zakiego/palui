@@ -13,6 +13,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Added
 
+- Pick the reaction per WhatsApp chat. Palui puts ⏳ on your message while it writes a reply, and now each chat can turn that off or use another emoji. Send `/ack off`, `/ack on` or `/ack 👀` in the chat, or pick it under "Reaction" on the Chats page or an agent's Chats tab. Typing still shows when it's off. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 - Palui can delete a saved document from recall with `forget_document`, so the full text of a note it saved stops showing up in searches. Before, it could only forget the facts taken from a document, and the text itself had to be deleted on the recall dashboard. It asks you first and only touches the agent's own container.
 - Agents can keep a separate memory per chat. On an agent's Memory tab, "Separate memory per chat" gives each chat its own recall container, so what one customer said never comes up in another customer's chat. New agents start with it on; existing ones keep their single container until you turn it on. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 - Shared containers on an agent's Memory tab: up to 5 recall containers it reads but never writes, like a `kb-shop` you fill with product facts. Auto-recall shows them next to the agent's own memory, labeled as reference only. Palui can use them too.

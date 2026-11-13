@@ -59,5 +59,9 @@ export const migrations: { name: string; sql: string }[] = [
   {
     "name": "0014_secret_starbolt",
     "sql": "CREATE TABLE `contacts` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`agent_id` text,\n\t`name` text NOT NULL,\n\t`channel` text NOT NULL,\n\t`address` text NOT NULL,\n\t`chat_id` text NOT NULL,\n\t`policy` text DEFAULT 'ask' NOT NULL,\n\t`note` text,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`removed_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `contacts_agent` ON `contacts` (`agent_id`,`removed_at`);--> statement-breakpoint\nCREATE INDEX `contacts_chat` ON `contacts` (`chat_id`);--> statement-breakpoint\nCREATE TABLE `outbound_messages` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`agent_id` text,\n\t`contact_id` text NOT NULL,\n\t`text` text NOT NULL,\n\t`origin` text NOT NULL,\n\t`origin_ref` text,\n\t`approved_by` text NOT NULL,\n\t`owner_chat_id` text,\n\t`rrule` text,\n\t`tz` text NOT NULL,\n\t`local_start` text NOT NULL,\n\t`fire_at` integer NOT NULL,\n\t`status` text DEFAULT 'scheduled' NOT NULL,\n\t`last_outbox_id` text,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n);\n--> statement-breakpoint\nCREATE INDEX `outbound_status_fire` ON `outbound_messages` (`status`,`fire_at`);--> statement-breakpoint\nCREATE INDEX `outbound_contact` ON `outbound_messages` (`contact_id`);"
+  },
+  {
+    "name": "0015_blue_silver_sable",
+    "sql": "ALTER TABLE `chats` ADD `ack` integer DEFAULT true NOT NULL;--> statement-breakpoint\nALTER TABLE `chats` ADD `ack_emoji` text DEFAULT '⏳' NOT NULL;"
   }
 ]

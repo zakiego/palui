@@ -202,7 +202,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
   const state = { tainted: !!(input.untrustedInput || input.resume?.context.tainted || quotesOutsider(history, batch)) }
   const toolStarts = new Map<string, number>()
   const channel = chat.channel === "web" ? undefined : chat.connectorId ? ctx.host.get(chat.connectorId)?.handle?.channel : ctx.host.channel(chat.channel)
-  const typing = (on: boolean) => channel?.typing?.(chat.externalId, on).catch(() => {})
+  const typing = (on: boolean) => channel?.typing?.(chat.externalId, on, { reaction: chat.ack ? chat.ackEmoji : "" }).catch(() => {})
 
   let status: RunStatus = "ok"
   let error: string | undefined

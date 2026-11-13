@@ -5,7 +5,8 @@ import { getSetting } from "../settings"
 import { activePause, formatClock, tokensToday, getUsage, usageKeys } from "../budget"
 import { eq } from "drizzle-orm"
 import { chats } from "@palui/db"
-import { rotateSession, setReplyMode, type ChatRow } from "../chats"
+import { rotateSession, setAck, setReplyMode, type ChatRow } from "../chats"
+import { parseAckEmoji } from "../ack"
 import { autoSave, findMemory } from "../memory"
 import { channelName, ownerChat, selfChannelOffUndo } from "../connectors/rules"
 import { getConnector, listConnectors, pauseConnector, resumeConnector } from "../connectors/store"
@@ -64,6 +65,8 @@ export async function runCommand(ctx: EngineCtx, chat: ChatRow, name: CommandNam
       return cmdAgent(ctx, chat, args)
     case "reply":
       return cmdReply(ctx, chat, args)
+    case "ack":
+      return cmdAck(ctx, chat, args)
     case "report":
       return cmdReport(ctx, chat, args)
   }
@@ -144,6 +147,26 @@ function cmdReply(ctx: EngineCtx, chat: ChatRow, args: string[]): CommandReply {
   // it, and the change only reaches groups it joins afterwards.
   const tg = chat.channel === "telegram" ? "\nDi Telegram, matiin dulu privacy mode bot-nya di @BotFather, lalu keluarin dan masukin lagi bot-nya ke grup." : ""
   return { text: `Oke, ${name} sekarang jawab semua pesan di grup ini.${off}${tg}` }
+}
+
+// The reaction while a reply is being written (PLAN 5): on, off, or which
+// emoji. Only WhatsApp sends one; typing keeps showing either way.
+function cmdAck(ctx: EngineCtx, chat: ChatRow, args: string[]): CommandReply {
+  const raw = args.join(" ").trim()
+  const arg = raw.toLowerCase()
+  const only = chat.channel === "whatsapp" ? "" : "\nReaksi cuma ada di WhatsApp, di sini yang muncul cuma typing."
+  if (!arg) {
+    const state = chat.ack ? `nyala pakai ${chat.ackEmoji}` : `mati (emoji-nya ${chat.ackEmoji})`
+    return { text: `Reaksi pas mikir di chat ini ${state}. Ganti: /ack ${chat.ack ? "off" : "on"}, atau /ack <emoji> buat ganti emoji.${only}` }
+  }
+  if (arg === "on" || arg === "off") {
+    setAck(ctx.db, chat.id, { on: arg === "on" })
+    return { text: arg === "on" ? `Oke, reaksi ${chat.ackEmoji} nyala lagi di chat ini.${only}` : `Oke, gak pakai reaksi lagi di chat ini. Typing tetap muncul.${only}` }
+  }
+  const emoji = parseAckEmoji(raw)
+  if (!emoji) return { text: "Pilih /ack on, /ack off, atau satu emoji, misal /ack 👀" }
+  setAck(ctx.db, chat.id, { on: true, emoji })
+  return { text: `Oke, reaksinya sekarang ${emoji}.${only}` }
 }
 
 const REPORT_NOTE_TIP = "Lain kali tulis juga apa yang salah, biar lebih gampang dilacak: /report <apa yang salah>"

@@ -38,6 +38,8 @@ export function chatList(db: DB, where?: SQL) {
       kind: c.kind,
       allowed: c.allowed,
       replyMode: c.replyMode,
+      ack: c.ack,
+      ackEmoji: c.ackEmoji,
       lastAt: last?.createdAt ?? c.lastMessageAt ?? c.createdAt,
       preview: last ? clip(last.text, 140) : "",
       previewRole: last?.role ?? null,
@@ -112,7 +114,7 @@ export function transcript(db: DB, chatId: string, limit = 150) {
     .all()
     .map((a) => ({ id: a.id, tool: a.tool, class: a.toolClass, argsPreview: a.argsPreview, expiresAt: a.expiresAt }))
   return {
-    chat: { id: chat.id, channel: chat.channel, title: chat.title || chat.externalId, kind: chat.kind, agentId: chat.agentId, allowed: chat.allowed, replyMode: chat.replyMode, connectorId: chat.connectorId },
+    chat: { id: chat.id, channel: chat.channel, title: chat.title || chat.externalId, kind: chat.kind, agentId: chat.agentId, allowed: chat.allowed, replyMode: chat.replyMode, ack: chat.ack, ackEmoji: chat.ackEmoji, connectorId: chat.connectorId },
     messages: items,
     approvals,
   }

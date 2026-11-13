@@ -33,6 +33,7 @@ import { RuntimeAlert } from "@/components/runtime-alert"
 import { CLASS_TONE, ToolTrace } from "@/components/tool-trace"
 import { AgentAvatar } from "@/components/agent-avatar"
 import { SimpleSelect } from "@/components/simple-select"
+import { AckControl } from "@/components/ack-control"
 import { Switch } from "@/components/ui/switch"
 import { setChatAgentFn, setChatAllowedFn, setChatReplyModeFn } from "@/lib/fns/agents"
 import { decideApproval, getChats, getTranscript, sendWebMessage, stopTurn } from "@/lib/fns/chats"
@@ -460,6 +461,7 @@ function AgentBar({ transcript }: { transcript: Transcript }) {
             onChange={(v) => void changeMode(v)}
           />
         )}
+        {chat.channel === "whatsapp" && <AckControl chat={chat} />}
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={allowed} disabled={busy} onCheckedChange={(v) => void toggle(v)} aria-label={t("chats.allowedFor", { name: chat.title })} />
           {t("chats.allowed")}

@@ -24,6 +24,7 @@ import { InstructionList, InstructionSheet, useInstructionSheet } from "@/compon
 import { ListCapNote } from "@/components/list-cap-note"
 import { PagePending } from "@/components/page-pending"
 import { SimpleSelect } from "@/components/simple-select"
+import { AckControl } from "@/components/ack-control"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -654,6 +655,7 @@ function ChatRow({ chat }: { chat: AgentChat }) {
               onChange={(v) => void changeMode(v)}
             />
           )}
+          {chat.channel === "whatsapp" && <AckControl chat={chat} />}
           <label className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">{t("chats.allowed")}</span>
             <Switch checked={allowed} onCheckedChange={(v) => void toggle(v)} aria-label={t("chats.allowedFor", { name: chat.title })} />

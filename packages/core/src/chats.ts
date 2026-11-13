@@ -27,6 +27,14 @@ export function setReplyMode(db: DB, chatId: string, mode: ReplyMode): ChatRow |
   return db.update(chats).set({ replyMode: mode }).where(eq(chats.id, chatId)).returning().get()
 }
 
+// The reaction while a reply is being written (PLAN 5): on or off, and which
+// emoji. Typing stays either way. Callers check the emoji with parseAckEmoji.
+export function setAck(db: DB, chatId: string, patch: { on?: boolean; emoji?: string }): ChatRow | undefined {
+  const set = { ...(patch.on === undefined ? {} : { ack: patch.on }), ...(patch.emoji === undefined ? {} : { ackEmoji: patch.emoji }) }
+  if (!Object.keys(set).length) return getChat(db, chatId)
+  return db.update(chats).set(set).where(eq(chats.id, chatId)).returning().get()
+}
+
 // Find or create the chat and make sure it has an open session. `allowed` and
 // `agentId` only apply to a new chat.
 export function ensureChat(

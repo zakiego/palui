@@ -159,7 +159,7 @@ export function worst(k: Kit) {
   const web = k.webChat()
   const say = (chat: ReturnType<Kit["chat"]>, text: string, at: number, role: "user" | "assistant" = "user") => k.message(chat, role, text, at)
 
-  const aleksandra = k.chat("whatsapp", "48600123456@s.whatsapp.net", "Aleksandra Wiśniewska-Kowalczyk")
+  const aleksandra = k.chat("whatsapp", "48600123456@s.whatsapp.net", "Aleksandra Wiśniewska-Kowalczyk", { ackEmoji: "👨‍👩‍👧‍👦" })
   say(aleksandra, LONG_URL, now - 10_000)
 
   // A phone with the wrong clock: the newest message is from the future.
@@ -221,7 +221,7 @@ export function worst(k: Kit) {
   say(single, "Line one\nLine two\nLine three", now - 26 * H)
   const vietnamese = k.chat("telegram", "1000000002", "Đặng Thị Ngọc Hân")
   say(vietnamese, "Ừ, được rồi. ก็ที่นี่ผู้ใหญ่ชี้ กตัญญูรู้คุณ", now - 12 * D)
-  const cjk = k.chat("whatsapp", "8613800138000@s.whatsapp.net", "王秀英")
+  const cjk = k.chat("whatsapp", "8613800138000@s.whatsapp.net", "王秀英", { ack: false })
   say(cjk, "明天上午九点在办公室开会，请带上第三季度的销售报告和所有客户的联系方式，谢谢。", now - 29 * D)
   const arabic = k.chat("whatsapp", "966500000000@s.whatsapp.net", "نور الهدى عبد الرحمن")
   say(arabic, "مرحبا، هل يمكنك تذكيري باجتماع الغد الساعة 9؟ (Q3 report)", now - 31 * D)

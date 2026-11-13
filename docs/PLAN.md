@@ -217,7 +217,7 @@ WhatsApp
 - Owner match: messages from the stored number are accepted. The LID is learned from the first DM whose `key.remoteJidAlt` (or the LID mapping) matches the number, and both are stored. Anything with `fromMe` is dropped.
 - Number: Palui's own number (D2), not utusan's. Nothing is shared with utusan, so there's no chat split and no utusan check. Every DM from the owner is answered. Groups and other people's DMs start outside the allowlist until they get an agent (section 19).
 - Runtime: a lock on the auth dir, reconnect with exponential backoff, and 440 means "another session took over", so it pauses with that reason instead of fighting. A logout means `error: unlinked`.
-- DMs, plus groups with an agent (section 19). An ⏳ reaction while thinking, cleared on reply.
+- DMs, plus groups with an agent (section 19). An ⏳ reaction while thinking, cleared on reply. Each chat can turn it off or pick another emoji (`chats.ack`, `chats.ack_emoji`; `/ack on|off|<emoji>`, the Chats page or an agent's Chats tab); typing still shows.
 - Risk: Baileys is unofficial. Keep volume low, use one owner, never broadcast. Telegram is the reliable channel.
 
 Web chat

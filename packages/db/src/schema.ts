@@ -194,6 +194,11 @@ export const chats = sqliteTable(
     // Groups only: "mention" answers @mentions and replies to the bot, "all"
     // answers every message. DMs always answer every message.
     replyMode: text("reply_mode").$type<ReplyMode>().notNull().default("mention"),
+    // WhatsApp's reaction on the message being answered while the agent thinks
+    // (PLAN 5). Off keeps the typing indicator and drops the emoji.
+    ack: bool("ack").notNull().default(true),
+    // The emoji for that reaction. Kept while `ack` is off.
+    ackEmoji: text("ack_emoji").notNull().default("⏳"),
     lastMessageAt: integer("last_message_at"),
     createdAt: integer("created_at").notNull(),
   },
