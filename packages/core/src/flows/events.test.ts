@@ -4,6 +4,7 @@ import { outbox, outboundMessages } from "@palui/db"
 import { ensureChat } from "../chats"
 import { getDefaultAgent } from "../agents"
 import { addContact, removeContact, setOutboundEnabled, updateContact } from "../outbound/service"
+import { DEFAULT_OUTBOUND_SIGNATURE } from "../settings"
 import { decideVersion } from "./service"
 import { at, exampleConnectors, flowHarness, runsOf, sentTexts, stepLog } from "./test-harness"
 
@@ -92,7 +93,7 @@ describe("message.contact (docs/design/outbound-messages.md)", () => {
     decideVersion(h.db, saved.version.id, true, "test", h.now())
     await h.run(h.now())
     const sent = h.db.select().from(outbox).where(eq(outbox.chatId, zaki.chatId)).all()
-    expect(sent.map((r) => r.payload.text)).toEqual(["Zaki belum jawab check-in."])
+    expect(sent.map((r) => r.payload.text)).toEqual([`Zaki belum jawab check-in.\n\n${DEFAULT_OUTBOUND_SIGNATURE}`])
     expect(sent[0]!.source).toMatch(/^outbound:obm_/)
     expect(h.db.select().from(outboundMessages).get()).toMatchObject({ origin: "flow", approvedBy: "flow_version", contactId: zaki.id })
   })

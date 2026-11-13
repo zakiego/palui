@@ -6,7 +6,7 @@ import { chats, contacts, newId, outbox, outboundMessages, type ContactPolicy, t
 import { findChat, getChat, ensureChat, type ChatRow } from "../chats"
 import { logEvent } from "../events"
 import { enqueueOutbox, notifyOutbox } from "../outbox/enqueue"
-import { getSetting, setSetting, type OutboundSettings } from "../settings"
+import { DEFAULT_OUTBOUND_SIGNATURE, getSetting, LEGACY_OUTBOUND_SIGNATURES, setSetting, type OutboundSettings } from "../settings"
 import { assertZone, formatWhen, normalizeLocal, normalizeRrule, resolveFirstFire, TimeError } from "../reminders/time"
 import { notifyScheduleChanged } from "../reminders/signal"
 import { formatPhone, normalizePhone, phonesIn, waJid } from "./phone"
@@ -184,13 +184,67 @@ export function assertCanSend(db: DB, given: ContactRow, now = Date.now()) {
   if (u.total >= s.perDay) throw new OutboundError(`Limit reached: ${u.total} messages to contacts in the last 24 hours (max ${s.perDay}).`)
 }
 
-export function finalText(db: DB, text: string): string {
+// --- Signature -----------------------------------------------------------------------
+
+// Compared loosely: case, whitespace and the WhatsApp markup (_ * ~) don't count,
+// so a signature the agent typed by hand still matches.
+function looseText(s: string): string {
+  return s.replace(/[_*~]/g, "").replace(/\s+/g, " ").trim().toLowerCase()
+}
+
+// Every signature text Palui knows: the current one, the owner's earlier ones and
+// the earlier defaults.
+export function knownSignatures(s: OutboundSettings): string[] {
+  return [s.signature, ...s.pastSignatures, DEFAULT_OUTBOUND_SIGNATURE, ...LEGACY_OUTBOUND_SIGNATURES].filter((x) => x.trim())
+}
+
+// Whether the text already ends with one of these signatures, or with a
+// signature's last line (the agent may have left out the dash line).
+export function endsWithSignature(text: string, signatures: string[]): boolean {
+  const body = looseText(text)
+  return signatures.some((sig) => {
+    const full = looseText(sig)
+    if (full && body.endsWith(full)) return true
+    const last = looseText(sig.trim().split("\n").at(-1) ?? "")
+    return last.length >= 20 && body.endsWith(last)
+  })
+}
+
+// The body with the signature after one blank line, unless it's off, opted out,
+// or already there.
+export function withSignature(text: string, s: OutboundSettings, opts: { signature?: boolean } = {}): string {
+  const t = text.trim()
+  const sig = s.signature.trim()
+  if (!s.signatureOn || !sig || opts.signature === false) return t
+  if (endsWithSignature(t, knownSignatures(s))) return t
+  return `${t}\n\n${sig}`
+}
+
+// The exact text a contact gets. Throws when it's empty or too long.
+export function finalText(db: DB, text: string, opts: { signature?: boolean } = {}): string {
   const t = text.trim()
   if (!t) throw new OutboundError("The message is empty.")
-  const sig = outboundSettings(db).signature.trim()
-  const full = sig ? `${t}\n\n${sig}` : t
-  if (full.length > MAX_OUTBOUND_TEXT) throw new OutboundError(`Keep the message under ${MAX_OUTBOUND_TEXT} characters.`)
+  const full = withSignature(t, outboundSettings(db), opts)
+  if (full.length > MAX_OUTBOUND_TEXT) throw new OutboundError(`Keep the message under ${MAX_OUTBOUND_TEXT} characters, signature included (this one is ${full.length}).`)
   return full
+}
+
+// Saves the limits and the signature from the Outbound page. An edited signature
+// text is remembered, so messages already carrying it aren't signed twice.
+export function saveOutboundSettings(db: DB, patch: Omit<OutboundSettings, "enabled" | "pastSignatures">, now = Date.now()): OutboundSettings {
+  const cur = outboundSettings(db)
+  const signature = patch.signature.replace(/\r\n?/g, "\n").trim()
+  if (patch.signatureOn && !signature) throw new OutboundError("Write the signature, or turn it off.")
+  let pastSignatures = cur.pastSignatures
+  if (cur.signature.trim() && cur.signature.trim() !== signature) {
+    pastSignatures = [cur.signature.trim(), ...pastSignatures.filter((x) => x !== cur.signature.trim() && x !== signature)].slice(0, 10)
+  }
+  const next: OutboundSettings = { ...cur, ...patch, signature, pastSignatures }
+  setSetting(db, "outbound", next, now)
+  if (cur.signatureOn !== next.signatureOn || cur.signature.trim() !== signature) {
+    logEvent(db, { kind: "outbound.signature", message: next.signatureOn ? "Signature for messages to contacts changed" : "Signature for messages to contacts turned off" }, now)
+  }
+  return next
 }
 
 // The kill switch. Off cancels every send still waiting in the outbox.
@@ -217,6 +271,8 @@ export type SendMeta = {
   approvedBy: "owner" | "policy" | "flow_version"
   // Where notices about this send go.
   ownerChatId?: string | null
+  // false: no signature on this one (the owner asked for that).
+  signature?: boolean
 }
 
 function enqueueTo(db: DB, contact: ContactRow, outboundId: string, text: string, now: number, notBefore: number): string {
@@ -233,7 +289,7 @@ function enqueueTo(db: DB, contact: ContactRow, outboundId: string, text: string
 // Send now. `holdMs` (the undo window) delays the outbox row; 0 sends at once.
 export function sendNow(db: DB, contact: ContactRow, text: string, meta: SendMeta & { holdMs: number }, now = Date.now()): { row: OutboundRow; outboxId: string; sendAt: number } {
   assertCanSend(db, contact, now)
-  const full = finalText(db, text)
+  const full = finalText(db, text, { signature: meta.signature })
   const sendAt = now + Math.max(0, meta.holdMs)
   const tz = getSetting(db, "timezone")
   const result = db.transaction(() => {
@@ -274,7 +330,9 @@ export function scheduleSend(db: DB, contact: ContactRow, text: string, when: Sc
   const s = outboundSettings(db)
   if (!s.enabled) throw new OutboundError("Sending messages to contacts is turned off (kill switch on the Outbound page).")
   if ((getContact(db, contact.id) ?? contact).removedAt) throw new OutboundError(`${contact.name} was removed from contacts.`)
-  const full = finalText(db, text)
+  // Signed now, so the stored text is the one the owner approved; the scheduler
+  // sends it as is at every fire.
+  const full = finalText(db, text, { signature: meta.signature })
   let first
   try {
     assertZone(when.tz)
