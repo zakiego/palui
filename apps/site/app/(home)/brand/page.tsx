@@ -38,13 +38,14 @@ const marks = [
   { file: "palui-mark-on-light", name: "On light", bg: "#ffffff" },
 ]
 
+// The landing's palette, which is the dashboard's at night.
 const colors = [
-  { name: "Ink", hex: "#0a0a0a", use: "Page" },
-  { name: "Surface", hex: "#111111", use: "Cards" },
-  { name: "Line", hex: "#272727", use: "Borders" },
-  { name: "Dim", hex: "#a1a1a1", use: "Muted text" },
-  { name: "Text", hex: "#ededed", use: "Body text" },
-  { name: "White", hex: "#ffffff", use: "The one accent" },
+  { name: "Ink", hex: "#08090a", use: "Page" },
+  { name: "Surface", hex: "#0f1011", use: "Cards" },
+  { name: "Line", hex: "#23252a", use: "Borders" },
+  { name: "Muted", hex: "#8a8f98", use: "Muted text" },
+  { name: "Text", hex: "#f7f8f8", use: "Body text" },
+  { name: "Indigo", hex: "#5e6ad2", use: "Focus only" },
 ]
 
 export default function BrandPage() {
@@ -144,12 +145,12 @@ export default function BrandPage() {
         </h2>
         <div className="br-type">
           <div className="br-type-row">
-            <p className="br-specimen br-specimen-mono">An agent friend you host yourself</p>
-            <p className="br-note">IBM Plex Mono, for headlines and small labels.</p>
+            <p className="br-specimen br-specimen-head">An agent friend you host yourself</p>
+            <p className="br-note">Inter, for headlines and everything you read.</p>
           </div>
           <div className="br-type-row">
-            <p className="br-specimen br-specimen-sans">Palui remembers what you tell it and reminds you on time.</p>
-            <p className="br-note">IBM Plex Sans, for everything you read.</p>
+            <p className="br-specimen br-specimen-mono">palui.zakiego.com #08090a</p>
+            <p className="br-note">Geist Mono, for values a machine wrote.</p>
           </div>
         </div>
       </section>
