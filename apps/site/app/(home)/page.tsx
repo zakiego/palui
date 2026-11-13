@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 }
 
 // The landing is dark whatever the system theme, so the browser chrome is too.
-export const viewport: Viewport = { themeColor: "#0a0a0a", colorScheme: "dark" }
+export const viewport: Viewport = { themeColor: "#08090a", colorScheme: "dark" }
 
 const jsonLd = {
   "@context": "https://schema.org",

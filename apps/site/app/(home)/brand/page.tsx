@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: `${title} · ${appName}`, description, images: [siteImage] },
 }
 
-export const viewport: Viewport = { themeColor: "#0a0a0a", colorScheme: "dark" }
+export const viewport: Viewport = { themeColor: "#08090a", colorScheme: "dark" }
 
 // Every file here is written by scripts/brand-icons.mjs into public/brand,
 // as palui-avatar-<design>-<theme>.png and .svg.
