@@ -2,6 +2,7 @@ import { Step, Steps } from "fumadocs-ui/components/steps"
 import { Tab, Tabs } from "fumadocs-ui/components/tabs"
 import defaultMdxComponents from "fumadocs-ui/mdx"
 import type { MDXComponents } from "mdx/types"
+import { Callout } from "@/components/docs/callout"
 import {
   ApprovalDiagram,
   ArchitectureDiagram,
@@ -17,6 +18,7 @@ export function getMDXComponents(components?: MDXComponents) {
     ApprovalDiagram,
     ArchitectureDiagram,
     BackupDiagram,
+    Callout,
     EdgeRoutingDiagram,
     MessageFlowDiagram,
     ConnectorStatesDiagram,

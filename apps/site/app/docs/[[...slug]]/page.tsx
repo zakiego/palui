@@ -20,12 +20,15 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
 
   const MDX = page.data.body;
   const markdownUrl = getPageMarkdownUrl(page).url;
+  // The changelog has an Added/Changed/Fixed heading under every release, so
+  // its contents list only the releases.
+  const toc = page.slugs.join('/') === 'changelog' ? page.data.toc.filter((item) => item.depth <= 2) : page.data.toc;
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
+    <DocsPage toc={toc} full={page.data.full}>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
-      <div className="flex flex-row gap-2 items-center border-b pb-6">
+      <div className="docs-actions mt-6 flex flex-row items-center gap-2">
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover markdownUrl={markdownUrl} />
       </div>
