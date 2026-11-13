@@ -97,6 +97,14 @@ export type TurnInfo = {
   agentId?: string
   // The flow whose tool step is calling (RFC flows 5.1). Built-in flow tools default to it.
   flowId?: string
+  // What started the turn, kept across approval resumes ("message" = the owner wrote).
+  origin?: "message" | "schedule" | "hook" | "reminder" | "flow"
+  // owner: a private chat with the owner (PLAN 19.4).
+  mode?: "owner" | "guest" | "sharedOwner"
+  // Whether untrusted content reached the turn so far. Read it when the tool runs.
+  tainted?: () => boolean
+  // The owner's own messages in this batch, as typed. Unset on approval resumes.
+  ownerText?: string
   // What the memory connector's tools may touch this turn (PLAN 19.5). Unset:
   // the connector's own container and any other the model names (the owner).
   // `locked`: writes go to `container` only, reads to it and `read`.
@@ -117,6 +125,11 @@ export type PaluiTool = {
   // Write tools in flows (RFC flows 7.2): "version" (default) is approved once per
   // flow version; "every_run" asks on every run (email, posts others read).
   flowApproval?: "version" | "every_run"
+  // Ask the owner for this call even where the class rules wouldn't (a write
+  // that depends on its args, like a message to a contact). Runs before the call.
+  needsApproval?: (input: unknown) => boolean
+  // The approval prompt's text for this call, instead of the args cut to 300 chars.
+  preview?: (input: unknown) => string
 }
 
 export type InboundMedia = {

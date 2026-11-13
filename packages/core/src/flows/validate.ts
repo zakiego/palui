@@ -42,7 +42,8 @@ export type ToolInfo = {
 // One side effect a version can cause, as the owner approves it.
 export type WriteCall =
   | { stepId: string; kind: "tool"; connectorId: string; connectorType?: string; tool: string; class: ToolClass; args: Record<string, unknown> }
-  | { stepId: string; kind: "message"; to: string }
+  // `to` is a chat id, or "contact:<id>" for a saved contact (label: its name).
+  | { stepId: string; kind: "message"; to: string; label?: string }
 
 export type ValidateContext = {
   // Resolves a tool step's tool. Omitted: tools aren't checked (offline drafts).
@@ -51,6 +52,8 @@ export type ValidateContext = {
   // The flow's own chat, and whether another chat may receive messages.
   chatId?: string
   chatAllowed?: (chatId: string) => "own" | "allowed" | false
+  // A saved contact by name or id (message steps with `contact`).
+  resolveContact?: (ref: string) => { id: string; name: string } | null
   // Other flows in the chat, for event triggers that name one.
   flowNames?: string[]
 }
@@ -166,6 +169,8 @@ export function validateDefinition(raw: unknown, ctx: ValidateContext = {}): Val
       case "message":
         tpl(["text"], s.text)
         noTemplate(["to"], s.to, "message.to")
+        noTemplate(["contact"], s.contact, "message.contact")
+        if (s.to && s.contact) p(["steps", i, "contact"], "Use either to (a chat) or contact (a saved contact), not both.")
         break
       case "checkin":
         tpl(["text"], s.text)
@@ -278,6 +283,12 @@ export function validateDefinition(raw: unknown, ctx: ValidateContext = {}): Val
         else if (info.class === "destructive") p(["steps", i, "tools", j], `${info.name} is destructive; prompt steps never get destructive tools.`)
       })
     }
+    if (s.kind === "message" && s.contact && !hasTemplate(s.contact)) {
+      const c = ctx.resolveContact ? ctx.resolveContact(s.contact) : null
+      if (!c) p(["steps", i, "contact"], `No saved contact ${s.contact}. Contacts are added from chat by sending them a message, or on the Outbound page.`)
+      // Always approved per version, whatever the contact's own setting: the flow picks the moment, not the owner.
+      else out.writeCalls.push({ stepId: s.id, kind: "message", to: `contact:${c.id}`, label: c.name })
+    }
     if (s.kind === "message" && s.to && s.to !== ownChat) {
       const ok = ctx.chatAllowed ? ctx.chatAllowed(s.to) : "allowed"
       if (!ok) p(["steps", i, "to"], `Chat ${s.to} isn't one of the owner's chats or an allowed chat.`)
@@ -300,7 +311,7 @@ function pathsOfEachItems(s: Extract<FlowStep, { kind: "each" }>): PathNode[] {
 
 // The write calls as the owner sees them: "keuangan.mark_paid(id: {{item.id}})".
 export function describeWriteCall(w: WriteCall): string {
-  if (w.kind === "message") return `kirim pesan ke chat ${w.to}`
+  if (w.kind === "message") return w.to.startsWith("contact:") ? `kirim pesan ke kontak ${w.label ?? w.to.slice(8)}` : `kirim pesan ke chat ${w.to}`
   const args = Object.entries(w.args)
     .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
     .join(", ")

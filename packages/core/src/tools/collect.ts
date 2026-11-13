@@ -29,6 +29,8 @@ export type ToolMeta = {
   title?: string
   // Connector label, for search and the capability list.
   label?: string
+  needsApproval?: (input: unknown) => boolean
+  preview?: (input: unknown) => string
   // Offered in guest turns too (PLAN 19.4).
   guestSafe?: boolean
 }
@@ -107,6 +109,8 @@ export async function collectTools(running: RunningEntry[], opts: CollectOptions
       if (opts.only && !opts.only.includes("*") && !opts.only.includes(name)) continue
       if (opts.deny?.includes(name)) continue
       const meta: ToolMeta = { name, connectorId: e.id, tool: toolName, class: cls, untrusted: !!pt.untrusted || e.row.trust === "external", title: pt.title, label: e.row.label, guestSafe: !!pt.guestSafe }
+      if (pt.needsApproval) meta.needsApproval = pt.needsApproval
+      if (pt.preview) meta.preview = pt.preview
       out.tools[name] = wrapTool(pt.tool, meta, opts)
       out.meta[name] = meta
       order.push(name)

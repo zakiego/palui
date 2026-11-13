@@ -20,7 +20,7 @@ import type { Supervisor } from "../connectors/supervisor"
 import { notesPrompt } from "../notes/service"
 import { flowCheckinsPrompt } from "../flows/checkin"
 import { getAllSettings, type ModelRole } from "../settings"
-import { collectTools, emptyTools, SEARCH_TOOL, STICKY_MAX, type CollectedTools } from "../tools/collect"
+import { collectTools, emptyTools, SEARCH_TOOL, STICKY_MAX, type CollectedTools, type ToolMeta } from "../tools/collect"
 import { deniedTools, needsApproval, permissionFor } from "../tools/permissions"
 import type { TurnBus } from "./bus"
 import { limitNotice, shouldWrapUp, stepClock, WRAP_UP_NOTE, type RanTool, type WrapUpReason } from "./turn-limits"
@@ -234,7 +234,28 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
 
   try {
     const batchRunId = input.resume ? (input.resume.context.batchRunId ?? input.resume.previousRunId) : runId
-    const turnInfo: TurnInfo = { runId, chatId: chat.id, channel: chat.channel, trigger: input.trigger, tz: settings.timezone, now: startedAt, jobId, batchRunId, agentId: agent.id, memory: memoryScope(agent, chat.id) }
+    const ownerText = input.resume
+      ? undefined
+      : history
+          .filter((h) => batch.has(h.id) && h.role === "user" && h.fromOwner)
+          .map((h) => h.text)
+          .join("\n")
+    const turnInfo: TurnInfo = {
+      runId,
+      chatId: chat.id,
+      channel: chat.channel,
+      trigger: input.trigger,
+      tz: settings.timezone,
+      now: startedAt,
+      jobId,
+      batchRunId,
+      agentId: agent.id,
+      memory: memoryScope(agent, chat.id),
+      origin,
+      mode,
+      tainted: () => state.tainted,
+      ...(ownerText ? { ownerText } : {}),
+    }
     const guest = mode === "guest"
     const noTools = input.noTools || origin === "hook" || (guest && agent.guestTools === "none")
     const scope = input.resume ? input.resume.context.toolScope : input.toolScope
@@ -357,6 +378,15 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
         if (meta?.untrusted && !state.tainted) {
           rlog.info("turn tainted by an untrusted tool call", { tool: meta.name })
           state.tainted = true
+        }
+        // A tool's own rule (a message to a contact) asks first, and no per-agent
+        // "allow" can skip it: the tool knows what its args mean.
+        if (meta?.needsApproval) {
+          try {
+            if (meta.needsApproval(toolCall.input)) return "user-approval"
+          } catch {
+            return "user-approval"
+          }
         }
         const ask = needsApproval({
           class: meta?.class ?? "destructive",
@@ -498,7 +528,7 @@ export async function executeTurn(ctx: EngineCtx, input: ExecInput): Promise<Tur
             toolCallId: r.toolCallId,
             tool: r.toolName,
             toolClass: meta?.class ?? "destructive",
-            argsPreview: preview(labelFileRefs(db, r.input), 300),
+            argsPreview: approvalPreview(meta, r.input, () => preview(labelFileRefs(db, r.input), 300)),
             messages: [...modelMessages, ...response],
             context,
           },
@@ -582,6 +612,18 @@ function isToolChoiceViolation(e: unknown): boolean {
 
 // Jobs, smart reminders and flow prompt steps run with nobody watching (PLAN 7):
 // no destructive tools, and every write tool needs approval.
+// A tool's own preview (exact text, recipient) when it has one; fails closed to the JSON cut.
+function approvalPreview(meta: ToolMeta | undefined, input: unknown, fallback: () => string): string {
+  if (meta?.preview) {
+    try {
+      return meta.preview(input)
+    } catch {
+      // Fall through.
+    }
+  }
+  return fallback()
+}
+
 function unattended(origin: ResumeContext["originTrigger"]): boolean {
   return origin === "schedule" || origin === "reminder" || origin === "flow"
 }

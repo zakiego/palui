@@ -735,6 +735,69 @@ export const outbox = sqliteTable(
   (t) => [index("outbox_status_next").on(t.status, t.nextAttemptAt), index("outbox_chat").on(t.chatId)],
 )
 
+// --- Outbound messages (docs/design/outbound-messages.md) ---------------------------
+
+// ask: every message needs the owner's approval. allow: messages the owner asked
+// for himself skip it (set from the dashboard only).
+export type ContactPolicy = "ask" | "allow"
+
+// People an agent may message on the owner's behalf. Each agent has its own list
+// (PLAN 19), like instructions. Soft-deleted so the log keeps names.
+export const contacts = sqliteTable(
+  "contacts",
+  {
+    id: text("id").primaryKey(),
+    // The agent this contact belongs to; null means the default agent.
+    agentId: text("agent_id"),
+    name: text("name").notNull(),
+    channel: text("channel").$type<"whatsapp" | "telegram">().notNull(),
+    // WhatsApp digits ("6282200001001") or the Telegram chat's external id.
+    address: text("address").notNull(),
+    // The chat the outbox sends to. A new number gets a chat row with allowed=false.
+    chatId: text("chat_id").notNull(),
+    policy: text("policy").$type<ContactPolicy>().notNull().default("ask"),
+    note: text("note"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+    removedAt: integer("removed_at"),
+  },
+  (t) => [index("contacts_agent").on(t.agentId, t.removedAt), index("contacts_chat").on(t.chatId)],
+)
+
+export type OutboundStatus = "scheduled" | "firing" | "done" | "cancelled"
+
+// One row per send request: now (held for the undo window), at a time, or a series.
+// Every actual send is an outbox row with source "outbound:<id>".
+export const outboundMessages = sqliteTable(
+  "outbound_messages",
+  {
+    id: text("id").primaryKey(),
+    // The contact's agent, copied so a list per agent needs no join.
+    agentId: text("agent_id"),
+    contactId: text("contact_id").notNull(),
+    // The exact text that goes out, signature included.
+    text: text("text").notNull(),
+    origin: text("origin").$type<"chat" | "flow">().notNull(),
+    // The run that asked (chat) or the flow run id (flow).
+    originRef: text("origin_ref"),
+    approvedBy: text("approved_by").$type<"owner" | "policy" | "flow_version">().notNull(),
+    // The chat the request came from, for notices about it.
+    ownerChatId: text("owner_chat_id"),
+    // RRULE body without DTSTART for a series, null for a one-off.
+    rrule: text("rrule"),
+    tz: text("tz").notNull(),
+    // Wall-clock anchor in tz (ISO local, no offset).
+    localStart: text("local_start").notNull(),
+    // Next send time, UTC ms.
+    fireAt: integer("fire_at").notNull(),
+    status: text("status").$type<OutboundStatus>().notNull().default("scheduled"),
+    lastOutboxId: text("last_outbox_id"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [index("outbound_status_fire").on(t.status, t.fireAt), index("outbound_contact").on(t.contactId)],
+)
+
 // --- Events and settings -----------------------------------------------------------
 
 export type EventLevel = "debug" | "info" | "warn" | "error"

@@ -32,6 +32,14 @@ export const languageSchema = z.enum(["auto", "id", "en"])
 export const uiLanguageSchema = z.enum(["en", "id"])
 export const fallbackChannelSchema = z.enum(["telegram", "whatsapp", "none"])
 
+export const outboundSettingsSchema = z.object({
+  enabled: z.boolean(),
+  perContactPerDay: z.number().int().min(1).max(50),
+  perDay: z.number().int().min(1).max(200),
+  holdSeconds: z.number().int().min(0).max(120),
+  signature: z.string().trim().max(120),
+})
+
 // A patch of the Settings page keys. Every key is optional; objects are whole.
 export const settingsPatchSchema = z.object({
   timezone: timezoneSchema.optional(),

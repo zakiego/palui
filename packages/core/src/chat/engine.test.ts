@@ -25,9 +25,11 @@ import {
   toolsRuntime,
 } from "./testing"
 import { MODEL_OFF_TEXT } from "./turn"
+import { addContact, sendNow } from "../outbound/service"
 import { STALE_READ_NOTE } from "./context"
 import { turnCandidates } from "../attachments/service"
 import type { TurnInfo } from "../connectors/define"
+
 
 function ownTelegram(db: DB) {
   const { nonce } = createClaim(db, "telegram", 1)
@@ -1483,5 +1485,99 @@ describe("tool search", () => {
     expect(h.m.offered[0]).toHaveLength(6)
     expect(h.m.offered[0]).not.toContain("palui__search_tools")
     expect(promptText(h.m.prompts[0])).toContain("jadwal-sholat (3 tools)")
+  })
+})
+
+describe("tools that decide their own approval", () => {
+  function registry(sent: string[], seen: TurnInfo[], ask: boolean) {
+    return {
+      // The tool under test, built per turn so it sees TurnInfo.
+      send: (() => {
+        const rt = toolsRuntime("send", () => ({}))
+        const start = rt.start
+        return {
+          ...rt,
+          start: async (ctx: Parameters<typeof start>[0]) => {
+            const h = await start(ctx)
+            return {
+              ...h,
+              tools: async (turn: TurnInfo) => {
+                seen.push(turn)
+                return {
+                  msg: {
+                    tool: fnTool("m", (i) => void sent.push(String(i.text))),
+                    class: "write" as const,
+                    needsApproval: () => ask,
+                    preview: (i: unknown) => `Kirim ke Zaki:\n${String((i as { text: string }).text)}`,
+                  },
+                }
+              },
+            }
+          },
+        }
+      })(),
+    }
+  }
+
+  it("asks when needsApproval says so, with the tool's own preview", async () => {
+    const sent: string[] = []
+    const seen: TurnInfo[] = []
+    const h = await basic([callTool("send__msg", { text: "gue otw" }, "s1")], { registry: registry(sent, seen, true), rows: { send: "tools" } })
+    await h.engine.inbound(tgMessage("chat Zaki bilang gue otw"))
+    await h.engine.idle()
+    expect(sent).toEqual([])
+    expect(h.db.select().from(pendingApprovals).get()).toMatchObject({ tool: "send__msg", argsPreview: "Kirim ke Zaki:\ngue otw" })
+    expect(outboxTexts(h.db).at(-1)).toContain("Kirim ke Zaki:\ngue otw")
+    expect(seen[0]).toMatchObject({ origin: "message", mode: "owner", ownerText: "chat Zaki bilang gue otw" })
+    expect(seen[0]!.tainted!()).toBe(false)
+  })
+
+  it("asks even when the agent may run every tool without asking", async () => {
+    const sent: string[] = []
+    const seen: TurnInfo[] = []
+    const h = await basic([callTool("send__msg", { text: "gue otw" }, "s1")], { registry: registry(sent, seen, true), rows: { send: "tools" } })
+    setToolPermissions(h.db, getDefaultAgent(h.db).id, { allowAll: true })
+    await h.engine.inbound(tgMessage("chat Zaki bilang gue otw"))
+    await h.engine.idle()
+    expect(sent).toEqual([])
+    expect(h.db.select().from(pendingApprovals).get()).toMatchObject({ tool: "send__msg" })
+  })
+
+  it("runs without asking when needsApproval says no in an untainted owner turn", async () => {
+    const sent: string[] = []
+    const seen: TurnInfo[] = []
+    const h = await basic([callTool("send__msg", { text: "gue otw" }, "s1")], { registry: registry(sent, seen, false), rows: { send: "tools" } })
+    await h.engine.inbound(tgMessage("chat Zaki bilang gue otw"))
+    await h.engine.idle()
+    expect(sent).toEqual(["gue otw"])
+    expect(h.db.select().from(pendingApprovals).all()).toHaveLength(0)
+  })
+})
+
+describe("router: cancelling a message to a contact", () => {
+  async function held() {
+    const h = await basic()
+    await h.engine.inbound(tgMessage("init"))
+    await h.engine.idle()
+    const chat = h.db.select().from(chats).get()!
+    const c = addContact(h.db, { agentId: getDefaultAgent(h.db).id, name: "Zaki", phone: "082200001001" }, h.clock.now)
+    const r = sendNow(h.db, c, "otw", { origin: "chat", approvedBy: "owner", ownerChatId: chat.id, holdMs: 15_000 }, h.clock.now)
+    return { h, r }
+  }
+  const status = (db: DB, id: string) => db.select().from(outbox).where(eq(outbox.id, id)).get()!.status
+
+  it("a bare batal cancels the newest held send", async () => {
+    const { h, r } = await held()
+    await h.engine.inbound(tgMessage("batal"))
+    await h.engine.idle()
+    expect(status(h.db, r.outboxId)).toBe("cancelled")
+    expect(outboxTexts(h.db).at(-1)).toBe("Oke, pesan ke Zaki dibatalin.")
+  })
+
+  it("the cancel button cancels it", async () => {
+    const { h, r } = await held()
+    await h.engine.inbound(tgMessage("", { callback: { data: `ob:cancel:${r.row.id}` } }))
+    await h.engine.idle()
+    expect(status(h.db, r.outboxId)).toBe("cancelled")
   })
 })

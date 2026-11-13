@@ -12,7 +12,7 @@ import { D, H, MIN, gradientAvatar, type Kit } from "./kit"
 // Limits the dashboard enforces (the zod schemas in src/lib/fns). A value that
 // claims to be "at the limit" is checked against it, so the fixture can't
 // drift past what the forms accept.
-const LIMITS = { flowName: 80, flowDescription: 200, flowSteps: 40, flowTriggers: 8, flowError: 300, agentName: 40, agentSlug: 24, attachmentTitle: 200, attachmentDescription: 1000, attachmentFilename: 200, connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500, instructionTitle: 80, instructionBody: 1000, preferenceKey: 40, preferenceValue: 300, botUsername: 32 }
+const LIMITS = { flowName: 80, flowDescription: 200, flowSteps: 40, flowTriggers: 8, flowError: 300, agentName: 40, agentSlug: 24, attachmentTitle: 200, attachmentDescription: 1000, attachmentFilename: 200, connectorLabel: 80, connectorId: 63, jobName: 80, rrule: 300, reminderText: 500, contactName: 60, outboundText: 2000, contactNote: 200, hookName: 60, model: 120, persona: 8000, webMessage: 8000, toolName: 64, approvalArgs: 300, toolResult: 500, statusDetail: 300, jobResult: 500, instructionTitle: 80, instructionBody: 1000, preferenceKey: 40, preferenceValue: 300, botUsername: 32 }
 
 function within(value: string, limit: number): string {
   if (value.length > limit) throw new Error(`fixture value is ${value.length} characters, over the limit of ${limit}: ${value.slice(0, 40)}`)
@@ -494,6 +494,30 @@ export function worst(k: Kit) {
     { at: now - 11 * MIN, level: "error", connectorId: "mcp-northwind-industries-holdings-internal-knowledge-base-prod", kind: "status", message: `error: ${fill(`${STACK}\n`, 2000)}` },
   ]
   for (const e of events) k.event(e)
+
+  // --- outbound: the longest name, note and text, every send status, a removed contact ---
+  k.setting("outbound", { enabled: true, perContactPerDay: 50, perDay: 200, holdSeconds: 120, signature: within("(dikirim asisten Muhammad Zakiyuddin Munziri lewat Palui, balas ke nomor pribadinya ya)", 120) })
+  const longContact = k.chat("whatsapp", "6282200001001@s.whatsapp.net", within("Muhammad Fadhlurrahman Al-Banjari bin H. Abdurrahman Siddiq", LIMITS.contactName), { allowed: false })
+  k.contact(
+    longContact,
+    { name: within("Muhammad Fadhlurrahman Al-Banjari bin H. Abdurrahman Siddiq", LIMITS.contactName), address: "6282200001001", policy: "allow", note: within(fill("Adik ipar, kerja di Banjarbaru, jangan chat sebelum jam 7 pagi. ", LIMITS.contactNote), LIMITS.contactNote) },
+    [
+      { text: within(fill(`Halo, ini asisten Zaki. ${PARAGRAPH} `, LIMITS.outboundText), LIMITS.outboundText), status: "pending", at: now - 5_000, held: true, approvedBy: "policy" },
+      { text: "Zaki otw ya", status: "sent", at: now - 20_000, approvedBy: "policy" },
+      { text: "Pengingat arisan besok jam 10", status: "failed", at: now - 2 * H, error: within(fill(`${STACK.split("\n")[0]} `, 300), 300) },
+      { text: "Dibatalin", status: "cancelled", at: now - 3 * D, error: "cancelled by the owner" },
+      { text: "Zaki belum jawab check-in sholat Maghrib.", status: "sending", at: now - 1000, approvedBy: "flow_version" },
+    ],
+    [
+      { text: within(fill("Kabar mingguan: ", LIMITS.outboundText), LIMITS.outboundText), fireAt: now + 3 * D, rrule: within(RRULE_LONG, LIMITS.rrule) },
+      { text: "Jangan lupa jemput jam 8 ya", fireAt: now + 10 * H },
+    ],
+  )
+  k.contact(arabic, { name: "نور الهدى عبد الرحمن", address: "966500000000" }, [{ text: "مرحبا، زكي في الطريق", status: "sent", at: now - 31 * D }])
+  k.contact(christopher, { name: "Christopher Alexander Montgomery III", address: "1000000004", agentId: arisan }, [], [{ text: "Meeting moved to 3pm", fireAt: now + 2 * 365 * D }])
+  k.contact(single, { name: "J", address: "6281200000001" })
+  const gone = k.chat("whatsapp", "6281299999999@s.whatsapp.net", "Removed", { allowed: false })
+  k.contact(gone, { name: "Mantan kontak", address: "6281299999999", removed: true }, [{ text: "Pesan lama ke kontak yang udah dihapus", status: "sent", at: now - 12 * D }])
 
   // --- settings lists -----------------------------------------------------------
   k.passkey({ name: null, createdAt: null })

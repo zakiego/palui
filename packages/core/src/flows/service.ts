@@ -2,6 +2,8 @@
 // trigger rows derived from each version. The engine (engine.ts) runs them;
 // this module owns the rows. Every write that moves a due time calls
 // notifyScheduleChanged() so the scheduler re-arms at once.
+import { getDefaultAgent } from "../agents"
+import { findContact } from "../outbound/service"
 import { createHash } from "node:crypto"
 import { and, asc, desc, eq, inArray } from "drizzle-orm"
 import { chats, flowRuns, flows, flowStepRuns, flowTriggers, flowVersions, newId, pendingApprovals, type DB, type SourceCursor } from "@palui/db"
@@ -107,6 +109,16 @@ export function hashDefinition(def: FlowDefinition): string {
 
 // "own": the flow's chat or one of the owner's DMs (or the web chat). "allowed": a
 // chat the owner allowed (PLAN 19.2). false: anything else.
+// Message steps with `contact`: a saved contact by name or id.
+// Only the flow's own agent's contacts (PLAN 19); null is the default agent.
+export function contactResolver(db: DB, agentId: string | null | undefined): (ref: string) => { id: string; name: string } | null {
+  const agent = agentId ?? getDefaultAgent(db).id
+  return (ref) => {
+    const c = findContact(db, agent, ref)
+    return c ? { id: c.id, name: c.name } : null
+  }
+}
+
 export function chatAccess(db: DB, flowChatId: string): (chatId: string) => "own" | "allowed" | false {
   return (chatId) => {
     if (chatId === flowChatId) return "own"
@@ -227,11 +239,11 @@ export type SaveResult = {
   diff: string[]
 }
 
-function check(db: DB, chatId: string, definition: unknown, ctx: ValidateContext | undefined, selfName?: string) {
+function check(db: DB, chatId: string, definition: unknown, ctx: ValidateContext | undefined, selfName?: string, agentId?: string | null) {
   const names = listFlows(db, chatId)
     .map((f) => f.name)
     .filter((n) => n !== selfName)
-  const r = validateDefinition(definition, { chatId, chatAllowed: chatAccess(db, chatId), flowNames: [...names, ...(selfName ? [selfName] : [])], ...ctx })
+  const r = validateDefinition(definition, { chatId, chatAllowed: chatAccess(db, chatId), resolveContact: contactResolver(db, agentId), flowNames: [...names, ...(selfName ? [selfName] : [])], ...ctx })
   if (!r.ok || !r.definition) {
     const lines = r.problems.slice(0, 8).map((p) => `${p.path}: ${p.message}`)
     throw new FlowError(`The flow has ${r.problems.length} problem${r.problems.length === 1 ? "" : "s"}: ${lines.join(" | ")}`, r.problems)
@@ -240,7 +252,7 @@ function check(db: DB, chatId: string, definition: unknown, ctx: ValidateContext
 }
 
 export function createFlow(db: DB, input: SaveInput, now = Date.now()): SaveResult {
-  const r = check(db, input.chatId, input.definition, input.validate)
+  const r = check(db, input.chatId, input.definition, input.validate, undefined, input.agentId)
   const def = r.definition!
   if (!getChat(db, input.chatId)) throw new FlowError(`No chat ${input.chatId}.`)
   if (listFlows(db, input.chatId).length >= MAX_FLOWS_PER_CHAT) throw new FlowError(`This chat already has ${MAX_FLOWS_PER_CHAT} flows. Delete one first.`)
@@ -329,7 +341,7 @@ export function updateFlow(db: DB, id: string, input: UpdateInput, now = Date.no
   const curDef = definitionOf(cur)
   if (!input.definition && !input.patch) throw new FlowError("Pass a definition or a patch.")
   const raw = input.definition ?? applyPatch(curDef, input.patch)
-  const r = check(db, flow.chatId, raw, input.validate, flow.name)
+  const r = check(db, flow.chatId, raw, input.validate, flow.name, flow.agentId)
   const def = r.definition!
   const hash = hashDefinition(def)
   if (hash === cur.hash) return { flow, version: cur, changed: false, needsApproval: !writesApproved(cur), writeCalls: r.writeCalls, diff: [] }

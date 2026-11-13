@@ -8,6 +8,7 @@ import gcal from "./gcal/runtime"
 import hooks from "./hooks/runtime"
 import jobs from "./jobs/runtime"
 import mcp from "./mcp/runtime"
+import outbound from "./outbound/runtime"
 import notes from "./notes/runtime"
 import settings from "./settings/runtime"
 import recall from "./recall/runtime"
@@ -34,6 +35,7 @@ export const runtimes: Record<string, AnyRuntime> = {
   gcal,
   t3code,
   reminders,
+  outbound,
   flows,
   jobs,
   chats: chatHistory,

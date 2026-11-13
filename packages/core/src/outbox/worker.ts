@@ -9,6 +9,7 @@ import type { Logger } from "../log"
 import type { ChannelHandle, SendResult } from "../connectors/define"
 import { ownerChat } from "../connectors/rules"
 import { getSetting } from "../settings"
+import { outboundFailed } from "../outbound/service"
 import { onOutboxEnqueued, type OutboxRow } from "./enqueue"
 
 export const OUTBOX_BACKOFF_MS = [5_000, 30_000, 120_000, 600_000, 1_800_000]
@@ -74,7 +75,8 @@ export function rerouteChannelRows(db: DB, from: Channel, now = Date.now(), hand
   let moved = 0
   let cancelled = 0
   for (const r of rows) {
-    if (target) {
+    // A message to a contact never goes to the owner's chat instead.
+    if (target && !r.source.startsWith("outbound:")) {
       db.update(outbox)
         .set({ channel: target.channel, chatId: target.chatId, fallbackFrom: from, status: "pending", claimedAt: null, nextAttemptAt: now })
         .where(eq(outbox.id, r.id))
@@ -157,6 +159,7 @@ export function createOutboxWorker(opts: OutboxWorkerOptions) {
       .returning()
       .all()
     for (const r of rows) {
+      outboundFailed(db, r, now)
       logEvent(
         db,
         { connectorId: r.channel, kind: "outbox.failed", level: "error", message: `Gave up sending ${r.source} after ${r.attempts} attempt(s): ${r.error ?? "expired"}`, data: { outboxId: r.id } },
@@ -212,6 +215,11 @@ export function createOutboxWorker(opts: OutboxWorkerOptions) {
     const handle = row.connectorId ? opts.connector?.(row.connectorId) : opts.channel(row.channel)
     const chat = getChat(db, row.chatId)
     let timer: NodeJS.Timeout | undefined
+    // The kill switch holds at send time too, whatever enqueued the row.
+    if (row.source.startsWith("outbound:") && !getSetting(db, "outbound").enabled) {
+      db.update(outbox).set({ status: "cancelled", error: "outbound turned off", claimedAt: null }).where(eq(outbox.id, row.id)).run()
+      return "failed"
+    }
     try {
       if (!chat) throw new Error(`chat ${row.chatId} not found`)
       if (!handle) throw new Error(`channel ${row.connectorId ?? row.channel} isn't running`)

@@ -6,6 +6,7 @@ import { connectorFlowCaller } from "@palui/core/flows/call"
 import { createFlowEngine, SILENT_TOKEN as FLOW_SILENT, type PromptRequest, type PromptResponse } from "@palui/core/flows/engine"
 import { createJobRunner } from "@palui/core/jobs/runner"
 import { meterToBudget } from "@palui/core/models/meter"
+import { createOutboundScheduler } from "@palui/core/outbound/scheduler"
 import { reminderActions } from "@palui/core/reminders/actions"
 import { parseReminder } from "@palui/core/reminders/parse"
 import { createScheduler } from "@palui/core/reminders/scheduler"
@@ -66,7 +67,8 @@ export const buildDeps: DepsFactory = ({ db, engine, log, supervisor }) => {
     },
     // Smart reminders run their prompt as a turn in the reminder's chat.
     onSmartReminder: (r) => runSmartReminder((o) => engine.runTurn(o), r),
-    extensions: [flows],
+    // Scheduled messages to contacts (docs/design/outbound-messages.md).
+    extensions: [flows, createOutboundScheduler({ db, log: log.child({ component: "outbound" }) })],
   })
   const deps: EngineDeps = {
     reminderActions,

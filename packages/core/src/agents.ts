@@ -2,8 +2,8 @@
 // container and daily cap. Exactly one is the default (Palui), the owner's
 // personal agent; it never answers in a shared chat.
 import { createHash } from "node:crypto"
-import { asc, desc, eq, isNull, or, sql, type SQL } from "drizzle-orm"
-import { agents, chats, connectors, instructions, newId, type DB, type GuestTools, type OwnerPowers, type ToolPermission } from "@palui/db"
+import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm"
+import { agents, chats, connectors, contacts, instructions, newId, outbox, outboundMessages, type DB, type GuestTools, type OwnerPowers, type ToolPermission } from "@palui/db"
 import type { ChatRow } from "./chats"
 import { isOwner } from "./owner"
 import { getSetting } from "./settings"
@@ -348,6 +348,11 @@ export function deleteAgent(db: DB, id: string): boolean {
     // everyone), and pause until the owner makes them global or gives them a new agent.
     tx.update(connectors).set({ enabled: false }).where(eq(connectors.agentId, id)).run()
     tx.delete(instructions).where(eq(instructions.agentId, id)).run()
+    // Its contacts go with it, and nothing waiting is sent on its behalf.
+    tx.update(contacts).set({ removedAt: Date.now() }).where(and(eq(contacts.agentId, id), isNull(contacts.removedAt))).run()
+    const waiting = tx.select({ id: outboundMessages.id }).from(outboundMessages).where(eq(outboundMessages.agentId, id)).all().map((r) => `outbound:${r.id}`)
+    tx.update(outboundMessages).set({ status: "cancelled", updatedAt: Date.now() }).where(and(eq(outboundMessages.agentId, id), inArray(outboundMessages.status, ["scheduled", "firing"]))).run()
+    if (waiting.length) tx.update(outbox).set({ status: "cancelled", error: "agent deleted", claimedAt: null }).where(and(inArray(outbox.source, waiting), eq(outbox.status, "pending"))).run()
     tx.delete(agents).where(eq(agents.id, id)).run()
   })
   return true

@@ -99,6 +99,13 @@
       "when": 1794511440227,
       "tag": "0013_tranquil_starjammers",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1794544921010,
+      "tag": "0014_secret_starbolt",
+      "breakpoints": true
     }
   ]
 }

@@ -21,6 +21,7 @@ import { Route as AppConnectorsRouteImport } from './routes/_app/connectors'
 import { Route as AppFlowsRouteImport } from './routes/_app/flows'
 import { Route as AppJobsRouteImport } from './routes/_app/jobs'
 import { Route as AppNotesRouteImport } from './routes/_app/notes'
+import { Route as AppOutboundRouteImport } from './routes/_app/outbound'
 import { Route as AppRemindersRouteImport } from './routes/_app/reminders'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
@@ -94,6 +95,11 @@ const AppJobsRoute = AppJobsRouteImport.update({
 const AppNotesRoute = AppNotesRouteImport.update({
   id: '/notes',
   path: '/notes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOutboundRoute = AppOutboundRouteImport.update({
+  id: '/outbound',
+  path: '/outbound',
   getParentRoute: () => AppRoute,
 } as any)
 const AppRemindersRoute = AppRemindersRouteImport.update({
@@ -184,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/flows': typeof AppFlowsRoute
   '/jobs': typeof AppJobsRoute
   '/notes': typeof AppNotesRoute
+  '/outbound': typeof AppOutboundRoute
   '/reminders': typeof AppRemindersRoute
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -211,6 +218,7 @@ export interface FileRoutesByTo {
   '/flows': typeof AppFlowsRoute
   '/jobs': typeof AppJobsRoute
   '/notes': typeof AppNotesRoute
+  '/outbound': typeof AppOutboundRoute
   '/reminders': typeof AppRemindersRoute
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -241,6 +249,7 @@ export interface FileRoutesById {
   '/_app/flows': typeof AppFlowsRoute
   '/_app/jobs': typeof AppJobsRoute
   '/_app/notes': typeof AppNotesRoute
+  '/_app/outbound': typeof AppOutboundRoute
   '/_app/reminders': typeof AppRemindersRoute
   '/_app/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -272,6 +281,7 @@ export interface FileRouteTypes {
     | '/flows'
     | '/jobs'
     | '/notes'
+    | '/outbound'
     | '/reminders'
     | '/settings'
     | '/invite/$token'
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/flows'
     | '/jobs'
     | '/notes'
+    | '/outbound'
     | '/reminders'
     | '/settings'
     | '/invite/$token'
@@ -328,6 +339,7 @@ export interface FileRouteTypes {
     | '/_app/flows'
     | '/_app/jobs'
     | '/_app/notes'
+    | '/_app/outbound'
     | '/_app/reminders'
     | '/_app/settings'
     | '/invite/$token'
@@ -444,6 +456,13 @@ declare module '@tanstack/react-router' {
       path: '/notes'
       fullPath: '/notes'
       preLoaderRoute: typeof AppNotesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/outbound': {
+      id: '/_app/outbound'
+      path: '/outbound'
+      fullPath: '/outbound'
+      preLoaderRoute: typeof AppOutboundRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/reminders': {
@@ -563,6 +582,7 @@ interface AppRouteChildren {
   AppFlowsRoute: typeof AppFlowsRoute
   AppJobsRoute: typeof AppJobsRoute
   AppNotesRoute: typeof AppNotesRoute
+  AppOutboundRoute: typeof AppOutboundRoute
   AppRemindersRoute: typeof AppRemindersRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -582,6 +602,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFlowsRoute: AppFlowsRoute,
   AppJobsRoute: AppJobsRoute,
   AppNotesRoute: AppNotesRoute,
+  AppOutboundRoute: AppOutboundRoute,
   AppRemindersRoute: AppRemindersRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,

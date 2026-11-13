@@ -13,6 +13,7 @@
 // A step finishes in one transaction: its step row, its output into vars, any
 // outbox row, any flow state write and the cursor move. Nothing lives in memory,
 // so a restart only delays the next sweep.
+import { assertCanSend, finalText, getContact, OutboundError, sendNow } from "../outbound/service"
 import { getAgent, getDefaultAgent, memoryScope } from "../agents"
 import { and, desc, eq, inArray, isNotNull, isNull, lte, max, min, or, sql } from "drizzle-orm"
 import { flowRuns, flows, flowStepRuns, flowTriggers, newId, runs, toolCalls, type DB, type FlowPollState, type FlowRunStatus, type FlowSkipReason, type OutboxPayload } from "@palui/db"
@@ -121,7 +122,8 @@ type Transition = {
   flowTaint?: string[]
   taint?: string[]
   // `extra`: a re-ask or a missed note, which doesn't count toward the per-run message cap.
-  messages?: { chatId: string; payload: OutboxPayload; expiresAt?: number; extra?: boolean }[]
+  // `contactId`: a message to a saved contact, sent through the outbound service (its log and limits).
+  messages?: { chatId: string; payload: OutboxPayload; expiresAt?: number; extra?: boolean; contactId?: string }[]
   // An each step's child runs, inserted with the step (RFC 5.8).
   children?: { body: string; items: { item: unknown; index: number; key: string | null }[]; tainted: boolean }
   events?: { name: string; data: Record<string, unknown> }[]
@@ -691,6 +693,14 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
       let messagesSent = fresh.messagesSent
       for (const m of tr.messages ?? []) {
         if (c.dry) continue
+        if (m.contactId) {
+          const contact = getContact(db, m.contactId)
+          if (!contact) continue
+          const sent = sendNow(db, contact, m.payload.text, { origin: "flow", originRef: c.run.id, approvedBy: "flow_version", ownerChatId: c.flow.chatId, holdMs: 0 }, now)
+          outboxIds.push(sent.outboxId)
+          if (!m.extra) messagesSent++
+          continue
+        }
         const id = send(m.chatId, m.payload, runSource(c.run.id), now, m.expiresAt)
         if (id) outboxIds.push(id)
         if (!m.extra) messagesSent++
@@ -894,7 +904,42 @@ export function createFlowEngine(opts: FlowEngineOptions): FlowEngine {
     }
   }
 
+  // A message to a saved contact. The contact is the one the approved version named
+  // (its write call), never anything from run data.
+  function stepContactMessage(c: RunContext, step: Extract<FlowStep, { kind: "message" }>): Transition {
+    const call = (c.version.writeCalls as { stepId?: unknown; kind?: unknown; to?: unknown; label?: unknown }[]).find(
+      (w) => w.stepId === step.id && w.kind === "message" && typeof w.to === "string" && w.to.startsWith("contact:"),
+    ) as { to: string; label?: string } | undefined
+    if (!call) return onError(c, step, `Contact ${step.contact} isn't in this version's approved calls. Save the flow again.`, { status: "error" })
+    const contactId = call.to.slice("contact:".length)
+    if (c.run.messagesSent >= LIMITS.messagesPerRun) return onError(c, step, `More than ${LIMITS.messagesPerRun} messages in one run.`, { status: "error" })
+    if (!c.dry && !c.version.approvedAt) {
+      return { row: { status: "waiting", input: { contact: step.contact }, error: "This version isn't approved yet." }, then: { t: "wait", wait: { kind: "version", stepId: step.id }, wakeAt: null, status: "awaiting_approval", skipReason: "not_approved" } }
+    }
+    const contact = getContact(db, contactId)
+    if (!c.dry && (!contact || contact.removedAt)) return onError(c, step, `Contact ${call.label ?? step.contact} was removed.`, { status: "error" })
+    // Tool output or webhook data never goes to someone else.
+    if (valueTainted(c.run.taint ?? [], step.text)) return onError(c, step, "A message to a contact can't include data from tools or webhooks (tainted). Use fixed text.", { status: "error" })
+    const text = renderText(step.text, envOf(c), taintCheck(c))
+    const output = { text, contact: call.label ?? step.contact }
+    if (c.dry) return { row: { status: "stubbed", input: { contact: step.contact }, output }, output, then: { t: "goto", to: defaultNext(c.def, step.id) } }
+    try {
+      assertCanSend(db, contact!, c.now)
+      finalText(db, text)
+    } catch (e) {
+      if (e instanceof OutboundError) return onError(c, step, e.message, { status: "error" })
+      throw e
+    }
+    return {
+      row: { status: "ok", input: { contact: step.contact }, output },
+      output,
+      messages: [{ chatId: contact!.chatId, payload: { text, format: "plain" }, contactId }],
+      then: { t: "goto", to: defaultNext(c.def, step.id) },
+    }
+  }
+
   function stepMessage(c: RunContext, step: Extract<FlowStep, { kind: "message" }>): Transition {
+    if (step.contact) return stepContactMessage(c, step)
     const chatId = step.to ?? c.flow.chatId
     if (c.run.messagesSent >= LIMITS.messagesPerRun) return onError(c, step, `More than ${LIMITS.messagesPerRun} messages in one run.`, { status: "error" })
     if (!c.dry && !getChat(db, chatId)) return onError(c, step, `Chat ${chatId} no longer exists.`, { status: "error" })

@@ -127,4 +127,11 @@ export function demo(k: Kit) {
   k.attachment({ chatId: wa.id, title: "Tiket pesawat BDJ-CGK 12 Des", description: "Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.", kind: "pdf", filename: "e-ticket-XKQ9PL.pdf", size: 184_320, createdAt: now - 3 * H })
   k.attachment({ chatId: tg.id, title: "KTP Zaki", description: "Foto KTP, berlaku seumur hidup.", kind: "png", size: 412_000, createdAt: now - 26 * H })
   k.attachment({ chatId: tg.id, title: "Struk servis motor", description: "Bengkel resmi Banjarbaru, ganti oli dan kampas rem, Rp 385.000.", kind: "pdf", filename: "struk_servis_2026-11-01.pdf", size: 96_000, createdAt: now - 9 * D })
+  // Outbound: one contact on Always allow, one on Always ask.
+  const adik = k.chat("whatsapp", "6282200001001@s.whatsapp.net", "Zaki", { allowed: false })
+  k.contact(adik, { name: "Zaki", address: "6282200001001", policy: "allow", note: "Adik" }, [
+    { text: "Halo, ini asisten Zaki. Zaki lagi otw ya.", status: "sent", at: now - 40 * MIN, approvedBy: "policy" },
+  ], [{ text: "Halo, ini asisten Zaki. Ingetin jemput jam 8 ya.", fireAt: now + 6 * H }])
+  const ibu = k.chat("whatsapp", "6281111111111@s.whatsapp.net", "Ibu", { allowed: false })
+  k.contact(ibu, { name: "Ibu", address: "6281111111111" }, [{ text: "Bu, Zaki pulang Jumat ya.", status: "sent", at: now - 2 * D }], [{ text: "Kabar mingguan dari Zaki.", fireAt: now + 2 * D, rrule: "FREQ=WEEKLY;BYDAY=FR" }])
 }

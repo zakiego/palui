@@ -109,6 +109,9 @@ export const messageStepSchema = z.object({
   text: text(4000),
   // A literal chat id of another chat the owner owns or allowed. Never a template.
   to: text(80).optional(),
+  // A saved contact (docs/design/outbound-messages.md), by name or id. Literal,
+  // fixed when the version is approved. Not together with `to`.
+  contact: text(80).optional(),
 })
 
 // When a check-in stops waiting, up to a week out:

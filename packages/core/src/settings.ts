@@ -38,6 +38,20 @@ export type Settings = {
   // The commit the runtime last started with (from build-info.json). Null until a
   // build that knows its commit runs.
   lastRunCommit: string | null
+  // Messages to contacts on the owner's behalf (docs/design/outbound-messages.md).
+  outbound: OutboundSettings
+}
+
+export type OutboundSettings = {
+  // The kill switch: off refuses new sends and cancels the waiting ones.
+  enabled: boolean
+  // Rolling 24 hours, cancelled sends don't count.
+  perContactPerDay: number
+  perDay: number
+  // "Now" sends wait this long so the owner can cancel them.
+  holdSeconds: number
+  // Appended on its own line when set.
+  signature: string
 }
 
 export const DEFAULT_PERSONA = `Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.
@@ -78,6 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
   turnsPausedUntil: null,
   turnsPausedReason: null,
   firstRun: { saidHi: false, dismissed: false },
+  outbound: { enabled: true, perContactPerDay: 5, perDay: 20, holdSeconds: 15, signature: "" },
   deployNoticeChats: [],
   lastRunVersion: null,
   lastRunCommit: null,

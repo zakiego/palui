@@ -43,6 +43,8 @@ const PRODUCT_TABLES = [
   schema.toolCalls,
   schema.pendingApprovals,
   schema.reminders,
+  schema.contacts,
+  schema.outboundMessages,
   schema.jobs,
   schema.routines,
   schema.routineOccurrences,

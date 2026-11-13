@@ -7,6 +7,7 @@ import { agentForTelegramConnector } from "../agents"
 import { askedIn, pendingForChat } from "../approvals/store"
 import { ensureChat, findChat, type ChatRow } from "../chats"
 import { isOwner } from "../owner"
+import { cancelOutbound, getOutbound, heldFromNotice, newestHeld } from "../outbound/service"
 import type { InboundMessage } from "../connectors/define"
 import { COMMANDS, type CommandName } from "./command-names"
 import type { StoredContent } from "./context"
@@ -160,6 +161,8 @@ export async function route(i: RouteInput): Promise<Route> {
     if (m) return { kind: "approval", approvalId: m[2]!, approved: m[1] === "approve" }
     const s = /^connector:(on|off):(.+)$/.exec(cb)
     if (s) return { kind: "command", name: "connectors", args: [s[1]!, s[2]!] }
+    const ob = /^ob:cancel:(.+)$/.exec(cb)
+    if (ob) return { kind: "reminder", reply: cancelHeld(i.db, ob[1]!, i.chat.id, i.now) }
     if (cb.startsWith("rem:") && i.reminderActions) {
       const reply = await i.reminderActions.fromCallback(i.db, cb, i.chat.id, i.now)
       if (reply !== null) return { kind: "reminder", reply }
@@ -184,6 +187,11 @@ export async function route(i: RouteInput): Promise<Route> {
       const batch = pending.filter((p) => p.runId === newest).map((p) => p.id)
       return { kind: "approval", approvalId: batch[0]!, approved: yn, batch }
     }
+    // "batal" with no approval waiting: a message to a contact still in its undo window.
+    if (yn === false) {
+      const held = i.replyToChannelMsgId ? heldFromNotice(i.db, i.chat.id, i.replyToChannelMsgId) : newestHeld(i.db, i.chat.id, i.now)?.id
+      if (held) return { kind: "reminder", reply: cancelHeld(i.db, held, i.chat.id, i.now) }
+    }
   }
 
   const cmd = parseCommand(i.text)
@@ -203,4 +211,11 @@ export async function route(i: RouteInput): Promise<Route> {
   }
   if (!i.text.trim() && !(i.content.media ?? []).length) return { kind: "ignore", reason: "Empty message." }
   return { kind: "turn" }
+}
+
+// Only the chat that asked for a message to a contact can cancel it.
+function cancelHeld(db: DB, outboundId: string, chatId: string, now: number): string {
+  const row = getOutbound(db, outboundId)
+  if (!row || row.ownerChatId !== chatId) return "Pesan itu nggak ketemu di chat ini."
+  return cancelOutbound(db, outboundId, now).message
 }

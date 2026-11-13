@@ -9,6 +9,7 @@ import gcal from "./gcal/manifest"
 import hooks from "./hooks/manifest"
 import jobs from "./jobs/manifest"
 import mcp from "./mcp/manifest"
+import outbound from "./outbound/manifest"
 import notes from "./notes/manifest"
 import settings from "./settings/manifest"
 import recall from "./recall/manifest"
@@ -36,6 +37,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   gcal,
   t3code,
   reminders,
+  outbound,
   flows,
   jobs,
   chats: chatHistory,

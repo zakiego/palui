@@ -2,6 +2,7 @@
 // same tables the dashboard reads, so a fixture tests the real queries and
 // components, never a mocked shape.
 import { ensureChat, ensureWebChat, type ChatRow } from "@palui/core/chats"
+import { getDefaultAgent } from "@palui/core/agents"
 import { masterKey } from "@palui/core/config"
 import { saveAttachment } from "@palui/core/attachments/service"
 import { createShare } from "@palui/core/attachments/shares"
@@ -30,6 +31,9 @@ import {
   reminders,
   runs,
   schema,
+  contacts,
+  outbox,
+  outboundMessages,
   toolCalls,
   type Channel,
   type ConnectorStatus,
@@ -160,6 +164,36 @@ export function createKit(db: DB, now = Date.now()) {
 
     reminder(values: Omit<typeof reminders.$inferInsert, "id" | "scheduledFor" | "localStart" | "createdAt" | "updatedAt"> & { updatedAt?: number }) {
       db.insert(reminders).values({ id: newId("rem"), scheduledFor: values.fireAt, localStart: "2026-11-11T09:00:00", createdAt: now, updatedAt: now, ...values }).run()
+    },
+
+    // A contact plus the messages sent to it: `sends` become outbox rows (the log),
+    // `scheduled` become waiting outbound rows.
+    contact(
+      chat: ChatRow,
+      values: { name: string; address: string; policy?: "ask" | "allow"; note?: string | null; removed?: boolean; agentId?: string },
+      sends: { text: string; status: "pending" | "sending" | "sent" | "failed" | "cancelled"; at: number; error?: string | null; approvedBy?: "owner" | "policy" | "flow_version"; held?: boolean }[] = [],
+      scheduled: { text: string; fireAt: number; rrule?: string | null }[] = [],
+    ) {
+      const id = newId("con")
+      db.insert(contacts)
+        .values({ id, agentId: values.agentId ?? getDefaultAgent(db).id, name: values.name, channel: chat.channel === "telegram" ? "telegram" : "whatsapp", address: values.address, chatId: chat.id, policy: values.policy ?? "ask", note: values.note ?? null, createdAt: now, updatedAt: now, removedAt: values.removed ? now : null })
+        .run()
+      for (const s of sends) {
+        const obm = newId("obm")
+        const sendAt = s.held ? now + 10_000 : s.at
+        db.insert(outboundMessages)
+          .values({ id: obm, agentId: values.agentId ?? getDefaultAgent(db).id, contactId: id, text: s.text, origin: s.approvedBy === "flow_version" ? "flow" : "chat", approvedBy: s.approvedBy ?? "owner", tz: "Asia/Makassar", localStart: "2026-11-11T09:00", fireAt: sendAt, status: "done", createdAt: s.at, updatedAt: s.at })
+          .run()
+        db.insert(outbox)
+          .values({ id: newId("out"), chatId: chat.id, channel: chat.channel, payload: { text: s.text, format: "plain" }, status: s.status, attempts: s.status === "failed" ? 6 : 0, nextAttemptAt: sendAt, source: `outbound:${obm}`, error: s.error ?? null, createdAt: s.at, sentAt: s.status === "sent" ? s.at : null })
+          .run()
+      }
+      for (const s of scheduled) {
+        db.insert(outboundMessages)
+          .values({ id: newId("obm"), agentId: values.agentId ?? getDefaultAgent(db).id, contactId: id, text: s.text, origin: "chat", approvedBy: "owner", rrule: s.rrule ?? null, tz: "Asia/Makassar", localStart: "2026-11-11T09:00", fireAt: s.fireAt, status: "scheduled", createdAt: now, updatedAt: now })
+          .run()
+      }
+      return id
     },
 
     job(values: Omit<typeof jobs.$inferInsert, "id" | "localStart" | "createdAt" | "updatedAt"> & { createdAt?: number }) {
