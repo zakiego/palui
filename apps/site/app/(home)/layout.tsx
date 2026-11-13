@@ -1,15 +1,17 @@
 import Link from "next/link"
 import { MARK_TILE, PaluiFace } from "@/components/palui-mark"
+import { geistMono, inter } from "@/lib/landing-fonts"
 import { appName } from "@/lib/shared"
 import "@/components/landing/landing.css"
 
 // The landing keeps its own chrome instead of Fumadocs' HomeLayout: a glass
 // bar that stays at the top with the brand and one link to the docs, and a
 // one-line footer. It's always dark (`dark` keeps any shared token on the dark
-// ramp, landing.css does the rest).
+// ramp, landing.css does the rest). Inter and Geist Mono load here, so the
+// docs never fetch them.
 export default function Layout({ children }: LayoutProps<"/">) {
   return (
-    <div className="dark lp-root">
+    <div className={`${inter.variable} ${geistMono.variable} dark lp-root`}>
       <header className="lp-header">
         <div className="lp-header-in">
           <Link href="/" className="lp-brand">

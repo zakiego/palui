@@ -8,6 +8,6 @@ export function GET() {
     kicker: "by Zaki",
     mascot: true,
     title: "An agent friend\nyou host yourself",
-    description: "A simple, friendly agent that keeps you company",
+    description: "It remembers things, reminds you on time and runs your tools",
   })
 }

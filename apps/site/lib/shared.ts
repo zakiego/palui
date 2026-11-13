@@ -7,7 +7,7 @@ export const homeTitle = `${appName}: an agent friend you host yourself`
 export const siteDescription =
   "A self-hosted AI agent that remembers things, reminds you on time and runs your tools."
 export const siteImage = {
-  url: "/og.png?v=3",
+  url: "/og.png?v=4",
   width: 1200,
   height: 630,
   alt: "Palui Agent: an agent friend you host yourself",

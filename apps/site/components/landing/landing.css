@@ -1,37 +1,46 @@
 /* The landing page. Everything is scoped under .lp-root, which is always dark
-   whatever theme the docs are set to. Neutrals do all the work: black and
-   grays with no hue, and white for anything you press. There is no accent
-   color, no colored glow and no gradient text. A gradient only ever fades a
-   hairline or lights the top of the hero's frame, in white at a low alpha.
-   Text is never darker than --lp-faint: text 16.9:1, dim 7.7:1, faint 5.7:1.
-   Panels take their radius from the site's steps (6, 8, 10, 14px); buttons
-   and the nav link are pills. */
+   whatever theme the docs are set to. It wears the dashboard's night tokens
+   (apps/app/src/styles/app.css, after Linear): #08090a and its panel steps,
+   Inter at 510 and 590, Geist Mono for values a machine wrote. Neutrals do
+   all the work, and white is for anything you press. One indigo marks focus,
+   selection and a switch that's on; green marks a finished step, as in the
+   dashboard. No colored glow and no gradient text. A gradient only ever
+   fades a hairline or lights the top of the hero's frame, in white at a low
+   alpha. Text is never darker than --lp-faint: text 18.7:1, dim and faint
+   6.1:1 (the dashboard's muted).
+   Panels take the dashboard's radius steps (6, 8, 12px); buttons, the nav
+   link and switches are pills. */
 
 .lp-root {
-  --lp-bg: #0a0a0a;
-  --lp-surface: #111111;
-  --lp-raise: #1a1a1a;
-  --lp-bar: #0d0d0d;
-  --lp-line: #272727;
-  --lp-line-soft: #1c1c1c;
-  --lp-text: #ededed;
-  --lp-dim: #a1a1a1;
-  --lp-faint: #8a8a8a;
+  --lp-bg: #08090a;
+  --lp-surface: #0f1011;
+  --lp-raise: #141516;
+  --lp-line: #23252a;
+  --lp-line-soft: #1c1c1f;
+  --lp-fill-hover: #232326;
+  --lp-line-strong: #34343a;
+  --lp-edge: #62666d;
+  --lp-text: #f7f8f8;
+  --lp-dim: #8a8f98;
+  --lp-faint: #8a8f98;
   --lp-accent: #ffffff;
   --lp-accent-hover: #d9d9d9;
-  --lp-accent-ink: #0a0a0a;
-  /* The landing's buttons rest a step under white and go white on hover. */
-  --lp-btn: #e6e6e6;
+  --lp-accent-ink: #08090a;
+  /* The landing's buttons rest a step under white and go white on hover,
+     the dashboard's night primary. */
+  --lp-btn: #e5e5e6;
+  --lp-indigo: #5e6ad2;
+  --lp-done: #4cb782;
   /* Hairlines, as white at an alpha. */
   --lp-hair: rgb(255 255 255 / 0.08);
   --lp-hair-strong: rgb(255 255 255 / 0.14);
   --lp-ease: cubic-bezier(0.23, 1, 0.32, 1);
   /* easeInOutSine, for things that swing back and forth. */
   --lp-sine: cubic-bezier(0.37, 0, 0.63, 1);
-  --lp-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
-  --lp-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --lp-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --lp-sans: var(--font-inter), -apple-system, system-ui, "Segoe UI", sans-serif;
   /* The site-wide focus outline reads this. */
-  --focus-ring: var(--lp-accent);
+  --focus-ring: var(--lp-indigo);
   /* shadcn components on the landing take the landing's own colors. */
   --primary: var(--lp-accent);
   --primary-foreground: var(--lp-accent-ink);
@@ -45,13 +54,17 @@
   background: var(--lp-bg);
   color: var(--lp-text);
   font-family: var(--lp-sans);
+  /* Inter's single-storey alternates, the cut the dashboard sets. */
+  font-feature-settings: "cv01", "ss03";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* No light band when a phone overscrolls past the landing, and a focused
    link never ends up under the bar. */
 html:has(.lp-root),
 html:has(.lp-root) body {
-  background: #0a0a0a;
+  background: #08090a;
   color-scheme: dark;
 }
 html:has(.lp-root) {
@@ -59,8 +72,8 @@ html:has(.lp-root) {
 }
 
 .lp-root ::selection {
-  background: #3a3a3a;
-  color: var(--lp-text);
+  background: color-mix(in lch, var(--lp-indigo), black 10%);
+  color: #ffffff;
 }
 
 /* ------------------------------------------------------------- header
@@ -71,7 +84,7 @@ html:has(.lp-root) {
   z-index: 30;
   width: 100%;
   border-bottom: 1px solid var(--lp-hair);
-  background: rgb(10 10 10 / 0.8);
+  background: rgb(8 9 10 / 0.8);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
 }
@@ -104,7 +117,7 @@ html:has(.lp-root) {
   min-height: 32px;
   border-radius: 6px;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 590;
   letter-spacing: -0.01em;
 }
 .lp-mark {
@@ -176,15 +189,14 @@ html:has(.lp-root) {
   align-items: flex-start;
 }
 .lp-h1 {
-  /* 17ch holds "you host yourself" and breaks the line before it. */
-  max-width: 17ch;
+  /* 14ch holds "you host yourself" and breaks the line before it. */
+  max-width: 14ch;
   /* Pulled 2px left, so the A's stem lines up with the text under it. */
   margin: 0 0 0 -2px;
-  font-family: var(--lp-mono);
-  font-size: clamp(2.125rem, 1.2rem + 4vw, 4rem);
-  font-weight: 500;
-  line-height: 1.04;
-  letter-spacing: -0.045em;
+  font-size: clamp(2.375rem, 1.4rem + 4vw, 4rem);
+  font-weight: 510;
+  line-height: 1.05;
+  letter-spacing: -0.022em;
 }
 .lp-word {
   display: inline-block;
@@ -212,7 +224,7 @@ html:has(.lp-root) {
   background: var(--lp-btn);
   color: var(--lp-accent-ink);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 510;
   transition:
     transform 140ms var(--lp-ease),
     background-color 120ms var(--lp-ease);
@@ -251,7 +263,7 @@ html:has(.lp-root) {
   align-items: center;
   width: 100%;
   padding: 20px 16px 8px;
-  border-radius: 14px 14px 0 0;
+  border-radius: 12px 12px 0 0;
   background: radial-gradient(80% 60% at 50% 0%, rgb(255 255 255 / 0.055), transparent 72%);
 }
 /* The frame's hairline: a ring cut out of a filled box with a mask, bright
@@ -323,7 +335,7 @@ html:has(.lp-root) {
   max-width: 440px;
   height: 48px;
   border-color: var(--lp-hair-strong);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--lp-surface);
   font-size: 15px;
 }
@@ -336,7 +348,6 @@ html:has(.lp-root) {
   gap: 8px;
   height: 20px;
   margin: 14px 0 0;
-  font-family: var(--lp-mono);
   font-size: 13px;
   opacity: 0;
   transform: translateY(4px);
@@ -399,11 +410,11 @@ html:has(.lp-root) {
   width: 78px;
   height: 68px;
   border: 1px solid var(--lp-line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--lp-surface);
   color: var(--lp-faint);
-  font-family: var(--lp-mono);
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 510;
   white-space: nowrap;
   transition:
     color 300ms var(--lp-ease),
@@ -533,11 +544,10 @@ html:has(.lp-root) {
 }
 .lp-h2 {
   margin: 0 0 28px;
-  font-family: var(--lp-mono);
-  font-size: clamp(1.625rem, 1.1rem + 2.2vw, 2.75rem);
-  font-weight: 500;
+  font-size: clamp(1.75rem, 1.2rem + 2.2vw, 3rem);
+  font-weight: 510;
   line-height: 1.08;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.022em;
 }
 /* Two-tone, in place of a subtitle. */
 .lp-h2-dim {
@@ -553,7 +563,7 @@ html:has(.lp-root) {
   gap: 1px;
   overflow: hidden;
   border: 1px solid var(--lp-line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--lp-line);
 }
 .lp-card {
@@ -567,7 +577,7 @@ html:has(.lp-root) {
 .lp-card-title {
   margin: 0;
   font-size: 17px;
-  font-weight: 500;
+  font-weight: 510;
   letter-spacing: -0.01em;
 }
 .lp-card-text {
@@ -594,7 +604,7 @@ html:has(.lp-root) {
 .lp-inset {
   width: 100%;
   border: 1px solid var(--lp-line);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--lp-surface);
   font-size: 14px;
   line-height: 1.45;
@@ -615,18 +625,18 @@ html:has(.lp-root) {
   flex: none;
   width: 14px;
   height: 14px;
-  border: 1.5px solid #6a6a6a;
+  border: 1.5px solid var(--lp-edge);
   border-radius: 50%;
 }
 .lp-status[data-state="active"] {
-  border-color: #3a3a3a;
+  border-color: var(--lp-line-strong);
   border-top-color: var(--lp-text);
 }
 .lp-status-done {
   flex: none;
   width: 14px;
   height: 14px;
-  color: var(--lp-text);
+  color: var(--lp-done);
 }
 .lp-actions {
   display: inline-flex;
@@ -639,7 +649,7 @@ html:has(.lp-root) {
   padding: 0 10px;
   border-radius: 6px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 510;
   transition:
     transform 140ms var(--lp-ease),
     background-color 140ms var(--lp-ease);
@@ -649,7 +659,7 @@ html:has(.lp-root) {
   color: var(--lp-accent-ink);
 }
 .lp-btn-no {
-  box-shadow: inset 0 0 0 1px #3a3a3a;
+  box-shadow: inset 0 0 0 1px var(--lp-line-strong);
   color: var(--lp-dim);
 }
 .lp-btn[data-pressed] {
@@ -674,7 +684,7 @@ html:has(.lp-root) {
   gap: 10px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--lp-line);
-  font-weight: 500;
+  font-weight: 510;
 }
 /* A fixed height, filled from the top, so nothing already on screen moves
    when the next message arrives. */
@@ -689,7 +699,7 @@ html:has(.lp-root) {
   margin: 0;
   max-width: 86%;
   padding: 8px 12px;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 .lp-bubble-me {
   align-self: flex-end;
@@ -698,7 +708,7 @@ html:has(.lp-root) {
 }
 .lp-bubble-agent {
   align-self: flex-start;
-  background: #1f1f1f;
+  background: var(--lp-line-soft);
 }
 .lp-step {
   align-self: flex-start;
@@ -712,7 +722,6 @@ html:has(.lp-root) {
   border: 1px solid var(--lp-line);
   border-radius: 8px;
   color: var(--lp-dim);
-  font-family: var(--lp-mono);
   font-size: 13px;
 }
 .lp-step > svg:first-child {
@@ -741,7 +750,7 @@ html:has(.lp-root) {
   border-bottom: 1px solid var(--lp-line);
 }
 .lp-run-title {
-  font-weight: 500;
+  font-weight: 510;
 }
 .lp-run-meta,
 .lp-run-kind,
@@ -811,7 +820,7 @@ html:has(.lp-root) {
   gap: 10px;
   padding: 10px 12px;
   border: 1px solid var(--lp-line);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--lp-surface);
   color: var(--lp-dim);
   font-size: 14px;
@@ -850,7 +859,7 @@ html:has(.lp-root) {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: #1f1f1f;
+  background: var(--lp-line-soft);
 }
 .lp-bell svg {
   width: 16px;
@@ -860,7 +869,7 @@ html:has(.lp-root) {
 .lp-reminder-title {
   flex: 1;
   min-width: 0;
-  font-weight: 500;
+  font-weight: 510;
 }
 .lp-reminder-time {
   color: var(--lp-dim);
@@ -919,17 +928,17 @@ html:has(.lp-root) {
 .lp-kind[data-on] {
   color: var(--lp-text);
 }
-/* Off is a gray track with the thumb on the left, on is a white track with
-   the thumb on the right. */
+/* The dashboard's switch: off is a gray track with the thumb on the left,
+   on is the indigo track with the thumb on the right. */
 .lp-switch {
   flex: none;
   position: relative;
   width: 32px;
   height: 20px;
-  border-radius: 10px;
-  background: #2a2a2a;
+  border-radius: 9999px;
+  background: var(--lp-fill-hover);
   /* The ring gives the off track an edge you can see against the page. */
-  box-shadow: inset 0 0 0 1px #6a6a6a;
+  box-shadow: inset 0 0 0 1px var(--lp-edge);
   transition: background-color 200ms var(--lp-ease);
 }
 .lp-switch::after {
@@ -946,12 +955,12 @@ html:has(.lp-root) {
     background-color 200ms var(--lp-ease);
 }
 .lp-kind[data-on] .lp-switch {
-  background: var(--lp-btn);
+  background: var(--lp-indigo);
   box-shadow: none;
 }
 .lp-kind[data-on] .lp-switch::after {
   transform: translateX(12px);
-  background: var(--lp-accent-ink);
+  background: #ffffff;
 }
 
 /* Terminal: the two commands. Tall enough for the second one to wrap on a
@@ -1021,7 +1030,6 @@ html:has(.lp-root) {
   padding-top: 12px;
   padding-bottom: 16px;
   color: var(--lp-faint);
-  font-family: var(--lp-mono);
   font-size: 13px;
 }
 .lp-footer a {
