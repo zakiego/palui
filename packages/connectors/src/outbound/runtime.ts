@@ -53,8 +53,12 @@ const sendInput = z.object({
     .min(1)
     .max(1800)
     .describe(
-      "The exact message the recipient gets, written to them in the owner's language. It arrives from Palui's own number, not the owner's, so say who it's from when it isn't obvious (\"Halo, ini asisten Zaki. Zaki lagi otw ya\"). The owner approves this exact text.",
+      "The message the recipient gets, written to them in the owner's language. It arrives from Palui's own number, not the owner's, so say who it's from when it isn't obvious (\"Halo, ini asisten Zaki. Zaki lagi otw ya\"). Don't add a signature or a \"pesan otomatis\" line: Palui appends the owner's signature after it. The owner approves the text with the signature.",
     ),
+  signature: z
+    .boolean()
+    .optional()
+    .describe("Leave this out: the signature is added automatically. Set false only when the owner explicitly asked for this message to go without the signature."),
   localDateTime: localDateTime.optional(),
   rrule: z
     .string()
@@ -192,11 +196,12 @@ export function outboundTools(db: DB, turn: TurnInfo, clock: () => number = () =
     const who = r.kind === "saved" ? contactLabel(r.contact) : r.kind === "new" ? `${r.name} (${formatPhone(r.phone)}), kontak baru` : input.to
     let text: string
     try {
-      text = finalText(db, input.text)
+      text = finalText(db, input.text, { signature: input.signature })
     } catch {
       text = input.text
     }
-    return `Kirim pesan ke ${who}\nKapan: ${whenText(db, turn, input, clock())}\nIsi pesan:\n${text}`
+    const unsigned = input.signature === false && outboundSettings(db).signatureOn ? "\nTanpa tanda tangan" : ""
+    return `Kirim pesan ke ${who}\nKapan: ${whenText(db, turn, input, clock())}${unsigned}\nIsi pesan:\n${text}`
   }
 
   return {
@@ -225,7 +230,13 @@ export function outboundTools(db: DB, turn: TurnInfo, clock: () => number = () =
             } else {
               contact = r.contact
             }
-            const meta = { origin: "chat" as const, originRef: turn.runId, approvedBy: approved ? ("owner" as const) : ("policy" as const), ownerChatId: turn.chatId }
+            const meta = {
+              origin: "chat" as const,
+              originRef: turn.runId,
+              approvedBy: approved ? ("owner" as const) : ("policy" as const),
+              ownerChatId: turn.chatId,
+              signature: input.signature,
+            }
             if (input.localDateTime) {
               const row = scheduleSend(db, contact, input.text, { localStart: input.localDateTime, tz: zoneFor(db, turn, input.tz), rrule: input.rrule ?? null }, meta, now)
               const when = row.rrule ? describeRecurrence({ rrule: row.rrule, tz: row.tz, localStart: row.localStart }, now) : formatWhen(row.fireAt, row.tz, now)
