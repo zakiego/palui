@@ -6,7 +6,7 @@ export default defineManifest({
   kind: "skill",
   name: "Flows",
   icon: "workflow",
-  summary: "Automations Palui builds from chat: triggers plus steps that read tools, decide, ask and send.",
+  summary: "Automations built from chat.",
   description:
     "A flow is a small automation: one or more triggers (a schedule, a webhook, a chat command, a value that changes, another flow's event, or a manual run) and a list of steps (call a tool, branch on a condition, set a variable, send a message, ask a check-in, wait, run a prompt, or repeat for each item in a list). Steps pass data with templates and decide with simple conditions, so nothing calls the model unless a step asks for it, and every run logs what each step saw and did. Ask in chat (\"tiap pagi kirim jadwal sholat, cuaca sama pengingat hari ini\") and Palui builds it, dry-runs it, and shows you the result before saving.",
   builtin: true,

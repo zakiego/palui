@@ -2,7 +2,8 @@
 // (tokens per day, model, chat and job). No dollar figures: CLIProxyAPI has no
 // usage stats and subscriptions have no per-token cost.
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router"
-import { ActivityIcon, BarChart3Icon, HistoryIcon } from "lucide-react"
+import { ActivityIcon, BarChart3Icon, BugIcon, HistoryIcon, InfoIcon } from "lucide-react"
+import type { ReactNode } from "react"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { z } from "zod"
 
@@ -10,7 +11,7 @@ import { AppError } from "@/components/app-error"
 import { ClampText } from "@/components/clamp-text"
 import { ListCapNote } from "@/components/list-cap-note"
 import { PageHeader } from "@/components/page-header"
-import { PageHeaderSkeleton, PagePending, SkeletonButton, SkeletonText, TableSkeleton, TabsSkeleton } from "@/components/page-pending"
+import { PageHeaderSkeleton, PagePending, LineTabsSkeleton, SkeletonButton, SkeletonText, TableSkeleton } from "@/components/page-pending"
 import { SimpleSelect } from "@/components/simple-select"
 import { Badge } from "@/components/ui/badge"
 import { StatusText } from "@/components/ui/status-text"
@@ -66,11 +67,20 @@ function ActivityPage() {
   return (
     <>
       <PageHeader title={t("activity.title")} />
-      <Tabs value={tab} onValueChange={(v) => void navigate({ search: (p) => ({ ...p, tab: v as typeof tab }) })} className="gap-4">
-        <TabsList>
-          <TabsTrigger value="events">{t("activity.events")}</TabsTrigger>
-          <TabsTrigger value="runs">{t("activity.runs")}</TabsTrigger>
-          <TabsTrigger value="usage">{t("activity.usage")}</TabsTrigger>
+      <Tabs value={tab} onValueChange={(v) => void navigate({ search: (p) => ({ ...p, tab: v as typeof tab }) })} className="gap-6">
+        <TabsList variant="line" aria-label={t("activity.title")}>
+          <TabsTrigger value="events">
+            <ActivityIcon aria-hidden="true" className="hidden @xl/main:block" />
+            {t("activity.events")}
+          </TabsTrigger>
+          <TabsTrigger value="runs">
+            <HistoryIcon aria-hidden="true" className="hidden @xl/main:block" />
+            {t("activity.runs")}
+          </TabsTrigger>
+          <TabsTrigger value="usage">
+            <BarChart3Icon aria-hidden="true" className="hidden @xl/main:block" />
+            {t("activity.usage")}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="events">{data.tab === "events" && <EventsTab data={data.events} />}</TabsContent>
         <TabsContent value="runs">{data.tab === "runs" && <RunsTab runs={data.runs.runs} total={data.runs.total} timezone={data.runs.timezone} />}</TabsContent>
@@ -81,6 +91,7 @@ function ActivityPage() {
 }
 
 const LEVEL_TONE: Record<Level, "outline" | "secondary" | "warning" | "destructive"> = { debug: "outline", info: "secondary", warn: "warning", error: "destructive" }
+const LEVEL_ICON: Record<string, ReactNode> = { debug: <BugIcon aria-hidden="true" />, info: <InfoIcon aria-hidden="true" /> }
 
 function EventsTab({ data }: { data: Awaited<ReturnType<typeof getEvents>> }) {
   const t = useT()
@@ -148,7 +159,7 @@ function EventsTab({ data }: { data: Awaited<ReturnType<typeof getEvents>> }) {
                 <TableRow key={e.id}>
                   <TableCell className="font-mono text-caption tabular-nums max-sm:hidden">{when(e.at, data.timezone)}</TableCell>
                   <TableCell>
-                    <StatusText tone={LEVEL_TONE[e.level as Level] ?? "outline"}>{e.level}</StatusText>
+                    <StatusText tone={LEVEL_TONE[e.level as Level] ?? "outline"} icon={LEVEL_ICON[e.level]}>{e.level}</StatusText>
                   </TableCell>
                   <TableCell className="max-w-0 truncate font-mono text-caption max-md:hidden" title={e.connectorId ?? undefined}>
                     {e.connectorId ?? t("activity.system")}
@@ -352,9 +363,9 @@ function ActivitySkeleton() {
   const { tab = "events" } = Route.useSearch()
   return (
     <PagePending page="nav.activity">
-      <PageHeaderSkeleton title="w-28" description="w-96" />
-      <div className="flex flex-col gap-4">
-        <TabsSkeleton className="w-48" />
+      <PageHeaderSkeleton title="w-28" />
+      <div className="flex flex-col gap-6">
+        <LineTabsSkeleton widths={["w-16", "w-10", "w-14"]} />
         {tab === "events" && (
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">

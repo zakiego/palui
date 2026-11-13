@@ -431,7 +431,7 @@ function RowActions({ row }: { row: Row }) {
 function AttachmentsSkeleton() {
   return (
     <PagePending page="nav.attachments">
-      <PageHeaderSkeleton title="w-36" description="w-0" wraps={false} />
+      <PageHeaderSkeleton title="w-36" wraps={false} />
       <TableSkeleton
         rows={4}
         columns={[

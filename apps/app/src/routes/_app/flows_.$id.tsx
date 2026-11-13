@@ -3,12 +3,12 @@
 // Runs (each opens its step log on the run page, then the saved state), and
 // Versions (what each version changed).
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon, GitCommitVerticalIcon, HistoryIcon, MessagesSquareIcon, SearchXIcon, WorkflowIcon } from "lucide-react"
+import { ArrowLeftIcon, CircleAlertIcon, GitCommitVerticalIcon, HistoryIcon, MessagesSquareIcon, SearchXIcon, WorkflowIcon } from "lucide-react"
 import { z } from "zod"
 
 import { AppError } from "@/components/app-error"
 import { PagePending, SkeletonText } from "@/components/page-pending"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -74,8 +74,9 @@ function FlowPage() {
       <FlowHeader flow={flow} />
       {flow.lastError && (
         <Alert variant="destructive" role="note">
+          <CircleAlertIcon aria-hidden="true" />
+          <AlertTitle>{t("flow.lastError")}</AlertTitle>
           <AlertDescription>
-            <span className="font-medium">{t("flow.lastError")}: </span>
             <span className="break-words">{flow.lastError}</span>
           </AlertDescription>
         </Alert>
@@ -268,7 +269,7 @@ function Versions({ flow, timezone }: { flow: Flow; timezone: string }) {
             <li key={v.n} className="flex min-w-0 flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
               <span className="flex flex-wrap items-center gap-1.5">
                 <span className="text-sm font-medium tabular-nums">{t("flow.version", { n: String(v.n) })}</span>
-                {v.current && <Badge variant="outline">{t("flow.current")}</Badge>}
+                {v.current && <StatusText tone="secondary" icon={null}>{t("flow.current")}</StatusText>}
                 {v.writes > 0 && <StatusText tone={v.approved ? "success" : "warning"}>{v.approved ? t("flow.approved") : t("flow.notApproved")}</StatusText>}
                 <span className="text-caption text-muted-foreground tabular-nums">
                   {by(v.createdBy)} · {inZone(v.createdAt, timezone)}

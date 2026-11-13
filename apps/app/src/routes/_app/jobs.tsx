@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { useLiveRefresh } from "@/hooks/use-live-events"
@@ -224,10 +225,12 @@ function JobRow({ job, timezone, onEdit }: { job: Job; timezone: string; onEdit:
       <TableCell>
         {/* w-max: the column is as wide as the controls, so they never spill over the column beside them. */}
         <span className="ms-auto flex w-max items-center justify-end gap-1">
-          <Button variant="outline" size="sm" onClick={runNow} disabled={job.status === "running"}>
-            {job.status === "running" ? <Spinner data-icon="inline-start" /> : <PlayIcon data-icon="inline-start" />}
-            <span className="sr-only @2xl/main:not-sr-only @2xl/main:whitespace-nowrap">{t("jobs.runNow")}</span>
-          </Button>
+          <Tooltip>
+            <TooltipTrigger render={<Button variant="ghost" size="icon" onClick={job.status === "running" ? undefined : runNow} aria-disabled={job.status === "running" || undefined} aria-label={t("jobs.runNamed", { name: job.name })} className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50" />}>
+              {job.status === "running" ? <Spinner aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}
+            </TooltipTrigger>
+            <TooltipContent>{t("jobs.runNow")}</TooltipContent>
+          </Tooltip>
           <span className="flex size-11 items-center justify-center">
             <Switch checked={enabled} onCheckedChange={(v) => void toggle(v)} aria-label={t(enabled ? "connectors.pause" : "connectors.resume", { name: job.name })} className="after:-inset-x-1.5 after:-inset-y-[13px]" />
           </span>
@@ -437,7 +440,7 @@ function JobSheet({ open, target, onClose, data }: { open: boolean; target: Job 
 function JobsSkeleton() {
   return (
     <PagePending page="nav.jobs">
-      <PageHeaderSkeleton title="w-20" description="w-96" action="w-24" />
+      <PageHeaderSkeleton title="w-20" action="w-24" />
       <TableSkeleton
         rows={3}
         columns={[

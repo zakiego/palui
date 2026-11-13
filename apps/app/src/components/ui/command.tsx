@@ -54,7 +54,7 @@ function CommandDialog({
       <DialogContent
         className={cn(
           // Opened from the keyboard many times a day, so it appears at once.
-          "top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0 data-open:animate-none data-ending-style:animate-none",
+          "top-[13vh] translate-y-0 overflow-hidden rounded-xl! p-0 sm:max-w-xl data-open:animate-none data-ending-style:animate-none",
           className
         )}
         showCloseButton={showCloseButton}
@@ -74,10 +74,10 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandInputPrimitive>) {
   return (
-    <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
-        {/* The InputGroup draws the one focus ring (data-focus-within), so
-            the input doesn't add a second one inside it. */}
+    <div data-slot="command-input-wrapper" className="-mx-1 -mt-1 mb-1 border-b transition-colors duration-150 focus-within:border-b-brand forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-[Highlight]">
+      {/* Linear's palette input: no box. Focus shows as the indigo hairline
+          under it instead of a ring around it. */}
+      <InputGroup data-focus-within-ring={undefined} className="h-12! rounded-none! border-0 bg-transparent shadow-none! *:data-[slot=input-group-addon]:pl-4!">
         <CommandInputPrimitive
           data-focus-within=""
           aria-label={props["aria-label"] ?? props.placeholder}
@@ -162,7 +162,7 @@ function CommandItem({
       value={value}
       keywords={value ? [...(keywords ?? []), value] : keywords}
       className={cnState(
-        "group/command-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-muted data-highlighted:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-highlighted:*:[svg]:text-foreground",
+        "group/command-item relative flex cursor-default items-center gap-2.5 rounded-sm px-3 py-2.5 text-caption outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-highlighted:*:[svg]:text-foreground",
         className
       )}
       {...props}

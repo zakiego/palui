@@ -13,7 +13,7 @@ import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending } from "@/components/page-pending"
 import { ResponsiveSheet } from "@/components/responsive-sheet"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -50,7 +50,6 @@ function AgentsPage() {
     <>
       <PageHeader
         title={t("agents.title")}
-        description={t("agents.description")}
         actions={
           <Button
             onClick={() => {
@@ -64,10 +63,6 @@ function AgentsPage() {
         }
       />
       <Card>
-        <CardHeader>
-          <CardTitle>{t("agents.list")}</CardTitle>
-          <CardDescription>{t("agents.listBody")}</CardDescription>
-        </CardHeader>
         <CardContent>
           <ul className="-mx-2 flex flex-col">
             {data.agents.map((a) => (
@@ -100,7 +95,7 @@ function AgentRow({ agent, bot }: { agent: Agent; bot?: Data["bots"][number] }) 
               {agent.name}
             </span>
             <span className="font-mono text-caption break-all text-muted-foreground">{agent.slug}</span>
-            {agent.isDefault && <StatusText tone="secondary">{t("agents.default")}</StatusText>}
+            {agent.isDefault && <StatusText tone="secondary" icon={null}>{t("agents.default")}</StatusText>}
             {over && <StatusText tone="warning">{t("agents.capHit")}</StatusText>}
           </span>
           <p dir="auto" className="line-clamp-2 text-left text-sm text-muted-foreground [overflow-wrap:anywhere]">
@@ -224,7 +219,7 @@ function NewAgentSheet({ open, onClose }: { open: boolean; onClose: () => void }
 function AgentsSkeleton() {
   return (
     <PagePending page="nav.agents">
-      <PageHeaderSkeleton title="w-24" description="w-96" action="w-32" />
+      <PageHeaderSkeleton title="w-24" action="w-32" />
       <Skeleton className="h-64 w-full rounded-xl" />
     </PagePending>
   )

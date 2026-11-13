@@ -25,7 +25,7 @@ export function ConnectorRows({ items, live, onOpen }: ConnectorLayoutProps) {
     if (!rows.length) return null
     return (
       <section key={kind} aria-labelledby={`group-${kind}`} className="flex flex-col gap-2">
-        <h2 id={`group-${kind}`} className="px-1 text-overline text-muted-foreground uppercase">
+        <h2 id={`group-${kind}`} className="px-1 text-overline text-muted-foreground">
           {t(label)} <span className="tabular-nums">{rows.length}</span>
         </h2>
         <Card className="gap-0 py-0">

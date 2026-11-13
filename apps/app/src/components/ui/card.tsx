@@ -1,7 +1,7 @@
 /**
- * The card: a white surface lifted off the page by a shadow ring rather than a
- * border, so it reads as depth and the lines inside it stay free to mean
- * structure.
+ * The card: a raised surface held by a 1px hairline ring, Linear's tile, so
+ * the lines inside it stay free to mean structure. Roomy padding, because
+ * cards on this dashboard never feel packed.
  *
  * The title is an `h2`. Every card sits under the page's one `h1`, so the
  * outline a screen reader walks is page, then section, with nothing skipped.
@@ -21,7 +21,7 @@ function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex min-w-0 flex-col gap-(--card-gap) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground shadow-(--shadow-border) [--card-gap:--spacing(4)] [--card-spacing:--spacing(5)] has-data-[slot=card-footer]:pb-0 data-[size=sm]:[--card-gap:--spacing(2)] data-[size=sm]:[--card-spacing:--spacing(4)]",
+        "group/card flex min-w-0 flex-col gap-(--card-gap) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground shadow-(--shadow-border) [--card-gap:--spacing(4)] [--card-spacing:--spacing(5)] sm:[--card-spacing:--spacing(6)] has-data-[slot=card-footer]:pb-0 data-[size=sm]:[--card-gap:--spacing(2)] data-[size=sm]:[--card-spacing:--spacing(4)] sm:data-[size=sm]:[--card-spacing:--spacing(4)]",
         className
       )}
       {...props}
@@ -101,7 +101,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-footer"
       className={cn(
-        "flex items-center border-t bg-muted/50 px-(--card-spacing) py-3",
+        "flex items-center border-t px-(--card-spacing) py-3",
         className
       )}
       {...props}

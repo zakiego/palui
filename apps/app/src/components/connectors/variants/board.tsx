@@ -58,7 +58,7 @@ function BoardSide({ side, groups, items, live, onOpen, className }: { side: Sid
         const rows = items.filter((i) => i.kind === kind)
         return (
           <section key={kind} aria-labelledby={`group-${kind}`} className="flex flex-col gap-2">
-            <h2 id={`group-${kind}`} className={cn("ps-4 text-overline text-muted-foreground uppercase @5xl/main:px-4", side === "in" && "@5xl/main:text-end")}>
+            <h2 id={`group-${kind}`} className={cn("ps-4 text-overline text-muted-foreground @5xl/main:px-4", side === "in" && "@5xl/main:text-end")}>
               {t(label)} <span className="tabular-nums">{rows.length}</span>
             </h2>
             <ul className="flex flex-col gap-2">

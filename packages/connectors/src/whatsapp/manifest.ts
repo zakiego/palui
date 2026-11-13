@@ -10,7 +10,7 @@ export default defineManifest({
   kind: "channel",
   name: "WhatsApp",
   icon: "whatsapp",
-  summary: "Chat with Palui from WhatsApp, as a linked device.",
+  summary: "Chat from WhatsApp, as a linked device.",
   config: z.object({
     // The owner's own number. Messages from it (and its learned LID) are accepted.
     ownerPhone: phone.optional(),

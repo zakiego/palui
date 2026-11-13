@@ -2,6 +2,7 @@
 import * as React from "react"
 import { CheckIcon, ImageUpIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
+import { Radio, RadioGroup } from "@ui-sdk/react/radio"
 
 import { AgentAvatar, AVATAR_COLORS, AVATAR_ICONS, resizeAvatar } from "@/components/agent-avatar"
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,7 @@ export function AvatarPicker({
     }
   }
   const color = agent.avatarColor ?? "zinc"
+  const icon = agent.avatarIcon ?? (agent.isDefault ? null : "bot")
   return (
     <FieldSet>
       <FieldLegend variant="label">{t("agents.avatar")}</FieldLegend>
@@ -62,44 +64,47 @@ export function AvatarPicker({
         </div>
       </div>
       {agent.avatarImage && <FieldDescription>{t("agents.avatar.photoWins")}</FieldDescription>}
-      <div role="radiogroup" aria-label={t("agents.avatar.icon")} className="grid max-w-md grid-cols-8 gap-1.5">
+      <RadioGroup
+        aria-label={t("agents.avatar.icon")}
+        value={icon}
+        onValueChange={(v) => onIcon(String(v))}
+        className="grid max-w-md grid-cols-8 gap-2"
+      >
         {Object.entries(AVATAR_ICONS).map(([name, Icon]) => {
-          const on = (agent.avatarIcon ?? (agent.isDefault ? null : "bot")) === name
+          const on = icon === name
           return (
-            <button
+            <Radio
               key={name}
-              type="button"
-              role="radio"
-              aria-checked={on}
+              value={name}
               aria-label={name.replace(/-/g, " ")}
               data-avatar-tone={on ? color : "zinc"}
-              onClick={() => onIcon(on && agent.isDefault ? null : name)}
-              className="flex aspect-square items-center justify-center rounded-md bg-(--avatar-bg) text-(--avatar-fg) outline-offset-2 ring-foreground transition-[box-shadow] focus-visible:outline-2 focus-visible:outline-focus-ring aria-checked:ring-2 [&_svg]:size-4"
+              // The default agent can clear its icon to go back to the Palui mark.
+              onClick={on && agent.isDefault ? () => onIcon(null) : undefined}
+              className="flex aspect-square cursor-pointer items-center justify-center rounded-md bg-(--avatar-bg) text-(--avatar-fg) ring-foreground transition-[box-shadow] duration-150 data-checked:ring-2 [&_svg]:size-4"
             >
               <Icon aria-hidden="true" />
-            </button>
+            </Radio>
           )
         })}
-      </div>
-      <div role="radiogroup" aria-label={t("agents.avatar.color")} className="flex flex-wrap gap-1.5">
-        {AVATAR_COLORS.map((c) => {
-          const on = color === c
-          return (
-            <button
-              key={c}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              aria-label={c}
-              data-avatar-tone={c}
-              onClick={() => onColor(c === "zinc" ? null : c)}
-              className="flex size-8 items-center justify-center rounded-full border border-border bg-(--avatar-bg) text-(--avatar-fg) outline-offset-2 ring-foreground focus-visible:outline-2 focus-visible:outline-focus-ring aria-checked:ring-2 [&_svg]:size-4"
-            >
-              {on && <CheckIcon aria-hidden="true" />}
-            </button>
-          )
-        })}
-      </div>
+      </RadioGroup>
+      <RadioGroup
+        aria-label={t("agents.avatar.color")}
+        value={color}
+        onValueChange={(v) => onColor(v === "zinc" ? null : String(v))}
+        className="flex flex-wrap gap-2"
+      >
+        {AVATAR_COLORS.map((c) => (
+          <Radio
+            key={c}
+            value={c}
+            aria-label={c}
+            data-avatar-tone={c}
+            className="group/swatch flex size-8 cursor-pointer items-center justify-center rounded-full border border-border bg-(--avatar-bg) text-(--avatar-fg) ring-foreground data-checked:ring-2 [&_svg]:size-4"
+          >
+            <CheckIcon aria-hidden="true" className="hidden group-data-checked/swatch:block" />
+          </Radio>
+        ))}
+      </RadioGroup>
     </FieldSet>
   )
 }

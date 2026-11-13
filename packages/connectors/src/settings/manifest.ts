@@ -6,7 +6,7 @@ export default defineManifest({
   kind: "skill",
   name: "Settings",
   icon: "settings",
-  summary: "Palui reads its own setup and changes settings when you ask.",
+  summary: "Read and change settings from chat.",
   description:
     "Palui can look up its own setup (version, timezone, language, model roles, budgets, fallback channel, today's token use and which connectors are on) and change the settings from the Settings page when you ask in chat. Every change asks you first and shows the new values. Secrets and API keys are never shown or changed here.",
   builtin: true,

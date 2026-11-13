@@ -4,7 +4,7 @@
 // calls sit inline and collapsible; pending approvals show Approve/Deny.
 import * as React from "react"
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
-import { ArrowUpIcon, AtSignIcon, CircleAlertIcon, CircleDashedIcon, CopyIcon, HashIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SearchIcon, ShieldAlertIcon, SquareIcon, WebhookIcon } from "lucide-react"
+import { ArrowUpIcon, AtSignIcon, CircleAlertIcon, CopyIcon, HashIcon, ListIcon, MessagesSquareIcon, MonitorIcon, SearchIcon, ShieldAlertIcon, SquareIcon, WebhookIcon } from "lucide-react"
 import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -194,7 +194,7 @@ function ChatList({ chats, activeId, onPick }: { chats: ChatRow[]; activeId: str
               <ItemDescription className="line-clamp-1 break-all">
                 <span className="sr-only">{c.channel}. </span>
                 {!c.allowed && c.channel !== "web" && (
-                  <StatusText icon={<CircleDashedIcon aria-hidden="true" />} className="mr-1.5 align-[-2px]">
+                  <StatusText tone="secondary" className="mr-1.5 align-[-2px]">
                     {t("chats.off")}
                   </StatusText>
                 )}

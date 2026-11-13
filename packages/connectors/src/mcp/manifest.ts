@@ -26,7 +26,7 @@ export default defineManifest({
   kind: "tools",
   name: "MCP server",
   icon: "plug",
-  summary: "Give Palui the tools of an MCP server you run or trust.",
+  summary: "Tools from an MCP server you trust.",
   multiple: true,
   trust: "external",
   config: mcpConfig,

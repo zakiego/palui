@@ -6,7 +6,7 @@ export default defineManifest({
   kind: "tools",
   name: "Google Calendar",
   icon: "calendar",
-  summary: "Let Palui read your Google Calendar.",
+  summary: "Read your Google Calendar.",
   config: z.object({
     calendarIds: z.array(z.string().trim().min(1)).min(1).default(["primary"]),
     // Learned after sign-in (the primary calendar id is the account email).

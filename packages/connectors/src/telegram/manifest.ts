@@ -8,7 +8,7 @@ export default defineManifest({
   kind: "channel",
   name: "Telegram",
   icon: "telegram",
-  summary: "Chat with Palui from a Telegram bot.",
+  summary: "Chat from a Telegram bot.",
   config: z.object({
     // Learned at runtime from getMe, so the claim link works before polling starts.
     botUsername: z.string().optional(),

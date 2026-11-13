@@ -2,7 +2,7 @@
 // read, every tool call with its args and result, and the reply. Opened from
 // the Runs tab and the Home runs card.
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { ArrowLeftIcon, CalendarClockIcon, MessagesSquareIcon, SearchXIcon } from "lucide-react"
+import { ArrowLeftIcon, CalendarClockIcon, CircleAlertIcon, MessagesSquareIcon, SearchXIcon } from "lucide-react"
 
 import { AppError } from "@/components/app-error"
 import { ClampText } from "@/components/clamp-text"
@@ -10,7 +10,7 @@ import { FlowRunView } from "@/components/flow-run"
 import { Markdown } from "@/components/markdown"
 import { PagePending, SkeletonText } from "@/components/page-pending"
 import { ToolTrace } from "@/components/tool-trace"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -68,6 +68,8 @@ function RunPage() {
       {run.error && (
         // A past error, not a live one: no role="alert", so it isn't announced on every visit.
         <Alert variant="destructive" role="note">
+          <CircleAlertIcon aria-hidden="true" />
+          <AlertTitle>{t("status.error")}</AlertTitle>
           <AlertDescription>
             <pre className="max-h-80 overflow-auto font-mono text-xs break-words whitespace-pre-wrap">{run.error}</pre>
           </AlertDescription>

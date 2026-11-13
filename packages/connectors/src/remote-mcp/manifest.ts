@@ -6,7 +6,7 @@ export default defineManifest({
   kind: "skill",
   name: "Remote MCP setup",
   icon: "server-cog",
-  summary: "Let Palui add, list and remove public MCP servers from chat.",
+  summary: "Add and remove public MCP servers from chat.",
   description:
     "Ask Palui to add a public MCP server (Streamable HTTP, no auth) and it checks the URL, connects once to list the tools, and asks you before saving it as an MCP server connector. Only https URLs on public addresses are accepted, checked again on every request. Servers that need a token are added from the Connectors page, so the token never goes through chat.",
   builtin: true,

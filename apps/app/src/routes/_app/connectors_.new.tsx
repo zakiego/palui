@@ -14,7 +14,7 @@ import { CONNECTOR_GROUPS, ConnectorsBackLink } from "@/components/connectors/sh
 import { newConnectorId } from "@/components/connectors/targets"
 import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending } from "@/components/page-pending"
-import { Badge } from "@/components/ui/badge"
+import { StatusText } from "@/components/ui/status-text"
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item"
@@ -125,7 +125,7 @@ function Section({ id, title, description, children }: { id: string; title: stri
   return (
     <section aria-labelledby={id} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1 px-1">
-        <h2 id={id} className="text-overline text-muted-foreground uppercase">
+        <h2 id={id} className="text-overline text-muted-foreground">
           {title}
         </h2>
         {description && <p className="max-w-[65ch] text-sm text-pretty text-muted-foreground">{description}</p>}
@@ -148,7 +148,7 @@ function Sub({ title, note, children }: { title: string; note?: string; children
 }
 
 function Grid({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{children}</div>
+  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{children}</div>
 }
 
 function Choice({
@@ -184,7 +184,7 @@ function Choice({
       <ItemContent className="min-w-0 gap-0.5">
         <ItemTitle className="w-full min-w-0 flex-wrap gap-x-2 gap-y-1">
           <span className="min-w-0 break-words">{title}</span>
-          {added && <Badge variant="outline">{t("connectors.added")}</Badge>}
+          {added && <StatusText tone="success">{t("connectors.added")}</StatusText>}
         </ItemTitle>
         <ItemDescription className={oneLine ? "truncate" : "line-clamp-2 break-words"}>{description}</ItemDescription>
       </ItemContent>
@@ -197,7 +197,7 @@ function NewConnectorSkeleton() {
     <PagePending page="nav.connectors">
       <PageHeaderSkeleton title="w-44" />
       <Skeleton className="h-9 w-full max-w-md" />
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }, (_, i) => (
           <Skeleton key={i} className="h-16" />
         ))}

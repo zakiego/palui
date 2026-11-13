@@ -4,7 +4,7 @@ import * as React from "react"
 import { REASONING_EFFORTS } from "@palui/core/models/effort"
 import type { ModelChainLink } from "@palui/core/settings"
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowDownIcon, ArrowUpIcon, BrainIcon, CircleAlertIcon, DatabaseBackupIcon, EllipsisIcon, FingerprintIcon, PlusIcon, TrashIcon, WebhookIcon } from "lucide-react"
+import { ArrowDownIcon, ArrowUpIcon, BoxIcon, BrainIcon, CircleAlertIcon, DatabaseBackupIcon, EllipsisIcon, FingerprintIcon, GaugeIcon, PlusIcon, Settings2Icon, ShieldIcon, TrashIcon, WebhookIcon } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -13,7 +13,7 @@ import { connectorIcon } from "@/components/connector-icon"
 import { CopyButton } from "@/components/copy-button"
 import { ModelPicker, type ModelCatalog } from "@/components/model-picker"
 import { PageHeader } from "@/components/page-header"
-import { PageHeaderSkeleton, PagePending, SkeletonButton, SkeletonText, TabsSkeleton } from "@/components/page-pending"
+import { PageHeaderSkeleton, PagePending, LineTabsSkeleton, SkeletonButton, SkeletonText } from "@/components/page-pending"
 import { SimpleSelect } from "@/components/simple-select"
 import {
   AlertDialog,
@@ -90,16 +90,29 @@ function SettingsPage() {
   return (
     <>
       <PageHeader title={t("settings.title")} />
-      <Tabs value={tab} onValueChange={(v) => void navigate({ search: { tab: v as (typeof TABS)[number] }, replace: true })} className="gap-4">
-        <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-          <TabsList>
-            <TabsTrigger value="general">{t("settings.tab.general")}</TabsTrigger>
-            <TabsTrigger value="models">{t("settings.tab.models")}</TabsTrigger>
-            <TabsTrigger value="limits">{t("settings.tab.limits")}</TabsTrigger>
-            <TabsTrigger value="security">{t("settings.tab.security")}</TabsTrigger>
-            <TabsTrigger value="hooks">{t("settings.tab.hooks")}</TabsTrigger>
-          </TabsList>
-        </div>
+      <Tabs value={tab} onValueChange={(v) => void navigate({ search: { tab: v as (typeof TABS)[number] }, replace: true })} className="gap-6">
+        <TabsList variant="line" aria-label={t("settings.title")}>
+          <TabsTrigger value="general">
+            <Settings2Icon aria-hidden="true" className="hidden @xl/main:block" />
+            {t("settings.tab.general")}
+          </TabsTrigger>
+          <TabsTrigger value="models">
+            <BoxIcon aria-hidden="true" className="hidden @xl/main:block" />
+            {t("settings.tab.models")}
+          </TabsTrigger>
+          <TabsTrigger value="limits">
+            <GaugeIcon aria-hidden="true" className="hidden @xl/main:block" />
+            {t("settings.tab.limits")}
+          </TabsTrigger>
+          <TabsTrigger value="security">
+            <ShieldIcon aria-hidden="true" className="hidden @xl/main:block" />
+            {t("settings.tab.security")}
+          </TabsTrigger>
+          <TabsTrigger value="hooks">
+            <WebhookIcon aria-hidden="true" className="hidden @xl/main:block" />
+            {t("settings.tab.hooks")}
+          </TabsTrigger>
+        </TabsList>
         <TabsContent value="general" keepMounted>
           <GeneralTab data={data} />
         </TabsContent>
@@ -807,9 +820,9 @@ function SettingsSkeleton() {
   const { tab = "general" } = Route.useSearch()
   return (
     <PagePending page="nav.settings">
-      <PageHeaderSkeleton title="w-28" description="w-80" />
-      <div className="flex flex-col gap-4">
-        <TabsSkeleton className="w-80" />
+      <PageHeaderSkeleton title="w-28" />
+      <div className="flex flex-col gap-6">
+        <LineTabsSkeleton widths={["w-14", "w-12", "w-12", "w-16", "w-10"]} />
         <Card>
           <CardHeader>
             <SkeletonText className="font-heading text-heading" width="w-36" />

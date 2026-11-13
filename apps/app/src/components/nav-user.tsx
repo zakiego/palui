@@ -23,20 +23,17 @@ export function NavUser({ username, onLogout }: { username: string; onLogout: ()
   const initial = (Array.from(username.trim())[0] ?? "O").toUpperCase()
   const who = (
     <>
-      <Avatar className="rounded-lg">
-        <AvatarFallback className="rounded-lg">{initial}</AvatarFallback>
+      <Avatar className="size-6 rounded-full">
+        <AvatarFallback className="rounded-full text-xs">{initial}</AvatarFallback>
       </Avatar>
-      <span className="grid flex-1 text-start text-sm leading-tight">
-        <span className="truncate font-medium">{username}</span>
-        <span className="truncate text-xs text-muted-foreground">{t("app.tagline")}</span>
-      </span>
+      <span className="min-w-0 flex-1 truncate text-start text-caption font-medium text-foreground">{username}</span>
     </>
   )
   return (
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="aria-expanded:bg-muted" aria-label={`${username}, account menu`} />}>
+          <DropdownMenuTrigger render={<SidebarMenuButton className="aria-expanded:bg-sidebar-accent" aria-label={`${username}, account menu`} />}>
             {who}
             <ChevronsUpDownIcon className="ms-auto" aria-hidden="true" />
           </DropdownMenuTrigger>

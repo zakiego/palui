@@ -6,7 +6,7 @@ export default defineManifest({
   kind: "skill",
   name: "Attachments",
   icon: "paperclip",
-  summary: "Keep the important files you send in chat, like an ID card, a receipt or a ticket.",
+  summary: "Keep files you send in chat, like a receipt.",
   description:
     "When you send a photo or a document that's worth keeping, Palui saves it with a title and a short note. Nothing is saved automatically: Palui only keeps what matters, or what you ask it to. Saved files are encrypted with MASTER_KEY inside the database and can only be downloaded from the dashboard after you sign in.",
   builtin: true,

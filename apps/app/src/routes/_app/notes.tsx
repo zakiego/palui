@@ -229,7 +229,7 @@ function PreferencesCard({ data }: { data: Data }) {
 function NotesSkeleton() {
   return (
     <PagePending page="nav.notes">
-      <PageHeaderSkeleton title="w-20" description="w-96" action="w-36" />
+      <PageHeaderSkeleton title="w-20" action="w-36" />
       <Skeleton className="h-48 w-full rounded-xl" />
       <Skeleton className="h-48 w-full rounded-xl" />
     </PagePending>

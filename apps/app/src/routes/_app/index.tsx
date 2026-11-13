@@ -15,7 +15,6 @@ import { PageHeaderSkeleton, PagePending, SkeletonText, StatusTextSkeleton } fro
 import { RuntimeAlert } from "@/components/runtime-alert"
 import { ConnectorMap } from "@/components/connectors/connector-map"
 import { StatusAnnouncer } from "@/components/connectors/shared"
-import { Badge } from "@/components/ui/badge"
 import { StatusText } from "@/components/ui/status-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -92,9 +91,9 @@ function Checklist({ checklist }: { checklist: HomeData["checklist"] }) {
       <CardHeader>
         <CardTitle>{t("home.checklist")}</CardTitle>
         <CardAction>
-          <Badge variant="outline" className="font-mono tabular-nums">
+          <span className="font-mono text-caption text-muted-foreground tabular-nums">
             {done}/4
-          </Badge>
+          </span>
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -152,7 +151,7 @@ function AttentionCard({ connectors }: { connectors: HomeConnector[] }) {
         </CardAction>
       </CardHeader>
       <CardContent>
-        <ItemGroup className={cn("gap-3 @3xl/main:grid", ATTENTION_COLS[shown.length])}>
+        <ItemGroup className={cn("gap-4 @3xl/main:grid", ATTENTION_COLS[shown.length])}>
           {shown.map((c) => {
             const Icon = connectorIcon(manifestFor(c.type)?.icon)
             return (
@@ -307,7 +306,7 @@ function RemindersCard({ reminders, timezone }: { reminders: HomeData["reminders
             </EmptyContent>
           </Empty>
         ) : (
-          <ItemGroup className="gap-3">
+          <ItemGroup className="gap-4">
             {reminders.map((r) => {
               const other = inOtherZone(r.fireAt, r.tz, timezone)
               return (
@@ -476,7 +475,7 @@ const SUB_WIDTHS = ["w-56", "w-40", "w-48", "w-36", "w-52"]
 // (a title, a mono line under it, a status) render them.
 function ItemListSkeleton({ rows, status, agenda }: { rows: number; status?: boolean; agenda?: boolean }) {
   return (
-    <ItemGroup className={agenda ? "gap-3" : "gap-1"}>
+    <ItemGroup className={agenda ? "gap-4" : "gap-1"}>
       {Array.from({ length: rows }, (_, i) => (
         <Item key={i} size="sm" variant={agenda ? "muted" : "default"} className={agenda ? "items-start" : "px-0"}>
           {agenda && (

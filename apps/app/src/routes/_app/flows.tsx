@@ -38,7 +38,7 @@ function FlowsPage() {
 
   return (
     <>
-      <PageHeader title={t("flows.title")} description={t("flows.description")} />
+      <PageHeader title={t("flows.title")} />
       {data.flows.length === 0 ? (
         <Empty className="border border-dashed">
           <EmptyHeader>

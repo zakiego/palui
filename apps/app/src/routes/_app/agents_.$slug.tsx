@@ -258,7 +258,7 @@ function AgentSettings({ data }: { data: Loaded }) {
               </h1>
               <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="font-mono text-caption break-all text-muted-foreground">{agent.slug}</span>
-                {isDefault && <StatusText tone="secondary">{t("agents.default")}</StatusText>}
+                {isDefault && <StatusText tone="secondary" icon={null}>{t("agents.default")}</StatusText>}
                 {over && <StatusText tone="warning">{t("agents.capHit")}</StatusText>}
               </span>
             </div>

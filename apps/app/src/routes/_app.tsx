@@ -53,10 +53,7 @@ function ShellSkeleton() {
       <div className="hidden w-60 shrink-0 flex-col gap-4 p-2 md:flex">
         <div className="flex items-center gap-2 p-2">
           <Skeleton className="size-8 rounded-lg" />
-          <div className="flex flex-col">
-            <SkeletonText className="text-sm" width="w-12" />
-            <SkeletonText className="text-xs" width="w-20" />
-          </div>
+          <SkeletonText className="text-sm" width="w-12" />
         </div>
         {NAV_GROUPS.map((items, g) => (
           <div key={g} className="flex flex-col gap-1 p-2">
@@ -64,7 +61,7 @@ function ShellSkeleton() {
               <Skeleton className="h-2.5 w-12" />
             </span>
             {items.map((w, i) => (
-              <span key={i} className="flex h-8 items-center gap-2 px-2">
+              <span key={i} className="flex h-8 items-center gap-2.5 px-2.5">
                 <Skeleton className="size-4 rounded-sm" />
                 <Skeleton className={cn("h-3", w)} />
               </span>
@@ -72,15 +69,12 @@ function ShellSkeleton() {
           </div>
         ))}
         <div className="mt-auto flex items-center gap-2 p-2">
-          <Skeleton className="size-8 rounded-full" />
-          <div className="flex flex-col">
-            <SkeletonText className="text-sm" width="w-12" />
-            <SkeletonText className="text-xs" width="w-20" />
-          </div>
+          <Skeleton className="size-6 rounded-full" />
+          <SkeletonText className="text-sm" width="w-16" />
         </div>
       </div>
-      <div className="m-0 flex min-w-0 flex-1 flex-col bg-background md:m-2 md:rounded-xl md:shadow-(--shadow-border)">
-        <div className="flex h-14 shrink-0 items-center gap-3 border-b px-4 md:px-6">
+      <div className="m-0 flex min-w-0 flex-1 flex-col bg-background md:m-2 md:ms-0 md:rounded-xl md:shadow-(--shadow-border)">
+        <div className="flex h-12 shrink-0 items-center gap-3 border-b px-4 md:px-6">
           <Skeleton className="size-7 rounded-md" />
           <Skeleton className="h-3 w-16" />
           <StatusTextSkeleton className="ms-auto" width="w-24" />
@@ -130,7 +124,7 @@ function Shell() {
   }
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 60)", "--header-height": "calc(var(--spacing) * 14)" } as React.CSSProperties}>
+    <SidebarProvider style={{ "--sidebar-width": "calc(var(--spacing) * 60)", "--header-height": "calc(var(--spacing) * 12)" } as React.CSSProperties}>
       <a href="#main-content" className="skip-link">
         {t("nav.skip")}
       </a>
@@ -143,7 +137,7 @@ function Shell() {
           id="main-content"
           tabIndex={-1}
           data-no-ring=""
-          className="@container/main mx-auto flex w-full max-w-[90rem] min-w-0 flex-1 flex-col gap-6 ps-[max(1rem,env(safe-area-inset-left))] pe-[max(1rem,env(safe-area-inset-right))] pt-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] outline-none md:ps-6 md:pe-6 lg:ps-8 lg:pe-8 lg:pt-8"
+          className="@container/main mx-auto flex w-full max-w-[90rem] min-w-0 flex-1 flex-col gap-6 lg:gap-8 ps-[max(1rem,env(safe-area-inset-left))] pe-[max(1rem,env(safe-area-inset-right))] pt-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] outline-none md:ps-6 md:pe-6 lg:ps-8 lg:pe-8 lg:pt-8"
         >
           <Outlet />
         </main>

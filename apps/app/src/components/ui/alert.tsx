@@ -7,15 +7,15 @@ import { cn } from "@/lib/utils"
 // never the only thing that says "this failed". Only the destructive tone is
 // announced as an alert: a standing "copy it now" note is not an interruption.
 const alertVariants = cva(
-  "group/alert relative grid w-full gap-0.5 rounded-lg border px-3 py-2.5 text-start text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pe-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2.5 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
+  "group/alert relative grid w-full gap-0.5 rounded-lg border px-4 py-3 text-start text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pe-18 grid-cols-[minmax(0,1fr)] has-[>svg]:grid-cols-[auto_minmax(0,1fr)] has-[>svg]:gap-x-2.5 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: "bg-card text-card-foreground",
         destructive:
-          "border-destructive-border bg-destructive-bg text-destructive-fg *:data-[slot=alert-description]:text-destructive-fg",
+          "border-destructive-border bg-destructive-bg text-destructive-fg *:data-[slot=alert-description]:text-foreground-secondary",
         warning:
-          "border-warning-border bg-warning-bg text-warning-fg *:data-[slot=alert-description]:text-foreground",
+          "border-warning-border bg-warning-bg text-warning-fg *:data-[slot=alert-description]:text-foreground-secondary",
       },
     },
     defaultVariants: {
@@ -44,7 +44,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="alert-title"
       className={cn(
-        "font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground",
+        "font-medium [overflow-wrap:anywhere] group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground",
         className
       )}
       {...props}
@@ -60,7 +60,7 @@ function AlertDescription({
     <div
       data-slot="alert-description"
       className={cn(
-        "text-sm text-pretty text-muted-foreground [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
+        "text-sm text-pretty text-muted-foreground [overflow-wrap:anywhere] [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
         className
       )}
       {...props}

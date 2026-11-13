@@ -6,7 +6,7 @@ export default defineManifest({
   kind: "skill",
   name: "Web fetch",
   icon: "globe",
-  summary: "Let Palui read a web page you send it.",
+  summary: "Read a web page you send.",
   builtin: true,
   trust: "external",
   config: z.object({}),

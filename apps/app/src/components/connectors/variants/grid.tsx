@@ -24,7 +24,7 @@ export function ConnectorGrid({ items, live, onOpen }: ConnectorLayoutProps) {
         <h2 id={`group-${kind}`} className="text-heading">
           {t(label)} <span className="font-normal text-muted-foreground tabular-nums">{rows.length}</span>
         </h2>
-        <div className="grid gap-3 @2xl/main:grid-cols-2 @5xl/main:grid-cols-3">
+        <div className="grid gap-5 @2xl/main:grid-cols-2 @5xl/main:grid-cols-3">
           {rows.map((item) => (
             <ConnectorCard key={item.id} item={item} live={live} onOpen={() => onOpen(item.id)} />
           ))}
@@ -91,7 +91,7 @@ export function ConnectorGridSkeleton() {
   return SKELETON_GROUPS.map((g, gi) => (
     <div key={gi} className="flex flex-col gap-3">
       <SkeletonText className="text-heading" width={g.heading} />
-      <div className="grid gap-3 @2xl/main:grid-cols-2 @5xl/main:grid-cols-3">
+      <div className="grid gap-5 @2xl/main:grid-cols-2 @5xl/main:grid-cols-3">
         {g.cards.map((name, i) => (
           <Card key={i} size="sm" className="justify-between">
             <CardHeader>

@@ -6,7 +6,7 @@ export default defineManifest({
   kind: "channel",
   name: "Web chat",
   icon: "message-square",
-  summary: "Chat with Palui from the dashboard. Always on.",
+  summary: "Chat from the dashboard. Always on.",
   config: z.object({}),
   secrets: {},
   setup: [],

@@ -94,12 +94,13 @@ export function SkeletonButton({ className }: { className?: string }) {
  */
 export function PageHeaderSkeleton({
   title = "w-32",
-  description = "w-96",
+  description = null,
   wraps = true,
   action,
 }: {
   title?: string
-  description?: string
+  /** Null when the real header has no description. */
+  description?: string | null
   /** False when the real description fits one line on a phone. */
   wraps?: boolean
   action?: string
@@ -108,10 +109,12 @@ export function PageHeaderSkeleton({
     <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
       <div className="flex min-w-0 flex-col gap-1.5">
         <SkeletonText className="font-heading text-title" width={title} />
-        <span className="flex flex-col">
-          <SkeletonText className="text-sm" width={description} />
-          {wraps && <SkeletonText className="text-sm sm:hidden" width="w-1/2" />}
-        </span>
+        {description !== null && (
+          <span className="flex flex-col">
+            <SkeletonText className="text-sm" width={description} />
+            {wraps && <SkeletonText className="text-sm sm:hidden" width="w-1/2" />}
+          </span>
+        )}
       </div>
       {action && <SkeletonButton className={action} />}
     </div>
@@ -121,6 +124,17 @@ export function PageHeaderSkeleton({
 /** A TabsList-sized block (32 px, 40 px on touch, like the real one). */
 export function TabsSkeleton({ className }: { className: string }) {
   return <Skeleton className={cn("h-8 max-w-full pointer-coarse:h-10", className)} />
+}
+
+/** Line tabs (TabsList variant="line"): label bars on one full-width hairline, 40 px tall. */
+export function LineTabsSkeleton({ widths }: { widths: string[] }) {
+  return (
+    <div className="flex h-10 items-center gap-4 border-b">
+      {widths.map((w, i) => (
+        <Skeleton key={i} className={cn("h-3", w)} />
+      ))}
+    </div>
+  )
 }
 
 export type SkeletonColumn = {

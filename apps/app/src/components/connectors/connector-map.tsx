@@ -62,7 +62,7 @@ export function ConnectorMap({ connectors }: { connectors: MapConnector[] }) {
             )}
           </span>
           {row.type === "hub" && <span className="text-sm font-medium">{t("app.name")}</span>}
-          {row.type === "group" && <h3 className="pt-2 text-overline text-muted-foreground uppercase">{t(row.label)}</h3>}
+          {row.type === "group" && <h3 className="pt-2 text-overline text-muted-foreground">{t(row.label)}</h3>}
           {row.type === "conn" && <MapNode c={row.c} />}
         </li>
       ))}

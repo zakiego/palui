@@ -170,7 +170,7 @@ function ReminderTable({ rows, total, timezone, done, onNew }: { rows: Row[]; to
                       </Badge>
                     )}
                     {r.smart && (
-                      <Badge variant="soft">
+                      <Badge variant="outline">
                         <SparklesIcon aria-hidden="true" />
                         {t("reminders.smart")}
                       </Badge>
@@ -362,7 +362,7 @@ function NewReminderDialog({ open, onOpenChange, data }: { open: boolean; onOpen
               />
             </Field>
             <div id="reminder-preview" role="status" aria-live="polite" className="min-h-14 rounded-lg bg-muted px-3 py-2">
-              <p className="text-overline text-muted-foreground uppercase">{t("reminders.preview")}</p>
+              <p className="text-overline text-muted-foreground">{t("reminders.preview")}</p>
               {parsing ? (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Spinner aria-hidden="true" />

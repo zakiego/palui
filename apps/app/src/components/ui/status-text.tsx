@@ -2,7 +2,7 @@
 // labels (a kind, a channel, a mode); a state that changes (on, failed,
 // overdue, paused) reads as plain text so it doesn't look like a tag.
 import type * as React from "react"
-import { CircleAlertIcon, CircleCheckIcon, TriangleAlertIcon } from "lucide-react"
+import { CircleAlertIcon, CircleCheckIcon, CircleDashedIcon, CircleMinusIcon, TriangleAlertIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -16,10 +16,14 @@ const TONE: Record<StatusTone, string> = {
   outline: "text-muted-foreground",
 }
 
-const ICON: Partial<Record<StatusTone, React.ReactNode>> = {
+// Every tone carries an icon, so a gray state never reads as a bare word:
+// secondary is inactive (paused, off, cancelled), outline is pending.
+const ICON: Record<StatusTone, React.ReactNode> = {
   success: <CircleCheckIcon aria-hidden="true" />,
   warning: <TriangleAlertIcon aria-hidden="true" />,
   destructive: <CircleAlertIcon aria-hidden="true" />,
+  secondary: <CircleMinusIcon aria-hidden="true" />,
+  outline: <CircleDashedIcon aria-hidden="true" />,
 }
 
 export function StatusText({

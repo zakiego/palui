@@ -8,7 +8,7 @@ export default defineManifest({
   kind: "memory",
   name: "recall",
   icon: "brain",
-  summary: "Palui remembers what you tell it.",
+  summary: "Remembers what you tell your AI agent.",
   config: z.object({
     url: z.url({ protocol: /^https?$/ }).default(RECALL_DEFAULT_URL),
     container: z.string().trim().min(1).max(100).default("default"),

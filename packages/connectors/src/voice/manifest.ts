@@ -6,7 +6,7 @@ export default defineManifest({
   kind: "skill",
   name: "Voice notes",
   icon: "mic",
-  summary: "Send Palui a voice note and it reads the transcript.",
+  summary: "Voice notes, read as text.",
   config: z.object({
     model: z.string().trim().min(1).default("scribe_v1"),
     // ISO 639 code. "auto" (or empty) lets Scribe detect the language.

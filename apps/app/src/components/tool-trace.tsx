@@ -40,7 +40,7 @@ export function ToolTrace({ tools, limit = TRACE_LIMIT, className }: { tools: Tr
               <StatusText tone={CLASS_TONE[x.class] ?? "destructive"} icon={null}>{label("tool.class", x.class)}</StatusText>
               {/* A word next to the color, so a failed call doesn't rely on red alone. */}
               {x.status === "error" && <StatusText tone="destructive">{t("tool.failed")}</StatusText>}
-              {x.status === "denied" && <StatusText tone="outline">{t("tool.denied")}</StatusText>}
+              {x.status === "denied" && <StatusText tone="secondary">{t("tool.denied")}</StatusText>}
               {x.ms != null && <TraceDescription>{duration(x.ms)}</TraceDescription>}
             </TraceLine>
           </TraceCollapsibleTrigger>

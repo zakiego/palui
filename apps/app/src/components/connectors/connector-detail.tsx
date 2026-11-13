@@ -3,7 +3,7 @@
 // the danger area. Leaving the page with unsaved edits keeps them as a draft.
 import * as React from "react"
 import { useNavigate, useRouter } from "@tanstack/react-router"
-import { BotIcon, GlobeIcon } from "lucide-react"
+import { BotIcon, BugIcon, GlobeIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { ConnectorManifest, SetupStep } from "@palui/core/connectors/define"
 
@@ -351,7 +351,7 @@ export function ConnectorDetail({
                 {detail.data!.events.map((e) => (
                   <li key={e.id} className="flex min-w-0 items-baseline gap-2 text-sm">
                     <span className="shrink-0 font-mono text-caption text-muted-foreground tabular-nums">{inZone(e.at, detail.data?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</span>
-                    {e.level !== "info" && <StatusText tone={e.level === "error" ? "destructive" : e.level === "warn" ? "warning" : "outline"}>{e.level}</StatusText>}
+                    {e.level !== "info" && <StatusText tone={e.level === "error" ? "destructive" : e.level === "warn" ? "warning" : "outline"} icon={e.level === "debug" ? <BugIcon aria-hidden="true" /> : undefined}>{e.level}</StatusText>}
                     <span className="min-w-0 break-words">{e.message}</span>
                   </li>
                 ))}
