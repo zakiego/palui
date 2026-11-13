@@ -32,12 +32,21 @@ export const languageSchema = z.enum(["auto", "id", "en"])
 export const uiLanguageSchema = z.enum(["en", "id"])
 export const fallbackChannelSchema = z.enum(["telegram", "whatsapp", "none"])
 
+// A send_message body is at most 1800 characters and the signature at most 150,
+// so body + blank line + signature always fits the 2000 character cap on a
+// message to a contact (WhatsApp allows 4096).
+export const MAX_SIGNATURE = 150
+
 export const outboundSettingsSchema = z.object({
   enabled: z.boolean(),
   perContactPerDay: z.number().int().min(1).max(50),
   perDay: z.number().int().min(1).max(200),
   holdSeconds: z.number().int().min(0).max(120),
-  signature: z.string().trim().max(120),
+  signatureOn: z.boolean(),
+  signature: z
+    .string()
+    .transform((v) => v.replace(/\r\n?/g, "\n").trim())
+    .pipe(z.string().max(MAX_SIGNATURE)),
 })
 
 // A patch of the Settings page keys. Every key is optional; objects are whole.

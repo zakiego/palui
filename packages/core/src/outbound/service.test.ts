@@ -6,13 +6,14 @@ import { ensureChat } from "../chats"
 import { fakeChannel, seedConnector } from "../chat/testing"
 import { silentLogger } from "../log"
 import { createOutboxWorker } from "../outbox/worker"
-import { setSetting, DEFAULT_SETTINGS } from "../settings"
+import { setSetting, DEFAULT_SETTINGS, DEFAULT_OUTBOUND_SIGNATURE, LEGACY_OUTBOUND_SIGNATURES, getSetting } from "../settings"
 import { NOW, WITA, MIN, HOUR } from "../reminders/test-helpers"
 import { formatPhone, normalizePhone, phonesIn } from "./phone"
 import { createOutboundScheduler } from "./scheduler"
 import {
   addContact,
   cancelOutbound,
+  finalText,
   findContact,
   heldFromNotice,
   holdNotice,
@@ -21,6 +22,7 @@ import {
   newestHeld,
   OutboundError,
   removeContact,
+  saveOutboundSettings,
   scheduleSend,
   sendNow,
   setOutboundEnabled,
@@ -34,6 +36,8 @@ function setup() {
   const owner = ensureChat(db, { channel: "telegram", externalId: "42" }, NOW)
   return { db, owner }
 }
+
+const SIG = DEFAULT_OUTBOUND_SIGNATURE
 
 const meta = (ownerChatId: string) => ({ origin: "chat" as const, approvedBy: "owner" as const, ownerChatId })
 
@@ -118,20 +122,12 @@ describe("sending", () => {
     const r = sendNow(db, c, "Halo, ini asisten Zaki. Dia lagi otw.", { ...meta(owner.id), holdMs: 15_000 }, NOW)
     const row = db.select().from(outbox).where(eq(outbox.id, r.outboxId)).get()!
     expect(row).toMatchObject({ chatId: c.chatId, source: `outbound:${r.row.id}`, status: "pending", nextAttemptAt: NOW + 15_000 })
-    expect(row.payload.text).toBe("Halo, ini asisten Zaki. Dia lagi otw.")
+    expect(row.payload.text).toBe(`Halo, ini asisten Zaki. Dia lagi otw.\n\n${SIG}`)
     expect(newestHeld(db, owner.id, NOW + 1000)?.id).toBe(r.row.id)
     expect(cancelOutbound(db, r.row.id, NOW + 1000).ok).toBe(true)
     expect(db.select().from(outbox).where(eq(outbox.id, r.outboxId)).get()!.status).toBe("cancelled")
     expect(newestHeld(db, owner.id, NOW + 2000)).toBeUndefined()
     expect(cancelOutbound(db, r.row.id, NOW + 2000).ok).toBe(false)
-  })
-
-  it("appends the signature", () => {
-    const { db, owner } = setup()
-    setSetting(db, "outbound", { ...DEFAULT_SETTINGS.outbound, signature: "(dikirim asisten Zaki)" })
-    const c = addContact(db, { agentId: AGENT, name: "Zaki", phone: "082200001001" }, NOW)
-    const r = sendNow(db, c, "otw", { ...meta(owner.id), holdMs: 0 }, NOW)
-    expect(r.row.text).toBe("otw\n\n(dikirim asisten Zaki)")
   })
 
   it("enforces per-contact and total limits over a rolling day", () => {
@@ -201,6 +197,109 @@ describe("sending", () => {
     const { db } = setup()
     const c = addContact(db, { agentId: AGENT, name: "Zaki", phone: "082200001001" }, NOW)
     expect(updateContact(db, c.id, { policy: "allow" }, NOW).policy).toBe("allow")
+  })
+})
+
+describe("signature", () => {
+  const setupContact = () => {
+    const { db, owner } = setup()
+    const c = addContact(db, { agentId: AGENT, name: "Zaki", phone: "082200001001" }, NOW)
+    return { db, owner, c }
+  }
+  const sigOf = (ownerChatId: string) => ({ ...meta(ownerChatId), holdMs: 0 })
+
+  it("is on by default with the default text, after one blank line", () => {
+    const { db, owner, c } = setupContact()
+    expect(SIG).toBe("\u2014\n_Dikirim otomatis oleh asisten AI Zaki. Balasan ke nomor ini tidak dibaca, silakan hubungi Zaki langsung_")
+    const r = sendNow(db, c, "  otw  ", sigOf(owner.id), NOW)
+    expect(r.row.text).toBe(`otw\n\n${SIG}`)
+    expect(db.select().from(outbox).where(eq(outbox.id, r.outboxId)).get()!.payload.text).toBe(`otw\n\n${SIG}`)
+  })
+
+  it("uses the owner's own text, and nothing when turned off", () => {
+    const { db, owner, c } = setupContact()
+    saveOutboundSettings(db, { ...DEFAULT_SETTINGS.outbound, signature: "(dikirim asisten Zaki)" }, NOW)
+    expect(sendNow(db, c, "otw", sigOf(owner.id), NOW).row.text).toBe("otw\n\n(dikirim asisten Zaki)")
+    saveOutboundSettings(db, { ...DEFAULT_SETTINGS.outbound, signatureOn: false }, NOW)
+    expect(sendNow(db, c, "otw", sigOf(owner.id), NOW).row.text).toBe("otw")
+  })
+
+  it("leaves it off a message the owner opted out", () => {
+    const { db, owner, c } = setupContact()
+    expect(sendNow(db, c, "otw", { ...sigOf(owner.id), signature: false }, NOW).row.text).toBe("otw")
+    expect(scheduleSend(db, c, "malam", { localStart: "2026-11-10T20:00", tz: WITA }, { ...meta(owner.id), signature: false }, NOW).text).toBe("malam")
+  })
+
+  it("isn't added twice: current, earlier defaults, typed by hand, or an edited one", () => {
+    const { db, owner, c } = setupContact()
+    expect(finalText(db, `otw\n\n${SIG}`)).toBe(`otw\n\n${SIG}`)
+    for (const old of LEGACY_OUTBOUND_SIGNATURES) expect(finalText(db, `otw\n\n${old}`)).toBe(`otw\n\n${old}`)
+    // Typed by hand without the dash line or the italics.
+    expect(finalText(db, "otw\n\nPesan otomatis dari Palui, asisten Zaki. Balasan ke nomor ini tidak dibaca")).not.toContain(SIG)
+    expect(finalText(db, "otw\n_dikirim otomatis oleh asisten ai zaki. balasan ke nomor ini tidak dibaca, silakan hubungi zaki langsung_ ")).not.toContain("\u2014")
+    // A message that only mentions part of it still gets signed.
+    expect(finalText(db, "Balasan ke nomor ini tidak dibaca?")).toBe(`Balasan ke nomor ini tidak dibaca?\n\n${SIG}`)
+    // After the owner edits it, a text with the previous one isn't signed again.
+    const before = sendNow(db, c, "pagi", sigOf(owner.id), NOW).row.text
+    saveOutboundSettings(db, { ...DEFAULT_SETTINGS.outbound, signature: "\u2014\n_Asisten Zaki_" }, NOW)
+    expect(getSetting(db, "outbound").pastSignatures).toEqual([SIG])
+    expect(finalText(db, before)).toBe(before)
+    expect(finalText(db, "siang")).toBe("siang\n\n\u2014\n_Asisten Zaki_")
+  })
+
+  it("counts against the 2000 character cap: a full 1800 body plus the longest signature fits", () => {
+    const { db } = setupContact()
+    saveOutboundSettings(db, { ...DEFAULT_SETTINGS.outbound, signature: "s".repeat(150) }, NOW)
+    expect(finalText(db, "a".repeat(1800))).toHaveLength(1800 + 2 + 150)
+    expect(() => finalText(db, "a".repeat(1900))).toThrow(/2000 characters, signature included/)
+  })
+
+  it("refuses an empty signature that is turned on", () => {
+    const { db } = setupContact()
+    expect(() => saveOutboundSettings(db, { ...DEFAULT_SETTINGS.outbound, signature: "  " }, NOW)).toThrow(OutboundError)
+  })
+
+  it("turns on for settings saved before the switch existed, keeping a custom text", () => {
+    const { db } = setupContact()
+    const { signatureOn: _on, pastSignatures: _past, ...old } = DEFAULT_SETTINGS.outbound
+    setSetting(db, "outbound", { ...old, signature: "" } as never)
+    expect(getSetting(db, "outbound")).toMatchObject({ signatureOn: true, signature: SIG })
+    setSetting(db, "outbound", { ...old, signature: "(dikirim asisten Zaki)" } as never)
+    expect(getSetting(db, "outbound")).toMatchObject({ signatureOn: true, signature: "(dikirim asisten Zaki)" })
+  })
+
+  it("is in the cancel notice the owner sees", () => {
+    const { db, owner, c } = setupContact()
+    const r = sendNow(db, c, "otw", { ...meta(owner.id), holdMs: 15_000 }, NOW)
+    holdNotice(db, r.row, c, r.sendAt, NOW)
+    const notice = db.select().from(outbox).where(eq(outbox.source, `outbound-notice:${r.row.id}`)).get()!
+    expect(notice.payload.text).toBe(`Pesan ke Zaki (+62 822-0000-1001) kekirim 15 detik lagi:\n\notw\n\n${SIG}`)
+  })
+
+  it("scheduled and repeating sends store the signed text and send it once", () => {
+    const { db, owner, c } = setupContact()
+    const ext = createOutboundScheduler({ db, log: silentLogger })
+    const one = scheduleSend(db, c, "malam", { localStart: "2026-11-10T20:00", tz: WITA }, meta(owner.id), NOW)
+    const weekly = scheduleSend(db, c, "kabar", { localStart: "2026-11-13T11:00", tz: WITA, rrule: "FREQ=WEEKLY;BYDAY=FR" }, meta(owner.id), NOW)
+    expect(one.text).toBe(`malam\n\n${SIG}`)
+    expect(weekly.text).toBe(`kabar\n\n${SIG}`)
+    ext.sweep(one.fireAt)
+    ext.sweep(weekly.fireAt)
+    ext.sweep(weekly.fireAt + 7 * 24 * HOUR)
+    const texts = (id: string) => db.select().from(outbox).where(eq(outbox.source, `outbound:${id}`)).all().map((r) => r.payload.text)
+    expect(texts(one.id)).toEqual([`malam\n\n${SIG}`])
+    expect(texts(weekly.id)).toEqual([`kabar\n\n${SIG}`, `kabar\n\n${SIG}`])
+  })
+
+  it("a repeat saved with an earlier signature keeps one signature", () => {
+    const { db, owner, c } = setupContact()
+    const ext = createOutboundScheduler({ db, log: silentLogger })
+    const old = LEGACY_OUTBOUND_SIGNATURES[0]!
+    // Saved by the agent from the old standing instruction.
+    const r = scheduleSend(db, c, `kabar\n\n${old}`, { localStart: "2026-11-13T11:00", tz: WITA, rrule: "FREQ=WEEKLY;BYDAY=FR" }, meta(owner.id), NOW)
+    expect(r.text).toBe(`kabar\n\n${old}`)
+    ext.sweep(r.fireAt)
+    expect(db.select().from(outbox).where(eq(outbox.source, `outbound:${r.id}`)).get()!.payload.text).toBe(`kabar\n\n${old}`)
   })
 })
 
@@ -275,7 +374,7 @@ describe("outbox worker and outbound rows", () => {
     sendNow(db, c, "otw", { ...meta(owner.id), holdMs: 0 }, NOW)
     const worker = createOutboxWorker({ db, channel: (ch) => (ch === "whatsapp" ? wa : undefined), log: silentLogger, clock: () => NOW })
     await worker.tick()
-    expect(wa.sent).toEqual([{ to: "6282200001001@s.whatsapp.net", payload: { text: "otw", format: "plain" } }])
+    expect(wa.sent).toEqual([{ to: "6282200001001@s.whatsapp.net", payload: { text: `otw\n\n${SIG}`, format: "plain" } }])
   })
 })
 

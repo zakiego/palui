@@ -496,7 +496,10 @@ export function worst(k: Kit) {
   for (const e of events) k.event(e)
 
   // --- outbound: the longest name, note and text, every send status, a removed contact ---
-  k.setting("outbound", { enabled: true, perContactPerDay: 50, perDay: 200, holdSeconds: 120, signature: within("(dikirim asisten Muhammad Zakiyuddin Munziri lewat Palui, balas ke nomor pribadinya ya)", 120) })
+  k.setting("outbound", { enabled: true, perContactPerDay: 50, perDay: 200, holdSeconds: 120, signatureOn: true,
+    signature: within("\u2014\n_Dikirim otomatis oleh asisten AI Muhammad Zakiyuddin Munziri. Balasan ke nomor ini tidak dibaca, silakan hubungi beliau langsung di nomornya ya_", 150),
+    pastSignatures: [],
+  })
   const longContact = k.chat("whatsapp", "6282200001001@s.whatsapp.net", within("Muhammad Fadhlurrahman Al-Banjari bin H. Abdurrahman Siddiq", LIMITS.contactName), { allowed: false })
   k.contact(
     longContact,

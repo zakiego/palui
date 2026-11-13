@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest"
 import { memoryDb, outbox, outboundMessages } from "@palui/db"
 import { ensureChat } from "@palui/core/chats"
 import type { PaluiTool, TurnInfo } from "@palui/core/connectors/define"
-import { addContact, listContacts, setOutboundEnabled, updateContact } from "@palui/core/outbound/service"
+import { addContact, listContacts, saveOutboundSettings, setOutboundEnabled, updateContact } from "@palui/core/outbound/service"
+import { DEFAULT_OUTBOUND_SIGNATURE as SIG, DEFAULT_SETTINGS, LEGACY_OUTBOUND_SIGNATURES } from "@palui/core/settings"
 import manifest from "./manifest"
 import { outboundTools } from "./runtime"
 
@@ -79,9 +80,9 @@ describe("approval policy", () => {
     const { db, tools } = setup()
     addContact(db, { agentId: AGENT, name: "Zaki", phone: "082200001001" }, NOW)
     const t = tools().send_message!
-    expect(t.preview!(otw)).toBe("Kirim pesan ke Zaki (+62 822-0000-1001)\nKapan: sekarang (ditahan 15 detik, bisa dibatalin)\nIsi pesan:\nHalo, ini asisten Zaki. Zaki lagi otw ya.")
+    expect(t.preview!(otw)).toBe(`Kirim pesan ke Zaki (+62 822-0000-1001)\nKapan: sekarang (ditahan 15 detik, bisa dibatalin)\nIsi pesan:\nHalo, ini asisten Zaki. Zaki lagi otw ya.\n\n${SIG}`)
     expect(t.preview!({ to: "081111111111", name: "Budi", text: "halo", localDateTime: "2026-11-10T20:00" })).toBe(
-      "Kirim pesan ke Budi (+62 811-1111-1111), kontak baru\nKapan: Hari ini, 20.00 WITA\nIsi pesan:\nhalo",
+      `Kirim pesan ke Budi (+62 811-1111-1111), kontak baru\nKapan: Hari ini, 20.00 WITA\nIsi pesan:\nhalo\n\n${SIG}`,
     )
     expect(t.preview!({ to: "Zaki", text: "kabar", localDateTime: "2026-11-13T11:00", rrule: "FREQ=WEEKLY;BYDAY=FR" })).toContain("Kapan: Tiap Jumat")
   })
@@ -95,9 +96,10 @@ describe("send_message", () => {
     expect(r.ok).toBe(true)
     const row = db.select().from(outbox).where(eq(outbox.source, `outbound:${r.id}`)).get()!
     expect(row).toMatchObject({ chatId: c.chatId, nextAttemptAt: NOW + 15_000 })
-    expect(row.payload.text).toBe(otw.text)
+    expect(row.payload.text).toBe(`${otw.text}\n\n${SIG}`)
     const notice = db.select().from(outbox).where(eq(outbox.source, `outbound-notice:${r.id}`)).get()!
     expect(notice.chatId).toBe(chat.id)
+    expect(notice.payload.text).toContain(`${otw.text}\n\n${SIG}`)
     expect(db.select().from(outboundMessages).get()).toMatchObject({ approvedBy: "policy", origin: "chat", ownerChatId: chat.id })
   })
 
@@ -141,6 +143,50 @@ describe("send_message", () => {
     addContact(db, { agentId: AGENT, name: "Zaki", phone: "082200001001" }, NOW)
     const r = await call(tools().send_message, otw)
     expect(await call(tools().cancel_message, { id: r.id })).toEqual({ ok: true, message: "Oke, pesan ke Zaki dibatalin." })
+  })
+})
+
+describe("send_message signature", () => {
+  it("previews no signature when the owner opted out, and sends it bare", async () => {
+    const { db, tools } = setup()
+    addContact(db, { agentId: AGENT, name: "Zaki", phone: "082200001001" }, NOW)
+    const t = tools().send_message!
+    expect(t.preview!({ ...otw, signature: false })).toBe("Kirim pesan ke Zaki (+62 822-0000-1001)\nKapan: sekarang (ditahan 15 detik, bisa dibatalin)\nTanpa tanda tangan\nIsi pesan:\nHalo, ini asisten Zaki. Zaki lagi otw ya.")
+    const r = await call(t, { ...otw, signature: false })
+    expect(db.select().from(outbox).where(eq(outbox.source, `outbound:${r.id}`)).get()!.payload.text).toBe(otw.text)
+  })
+
+  it("tells the model the opt-out is only for an explicit ask", () => {
+    const { tools } = setup()
+    const shape = (tools().send_message!.tool.inputSchema as unknown as { shape: Record<string, { description?: string }> }).shape
+    expect(shape.signature!.description).toMatch(/only when the owner explicitly asked/)
+  })
+
+  it("doesn't sign twice when the agent already wrote it, old text included", async () => {
+    const { db, tools } = setup()
+    addContact(db, { agentId: AGENT, name: "Zaki", phone: "082200001001" }, NOW)
+    for (const sig of [SIG, ...LEGACY_OUTBOUND_SIGNATURES]) {
+      const text = `${otw.text}\n\n${sig}`
+      expect(tools().send_message!.preview!({ ...otw, text })).toMatch(new RegExp(`${otw.text.replace(/\./g, "\\.")}\\n\\n\u2014`))
+      const r = await call(tools().send_message, { ...otw, text })
+      const sent = db.select().from(outbox).where(eq(outbox.source, `outbound:${r.id}`)).get()!.payload.text
+      expect(sent).toBe(text)
+    }
+  })
+
+  it("schedules a one-off and a repeat with the signature", async () => {
+    const { db, tools } = setup()
+    addContact(db, { agentId: AGENT, name: "Zaki", phone: "082200001001" }, NOW)
+    await call(tools().send_message, { ...otw, localDateTime: "2026-11-10T20:00" })
+    await call(tools().send_message, { to: "Zaki", text: "kabar", localDateTime: "2026-11-13T11:00", rrule: "FREQ=WEEKLY;BYDAY=FR" })
+    expect(db.select().from(outboundMessages).all().map((r) => r.text)).toEqual([`${otw.text}\n\n${SIG}`, `kabar\n\n${SIG}`])
+  })
+
+  it("previews the owner's edited signature", () => {
+    const { db, tools } = setup()
+    addContact(db, { agentId: AGENT, name: "Zaki", phone: "082200001001" }, NOW)
+    saveOutboundSettings(db, { ...DEFAULT_SETTINGS.outbound, signature: "_Asisten Zaki_" }, NOW)
+    expect(tools().send_message!.preview!(otw)).toMatch(/lagi otw ya\.\n\n_Asisten Zaki_$/)
   })
 })
 

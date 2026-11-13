@@ -36,7 +36,7 @@ Each trigger fires at most once per key (the occurrence, the webhook delivery id
 | `tool` | Calls a tool server-side with your flow's chat in context. Read tools retry twice. |
 | `if` | Picks a branch from a condition like `daysUntil(item.due) < 3`. The run log keeps the values it compared. |
 | `set` | Sets a run variable, or a flow variable that persists across runs (16 KB at most). |
-| `message` | Sends a message to the flow's chat, or to another chat you allowed. |
+| `message` | Sends a message to the flow's chat, to another chat you allowed, or to a saved contact with `contact`. A message to a contact gets the signature from the Outbound page unless the step sets `signature: false`. |
 | `checkin` | Asks with answer buttons, re-asks until a closing answer or the deadline, and branches on the answer. |
 | `wait` | Sleeps for some minutes or until a time, up to 7 days. Survives restarts. |
 | `prompt` | Runs one model turn on data you pass in, for the parts that need wording. Fetched text goes in a separate data block the model is told never to follow. |

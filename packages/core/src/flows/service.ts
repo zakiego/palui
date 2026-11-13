@@ -3,7 +3,7 @@
 // this module owns the rows. Every write that moves a due time calls
 // notifyScheduleChanged() so the scheduler re-arms at once.
 import { getDefaultAgent } from "../agents"
-import { findContact } from "../outbound/service"
+import { findContact, outboundSettings } from "../outbound/service"
 import { createHash } from "node:crypto"
 import { and, asc, desc, eq, inArray } from "drizzle-orm"
 import { chats, flowRuns, flows, flowStepRuns, flowTriggers, flowVersions, newId, pendingApprovals, type DB, type SourceCursor } from "@palui/db"
@@ -396,6 +396,12 @@ export function diffDefinitions(a: FlowDefinition, b: FlowDefinition): string[] 
   return out
 }
 
+// Whether this version sends a contact a message that gets the signature.
+function signsContactMessages(db: DB, version: VersionRow): boolean {
+  if (!outboundSettings(db).signatureOn) return false
+  return (version.writeCalls as unknown as WriteCall[]).some((w) => w.kind === "message" && w.to.startsWith("contact:") && w.signature !== false)
+}
+
 // One prompt per version with write calls: the calls with their arg templates, and
 // what changed since the last approved version.
 export function requestVersionApproval(db: DB, flow: FlowRow, version: VersionRow, approved: VersionRow | null, now: number) {
@@ -406,6 +412,7 @@ export function requestVersionApproval(db: DB, flow: FlowRow, version: VersionRo
   const text = [
     `Flow "${flow.name}" versi ${version.n} mau jalanin aksi yang mengubah data tanpa nanya lagi tiap kali:`,
     ...calls,
+    ...(signsContactMessages(db, version) ? ["", "Pesan ke kontak dikirim dengan tanda tangan dari halaman Outbound."] : []),
     ...(diff.length ? ["", `Berubah dari versi ${approved!.n} yang disetujui: ${diff.slice(0, 10).join(", ")}`] : []),
     "",
     "Setujui? Balas ya atau batal (quote pesan ini). Sampai disetujui, bagian yang mengubah data nggak jalan; sisanya tetap jalan.",

@@ -30,13 +30,15 @@ import { Card } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { StatusText, type StatusTone } from "@/components/ui/status-text"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { MAX_SIGNATURE } from "@palui/core/settings-schema"
 import { addContactFn, cancelOutboundFn, getOutbound, LOG_LIMIT, removeContactFn, saveOutboundLimits, setContactPolicy, setOutboundSwitch } from "@/lib/fns/outbound"
 import { clip, errorMessage, inZone } from "@/lib/format"
 import { useT } from "@/lib/i18n"
@@ -579,6 +581,7 @@ function LimitsDialog({ open, onOpenChange, data }: { open: boolean; onOpenChang
   const [perContact, setPerContact] = React.useState(String(s.perContactPerDay))
   const [perDay, setPerDay] = React.useState(String(s.perDay))
   const [hold, setHold] = React.useState(String(s.holdSeconds))
+  const [signatureOn, setSignatureOn] = React.useState(s.signatureOn)
   const [signature, setSignature] = React.useState(s.signature)
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string>()
@@ -587,6 +590,7 @@ function LimitsDialog({ open, onOpenChange, data }: { open: boolean; onOpenChang
       setPerContact(String(s.perContactPerDay))
       setPerDay(String(s.perDay))
       setHold(String(s.holdSeconds))
+      setSignatureOn(s.signatureOn)
       setSignature(s.signature)
       setError(undefined)
     }
@@ -595,7 +599,7 @@ function LimitsDialog({ open, onOpenChange, data }: { open: boolean; onOpenChang
     setSaving(true)
     setError(undefined)
     try {
-      await saveOutboundLimits({ data: { perContactPerDay: Number(perContact), perDay: Number(perDay), holdSeconds: Number(hold), signature } })
+      await saveOutboundLimits({ data: { perContactPerDay: Number(perContact), perDay: Number(perDay), holdSeconds: Number(hold), signatureOn, signature } })
       toast.success(t("outbound.limitsSaved"))
       onOpenChange(false)
       void router.invalidate()
@@ -633,11 +637,22 @@ function LimitsDialog({ open, onOpenChange, data }: { open: boolean; onOpenChang
               <Input id="lim-hold" type="number" min={0} max={120} value={hold} onChange={(e) => setHold(e.target.value)} className="font-mono text-base md:text-sm" />
               <FieldDescription>{t("outbound.holdHint")}</FieldDescription>
             </Field>
-            <Field>
-              <FieldLabel htmlFor="lim-sig">{t("outbound.signature")}</FieldLabel>
-              <Input id="lim-sig" maxLength={120} placeholder="(dikirim asisten Zaki)" value={signature} onChange={(e) => setSignature(e.target.value)} className="text-base md:text-sm" />
-              <FieldDescription>{t("outbound.signatureHint")}</FieldDescription>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="lim-sig-on">{t("outbound.signature")}</FieldLabel>
+                <FieldDescription>{t("outbound.signatureHint")}</FieldDescription>
+              </FieldContent>
+              <Switch id="lim-sig-on" checked={signatureOn} onCheckedChange={setSignatureOn} />
             </Field>
+            {signatureOn && (
+              <Field>
+                <FieldLabel htmlFor="lim-sig" className="sr-only">
+                  {t("outbound.signatureText")}
+                </FieldLabel>
+                <Textarea id="lim-sig" rows={3} maxLength={MAX_SIGNATURE} value={signature} onChange={(e) => setSignature(e.target.value)} className="text-base md:text-sm" />
+                <FieldDescription>{t("outbound.signatureTextHint", { max: MAX_SIGNATURE })}</FieldDescription>
+              </Field>
+            )}
             {error && (
               <Alert variant="destructive">
                 <AlertTitle>{t("outbound.limitsError")}</AlertTitle>

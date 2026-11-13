@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm"
+import { eq, like } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
-import { outbox, outboundMessages } from "@palui/db"
+import { flowStepRuns, outbox, outboundMessages } from "@palui/db"
 import { ensureChat } from "../chats"
 import { getDefaultAgent } from "../agents"
-import { addContact, removeContact, setOutboundEnabled, updateContact } from "../outbound/service"
-import { decideVersion } from "./service"
+import { addContact, removeContact, saveOutboundSettings, setOutboundEnabled, updateContact } from "../outbound/service"
+import { DEFAULT_OUTBOUND_SIGNATURE, DEFAULT_SETTINGS } from "../settings"
+import { decideVersion, updateFlow } from "./service"
 import { at, exampleConnectors, flowHarness, runsOf, sentTexts, stepLog } from "./test-harness"
 
 
@@ -92,9 +93,59 @@ describe("message.contact (docs/design/outbound-messages.md)", () => {
     decideVersion(h.db, saved.version.id, true, "test", h.now())
     await h.run(h.now())
     const sent = h.db.select().from(outbox).where(eq(outbox.chatId, zaki.chatId)).all()
-    expect(sent.map((r) => r.payload.text)).toEqual(["Zaki belum jawab check-in."])
+    expect(sent.map((r) => r.payload.text)).toEqual([`Zaki belum jawab check-in.\n\n${DEFAULT_OUTBOUND_SIGNATURE}`])
     expect(sent[0]!.source).toMatch(/^outbound:obm_/)
     expect(h.db.select().from(outboundMessages).get()).toMatchObject({ origin: "flow", approvedBy: "flow_version", contactId: zaki.id })
+  })
+
+  it("signs the message, and the version approval says so", async () => {
+    const h = flowHarness()
+    const zaki = addContact(h.db, { agentId: getDefaultAgent(h.db).id, name: "Zaki", phone: "082200001001" }, h.now())
+    const saved = h.create({ name: "Kabar", steps: [{ id: "m", kind: "message", text: "halo", contact: "Zaki" }] })
+    const prompt = h.db.select().from(outbox).where(like(outbox.source, "flowver:%")).all().at(-1)!
+    expect(prompt.payload.text).toContain("Pesan ke kontak dikirim dengan tanda tangan dari halaman Outbound.")
+    decideVersion(h.db, saved.version.id, true, "test", h.now())
+    h.engine.startRun({ flowId: saved.flow.id, triggerKind: "manual", runKey: "m1", payload: {}, now: h.now() })
+    await h.run(h.now())
+    const run = runsOf(h.db, saved.flow.id)[0]!
+    expect(h.db.select().from(flowStepRuns).where(eq(flowStepRuns.runId, run.id)).get()!.output).toMatchObject({ text: `halo\n\n${DEFAULT_OUTBOUND_SIGNATURE}` })
+    // An owner notice for a flow send shows the signed text too.
+    const notice = h.db.select().from(outbox).where(like(outbox.source, "outbound-notice:%")).all()
+    for (const n of notice) expect(n.payload.text).toContain(DEFAULT_OUTBOUND_SIGNATURE)
+    expect(h.db.select().from(outbox).where(eq(outbox.chatId, zaki.chatId)).all().map((r) => r.payload.text)).toEqual([`halo\n\n${DEFAULT_OUTBOUND_SIGNATURE}`])
+  })
+
+  it("a changed signature text needs no new approval and goes out on the next run", async () => {
+    const h = flowHarness()
+    const zaki = addContact(h.db, { agentId: getDefaultAgent(h.db).id, name: "Zaki", phone: "082200001001" }, h.now())
+    const saved = h.create({ name: "Kabar", steps: [{ id: "m", kind: "message", text: "halo", contact: "Zaki" }] })
+    decideVersion(h.db, saved.version.id, true, "test", h.now())
+    saveOutboundSettings(h.db, { ...DEFAULT_SETTINGS.outbound, signature: "_Asisten Zaki_" }, h.now())
+    h.engine.startRun({ flowId: saved.flow.id, triggerKind: "manual", runKey: "m1", payload: {}, now: h.now() })
+    await h.run(h.now())
+    expect(h.db.select().from(outbox).where(eq(outbox.chatId, zaki.chatId)).all().map((r) => r.payload.text)).toEqual(["halo\n\n_Asisten Zaki_"])
+  })
+
+  it("signature: false sends it bare, and dropping the signature is a change the owner approves", async () => {
+    const h = flowHarness()
+    const zaki = addContact(h.db, { agentId: getDefaultAgent(h.db).id, name: "Zaki", phone: "082200001001" }, h.now())
+    const signed = h.create({ name: "Kabar", steps: [{ id: "m", kind: "message", text: "halo", contact: "Zaki" }] })
+    decideVersion(h.db, signed.version.id, true, "test", h.now())
+    const bare = updateFlow(h.db, signed.flow.id, { definition: { name: "Kabar", steps: [{ id: "m", kind: "message", text: "halo", contact: "Zaki", signature: false }] }, createdBy: "test" }, h.now())
+    expect(bare.needsApproval).toBe(true)
+    expect(bare.writeCalls).toEqual([{ stepId: "m", kind: "message", to: `contact:${zaki.id}`, label: "Zaki", signature: false }])
+    const prompt = h.db.select().from(outbox).where(like(outbox.source, "flowver:%")).all().at(-1)!
+    expect(prompt.payload.text).toContain("kirim pesan ke kontak Zaki (tanpa tanda tangan)")
+    expect(prompt.payload.text).not.toContain("dengan tanda tangan")
+    decideVersion(h.db, bare.version.id, true, "test", h.now())
+    h.engine.startRun({ flowId: signed.flow.id, triggerKind: "manual", runKey: "m1", payload: {}, now: h.now() })
+    await h.run(h.now())
+    expect(h.db.select().from(outbox).where(eq(outbox.chatId, zaki.chatId)).all().map((r) => r.payload.text)).toEqual(["halo"])
+  })
+
+  it("refuses signature on a message that isn't to a contact", () => {
+    const h = flowHarness()
+    expect(() => h.create({ name: "A", steps: [{ id: "m", kind: "message", text: "x", signature: false }] })).toThrow(/signature only applies/)
   })
 
   it("refuses unknown contacts, templates, and to plus contact", () => {

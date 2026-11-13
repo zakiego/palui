@@ -5,6 +5,7 @@ import type { ReasoningEffort } from "./models/effort"
 
 export type ModelRole = "default" | "fast" | "vision"
 
+export { MAX_SIGNATURE } from "./settings-schema"
 export { REASONING_EFFORTS, type ReasoningEffort } from "./models/effort"
 
 export type ModelChainLink = { connectorId: string; model: string; effort?: ReasoningEffort }
@@ -50,9 +51,24 @@ export type OutboundSettings = {
   perDay: number
   // "Now" sends wait this long so the owner can cancel them.
   holdSeconds: number
-  // Appended on its own line when set.
+  // Appended to every message to a contact, after a blank line, unless the
+  // owner opted a message out or the text already ends with a known signature.
+  signatureOn: boolean
   signature: string
+  // Texts this signature had before, newest first, so a message already
+  // carrying one isn't signed twice after the owner edits it.
+  pastSignatures: string[]
 }
+
+// The default signature. The em dash line and the WhatsApp italics are wanted.
+export const DEFAULT_OUTBOUND_SIGNATURE = "\u2014\n_Dikirim otomatis oleh asisten AI Zaki. Balasan ke nomor ini tidak dibaca, silakan hubungi Zaki langsung_"
+
+// Earlier defaults and the standing instruction's text. Messages saved with
+// them (scheduled, repeating, or written by the agent) count as signed.
+export const LEGACY_OUTBOUND_SIGNATURES = [
+  "\u2014\n_Pesan otomatis dari Palui, asisten Zaki. Balasan ke nomor ini tidak dibaca_",
+  "\u2014\n_Pesan otomatis dari asisten AI milik Zaki. Balasan ke nomor ini tidak dibaca. Silakan balas ke nomor utama Zaki_",
+]
 
 export const DEFAULT_PERSONA = `Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.
 Default bahasa Indonesia santai. Kalau Zaki menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.
@@ -92,7 +108,7 @@ export const DEFAULT_SETTINGS: Settings = {
   turnsPausedUntil: null,
   turnsPausedReason: null,
   firstRun: { saidHi: false, dismissed: false },
-  outbound: { enabled: true, perContactPerDay: 5, perDay: 20, holdSeconds: 15, signature: "" },
+  outbound: { enabled: true, perContactPerDay: 5, perDay: 20, holdSeconds: 15, signatureOn: true, signature: DEFAULT_OUTBOUND_SIGNATURE, pastSignatures: [] },
   deployNoticeChats: [],
   lastRunVersion: null,
   lastRunCommit: null,
@@ -104,9 +120,17 @@ export function getSetting<K extends keyof Settings>(db: DB, key: K): Settings[K
   const def = DEFAULT_SETTINGS[key]
   // Merge objects so a new default field shows up on old rows.
   if (def && typeof def === "object" && !Array.isArray(def) && row.value && typeof row.value === "object") {
-    return { ...def, ...(row.value as object) } as Settings[K]
+    const merged = { ...def, ...(row.value as object) } as Settings[K]
+    return key === "outbound" ? (upgradeOutbound(row.value as Partial<OutboundSettings>, merged as OutboundSettings) as Settings[K]) : merged
   }
   return row.value as Settings[K]
+}
+
+// Rows saved before the signature switch existed had signature "" for "none
+// yet". They get the default signature, which is on; a custom text is kept.
+function upgradeOutbound(raw: Partial<OutboundSettings>, merged: OutboundSettings): OutboundSettings {
+  if (raw.signatureOn !== undefined) return merged
+  return { ...merged, signatureOn: true, signature: raw.signature?.trim() || DEFAULT_OUTBOUND_SIGNATURE }
 }
 
 export function setSetting<K extends keyof Settings>(db: DB, key: K, value: Settings[K], now = Date.now()) {

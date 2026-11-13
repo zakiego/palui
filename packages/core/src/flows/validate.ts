@@ -43,7 +43,8 @@ export type ToolInfo = {
 export type WriteCall =
   | { stepId: string; kind: "tool"; connectorId: string; connectorType?: string; tool: string; class: ToolClass; args: Record<string, unknown> }
   // `to` is a chat id, or "contact:<id>" for a saved contact (label: its name).
-  | { stepId: string; kind: "message"; to: string; label?: string }
+  // `signature: false`: a contact message the step sends without the signature.
+  | { stepId: string; kind: "message"; to: string; label?: string; signature?: false }
 
 export type ValidateContext = {
   // Resolves a tool step's tool. Omitted: tools aren't checked (offline drafts).
@@ -171,6 +172,7 @@ export function validateDefinition(raw: unknown, ctx: ValidateContext = {}): Val
         noTemplate(["to"], s.to, "message.to")
         noTemplate(["contact"], s.contact, "message.contact")
         if (s.to && s.contact) p(["steps", i, "contact"], "Use either to (a chat) or contact (a saved contact), not both.")
+        if (s.signature !== undefined && !s.contact) p(["steps", i, "signature"], "signature only applies to a message to a contact.")
         break
       case "checkin":
         tpl(["text"], s.text)
@@ -287,7 +289,7 @@ export function validateDefinition(raw: unknown, ctx: ValidateContext = {}): Val
       const c = ctx.resolveContact ? ctx.resolveContact(s.contact) : null
       if (!c) p(["steps", i, "contact"], `No saved contact ${s.contact}. Contacts are added from chat by sending them a message, or on the Outbound page.`)
       // Always approved per version, whatever the contact's own setting: the flow picks the moment, not the owner.
-      else out.writeCalls.push({ stepId: s.id, kind: "message", to: `contact:${c.id}`, label: c.name })
+      else out.writeCalls.push({ stepId: s.id, kind: "message", to: `contact:${c.id}`, label: c.name, ...(s.signature === false ? { signature: false as const } : {}) })
     }
     if (s.kind === "message" && s.to && s.to !== ownChat) {
       const ok = ctx.chatAllowed ? ctx.chatAllowed(s.to) : "allowed"
@@ -311,7 +313,10 @@ function pathsOfEachItems(s: Extract<FlowStep, { kind: "each" }>): PathNode[] {
 
 // The write calls as the owner sees them: "keuangan.mark_paid(id: {{item.id}})".
 export function describeWriteCall(w: WriteCall): string {
-  if (w.kind === "message") return w.to.startsWith("contact:") ? `kirim pesan ke kontak ${w.label ?? w.to.slice(8)}` : `kirim pesan ke chat ${w.to}`
+  if (w.kind === "message") {
+    if (!w.to.startsWith("contact:")) return `kirim pesan ke chat ${w.to}`
+    return `kirim pesan ke kontak ${w.label ?? w.to.slice(8)}${w.signature === false ? " (tanpa tanda tangan)" : ""}`
+  }
   const args = Object.entries(w.args)
     .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
     .join(", ")
@@ -320,7 +325,8 @@ export function describeWriteCall(w: WriteCall): string {
 
 // Same calls, same args templates, same classes: no new approval needed.
 export function sameWriteCalls(a: WriteCall[], b: WriteCall[]): boolean {
-  const key = (w: WriteCall) => (w.kind === "message" ? `m:${w.to}` : `t:${w.connectorId}:${w.tool}:${w.class}:${canonicalJson(w.args)}`)
+  // Dropping a contact message's signature is a change the owner approves.
+  const key = (w: WriteCall) => (w.kind === "message" ? `m:${w.to}${w.signature === false ? ":unsigned" : ""}` : `t:${w.connectorId}:${w.tool}:${w.class}:${canonicalJson(w.args)}`)
   const ka = a.map(key).sort()
   const kb = b.map(key).sort()
   return ka.length === kb.length && ka.every((x, i) => x === kb[i])

@@ -7,11 +7,11 @@ import { chats, outbox, outboundMessages } from "@palui/db"
 import { createServerFn } from "@tanstack/react-start"
 import { z } from "zod"
 import { outboundSettingsSchema } from "@palui/core/settings-schema"
-import { getSetting, setSetting } from "@palui/core/settings"
+import { getSetting } from "@palui/core/settings"
 import { getOwner } from "@palui/core/owner"
 import { getAgent, getDefaultAgent, listAgents } from "@palui/core/agents"
 import { formatPhone } from "@palui/core/outbound/phone"
-import { addContact, cancelOutbound, getContact, listContacts, OutboundError, removeContact, setOutboundEnabled, updateContact, usage } from "@palui/core/outbound/service"
+import { addContact, cancelOutbound, getContact, listContacts, OutboundError, removeContact, saveOutboundSettings, setOutboundEnabled, updateContact, usage } from "@palui/core/outbound/service"
 import { requireUser, requireWriter } from "@/server/session"
 
 export const LOG_LIMIT = 100
@@ -99,7 +99,7 @@ export const saveOutboundLimits = createServerFn({ method: "POST" })
   .validator(outboundSettingsSchema.omit({ enabled: true }))
   .handler(async ({ data }) => {
     const { db } = await requireWriter()
-    setSetting(db, "outbound", { ...getSetting(db, "outbound"), ...data })
+    friendly(() => saveOutboundSettings(db, data))
     return { ok: true }
   })
 
