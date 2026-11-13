@@ -133,14 +133,14 @@
 .br-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 8px;
-  background: var(--lp-accent);
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  background: var(--lp-btn);
   color: var(--lp-accent-ink);
-  font-size: 15px;
-  font-weight: 590;
+  font-size: 13px;
+  font-weight: 510;
   touch-action: manipulation;
   transition:
     transform 140ms var(--lp-ease),
@@ -148,8 +148,8 @@
     border-color 160ms var(--lp-ease);
 }
 .br-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
 }
 .br-btn-quiet {
@@ -163,7 +163,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .br-btn:hover {
-    background: var(--lp-accent-hover);
+    background: var(--lp-accent);
   }
   .br-btn-quiet:hover {
     border-color: var(--lp-dim);

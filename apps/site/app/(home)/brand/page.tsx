@@ -45,7 +45,7 @@ const colors = [
   { name: "Line", hex: "#23252a", use: "Borders" },
   { name: "Muted", hex: "#8a8f98", use: "Muted text" },
   { name: "Text", hex: "#f7f8f8", use: "Body text" },
-  { name: "Indigo", hex: "#5e6ad2", use: "Focus only" },
+  { name: "Indigo", hex: "#5e6ad2", use: "Focus and on" },
 ]
 
 export default function BrandPage() {

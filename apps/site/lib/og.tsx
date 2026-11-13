@@ -11,6 +11,8 @@ import { MARK_CAP, MARK_EYES, MARK_SMILE, MARK_TILE } from "@/components/palui-m
 // carries the landing's mascot on its stage. Satori can't read CSS variables,
 // so the values below are copied from components/landing/landing.css.
 const BG = "#08090a"
+// The stage: the landing's faint white wash and 8% white hairline, flattened
+// over the page black.
 const STAGE = "#0c0d0e"
 const HAIRLINE = "#1d1e20"
 const TEXT = "#f7f8f8"

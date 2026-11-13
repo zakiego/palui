@@ -15,9 +15,9 @@
   --lp-bg: #08090a;
   --lp-surface: #0f1011;
   --lp-raise: #141516;
-  --lp-bar: #0c0d0e;
   --lp-line: #23252a;
   --lp-line-soft: #1c1c1f;
+  --lp-fill-hover: #232326;
   --lp-line-strong: #34343a;
   --lp-edge: #62666d;
   --lp-text: #f7f8f8;
@@ -72,7 +72,7 @@ html:has(.lp-root) {
 }
 
 .lp-root ::selection {
-  background: color-mix(in lch, #5e6ad2, black 10%);
+  background: color-mix(in lch, var(--lp-indigo), black 10%);
   color: #ffffff;
 }
 
@@ -263,7 +263,7 @@ html:has(.lp-root) {
   align-items: center;
   width: 100%;
   padding: 20px 16px 8px;
-  border-radius: 14px 14px 0 0;
+  border-radius: 12px 12px 0 0;
   background: radial-gradient(80% 60% at 50% 0%, rgb(255 255 255 / 0.055), transparent 72%);
 }
 /* The frame's hairline: a ring cut out of a filled box with a mask, bright
@@ -708,7 +708,7 @@ html:has(.lp-root) {
 }
 .lp-bubble-agent {
   align-self: flex-start;
-  background: #1c1c1f;
+  background: var(--lp-line-soft);
 }
 .lp-step {
   align-self: flex-start;
@@ -859,7 +859,7 @@ html:has(.lp-root) {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: #1c1c1f;
+  background: var(--lp-line-soft);
 }
 .lp-bell svg {
   width: 16px;
@@ -936,7 +936,7 @@ html:has(.lp-root) {
   width: 32px;
   height: 20px;
   border-radius: 9999px;
-  background: #232326;
+  background: var(--lp-fill-hover);
   /* The ring gives the off track an edge you can see against the page. */
   box-shadow: inset 0 0 0 1px var(--lp-edge);
   transition: background-color 200ms var(--lp-ease);
