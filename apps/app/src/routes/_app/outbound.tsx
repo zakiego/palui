@@ -533,7 +533,7 @@ function AddContactDialog({ open, onOpenChange, data, agent }: { open: boolean; 
             {source === "phone" ? (
               <Field>
                 <FieldLabel htmlFor="contact-phone">{t("outbound.phone")}</FieldLabel>
-                <Input id="contact-phone" inputMode="tel" maxLength={30} placeholder="0822 0000 1001" value={phone} onChange={(e) => setPhone(e.target.value)} className="font-mono text-base md:text-sm" />
+                <Input id="contact-phone" inputMode="tel" maxLength={30} placeholder="0812 3456 7890" value={phone} onChange={(e) => setPhone(e.target.value)} className="font-mono text-base md:text-sm" />
                 <FieldDescription>{t("outbound.phoneHint")}</FieldDescription>
               </Field>
             ) : (
