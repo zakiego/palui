@@ -2,7 +2,7 @@
 // a session round trip before it can start.
 //
 // This is only the dashboard's own redirect to /login. It grants nothing: every
-// server function and /api route checks the session itself, so a stale entry
+// RPC and /api route checks the session itself, so a stale entry
 // can at most show data this tab had already loaded.
 
 /** Younger than this, the entry is used as is. */

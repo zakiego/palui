@@ -1,0 +1,129 @@
+[
+  {
+    "name": "fresh millisecond",
+    "clock": [
+      1794441600000,
+      1794441600001,
+      1794441601000
+    ],
+    "draws": [
+      "aaaaaaaaaa",
+      "0000000000",
+      "zyxwvutsrq"
+    ],
+    "prefixes": [
+      "msg",
+      "msg",
+      "chat"
+    ],
+    "ids": [
+      "msg_0mwcs7400aaaaaaaaaa",
+      "msg_0mwcs74010000000000",
+      "chat_0mwcs74rszyxwvutsrq"
+    ]
+  },
+  {
+    "name": "same millisecond counts up",
+    "clock": [
+      1794441600000,
+      1794441600000,
+      1794441600000,
+      1794441600000
+    ],
+    "draws": [
+      "000000000y"
+    ],
+    "prefixes": [
+      "msg",
+      "msg",
+      "msg",
+      "run"
+    ],
+    "ids": [
+      "msg_0mwcs7400000000000y",
+      "msg_0mwcs7400000000000z",
+      "msg_0mwcs74000000000010",
+      "run_0mwcs74000000000011"
+    ]
+  },
+  {
+    "name": "carry",
+    "clock": [
+      1794441600000,
+      1794441600000
+    ],
+    "draws": [
+      "a9zzzzzzzz"
+    ],
+    "prefixes": [
+      "msg",
+      "msg"
+    ],
+    "ids": [
+      "msg_0mwcs7400a9zzzzzzzz",
+      "msg_0mwcs7400aa00000000"
+    ]
+  },
+  {
+    "name": "clock steps back",
+    "clock": [
+      1794441600000,
+      1794441540000,
+      1794441599999
+    ],
+    "draws": [
+      "5555555555"
+    ],
+    "prefixes": [
+      "msg",
+      "msg",
+      "msg"
+    ],
+    "ids": [
+      "msg_0mwcs74005555555555",
+      "msg_0mwcs74005555555556",
+      "msg_0mwcs74005555555557"
+    ]
+  },
+  {
+    "name": "overflow borrows the next millisecond",
+    "clock": [
+      1794441600000,
+      1794441600000,
+      1794441600000
+    ],
+    "draws": [
+      "zzzzzzzzzz",
+      "3333333333"
+    ],
+    "prefixes": [
+      "msg",
+      "msg",
+      "msg"
+    ],
+    "ids": [
+      "msg_0mwcs7400zzzzzzzzzz",
+      "msg_0mwcs74013333333333",
+      "msg_0mwcs74013333333334"
+    ]
+  },
+  {
+    "name": "epoch zero",
+    "clock": [
+      0,
+      1
+    ],
+    "draws": [
+      "0000000000",
+      "1111111111"
+    ],
+    "prefixes": [
+      "x",
+      "x"
+    ],
+    "ids": [
+      "x_0000000000000000000",
+      "x_0000000011111111111"
+    ]
+  }
+]

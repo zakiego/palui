@@ -36,7 +36,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { useLiveRefresh } from "@/hooks/use-live-events"
-import { deleteJobFn, getJobPreset, getJobs, runJobNow, saveJob, setJobEnabledFn } from "@/lib/fns/jobs"
+import { deleteJobFn, getJobPreset, getJobs, runJobNow, saveJob, setJobEnabledFn } from "@/lib/api/jobs"
 import { compact, errorMessage, inOtherZone, inZone } from "@/lib/format"
 import { useLabel, useT } from "@/lib/i18n"
 

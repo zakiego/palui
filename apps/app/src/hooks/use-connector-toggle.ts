@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useRouter } from "@tanstack/react-router"
 import { toast } from "sonner"
-import { pauseConnectorFn, resumeConnectorFn } from "@/lib/fns/connectors"
+import { pauseConnectorFn, resumeConnectorFn } from "@/lib/api/connectors"
 import { errorMessage } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 

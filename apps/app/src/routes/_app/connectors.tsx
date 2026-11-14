@@ -18,7 +18,7 @@ import { StatusAnnouncer } from "@/components/connectors/shared"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { useLiveRefresh } from "@/hooks/use-live-events"
-import { getConnectorsPage } from "@/lib/fns/connectors"
+import { getConnectorsPage } from "@/lib/api/connectors"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 

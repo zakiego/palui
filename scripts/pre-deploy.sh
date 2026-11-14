@@ -2,17 +2,24 @@
 # Run by the zaki-selfhost deploy script from the checkout dir, after `git pull`
 # and before `docker compose up`. A non-zero exit stops the deploy.
 #
-#   1. If the data volume exists, snapshot the database with the bundled CLI to
-#      /data/backups/pre-deploy-<UTC timestamp>.db.gz (inside the volume), so
-#      a migration in the new build can always be undone. Keeps the newest 3.
-#      A running app does it with `exec`. A stopped or crash-looping app does
-#      it in a one-off container (`run --rm --no-deps`) from palui:latest,
-#      which is still the old image at this point. Any failure stops the
-#      deploy. Only a missing volume (first deploy) skips the backup.
-#   2. If scripts/backup.sh changed, reinstall the nightly backup agent so the
+#   1. If the data volume exists, snapshot the database with the bundled CLI
+#      (`palui backup`, on the PATH in both the old Node image and the Go
+#      image) to /data/backups/pre-deploy-<UTC timestamp>.db.gz (inside the
+#      volume), so a migration in the new build can always be undone. Keeps
+#      the newest 3. A running app does it with `exec`. A stopped or
+#      crash-looping app does it in a one-off container (`run --rm --no-deps`)
+#      from palui:latest, which is still the old image at this point. Any
+#      failure stops the deploy. Only a missing volume (first deploy) skips it.
+#   2. Stop and remove a leftover `runtime` container of this project. The
+#      Go server is one service; compose.yaml has no `runtime` any more, so
+#      `compose up` would leave the old Node runtime running next to it: two
+#      turn engines and two WhatsApp and Telegram sessions on one database.
+#      Only acts when compose.yaml has no runtime service and such a container
+#      exists (the first Go deploy); every later deploy finds none.
+#   3. If scripts/backup.sh changed, reinstall the nightly backup agent so the
 #      installed copy in ~/selfhost/bin doesn't drift from the repo.
-#   3. Write build-info.json (the commit being deployed and the subjects before
-#      it) for the Dockerfile to copy into the image. The runtime reads it on
+#   4. Write build-info.json (the commit being deployed and the subjects before
+#      it) for the Dockerfile to copy into the image. The server reads it on
 #      start and tells the owner about a new commit. A failure only warns: the
 #      image then has no commit and the notice falls back to the version.
 set -euo pipefail
@@ -22,11 +29,15 @@ KEEP=3
 # Both overridable so tests never touch the real launchd agent.
 INSTALLED_BACKUP="${PALUI_INSTALLED_BACKUP:-$HOME/selfhost/bin/palui-backup.sh}"
 INSTALL_BACKUP="${PALUI_INSTALL_BACKUP:-./ops/install-backup.sh}"
+# compose.yaml `name:`; overridable so tests run against a scratch project.
+PROJECT="${PALUI_COMPOSE_PROJECT:-palui}"
+# The old runtime drains for up to 50 s on SIGTERM (its stop_grace_period was 60 s).
+RUNTIME_STOP_TIMEOUT="${PALUI_RUNTIME_STOP_TIMEOUT:-60}"
 
 log() { echo "[pre-deploy] $*"; }
 
 # The data volume: compose project `palui` (compose.yaml `name:`), volume `data`.
-DATA_VOLUME="${PALUI_DATA_VOLUME:-palui_data}"
+DATA_VOLUME="${PALUI_DATA_VOLUME:-${PROJECT}_data}"
 
 # Docker errors are not hidden: if docker can't answer, the deploy stops here
 # instead of migrating without a backup.
@@ -63,7 +74,7 @@ backup() {
   local dest
   dest="/data/backups/pre-deploy-$(date -u +%Y%m%dT%H%M%SZ).db.gz"
   log "backing up to $dest"
-  if ! in_app node .output/server/cli.mjs backup "$dest"; then
+  if ! in_app palui backup "$dest"; then
     log "backup FAILED, not deploying"
     exit 1
   fi
@@ -71,6 +82,39 @@ backup() {
   # shellcheck disable=SC2016 # $1 expands inside the container's shell
   in_app sh -c 'ls -1 /data/backups/pre-deploy-*.db.gz 2>/dev/null | sort -r | tail -n +$(($1 + 1)) | xargs -r rm -f --' _ "$KEEP" ||
     log "couldn't prune old pre-deploy backups (the new one is fine)"
+}
+
+# Step 2. Container labels, not `compose ps runtime`: compose refuses a
+# service name its file doesn't define.
+remove_old_runtime() {
+  local services ids
+  services=$(docker compose config --services) || {
+    log "docker didn't answer (compose config), not deploying"
+    exit 1
+  }
+  if printf '%s\n' "$services" | grep -qx runtime; then
+    return 0 # this checkout still has a runtime service; compose manages it
+  fi
+  ids=$(docker ps --all --quiet \
+    --filter "label=com.docker.compose.project=$PROJECT" \
+    --filter "label=com.docker.compose.service=runtime") || {
+    log "docker didn't answer (ps), not deploying"
+    exit 1
+  }
+  [ -n "$ids" ] || return 0
+  # shellcheck disable=SC2086 # one id per word
+  log "stopping the old runtime container ($(docker inspect --format '{{.Name}}' $ids | tr -d / | paste -sd ' ' -)); the new server replaces it"
+  # shellcheck disable=SC2086
+  if ! docker stop --time "$RUNTIME_STOP_TIMEOUT" $ids >/dev/null; then
+    log "couldn't stop the old runtime, not deploying (two runtimes would share the database)"
+    exit 1
+  fi
+  # shellcheck disable=SC2086
+  if ! docker rm $ids >/dev/null; then
+    log "couldn't remove the old runtime container, not deploying"
+    exit 1
+  fi
+  log "old runtime container removed"
 }
 
 if [ -z "$volume" ]; then
@@ -88,6 +132,8 @@ else
       ;;
   esac
 fi
+
+remove_old_runtime
 
 if command -v launchctl >/dev/null && ! cmp -s scripts/backup.sh "$INSTALLED_BACKUP"; then
   log "scripts/backup.sh differs from $INSTALLED_BACKUP, reinstalling the nightly backup"

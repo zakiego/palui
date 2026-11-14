@@ -1,0 +1,5 @@
+# The root .gitignore drops every dist/. Keep the placeholder index.html so the
+# module builds before the dashboard is; a real build copied in stays ignored.
+!dist
+dist/*
+!dist/index.html

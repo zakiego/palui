@@ -61,8 +61,6 @@ export const en = {
   "login.lockedOutAfter": "and open the link it prints.",
   "login.noOwner": "No owner yet",
   "login.noOwnerBody": "Claim this dashboard first: on the server, run",
-  "login.notConfigured": "Login isn't set up on this server",
-  "login.notConfiguredBody": "Set a 32+ character BETTER_AUTH_SECRET and APP_URL in .env, then restart the app.",
   "login.failed": "That passkey didn't work. Try again, or make a new owner link.",
   "invite.title": "Claim Palui",
   "invite.recoveryTitle": "Recover access",

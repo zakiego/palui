@@ -1,53 +1,77 @@
 # syntax=docker/dockerfile:1.7-labs
-# One image, two services (PLAN 3.1): `app` runs the Nitro server in .output/,
-# `runtime` runs runtime/dist/index.mjs from the same image (compose.yaml).
-# zaki-selfhost Dockerfile.nitro, on bookworm-slim: better-sqlite3 ships glibc builds.
+# One image, one process (docs/GO-PORT.md): `palui serve` is the HTTP server,
+# the dashboard and the runtime (connectors, turns, schedulers, outbox).
 #
-# Monorepo: the context is the repo root. Only apps/app, apps/runtime and the
-# packages they use are installed and built; the site and the edge worker never
-# enter the image (see .dockerignore), so a docs commit doesn't change any layer.
-FROM node:24-bookworm-slim AS build
+#   1. dashboard  Node + pnpm build the static SPA (apps/app/dist)
+#   2. server     Go builds one static binary with that dist embedded
+#   3. final      alpine (sh, tar and CA certificates for the ops scripts),
+#                 the binary as /usr/local/bin/palui, user 1000:1000
+#
+# The context is the repo root, trimmed by .dockerignore: docs, the site and
+# the edge worker never enter it (the site and edge only send their
+# package.json, which the shared lockfile needs), so a docs or site commit
+# changes no layer. A Go-only change doesn't touch stage 1, and a dashboard
+# change doesn't rerun `go mod download`.
+
+# --- 1. dashboard ------------------------------------------------------------
+FROM node:24-bookworm-slim AS dashboard
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 WORKDIR /repo
 # Every workspace manifest, so the shared lockfile matches; nothing else yet,
-# so the install layer stays cached until dependencies change.
+# so this layer stays cached until dependencies change. Only @palui/app's own
+# dependencies are installed: the site, the edge worker and the host bridge
+# aren't part of the image.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc* ./
-COPY --parents apps/*/package.json packages/*/package.json ./
+COPY --parents apps/*/package.json ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-  pnpm install --frozen-lockfile --filter @palui/app... --filter @palui/runtime...
-COPY tsconfig.base.json ./
-COPY packages ./packages
+  pnpm install --frozen-lockfile --filter @palui/app
 COPY apps/app ./apps/app
-COPY apps/runtime ./apps/runtime
-RUN pnpm --filter @palui/app build && pnpm --filter @palui/runtime build
-# The runtime bundle keeps native and heavy packages external (better-sqlite3,
-# baileys); `pnpm deploy` gives it a self-contained node_modules for them.
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-  pnpm --filter @palui/runtime deploy --prod --legacy /out/runtime \
-  && ARCH=$(node -p "process.arch") \
-  # better-sqlite3 carries prebuilds for every platform. Keep this one.
-  && for d in apps/app/.output/server/node_modules/better-sqlite3 /out/runtime/node_modules/better-sqlite3; do \
-       find "$d/prebuilds" -type f ! -name "linux-$ARCH.node" -delete 2>/dev/null || true; \
-     done
+RUN pnpm --filter @palui/app build
 
-FROM node:24-bookworm-slim
+# --- 2. server ---------------------------------------------------------------
+# The tag follows the `go` directive in apps/server/go.mod.
+FROM golang:1.26.0-alpine3.23 AS server
+ENV CGO_ENABLED=0 GOTOOLCHAIN=local
+WORKDIR /src/apps/server
+COPY apps/server/go.mod apps/server/go.sum ./
+RUN --mount=type=cache,id=gomod,target=/go/pkg/mod go mod download
+COPY apps/server ./
+# The dashboard build replaces the placeholder that internal/web embeds.
+COPY --from=dashboard /repo/apps/app/dist ./internal/web/dist
+# Last, so a release (a new version in package.json) only reruns the link.
+COPY package.json /src/package.json
+RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
+  --mount=type=cache,id=gobuild,target=/root/.cache/go-build \
+  version=$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' /src/package.json | head -n 1) \
+  && echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' \
+  && go build -trimpath \
+    -ldflags "-s -w -X github.com/zakiego/palui/apps/server/internal/version.Version=$version" \
+    -o /out/palui ./cmd/palui \
+  && /out/palui version
+
+# --- 3. final ----------------------------------------------------------------
+FROM alpine:3.24.4
+# The production volume was written by the old image's `node` user, 1000:1000.
+# Running as the same ids keeps it readable and writable without a chown.
+RUN addgroup -g 1000 palui \
+  && adduser -D -H -u 1000 -G palui -s /sbin/nologin palui \
+  && mkdir -p /data /app/build \
+  && chown 1000:1000 /data
 WORKDIR /app
-ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0 DATA_DIR=/data
-# /data is the volume: palui.db (SQLite WAL), wa-auth/, backups/.
-# `palui` is the admin CLI: docker compose exec app palui owner invite
-RUN mkdir -p /data && chown node:node /data \
-  && printf '#!/bin/sh\nexec node /app/.output/server/cli.mjs "$@"\n' > /usr/local/bin/palui \
-  && chmod 755 /usr/local/bin/palui
-USER node
-COPY --from=build --chown=node:node /repo/apps/app/.output ./.output
-COPY --from=build --chown=node:node /out/runtime/dist ./runtime/dist
-COPY --from=build --chown=node:node /out/runtime/node_modules ./runtime/node_modules
-COPY --from=build --chown=node:node /out/runtime/package.json ./runtime/package.json
+# NODE_ENV=production is the server's prod mode (MASTER_KEY required,
+# dev fixtures off). /data is the volume: palui.db (SQLite WAL), wa/ (the
+# WhatsApp stores), backups/.
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATA_DIR=/data \
+  PALUI_BUILD_INFO=/app/build/build-info.json
+# `palui` is the server and the admin CLI: docker compose exec app palui owner invite
+COPY --from=server /out/palui /usr/local/bin/palui
 # build-info.json names the commit (scripts/pre-deploy.sh writes it before the
 # build). Optional: the glob lets a local build without it still copy package.json.
-COPY --chown=node:node package.json build-info.jso[n] ./build/
-ENV PALUI_BUILD_INFO=/app/build/build-info.json
+COPY package.json build-info.jso[n] ./build/
+USER 1000:1000
 EXPOSE 3000
 VOLUME ["/data"]
-CMD ["node", ".output/server/index.mjs"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --start-interval=2s --retries=3 \
+  CMD ["palui", "healthcheck"]
+CMD ["palui", "serve"]

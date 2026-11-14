@@ -13,10 +13,10 @@ Status: reviewed and built, 2026-11-13. Author: Palui agent session. Reviewer: Z
 
 ## 1. What exists today (verified in code)
 
-- Reminders only go to the chat they were set in. `ownReminder` (`packages/connectors/src/reminders/runtime.ts`) rejects any other chat, and the scheduler sends to `reminders.chat_id`.
-- A flow `message` step has `to` (`packages/core/src/flows/schema.ts`). It must be a literal chat id that already exists and is the owner's or allowed (`validate.ts`, `chatAccess`). A number that never wrote to Palui has no chat row, so it can't be a target. That matches what `search_chats` showed.
-- No model tool sends to another chat. The outbox (`packages/core/src/outbox`) sends to any chat row it's given and checks nothing about the recipient: no allowlist, no rate limit.
-- Approvals (`packages/core/src/chat/turn.ts` `toolApproval`): destructive always asks, write asks when the turn is tainted or "strict" (schedule, reminder, flow, hook, shared chat), otherwise runs. The prompt shows `preview(args, 300)`, so a long text is cut off in the prompt. On approval the SDK runs the stored call, so the args that run are exactly the args the model emitted. Nothing re-generates them.
+- Reminders only go to the chat they were set in. The reminders tools (`apps/server/internal/connectors/reminders`) reject any other chat, and the scheduler sends to `reminders.chat_id`.
+- A flow `message` step has `to` (`apps/server/internal/flows/schema.go`). It must be a literal chat id that already exists and is the owner's or allowed (`validate.go`). A number that never wrote to Palui has no chat row, so it can't be a target. That matches what `search_chats` showed.
+- No model tool sends to another chat. The outbox (`apps/server/internal/outbox`) sends to any chat row it's given and checks nothing about the recipient: no allowlist, no rate limit.
+- Approvals (`apps/server/internal/chat/turn.go`): destructive always asks, write asks when the turn is tainted or "strict" (schedule, reminder, flow, hook, shared chat), otherwise runs. The prompt shows `preview(args, 300)`, so a long text is cut off in the prompt. On approval the SDK runs the stored call, so the args that run are exactly the args the model emitted. Nothing re-generates them.
 - Taint: a turn is tainted by an untrusted tool call or result (web fetch, chat search, calendar, external MCP), by a hook, or by quoting someone else. Auto-recall does not taint, and guest chat text can land in memory.
 
 ### Which number WhatsApp sends from
@@ -214,7 +214,7 @@ Built on branch `feat/outbound-messages` following section 9, plus per-agent sco
 
 Every message to a contact ends with the owner's signature, added in code, not by the model.
 
-- Where: `finalText` in `packages/core/src/outbound/service.ts`, used by `send_message` (now, scheduled, repeating), its approval preview, and flow message steps with `contact`. The text goes after the body with one blank line between.
+- Where: `FinalText` in `apps/server/internal/outbound/service.go`, used by `send_message` (now, scheduled, repeating), its approval preview, and flow message steps with `contact`. The text goes after the body with one blank line between.
 - Settings: `outbound.signatureOn` (default on) and `outbound.signature` (up to 150 characters), edited under "Limits and signature" on the Outbound page. The owner's name isn't a setting, so the text is stored as typed, not templated. Rows saved before the switch existed (signature `""`) are read as on with the default text.
 - Opt-out: `send_message` takes `signature: false`, and a flow message step with `contact` can set `signature: false`. The tool tells the model to use it only when the owner explicitly asks. The approval preview says "Tanpa tanda tangan".
 - No double signature: a body that already ends with a known signature is left alone. Known means the current text, the owner's earlier texts (`pastSignatures`, kept when the text is edited), the current default and the earlier defaults. The match ignores case, whitespace and WhatsApp markup, and also accepts just the signature's last line, for when the model typed it without the dash line.

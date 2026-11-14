@@ -61,12 +61,10 @@ export function ArchitectureDiagram({ children }: Props) {
           <Node key="web" stack icon={LayoutDashboardIcon} title="Web chat" />,
         ]}
       </Join>
-      <Group icon={Server} label="The Docker host (one image, two services)">
-        <Node icon={Container} title="runtime" detail="router, turns, scheduler, outbox, Connectors" />
-        <Arrow label="control API, compose network only" />
-        <Node icon={Container} title="app" detail="dashboard /app, REST /api, /health, migrations" />
+      <Group icon={Server} label="The Docker host (one image, one service)">
+        <Node icon={Container} title="app" detail="turns, scheduler, outbox, connectors, dashboard, API, /health" />
         <Arrow />
-        <Node icon={HardDrive} title="Data volume" detail="/data: palui.db, wa-auth/, backups/" />
+        <Node icon={HardDrive} title="Data volume" detail="/data: palui.db, wa/, backups/" />
       </Group>
       <Fork labels={["models", "memory", "tools"]}>
         <Node stack icon={CpuIcon} title="CLIProxyAPI, ai-gateway" />
@@ -155,14 +153,14 @@ export function BackupDiagram({ children }: Props) {
   return (
     <Diagram description={children}>
       <Node icon={ClockIcon} title="Nightly job" detail="03:30, launchd" />
-      <Fork labels={["app CLI backup", "tar, streamed"]}>
+      <Fork labels={["palui backup", "palui snapshot"]}>
         <Node stack icon={DatabaseIcon} title="DB snapshot" detail="palui.db" />
-        <Node stack icon={KeyRoundIcon} title="WhatsApp auth" detail="/data/wa-auth" />
+        <Node stack icon={KeyRoundIcon} title="WhatsApp stores" detail="/data/wa" />
       </Fork>
       <Join>
         {[
           <Node key="db" stack icon={LockIcon} title="age encrypt" detail=".db.gz.age" />,
-          <Node key="wa" stack icon={LockIcon} title="age encrypt" detail=".tar.gz.age" />,
+          <Node key="wa" stack icon={LockIcon} title="age encrypt" detail=".tar.age" />,
         ]}
       </Join>
       <Node icon={CloudUploadIcon} title="Upload to R2" detail="palui-backups" />

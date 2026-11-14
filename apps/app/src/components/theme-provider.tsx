@@ -74,10 +74,9 @@ export function ThemeProvider({
   disableTransitionOnChange = true,
   ...props
 }: ThemeProviderProps) {
-  // The server can't see localStorage or the OS theme. Start from the class
-  // the inline script in __root already put on <html>, then sync.
+  // Start from the stored choice, as the inline script in index.html did
+  // for the class on <html>, then sync.
   const [theme, setThemeState] = React.useState<Theme>(() => {
-    if (typeof window === "undefined") return defaultTheme
     try {
       const storedTheme = localStorage.getItem(storageKey)
       if (isTheme(storedTheme)) return storedTheme
@@ -87,9 +86,7 @@ export function ThemeProvider({
     return defaultTheme
   })
 
-  const [systemTheme, setSystemTheme] = React.useState<ResolvedTheme>(() =>
-    typeof window === "undefined" ? "light" : getSystemTheme()
-  )
+  const [systemTheme, setSystemTheme] = React.useState<ResolvedTheme>(getSystemTheme)
   const resolvedTheme = theme === "system" ? systemTheme : theme
 
   const setTheme = React.useCallback(

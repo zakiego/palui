@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { LiveEventsProvider } from "@/hooks/use-live-events"
 import { useWarmPages } from "@/hooks/use-warm-pages"
 import { authClient } from "@/lib/auth-client"
-import { getShell } from "@/lib/fns/home"
+import { getShell } from "@/lib/api/home"
 import { LocaleProvider, useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { currentViewer, forgetViewer, onViewerLost, seedViewer } from "@/lib/viewer"
@@ -110,8 +110,8 @@ function Shell() {
 
   useWarmPages()
 
-  // The server rendered this page with a viewer it had just verified, so the
-  // first page switch doesn't need to ask again.
+  // The guard just verified this viewer, so the first page switch doesn't
+  // need to ask again.
   React.useEffect(() => seedViewer(viewer), [viewer])
   // Signed out somewhere else: run the guard again, which sends this tab to /login.
   React.useEffect(() => onViewerLost(() => void router.invalidate()), [router])

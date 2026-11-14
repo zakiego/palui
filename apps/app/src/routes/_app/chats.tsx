@@ -35,8 +35,9 @@ import { AgentAvatar } from "@/components/agent-avatar"
 import { SimpleSelect } from "@/components/simple-select"
 import { AckControl } from "@/components/ack-control"
 import { Switch } from "@/components/ui/switch"
-import { setChatAgentFn, setChatAllowedFn, setChatReplyModeFn } from "@/lib/fns/agents"
-import { decideApproval, getChats, getTranscript, sendWebMessage, stopTurn } from "@/lib/fns/chats"
+import { setChatAgentFn, setChatAllowedFn, setChatReplyModeFn } from "@/lib/api/agents"
+import { decideApproval, getChats, getTranscript, sendWebMessage, stopTurn } from "@/lib/api/chats"
+import { notifyUnauthorized } from "@/lib/api/client"
 import { ago, errorMessage } from "@/lib/format"
 import { markdownToPlain } from "@/lib/markdown"
 import { transcriptToMarkdown } from "@/lib/transcript-text"
@@ -238,6 +239,11 @@ function useTurnStream(chatId: string, onSettled: () => Promise<unknown>) {
     const es = new EventSource("/api/chat/stream")
     es.onopen = () => setDown(false)
     es.onerror = () => setDown(true)
+    // Sent once before the server closes a stream whose session is gone.
+    es.addEventListener("unauthorized", () => {
+      es.close()
+      notifyUnauthorized()
+    })
     es.onmessage = (e) => {
       let ev: TurnEvent
       try {

@@ -1,11 +1,12 @@
 // Dev only: the "Demo data / Worst case" switch from the `break-ui` skill. It
-// swaps the dataset behind the whole dashboard (src/dev/fixtures) so every page
-// can be checked against the realistic worst case without touching a component.
+// swaps the dataset behind the whole dashboard (the Go server's
+// internal/fixtures) so every page can be checked against the realistic worst
+// case without touching a component.
 // It renders nothing unless the database was filled by a fixture, and the shell
 // only mounts it in a dev build.
 import { useRouter } from "@tanstack/react-router"
 import * as React from "react"
-import { getFixtureState, setFixture } from "@/lib/fns/dev-fixtures"
+import { getFixtureState, setFixture } from "@/lib/api/dev-fixtures"
 import "./fixture-toggle.css"
 
 const SEGMENTS = [

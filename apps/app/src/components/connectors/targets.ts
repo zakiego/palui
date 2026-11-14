@@ -1,7 +1,7 @@
 // What the connector page edits: a saved connector, or a draft that doesn't
 // exist yet. A draft lives at /connectors/<id>?type=<type>&preset=<id> until
 // its first save, so the URL stays the same once it's real.
-import type { ConnectorManifest } from "@palui/core/connectors/define"
+import type { ConnectorManifest } from "@/shared/connectors/define"
 
 import type { ConnectorItem } from "@/components/connectors/variants/types"
 import type { JsonObject } from "@/lib/json"

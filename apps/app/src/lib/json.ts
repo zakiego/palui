@@ -1,4 +1,4 @@
-// Server functions only return serializable types, and `unknown` isn't one.
+// RPC results are JSON, and `unknown` says nothing about their shape.
 // Values that come from JSON columns or the runtime are JSON already, so they
 // cross as `Json`.
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json }

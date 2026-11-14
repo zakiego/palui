@@ -1,4 +1,0 @@
-Reminder parse eval: model claude-haiku-4-5-20251001, now 2026-11-10T10:00 Asia/Makassar (Tuesday), 60 phrases
-
-Indonesian 30/30, English 30/30
-Score: 60/60 (100.0%), pass mark 95%, 15.8 s

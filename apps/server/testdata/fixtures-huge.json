@@ -1,0 +1,228 @@
+{
+ "fixture": "huge",
+ "now": 1794621600000,
+ "tables": {
+  "account": {
+   "columns": ["id","account_id","provider_id","user_id","access_token","refresh_token","id_token","access_token_expires_at","refresh_token_expires_at","scope","password","created_at","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "agents": {
+   "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat"],
+   "count": 1,
+   "first": ["<agt#1>","palui","Palui","Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.\nDefault bahasa Indonesia santai. Kalau Zaki menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.\nJangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.\nKalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.",1,null,"off","safe",0,null,null,null,null,"<wall clock>","<wall clock>",null,null,0],
+   "last": ["<agt#1>","palui","Palui","Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.\nDefault bahasa Indonesia santai. Kalau Zaki menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.\nJangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.\nKalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.",1,null,"off","safe",0,null,null,null,null,"<wall clock>","<wall clock>",null,null,0]
+  },
+  "attachment_shares": {
+   "columns": ["id","attachment_id","token_hash","visibility","created_by","expires_at","revoked_at","open_count","last_opened_at","created_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "chats": {
+   "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji"],
+   "count": 1287,
+   "first": ["<chat#1>","web","web","Palui (web)","dm","<ses#1>",1,null,1794621600000,"",null,"mention",1,"⏳"],
+   "last": ["<chat#2>","telegram","flowchat1","Flows 2","dm","<ses#2>",1,null,1794621600000,"",null,"mention",1,"⏳"]
+  },
+  "claims": {
+   "columns": ["nonce","channel","expires_at","used_at","used_by","created_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "connectors": {
+   "columns": ["id","type","kind","label","enabled","status","status_detail","trust","config","secrets","config_hash","error_since","alerted_at","sort_order","created_at","updated_at","agent_id"],
+   "count": 60,
+   "first": ["telegram","telegram","channel","Telegram",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
+   "last": ["mcp-server-49","mcp","tools","Widodo MCP 50",0,"paused",null,"external","{\"url\":\"https://mcp-49.example.com/mcp\"}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null]
+  },
+  "contacts": {
+   "columns": ["id","agent_id","name","channel","address","chat_id","policy","note","created_at","updated_at","removed_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "events": {
+   "columns": ["id","at","level","connector_id","kind","message","data"],
+   "count": 12180,
+   "first": [1,1794621600000,"info","telegram","status","on","{\"from\":\"not_set_up\",\"to\":\"on\"}"],
+   "last": [12180,1794618000000,"info",null,"flow.created","Flow \"Transfer arisan 120\" created (version 1).","{\"flowId\":\"<flw#1>\",\"versionId\":\"<flv#1>\"}"]
+  },
+  "flow_runs": {
+   "columns": ["id","flow_id","version_id","chat_id","trigger_id","trigger_kind","run_key","parent_run_id","item_index","status","skip_reason","trigger","vars","taint","cursor","wait","wake_at","lease_until","steps_done","messages_sent","scheduled_at","started_at","ended_at","error","legacy_occurrence_id","dry_run","updated_at"],
+   "count": 1000,
+   "first": ["<flr#1>","<flw#2>","<flv#2>","<chat#1>","main","schedule","fx:<flr#1>",null,null,"failed",null,"{}","{\"steps\":{},\"vars\":{}}","[]",null,null,null,null,0,0,null,1794621600000,1794621601200,"Step say: More than 5 messages in one run.",null,0,1794621600000],
+   "last": ["<flr#2>","<flw#3>","<flv#3>","<chat#2>","main","schedule","fx:<flr#2>",null,null,"done",null,"{}","{\"steps\":{},\"vars\":{}}","[]",null,null,null,null,0,0,null,1792403820000,1792403821200,null,null,0,1792403820000]
+  },
+  "flow_step_runs": {
+   "columns": ["id","run_id","seq","step_id","kind","attempt","status","input","output","tainted","branch","tool_call_id","turn_run_id","error","started_at","ms"],
+   "count": 1000,
+   "first": ["<fls#1>","<flr#1>",1,"say","message",1,"error",null,null,0,null,null,null,null,1794621600000,40],
+   "last": ["<fls#2>","<flr#2>",1,"say","message",1,"ok",null,null,0,null,null,null,null,1792403820000,40]
+  },
+  "flow_triggers": {
+   "columns": ["id","flow_id","trigger_id","kind","match","status","next_fire_at","next_occ","cursor","source_state","next_refresh_at","poll_state","last_error","updated_at"],
+   "count": 120,
+   "first": ["<flt#1>","<flw#2>","main","schedule",null,"idle",1794261600000,"{\"at\":1794261600000,\"key\":\"2026-11-10:06:00\",\"label\":\"06.00\"}","{\"at\":1794189600000,\"key\":\"\"}","{}",null,"{}",null,1794189600000],
+   "last": ["<flt#2>","<flw#1>","main","schedule",null,"idle",1794635580000,"{\"at\":1794635580000,\"key\":\"2026-11-14:13:53\",\"label\":\"13.53\"}","{\"at\":1794618000000,\"key\":\"\"}","{}",null,"{}",null,1794618000000]
+  },
+  "flow_versions": {
+   "columns": ["id","flow_id","n","definition","hash","write_calls","created_by","note","approved_at","approved_via","created_at"],
+   "count": 120,
+   "first": ["<flv#2>","<flw#2>",1,"{\"schema\":1,\"name\":\"Follow up deal 1\",\"triggers\":[{\"id\":\"main\",\"start\":\"say\",\"kind\":\"schedule\",\"source\":{\"kind\":\"times\",\"times\":[{\"time\":\"06:00\"}]}}],\"steps\":[{\"id\":\"say\",\"kind\":\"message\",\"text\":\"Follow up deal\"}]}","8d2fdff8404324f1474a3202406235d6a9a19b2c1bdac942578f457a3ad54cb1","[]","agent:run_fixture",null,1794189600000,"no_writes",1794189600000],
+   "last": ["<flv#1>","<flw#1>",1,"{\"schema\":1,\"name\":\"Transfer arisan 120\",\"triggers\":[{\"id\":\"main\",\"start\":\"say\",\"kind\":\"schedule\",\"source\":{\"kind\":\"times\",\"times\":[{\"time\":\"13:53\"}]}}],\"steps\":[{\"id\":\"say\",\"kind\":\"message\",\"text\":\"Transfer arisan\"}]}","0673a3d102bd42d0b464f8b4f02e73b1198bf786c9b23f1a3febf9cfea8d4d0d","[]","agent:run_fixture",null,1794618000000,"no_writes",1794618000000]
+  },
+  "flows": {
+   "columns": ["id","chat_id","name","tz","enabled","paused_until","current_version_id","approved_version_id","state","consecutive_failures","agent_id","legacy_routine_id","shadow","last_error","notice_for","created_at","updated_at"],
+   "count": 120,
+   "first": ["<flw#2>","<chat#1>","Follow up deal 1","Asia/Makassar",0,null,"<flv#2>","<flv#2>","{\"values\":{},\"tainted\":[]}",2,null,null,0,null,null,1794189600000,1794189600000],
+   "last": ["<flw#1>","<chat#2>","Transfer arisan 120","Asia/Makassar",1,null,"<flv#1>","<flv#1>","{\"values\":{},\"tainted\":[]}",0,null,null,0,null,null,1794618000000,1794618000000]
+  },
+  "hooks": {
+   "columns": ["id","slug","name","secret","mode","chat_id","enabled","last_at","created_at"],
+   "count": 40,
+   "first": ["<hook#1>","<id tail>","Wiśniewska-Kowalczyk alerts 1","phk_fixture-secret-not-a-real-one","forward","<chat#3>",1,null,1794621600000],
+   "last": ["<hook#2>","<id tail>","Ningsih alerts 40","phk_fixture-secret-not-a-real-one","summarize","<chat#4>",1,1794481200000,1794621600000]
+  },
+  "identities": {
+   "columns": ["id","channel","external_id","alt_id","display_name","role","created_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "instructions": {
+   "columns": ["id","title","body","enabled","created_at","updated_at","agent_id"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "jobs": {
+   "columns": ["id","name","kind","rrule","tz","local_start","prompt","chat_id","model_role","tool_scope","enabled","next_run_at","status","last_run_at","last_status","last_result","daily_token_cap","created_at","updated_at"],
+   "count": 120,
+   "first": ["<job#1>","Follow up deal 1","briefing","FREQ=DAILY;BYHOUR=7;BYMINUTE=0","Asia/Makassar","2026-01-01T07:00:00","x","<chat#3>","default",null,0,1794622200000,"idle",1794621000000,"error","Selesai.",50000,1794535200000,1794621600000],
+   "last": ["<job#2>","Transfer arisan 120","job","FREQ=DAILY;BYHOUR=7;BYMINUTE=0","Asia/Makassar","2026-01-01T07:00:00","x","<chat#5>","default",null,1,1794693600000,"idle",1794549600000,"ok","Selesai.",50000,1794535200119,1794621600000]
+  },
+  "messages": {
+   "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],
+   "count": 3284,
+   "first": ["<msg#1>","<chat#1>","<ses#1>","user","{\"text\":\"Follow up deal #1000\"}","Follow up deal #1000",null,null,null,"handled",null,null,1794501600000,null,1],
+   "last": ["<msg#2>","<chat#6>","<ses#3>","user","{\"text\":\"Kirim laporan mingguan ke tim Vorneo, Kartika Pratama\"}","Kirim laporan mingguan ke tim Vorneo, Kartika Pratama",null,null,null,"handled",null,null,1791773340000,null,1]
+  },
+  "outbound_messages": {
+   "columns": ["id","agent_id","contact_id","text","origin","origin_ref","approved_by","owner_chat_id","rrule","tz","local_start","fire_at","status","last_outbox_id","created_at","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "outbox": {
+   "columns": ["id","chat_id","channel","payload","status","attempts","next_attempt_at","claimed_at","channel_msg_id","source","error","fallback_from","created_at","expires_at","sent_at","connector_id"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "owner_invites": {
+   "columns": ["id","token_hash","expires_at","used_at","created_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "passkey": {
+   "columns": ["id","name","public_key","user_id","credential_id","counter","device_type","backed_up","transports","created_at","aaguid"],
+   "count": 26,
+   "first": ["pk_real","Real key","x","user_owner","cred_real",0,"multiDevice",1,null,null,null],
+   "last": ["fx_<pk#1>","Eka Santoso's device 25","fixture","user_owner","fx_<pk#1>",0,"multiDevice",1,"internal",1792548000000,null]
+  },
+  "pending_approvals": {
+   "columns": ["id","run_id","chat_id","approval_id","tool_call_id","tool","tool_class","args_preview","messages","context","prompt_msg_id","expires_at","status","decided_at","created_at","ask_chat_id"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "preferences": {
+   "columns": ["key","value","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "reminders": {
+   "columns": ["id","chat_id","text","rrule","tz","local_start","fire_at","scheduled_for","status","last_fired_at","snoozed_until","smart_prompt","last_outbox_id","created_at","updated_at"],
+   "count": 2868,
+   "first": ["<rem#1>","<chat#3>","Follow up deal #1000",null,"Asia/Makassar","2026-11-11T09:00:00",1794622980000,1794622980000,"pending",null,null,null,null,1794621600000,1794621600000],
+   "last": ["<rem#2>","<chat#6>","Kirim laporan mingguan ke tim Vorneo #1283",null,"Asia/Makassar","2026-11-11T09:00:00",1789999200000,1789999200000,"done",null,null,null,null,1794621600000,1789999200000]
+  },
+  "reports": {
+   "columns": ["id","chat_id","session_id","note","text","created_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "routine_occurrences": {
+   "columns": ["id","routine_id","chat_id","key","label","scheduled_at","fired_at","status","answer","answered_at","answers","follow_ups","next_follow_up_at","deadline_at","fallback","created_at","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "routines": {
+   "columns": ["id","chat_id","name","tz","days","source","action","recap","late_grace_min","enabled","paused_until","status","next_fire_at","next_occ","cursor","source_state","next_refresh_at","next_recap_at","last_error","created_at","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "runs": {
+   "columns": ["id","chat_id","job_id","trigger","model","model_connector_id","tokens_in","tokens_out","tokens_cached","steps","tainted","status","error","result_preview","started_at","ms","agent_id","tokens_cache_write"],
+   "count": 5000,
+   "first": ["<run#1>","<chat#3>","<job#1>","schedule","model-00",null,4000,300,0,0,0,"error","429 from CLIProxyAPI",null,1794621600000,2000,null,0],
+   "last": ["<run#2>","<chat#7>",null,"message","model-07",null,11350,690,0,0,0,"ok",null,null,1791922140000,16700,null,0]
+  },
+  "saved_attachments": {
+   "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "session": {
+   "columns": ["id","expires_at","token","created_at","updated_at","ip_address","user_agent","user_id"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "sessions": {
+   "columns": ["id","chat_id","summary","summarized_until","saved_to_recall_at","created_at","closed_at","loaded_tools"],
+   "count": 1287,
+   "first": ["<ses#1>","<chat#1>",null,null,null,1794621600000,null,null],
+   "last": ["<ses#2>","<chat#2>",null,null,null,1794621600000,null,null]
+  },
+  "settings": {
+   "columns": ["key","value","updated_at"],
+   "count": 1,
+   "first": ["devFixture","\"huge\"",1794621600000],
+   "last": ["devFixture","\"huge\"",1794621600000]
+  },
+  "tool_calls": {
+   "columns": ["id","run_id","connector_id","tool","class","args","result_preview","status","ms","created_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "usage": {
+   "columns": ["key","value","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "user": {
+   "columns": ["id","name","email","email_verified","image","username","display_username","created_at","updated_at"],
+   "count": 1,
+   "first": ["user_owner","Owner","owner@palui.invalid",0,null,"owner",null,1794621600000,1794621600000],
+   "last": ["user_owner","Owner","owner@palui.invalid",0,null,"owner",null,1794621600000,1794621600000]
+  },
+  "verification": {
+   "columns": ["id","identifier","value","expires_at","created_at","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  }
+ }
+}

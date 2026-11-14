@@ -1,0 +1,195 @@
+{
+ "fixture": "one",
+ "now": 1794621600000,
+ "tables": {
+  "account": {
+   "columns": ["id","account_id","provider_id","user_id","access_token","refresh_token","id_token","access_token_expires_at","refresh_token_expires_at","scope","password","created_at","updated_at"],
+   "rows": []
+  },
+  "agents": {
+   "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat"],
+   "rows": [
+    ["<agt#1>","palui","Palui","Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.\nDefault bahasa Indonesia santai. Kalau Zaki menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.\nJangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.\nKalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.",1,null,"off","safe",0,null,null,null,null,"<wall clock>","<wall clock>",null,null,0]
+   ]
+  },
+  "attachment_shares": {
+   "columns": ["id","attachment_id","token_hash","visibility","created_by","expires_at","revoked_at","open_count","last_opened_at","created_at"],
+   "rows": []
+  },
+  "chats": {
+   "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji"],
+   "rows": [
+    ["<chat#1>","web","web","Palui (web)","dm","<ses#1>",1,null,1794621600000,"",null,"mention",1,"⏳"]
+   ]
+  },
+  "claims": {
+   "columns": ["nonce","channel","expires_at","used_at","used_by","created_at"],
+   "rows": []
+  },
+  "connectors": {
+   "columns": ["id","type","kind","label","enabled","status","status_detail","trust","config","secrets","config_hash","error_since","alerted_at","sort_order","created_at","updated_at","agent_id"],
+   "rows": [
+    ["telegram","telegram","channel","Telegram",1,"error","401 Unauthorized","own","{}",null,"<config hash>",1794621600000,null,0,1794621600000,1794621600000,null]
+   ]
+  },
+  "contacts": {
+   "columns": ["id","agent_id","name","channel","address","chat_id","policy","note","created_at","updated_at","removed_at"],
+   "rows": []
+  },
+  "events": {
+   "columns": ["id","at","level","connector_id","kind","message","data"],
+   "rows": [
+    [1,1794621600000,"error","telegram","status","error: 401 Unauthorized","{\"from\":\"not_set_up\",\"to\":\"error\"}"],
+    [2,1794535200000,"info",null,"flow.created","Flow \"Air\" created (version 1).","{\"flowId\":\"<flw#1>\",\"versionId\":\"<flv#1>\"}"]
+   ]
+  },
+  "flow_runs": {
+   "columns": ["id","flow_id","version_id","chat_id","trigger_id","trigger_kind","run_key","parent_run_id","item_index","status","skip_reason","trigger","vars","taint","cursor","wait","wake_at","lease_until","steps_done","messages_sent","scheduled_at","started_at","ended_at","error","legacy_occurrence_id","dry_run","updated_at"],
+   "rows": [
+    ["<flr#1>","<flw#1>","<flv#1>","<chat#1>","main","schedule","fx:<flr#1>",null,null,"done",null,"{}","{\"steps\":{},\"vars\":{}}","[]",null,null,null,null,0,0,null,1794621540000,1794621541200,null,null,0,1794621540000]
+   ]
+  },
+  "flow_step_runs": {
+   "columns": ["id","run_id","seq","step_id","kind","attempt","status","input","output","tainted","branch","tool_call_id","turn_run_id","error","started_at","ms"],
+   "rows": [
+    ["<fls#1>","<flr#1>",1,"say","message",1,"ok",null,"{\"text\":\"Minum air\"}",0,null,null,null,null,1794621540000,40]
+   ]
+  },
+  "flow_triggers": {
+   "columns": ["id","flow_id","trigger_id","kind","match","status","next_fire_at","next_occ","cursor","source_state","next_refresh_at","poll_state","last_error","updated_at"],
+   "rows": [
+    ["<flt#1>","<flw#1>","main","schedule",null,"idle",1794538800000,"{\"at\":1794538800000,\"key\":\"2026-11-13:11:00\",\"label\":\"11.00\"}","{\"at\":1794535200000,\"key\":\"\"}","{}",null,"{}",null,1794535200000]
+   ]
+  },
+  "flow_versions": {
+   "columns": ["id","flow_id","n","definition","hash","write_calls","created_by","note","approved_at","approved_via","created_at"],
+   "rows": [
+    ["<flv#1>","<flw#1>",1,"{\"schema\":1,\"name\":\"Air\",\"triggers\":[{\"id\":\"main\",\"start\":\"say\",\"kind\":\"schedule\",\"source\":{\"kind\":\"times\",\"times\":[{\"time\":\"11:00\"}]}}],\"steps\":[{\"id\":\"say\",\"kind\":\"message\",\"text\":\"Minum air\"}]}","dc95132064c883f35cfcca2eb705d6871c8b980537913244fc04b5fa45c4f81d","[]","agent:run_fixture",null,1794535200000,"no_writes",1794535200000]
+   ]
+  },
+  "flows": {
+   "columns": ["id","chat_id","name","tz","enabled","paused_until","current_version_id","approved_version_id","state","consecutive_failures","agent_id","legacy_routine_id","shadow","last_error","notice_for","created_at","updated_at"],
+   "rows": [
+    ["<flw#1>","<chat#1>","Air","Asia/Makassar",1,null,"<flv#1>","<flv#1>","{\"values\":{},\"tainted\":[]}",0,null,null,0,null,null,1794535200000,1794535200000]
+   ]
+  },
+  "hooks": {
+   "columns": ["id","slug","name","secret","mode","chat_id","enabled","last_at","created_at"],
+   "rows": [
+    ["<hook#1>","<id tail>","Uptime","phk_fixture-secret-not-a-real-one","forward","<chat#1>",1,1794618000000,1794621600000]
+   ]
+  },
+  "identities": {
+   "columns": ["id","channel","external_id","alt_id","display_name","role","created_at"],
+   "rows": []
+  },
+  "instructions": {
+   "columns": ["id","title","body","enabled","created_at","updated_at","agent_id"],
+   "rows": []
+  },
+  "jobs": {
+   "columns": ["id","name","kind","rrule","tz","local_start","prompt","chat_id","model_role","tool_scope","enabled","next_run_at","status","last_run_at","last_status","last_result","daily_token_cap","created_at","updated_at"],
+   "rows": [
+    ["<job#1>","Daily briefing","briefing","FREQ=DAILY;BYHOUR=7;BYMINUTE=0","Asia/Makassar","2026-01-01T07:00:00","Brief me.","<chat#1>","default",null,1,1794625200000,"idle",1794621540000,"ok","1 reminder today.",1000,1794621600000,1794621600000]
+   ]
+  },
+  "messages": {
+   "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],
+   "rows": [
+    ["<msg#1>","<chat#1>","<ses#1>","user","{\"text\":\"hi\"}","hi",null,null,null,"handled",null,null,1794621540000,null,1]
+   ]
+  },
+  "outbound_messages": {
+   "columns": ["id","agent_id","contact_id","text","origin","origin_ref","approved_by","owner_chat_id","rrule","tz","local_start","fire_at","status","last_outbox_id","created_at","updated_at"],
+   "rows": []
+  },
+  "outbox": {
+   "columns": ["id","chat_id","channel","payload","status","attempts","next_attempt_at","claimed_at","channel_msg_id","source","error","fallback_from","created_at","expires_at","sent_at","connector_id"],
+   "rows": []
+  },
+  "owner_invites": {
+   "columns": ["id","token_hash","expires_at","used_at","created_at"],
+   "rows": []
+  },
+  "passkey": {
+   "columns": ["id","name","public_key","user_id","credential_id","counter","device_type","backed_up","transports","created_at","aaguid"],
+   "rows": [
+    ["pk_real","Real key","x","user_owner","cred_real",0,"multiDevice",1,null,null,null],
+    ["fx_<pk#1>","MacBook Air","fixture","user_owner","fx_<pk#1>",0,"multiDevice",1,"internal",1794535200000,null]
+   ]
+  },
+  "pending_approvals": {
+   "columns": ["id","run_id","chat_id","approval_id","tool_call_id","tool","tool_class","args_preview","messages","context","prompt_msg_id","expires_at","status","decided_at","created_at","ask_chat_id"],
+   "rows": []
+  },
+  "preferences": {
+   "columns": ["key","value","updated_at"],
+   "rows": []
+  },
+  "reminders": {
+   "columns": ["id","chat_id","text","rrule","tz","local_start","fire_at","scheduled_for","status","last_fired_at","snoozed_until","smart_prompt","last_outbox_id","created_at","updated_at"],
+   "rows": [
+    ["<rem#1>","<chat#1>","Bayar listrik",null,"Asia/Makassar","2026-11-11T09:00:00",1794625200000,1794625200000,"pending",null,null,null,null,1794621600000,1794621600000],
+    ["<rem#2>","<chat#1>","Standup","FREQ=DAILY","Asia/Makassar","2026-11-11T09:00:00",1794628800000,1794628800000,"pending",null,null,null,null,1794621600000,1794621600000],
+    ["<rem#3>","<chat#1>","Old one",null,"Asia/Makassar","2026-11-11T09:00:00",1794618000000,1794618000000,"done",1794618000000,null,null,null,1794621600000,1794621600000]
+   ]
+  },
+  "reports": {
+   "columns": ["id","chat_id","session_id","note","text","created_at"],
+   "rows": []
+  },
+  "routine_occurrences": {
+   "columns": ["id","routine_id","chat_id","key","label","scheduled_at","fired_at","status","answer","answered_at","answers","follow_ups","next_follow_up_at","deadline_at","fallback","created_at","updated_at"],
+   "rows": []
+  },
+  "routines": {
+   "columns": ["id","chat_id","name","tz","days","source","action","recap","late_grace_min","enabled","paused_until","status","next_fire_at","next_occ","cursor","source_state","next_refresh_at","next_recap_at","last_error","created_at","updated_at"],
+   "rows": []
+  },
+  "runs": {
+   "columns": ["id","chat_id","job_id","trigger","model","model_connector_id","tokens_in","tokens_out","tokens_cached","steps","tainted","status","error","result_preview","started_at","ms","agent_id","tokens_cache_write"],
+   "rows": [
+    ["<run#1>","<chat#1>","<job#1>","schedule","claude-sonnet-4-6",null,1,0,0,1,0,"ok",null,null,1794621540000,1,null,0]
+   ]
+  },
+  "saved_attachments": {
+   "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at"],
+   "rows": []
+  },
+  "session": {
+   "columns": ["id","expires_at","token","created_at","updated_at","ip_address","user_agent","user_id"],
+   "rows": []
+  },
+  "sessions": {
+   "columns": ["id","chat_id","summary","summarized_until","saved_to_recall_at","created_at","closed_at","loaded_tools"],
+   "rows": [
+    ["<ses#1>","<chat#1>",null,null,null,1794621600000,null,null]
+   ]
+  },
+  "settings": {
+   "columns": ["key","value","updated_at"],
+   "rows": [
+    ["modelRoles","{\"default\":[{\"connectorId\":\"cliproxy\",\"model\":\"claude-sonnet-4-6\"}],\"fast\":[{\"connectorId\":\"cliproxy\",\"model\":\"claude-haiku-4-5-20251001\"}],\"vision\":[{\"connectorId\":\"cliproxy\",\"model\":\"claude-sonnet-4-6\"}]}",1794621600000],
+    ["devFixture","\"one\"",1794621600000]
+   ]
+  },
+  "tool_calls": {
+   "columns": ["id","run_id","connector_id","tool","class","args","result_preview","status","ms","created_at"],
+   "rows": []
+  },
+  "usage": {
+   "columns": ["key","value","updated_at"],
+   "rows": []
+  },
+  "user": {
+   "columns": ["id","name","email","email_verified","image","username","display_username","created_at","updated_at"],
+   "rows": [
+    ["user_owner","Owner","owner@palui.invalid",0,null,"owner",null,1794621600000,1794621600000]
+   ]
+  },
+  "verification": {
+   "columns": ["id","identifier","value","expires_at","created_at","updated_at"],
+   "rows": []
+  }
+ }
+}

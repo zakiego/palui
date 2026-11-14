@@ -31,7 +31,7 @@ ingress:
   - service: http_status:404
 ```
 
-Use the port your `compose.yaml` binds the app to. The runtime needs no tunnel rule: it only talks to the app over the compose network and makes outbound connections to Telegram and WhatsApp.
+Use the port your `compose.yaml` binds the app to. Telegram and WhatsApp need no tunnel rule: Palui makes outbound connections to them.
 
 ## Reaching services on the Docker host
 

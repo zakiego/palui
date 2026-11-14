@@ -1,13 +1,14 @@
-# The build context is the monorepo root. Only apps/app, apps/runtime and packages/* go into the image;
-# the site and the edge worker contribute just their package.json, because
-# pnpm needs every workspace manifest to install from the shared lockfile.
+# The build context is the monorepo root. What the image build reads:
+#   - every workspace package.json plus the lockfile (pnpm installs from the
+#     shared lockfile, so it needs all the manifests)
+#   - apps/app (the dashboard build)
+#   - apps/server without its tests and testdata (the Go build)
+# apps/host-bridge, apps/site and apps/edge only send their package.json.
 # Patterns are anchored to the root, so nested ones need **/.
 .git
 **/node_modules
 **/.next
 **/out
-**/.output
-**/.nitro
 **/.tanstack
 **/.vite
 **/.source
@@ -25,9 +26,13 @@
 docs
 ops
 scripts
-**/eval/last-run.txt
 **/*.test.ts
-apps/runtime/dist
+**/*.test.tsx
+apps/server/testdata
+apps/server/**/*_test.go
+apps/server/palui
+apps/host-bridge/*
+!apps/host-bridge/package.json
 apps/site/*
 !apps/site/package.json
 apps/edge/*

@@ -23,7 +23,7 @@ The script:
 2. On the first run, writes `~/.config/palui/host-bridge.json` with a fresh token and two read-only starter commands. The token is printed, and it's always the `token` field in that file.
 3. Installs a LaunchAgent that keeps the bridge running on `127.0.0.1:4893`, then checks that it answers. The log is `~/selfhost/palui-host-bridge.log`.
 
-The bridge listens on loopback only. Docker Desktop and OrbStack route `host.docker.internal` to the host's loopback, so the runtime container still reaches it.
+The bridge listens on loopback only. Docker Desktop and OrbStack route `host.docker.internal` to the host's loopback, so the Palui container still reaches it.
 
 The LaunchAgent pins the `node` binary the script found. Rerun the script after upgrading Node, or after removing that version with nvm.
 

@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   Palui host bridge: an MCP server on 127.0.0.1:4893 that runs an allowlist of
-  host commands for the runtime container. Template: ops/install-host-bridge.sh
+  host commands for the Palui app container. Template: ops/install-host-bridge.sh
   replaces __HOME__ and __NODE__ and installs it into ~/Library/LaunchAgents.
   The allowlist lives in ~/.config/palui/host-bridge.json.
 -->

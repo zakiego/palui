@@ -12,7 +12,7 @@ Channels, models, memory, tools and skills are all connectors. You add and manag
 </Callout>
 
 <ArchitectureDiagram>
-  Messages arrive from three channels: WhatsApp, Telegram and the dashboard web chat. They flow into the runtime container, which holds the router, agent turns, the scheduler, the outbox and the connector supervisor. Next to it, the app container serves the dashboard, the REST API, authentication, the /health endpoint and database migrations. Both containers share one SQLite database on a single volume. Model providers, the recall memory service and MCP servers sit outside both containers and are reached over the network.
+  Messages arrive from three channels: WhatsApp, Telegram and the dashboard web chat. They flow into the one Palui container, which holds the router, agent turns, the scheduler, the outbox and the connector supervisor, and also serves the dashboard, the API, authentication, the /health endpoint and database migrations. It keeps one SQLite database and the WhatsApp session on a single volume. Model providers, the recall memory service and MCP servers sit outside the container and are reached over the network.
 </ArchitectureDiagram>
 
 ## Where to go next

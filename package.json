@@ -9,15 +9,15 @@
   },
   "scripts": {
     "dev": "pnpm --filter @palui/app dev",
-    "dev:runtime": "pnpm --filter @palui/runtime dev",
+    "dev:server": "cd apps/server && go run ./cmd/palui serve --host 127.0.0.1 --port 3000",
     "host-bridge": "pnpm --filter @palui/host-bridge dev",
-    "build": "pnpm -r --workspace-concurrency=2 build",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
-    "cli": "pnpm --filter @palui/app cli",
+    "build": "pnpm -r --workspace-concurrency=2 build && bash scripts/go.sh build",
+    "typecheck": "pnpm -r typecheck && bash scripts/go.sh typecheck",
+    "test": "pnpm -r test && bash scripts/go.sh test",
+    "cli": "cd apps/server && go run ./cmd/palui",
     "site:dev": "pnpm --filter @palui/site dev",
     "site:build": "pnpm --filter @palui/site build",
-    "eval:reminders": "pnpm --filter @palui/core eval:reminders",
+    "eval:reminders": "cd apps/server && go run ./cmd/palui eval-reminders",
     "release": "node scripts/release.ts"
   }
 }

@@ -1,0 +1,42 @@
+[
+  {
+    "input": "key rcl_ab-cd_ef1234 end",
+    "redacted": "key rcl_•••• end"
+  },
+  {
+    "input": "GET https://api.telegram.org/bot123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawZ/getMe",
+    "redacted": "GET https://api.telegram.org/bot1234••••/getMe"
+  },
+  {
+    "input": "token 123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawZ",
+    "redacted": "token 1234••••"
+  },
+  {
+    "input": "sk-abcdefgh1234 and zkg_abc-123_xyz",
+    "redacted": "sk-a•••• and zkg_••••"
+  },
+  {
+    "input": "run 12:30 at 2026-11-10",
+    "redacted": "run 12:30 at 2026-11-10"
+  },
+  {
+    "input": "1234567890123:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawZ",
+    "redacted": "1234567890123:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawZ"
+  },
+  {
+    "input": "Authorization: Bearer abcdefghijklmnopqrstuvwxyz.0123",
+    "redacted": "Authorization: Bear••••"
+  },
+  {
+    "input": "bearer abcdefghijklmnop",
+    "redacted": "bear••••"
+  },
+  {
+    "input": "x12345:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawZ and a12345678:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawZ",
+    "redacted": "x12345:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawZ and a1234••••"
+  },
+  {
+    "input": "rcl_short sk-short zkg_12345",
+    "redacted": "rcl_short sk-short zkg_12345"
+  }
+]

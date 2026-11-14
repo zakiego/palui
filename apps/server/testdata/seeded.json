@@ -1,0 +1,162 @@
+{
+  "masterKey": "palui-dev-master-key-not-for-production-use-0000",
+  "now": 1794621600000,
+  "schemaVersion": "0015_blue_silver_sable",
+  "golden": {
+    "chatId": "chat_0mwfavol5qz6o8bsmwj",
+    "hookId": "hook_0mwfavol5qz6o8bsmwl",
+    "hookSlug": "E2pFhxyoKgfEgAXA",
+    "hookSecret": "phk_bY-nlbZdbhpPlaWEX5VS8t4maoLEAD4w5lx7cUmMDYQ",
+    "hookBody": "{\"action\":\"opened\",\"number\":7,\"title\":\"Golden é\"}",
+    "hookTimestamp": "1794621600",
+    "hookSignature": "sha256=0fb77e48a504bf14f925db586a3132f8da115939c9a099670b8634866d048260",
+    "attachmentId": "att_0mwfavol68m6yo9h9bo",
+    "attachmentBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+  },
+  "connectors": [
+    {
+      "id": "ai-gateway",
+      "secrets": {
+        "apiKey": "zkg_0123456789abcdef"
+      }
+    },
+    {
+      "id": "cliproxy",
+      "secrets": {
+        "apiKey": "sk-cliproxy-0123456789abcdef"
+      }
+    },
+    {
+      "id": "golden-mcp",
+      "secrets": {
+        "token": "zkg_golden_token_0123456789",
+        "header": "x-api-key-0123456789abcdef",
+        "note": "unicode é 😀"
+      }
+    },
+    {
+      "id": "golden-telegram",
+      "secrets": {
+        "botToken": "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawZ"
+      }
+    },
+    {
+      "id": "recall",
+      "secrets": {
+        "apiKey": "rcl_0123456789a91f"
+      }
+    },
+    {
+      "id": "t3code",
+      "secrets": {
+        "pairingCode": "0123456789abcdefghijklmnopqrstuv"
+      }
+    },
+    {
+      "id": "telegram",
+      "secrets": {
+        "botToken": "123456789:AAbbccddeeffgghhiijjkkllmmnnooppqqrr"
+      }
+    },
+    {
+      "id": "tgbot-arisan",
+      "secrets": {
+        "botToken": "123456789:AAbbccddeeffgghhiijjkkllmmnnooppqqrs"
+      }
+    }
+  ],
+  "hooks": [
+    {
+      "id": "hook_0mwfavoirnribr9ytf4",
+      "slug": "9f8e7d6c5b4a4c3d",
+      "secret": "phk_fixture-secret-not-a-real-one"
+    },
+    {
+      "id": "hook_0mwfavoirnribr9ytf5",
+      "slug": "favoirnribr9ytf5",
+      "secret": "phk_fixture-secret-not-a-real-one"
+    },
+    {
+      "id": "hook_0mwfavoirnribr9ytf6",
+      "slug": "favoirnribr9ytf6",
+      "secret": "phk_fixture-secret-not-a-real-one"
+    },
+    {
+      "id": "hook_0mwfavoirnribr9ytf7",
+      "slug": "favoirnribr9ytf7",
+      "secret": "phk_fixture-secret-not-a-real-one"
+    },
+    {
+      "id": "hook_0mwfavoirnribr9ytf8",
+      "slug": "favoirnribr9ytf8",
+      "secret": "phk_fixture-secret-not-a-real-one"
+    },
+    {
+      "id": "hook_0mwfavoirnribr9ytf9",
+      "slug": "favoirnribr9ytf9",
+      "secret": "phk_fixture-secret-not-a-real-one"
+    },
+    {
+      "id": "hook_0mwfavol5qz6o8bsmwl",
+      "slug": "E2pFhxyoKgfEgAXA",
+      "secret": "phk_bY-nlbZdbhpPlaWEX5VS8t4maoLEAD4w5lx7cUmMDYQ"
+    }
+  ],
+  "attachments": [
+    {
+      "id": "att_0mwfavojm46xavsrj14",
+      "sha256": "78811cb69c72e8546052535403ea81c466bd134b7d5b622142be8f5526601a83",
+      "size": 12
+    },
+    {
+      "id": "att_0mwfavojtvoqisx8myi",
+      "sha256": "3645ad90546168ac687c954a6d1c58c6d7d0b2c1f42e22dde1cb85dd6c8b75be",
+      "size": 135032
+    },
+    {
+      "id": "att_0mwfavol68m6yo9h9bo",
+      "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+      "size": 70
+    }
+  ],
+  "counts": {
+    "_migrations": 16,
+    "account": 0,
+    "agents": 3,
+    "attachment_shares": 0,
+    "chats": 29,
+    "claims": 0,
+    "connectors": 36,
+    "contacts": 5,
+    "events": 50,
+    "flow_runs": 25,
+    "flow_step_runs": 30,
+    "flow_triggers": 10,
+    "flow_versions": 5,
+    "flows": 3,
+    "hooks": 7,
+    "identities": 0,
+    "instructions": 5,
+    "jobs": 14,
+    "messages": 39,
+    "outbound_messages": 10,
+    "outbox": 7,
+    "owner_invites": 0,
+    "passkey": 0,
+    "pending_approvals": 3,
+    "preferences": 4,
+    "reminders": 22,
+    "reports": 0,
+    "routine_occurrences": 0,
+    "routines": 0,
+    "runs": 41,
+    "saved_attachments": 3,
+    "session": 0,
+    "sessions": 29,
+    "settings": 10,
+    "tool_calls": 30,
+    "usage": 1,
+    "user": 0,
+    "verification": 0
+  }
+}

@@ -1,0 +1,2537 @@
+{
+ "names": [
+  {
+   "id": "notes",
+   "tool": "add",
+   "name": "notes__add"
+  },
+  {
+   "id": "notes",
+   "tool": "tool.name",
+   "name": "notes__tool_name"
+  },
+  {
+   "id": "notes",
+   "tool": "über",
+   "name": "notes___ber"
+  },
+  {
+   "id": "mcp-jadwal.sholat",
+   "tool": "add",
+   "name": "mcp-jadwal_sholat__add"
+  },
+  {
+   "id": "mcp-jadwal.sholat",
+   "tool": "tool.name",
+   "name": "mcp-jadwal_sholat__tool_name"
+  },
+  {
+   "id": "mcp-jadwal.sholat",
+   "tool": "über",
+   "name": "mcp-jadwal_sholat___ber"
+  },
+  {
+   "id": "MCP Ünïcode",
+   "tool": "add",
+   "name": "MCP__n_code__add"
+  },
+  {
+   "id": "MCP Ünïcode",
+   "tool": "tool.name",
+   "name": "MCP__n_code__tool_name"
+  },
+  {
+   "id": "MCP Ünïcode",
+   "tool": "über",
+   "name": "MCP__n_code___ber"
+  },
+  {
+   "id": "emoji😀id",
+   "tool": "add",
+   "name": "emoji__id__add"
+  },
+  {
+   "id": "emoji😀id",
+   "tool": "tool.name",
+   "name": "emoji__id__tool_name"
+  },
+  {
+   "id": "emoji😀id",
+   "tool": "über",
+   "name": "emoji__id___ber"
+  },
+  {
+   "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "tool": "add",
+   "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "tool": "tool.name",
+   "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "tool": "über",
+   "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "id": "a/b c",
+   "tool": "add",
+   "name": "a_b_c__add"
+  },
+  {
+   "id": "a/b c",
+   "tool": "tool.name",
+   "name": "a_b_c__tool_name"
+  },
+  {
+   "id": "a/b c",
+   "tool": "über",
+   "name": "a_b_c___ber"
+  },
+  {
+   "id": "ok-id_1",
+   "tool": "add",
+   "name": "ok-id_1__add"
+  },
+  {
+   "id": "ok-id_1",
+   "tool": "tool.name",
+   "name": "ok-id_1__tool_name"
+  },
+  {
+   "id": "ok-id_1",
+   "tool": "über",
+   "name": "ok-id_1___ber"
+  }
+ ],
+ "collections": [
+  {
+   "maxTools": 64,
+   "sticky": null,
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "active": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "deferred": [],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    }
+   ]
+  },
+  {
+   "maxTools": 64,
+   "sticky": [
+    "web__fetch",
+    "notes__remove"
+   ],
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "active": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "deferred": [],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    }
+   ]
+  },
+  {
+   "maxTools": 64,
+   "sticky": [
+    "missing__x",
+    "mcp-jadwal-sholat__get_prayer_times"
+   ],
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "active": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "deferred": [],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    }
+   ]
+  },
+  {
+   "maxTools": 10,
+   "sticky": null,
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "active": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "deferred": [],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    }
+   ]
+  },
+  {
+   "maxTools": 10,
+   "sticky": [
+    "web__fetch",
+    "notes__remove"
+   ],
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "active": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "deferred": [],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    }
+   ]
+  },
+  {
+   "maxTools": 10,
+   "sticky": [
+    "missing__x",
+    "mcp-jadwal-sholat__get_prayer_times"
+   ],
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "active": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "deferred": [],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    }
+   ]
+  },
+  {
+   "maxTools": 4,
+   "sticky": null,
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search",
+    "palui__search_tools"
+   ],
+   "active": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "palui__search_tools"
+   ],
+   "deferred": [
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "palui__search_tools",
+     "connectorId": "palui",
+     "tool": "search_tools",
+     "class": "read",
+     "untrusted": false,
+     "title": "Search tools",
+     "label": null,
+     "guestSafe": null
+    }
+   ]
+  },
+  {
+   "maxTools": 4,
+   "sticky": [
+    "web__fetch",
+    "notes__remove"
+   ],
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search",
+    "palui__search_tools"
+   ],
+   "active": [
+    "web__fetch",
+    "notes__remove",
+    "skills__read",
+    "palui__search_tools"
+   ],
+   "deferred": [
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__search"
+   ],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "palui__search_tools",
+     "connectorId": "palui",
+     "tool": "search_tools",
+     "class": "read",
+     "untrusted": false,
+     "title": "Search tools",
+     "label": null,
+     "guestSafe": null
+    }
+   ]
+  },
+  {
+   "maxTools": 4,
+   "sticky": [
+    "missing__x",
+    "mcp-jadwal-sholat__get_prayer_times"
+   ],
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search",
+    "palui__search_tools"
+   ],
+   "active": [
+    "mcp-jadwal-sholat__get_prayer_times",
+    "skills__read",
+    "recall__search",
+    "palui__search_tools"
+   ],
+   "deferred": [
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "web__fetch",
+    "web__search"
+   ],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "palui__search_tools",
+     "connectorId": "palui",
+     "tool": "search_tools",
+     "class": "read",
+     "untrusted": false,
+     "title": "Search tools",
+     "label": null,
+     "guestSafe": null
+    }
+   ]
+  },
+  {
+   "maxTools": 2,
+   "sticky": null,
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search",
+    "palui__search_tools"
+   ],
+   "active": [
+    "skills__read",
+    "palui__search_tools"
+   ],
+   "deferred": [
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "palui__search_tools",
+     "connectorId": "palui",
+     "tool": "search_tools",
+     "class": "read",
+     "untrusted": false,
+     "title": "Search tools",
+     "label": null,
+     "guestSafe": null
+    }
+   ]
+  },
+  {
+   "maxTools": 2,
+   "sticky": [
+    "web__fetch",
+    "notes__remove"
+   ],
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search",
+    "palui__search_tools"
+   ],
+   "active": [
+    "web__fetch",
+    "palui__search_tools"
+   ],
+   "deferred": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__search"
+   ],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "palui__search_tools",
+     "connectorId": "palui",
+     "tool": "search_tools",
+     "class": "read",
+     "untrusted": false,
+     "title": "Search tools",
+     "label": null,
+     "guestSafe": null
+    }
+   ]
+  },
+  {
+   "maxTools": 2,
+   "sticky": [
+    "missing__x",
+    "mcp-jadwal-sholat__get_prayer_times"
+   ],
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search",
+    "palui__search_tools"
+   ],
+   "active": [
+    "mcp-jadwal-sholat__get_prayer_times",
+    "palui__search_tools"
+   ],
+   "deferred": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "web__fetch",
+    "web__search"
+   ],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "palui__search_tools",
+     "connectorId": "palui",
+     "tool": "search_tools",
+     "class": "read",
+     "untrusted": false,
+     "title": "Search tools",
+     "label": null,
+     "guestSafe": null
+    }
+   ]
+  },
+  {
+   "maxTools": 1,
+   "sticky": null,
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search",
+    "palui__search_tools"
+   ],
+   "active": [
+    "skills__read",
+    "palui__search_tools"
+   ],
+   "deferred": [
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search"
+   ],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "palui__search_tools",
+     "connectorId": "palui",
+     "tool": "search_tools",
+     "class": "read",
+     "untrusted": false,
+     "title": "Search tools",
+     "label": null,
+     "guestSafe": null
+    }
+   ]
+  },
+  {
+   "maxTools": 1,
+   "sticky": [
+    "web__fetch",
+    "notes__remove"
+   ],
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search",
+    "palui__search_tools"
+   ],
+   "active": [
+    "web__fetch",
+    "palui__search_tools"
+   ],
+   "deferred": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__search"
+   ],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "palui__search_tools",
+     "connectorId": "palui",
+     "tool": "search_tools",
+     "class": "read",
+     "untrusted": false,
+     "title": "Search tools",
+     "label": null,
+     "guestSafe": null
+    }
+   ]
+  },
+  {
+   "maxTools": 1,
+   "sticky": [
+    "missing__x",
+    "mcp-jadwal-sholat__get_prayer_times"
+   ],
+   "tools": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "mcp-jadwal-sholat__get_prayer_times",
+    "web__fetch",
+    "web__search",
+    "palui__search_tools"
+   ],
+   "active": [
+    "mcp-jadwal-sholat__get_prayer_times",
+    "palui__search_tools"
+   ],
+   "deferred": [
+    "skills__read",
+    "recall__search",
+    "notes__add",
+    "notes__list",
+    "notes__remove",
+    "mcp-jadwal-sholat__search_cities",
+    "web__fetch",
+    "web__search"
+   ],
+   "connectorIds": [
+    "skills",
+    "recall",
+    "notes",
+    "mcp-jadwal-sholat",
+    "web"
+   ],
+   "meta": [
+    {
+     "name": "skills__read",
+     "connectorId": "skills",
+     "tool": "read",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Skills",
+     "guestSafe": false
+    },
+    {
+     "name": "recall__search",
+     "connectorId": "recall",
+     "tool": "search",
+     "class": "read",
+     "untrusted": false,
+     "title": null,
+     "label": "Recall",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__add",
+     "connectorId": "notes",
+     "tool": "add",
+     "class": "write",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__list",
+     "connectorId": "notes",
+     "tool": "list",
+     "class": "read",
+     "untrusted": false,
+     "title": "List notes",
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "notes__remove",
+     "connectorId": "notes",
+     "tool": "remove",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Notes",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__search_cities",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "search_cities",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "mcp-jadwal-sholat__get_prayer_times",
+     "connectorId": "mcp-jadwal-sholat",
+     "tool": "get_prayer_times",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "jadwal-sholat",
+     "guestSafe": false
+    },
+    {
+     "name": "web__fetch",
+     "connectorId": "web",
+     "tool": "fetch",
+     "class": "read",
+     "untrusted": true,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "web__search",
+     "connectorId": "web",
+     "tool": "search",
+     "class": "destructive",
+     "untrusted": false,
+     "title": null,
+     "label": "Web",
+     "guestSafe": false
+    },
+    {
+     "name": "palui__search_tools",
+     "connectorId": "palui",
+     "tool": "search_tools",
+     "class": "read",
+     "untrusted": false,
+     "title": "Search tools",
+     "label": null,
+     "guestSafe": null
+    }
+   ]
+  }
+ ],
+ "search": {
+  "description": "Find and load tools that are not loaded yet. Search by keywords in any language (what you want to do, a service or server name), or load exact tool names. Loaded tools can be called right after this, and stay loaded for the rest of the conversation.",
+  "schema": {
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "type": "object",
+   "properties": {
+    "query": {
+     "description": "Keywords, e.g. 'jadwal sholat' or 'prayer times'",
+     "type": "string",
+     "maxLength": 200
+    },
+    "names": {
+     "description": "Exact tool names to load",
+     "maxItems": 5,
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 100
+     }
+    },
+    "for": {
+     "description": "\"flow\" when picking a tool for a flow step: destructive tools are left out, since flows never run them.",
+     "type": "string",
+     "enum": [
+      "turn",
+      "flow"
+     ]
+    }
+   },
+   "additionalProperties": false
+  },
+  "results": [
+   {
+    "input": {
+     "query": "jadwal sholat"
+    },
+    "output": {
+     "loaded": [
+      {
+       "name": "mcp-jadwal-sholat__search_cities",
+       "connector": "jadwal-sholat",
+       "class": "read",
+       "untrusted": true,
+       "description": "Search Indonesian cities by name",
+       "input": {
+        "type": "object",
+        "properties": {
+         "q": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      {
+       "name": "mcp-jadwal-sholat__get_prayer_times",
+       "connector": "jadwal-sholat",
+       "class": "read",
+       "untrusted": true,
+       "description": "Get the prayer times for a city and a date",
+       "input": {
+        "type": "object",
+        "properties": {
+         "city": {
+          "type": "string"
+         },
+         "date": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "city"
+        ]
+       }
+      }
+     ],
+     "note": "These tools are loaded. Call them directly."
+    },
+    "active": [
+     "skills__read",
+     "recall__search",
+     "palui__search_tools",
+     "mcp-jadwal-sholat__search_cities",
+     "mcp-jadwal-sholat__get_prayer_times"
+    ],
+    "onLoad": [
+     [
+      "mcp-jadwal-sholat__search_cities",
+      "mcp-jadwal-sholat__get_prayer_times"
+     ]
+    ]
+   },
+   {
+    "input": {
+     "query": "prayer time"
+    },
+    "output": {
+     "loaded": [
+      {
+       "name": "mcp-jadwal-sholat__get_prayer_times",
+       "connector": "jadwal-sholat",
+       "class": "read",
+       "untrusted": true,
+       "description": "Get the prayer times for a city and a date",
+       "input": {
+        "type": "object",
+        "properties": {
+         "city": {
+          "type": "string"
+         },
+         "date": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "city"
+        ]
+       }
+      }
+     ],
+     "note": "These tools are loaded. Call them directly."
+    },
+    "active": [
+     "skills__read",
+     "recall__search",
+     "palui__search_tools",
+     "mcp-jadwal-sholat__get_prayer_times"
+    ],
+    "onLoad": [
+     [
+      "mcp-jadwal-sholat__get_prayer_times"
+     ]
+    ]
+   },
+   {
+    "input": {
+     "names": [
+      "notes__remove",
+      "fetch",
+      "nope"
+     ]
+    },
+    "output": {
+     "loaded": [
+      {
+       "name": "notes__remove",
+       "connector": "Notes",
+       "class": "destructive",
+       "untrusted": false,
+       "description": "Remove a note",
+       "input": {
+        "type": "object",
+        "properties": {
+         "q": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      {
+       "name": "web__fetch",
+       "connector": "Web",
+       "class": "read",
+       "untrusted": true,
+       "description": "Fetch a page",
+       "input": {
+        "type": "object",
+        "properties": {
+         "q": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     ],
+     "note": "These tools are loaded. Call them directly."
+    },
+    "active": [
+     "skills__read",
+     "recall__search",
+     "palui__search_tools",
+     "notes__remove",
+     "web__fetch"
+    ],
+    "onLoad": [
+     [
+      "notes__remove",
+      "web__fetch"
+     ]
+    ]
+   },
+   {
+    "input": {
+     "names": [
+      "web__search"
+     ],
+     "query": "notes"
+    },
+    "output": {
+     "loaded": [
+      {
+       "name": "web__search",
+       "connector": "Web",
+       "class": "destructive",
+       "untrusted": false,
+       "description": "Search the web",
+       "input": {
+        "type": "object",
+        "properties": {
+         "q": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      {
+       "name": "notes__list",
+       "connector": "Notes",
+       "class": "read",
+       "untrusted": false,
+       "description": "List notes",
+       "input": {
+        "type": "object",
+        "properties": {
+         "q": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      {
+       "name": "notes__add",
+       "connector": "Notes",
+       "class": "write",
+       "untrusted": false,
+       "description": "Add a note",
+       "input": {
+        "type": "object",
+        "properties": {
+         "q": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      {
+       "name": "notes__remove",
+       "connector": "Notes",
+       "class": "destructive",
+       "untrusted": false,
+       "description": "Remove a note",
+       "input": {
+        "type": "object",
+        "properties": {
+         "q": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     ],
+     "note": "These tools are loaded. Call them directly."
+    },
+    "active": [
+     "skills__read",
+     "recall__search",
+     "palui__search_tools",
+     "web__search",
+     "notes__list",
+     "notes__add",
+     "notes__remove"
+    ],
+    "onLoad": [
+     [
+      "web__search",
+      "notes__list",
+      "notes__add",
+      "notes__remove"
+     ]
+    ]
+   },
+   {
+    "input": {
+     "query": "zzz"
+    },
+    "output": {
+     "loaded": [],
+     "note": "No enabled tool matches. Try other words, or tell the owner this isn't available."
+    },
+    "active": [
+     "skills__read",
+     "recall__search",
+     "palui__search_tools"
+    ],
+    "onLoad": []
+   },
+   {
+    "input": {
+     "query": "remove",
+     "for": "flow"
+    },
+    "output": {
+     "loaded": [],
+     "note": "No enabled tool matches. Try other words, or tell the owner this isn't available."
+    },
+    "active": [
+     "skills__read",
+     "recall__search",
+     "palui__search_tools"
+    ],
+    "onLoad": []
+   },
+   {
+    "input": {
+     "query": ""
+    },
+    "output": {
+     "loaded": [],
+     "note": "No enabled tool matches. Try other words, or tell the owner this isn't available."
+    },
+    "active": [
+     "skills__read",
+     "recall__search",
+     "palui__search_tools"
+    ],
+    "onLoad": []
+   },
+   {
+    "input": {},
+    "output": {
+     "loaded": [],
+     "note": "No enabled tool matches. Try other words, or tell the owner this isn't available."
+    },
+    "active": [
+     "skills__read",
+     "recall__search",
+     "palui__search_tools"
+    ],
+    "onLoad": []
+   }
+  ]
+ },
+ "tokens": [
+  {
+   "input": "get_prayer_times",
+   "tokens": [
+    "get",
+    "prayer",
+    "times"
+   ]
+  },
+  {
+   "input": "Jadwal-Sholat",
+   "tokens": [
+    "jadwal",
+    "sholat"
+   ]
+  },
+  {
+   "input": "Über café 2026 a b 😀 Ⅻ",
+   "tokens": [
+    "über",
+    "café",
+    "2026"
+   ]
+  },
+  {
+   "input": "İstanbul ΣΑΣ",
+   "tokens": [
+    "stanbul",
+    "σας"
+   ]
+  },
+  {
+   "input": "",
+   "tokens": []
+  }
+ ],
+ "rank": [
+  {
+   "doc": {
+    "name": "a__x",
+    "connectorId": "a",
+    "connectorLabel": "A",
+    "tool": "x",
+    "description": "sholat sholatnya"
+   },
+   "score": 2
+  }
+ ]
+}

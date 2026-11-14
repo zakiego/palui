@@ -1,7 +1,7 @@
 // Writes build-info.json at the repo root: the commit being built and the
 // subjects of the commits before it. scripts/pre-deploy.sh runs it after the
-// pull, the Dockerfile copies the file into the image, and the runtime reads it
-// on start to tell the owner about a new commit (packages/core/src/build-info.ts).
+// pull, the Dockerfile copies the file into the image, and the server reads it
+// on start to tell the owner about a new commit (apps/server/internal/version).
 //
 //   node scripts/build-info.ts          # writes ./build-info.json
 //   node scripts/build-info.ts --print  # prints it instead

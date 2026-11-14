@@ -1,0 +1,38 @@
+[
+ {
+  "name": "textOnly",
+  "json": "[{\"role\":\"user\",\"content\":\"halo\"},{\"role\":\"assistant\",\"content\":\"hai, ada apa?\"}]"
+ },
+ {
+  "name": "systemBlocks",
+  "json": "[{\"role\":\"system\",\"content\":\"stable\",\"providerOptions\":{\"palui\":{\"cache\":\"1h\"}}},{\"role\":\"system\",\"content\":\"summary\"}]"
+ },
+ {
+  "name": "userParts",
+  "json": "[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"lihat ini\",\"providerOptions\":{\"palui\":{\"cache\":\"1h\"}}},{\"type\":\"image\",\"image\":\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\",\"mediaType\":\"image/png\"},{\"type\":\"file\",\"data\":\"JVBERi0xLjQKMSAwIG9iajw8Pj5lbmRvYmoKdHJhaWxlcjw8Pj4KJSVFT0Y=\",\"mediaType\":\"application/pdf\",\"filename\":\"ktp.pdf\"},{\"type\":\"text\",\"text\":\"[Palui context]\\nNow: 14.05\"}]}]"
+ },
+ {
+  "name": "toolRound",
+  "json": "[{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Aku cek dulu.\"},{\"type\":\"tool-call\",\"toolCallId\":\"call_1\",\"toolName\":\"notes__list\",\"input\":{\"q\":\"listrik\",\"limit\":3}},{\"type\":\"tool-call\",\"toolCallId\":\"call_2\",\"toolName\":\"web__fetch\",\"input\":{\"url\":\"https://example.com/?a=1&b=<2>\"}}]},{\"role\":\"tool\",\"content\":[{\"type\":\"tool-result\",\"toolCallId\":\"call_1\",\"toolName\":\"notes__list\",\"output\":{\"type\":\"json\",\"value\":[{\"id\":\"n1\",\"title\":\"bayar listrik\",\"done\":false,\"n\":1.5}]}},{\"type\":\"tool-result\",\"toolCallId\":\"call_2\",\"toolName\":\"web__fetch\",\"output\":{\"type\":\"error-text\",\"value\":\"fetch failed\"}}]}]"
+ },
+ {
+  "name": "approvals",
+  "json": "[{\"role\":\"assistant\",\"content\":[{\"type\":\"tool-call\",\"toolCallId\":\"call_3\",\"toolName\":\"alpha__wipe\",\"input\":{}},{\"type\":\"tool-approval-request\",\"approvalId\":\"aprq_1\",\"toolCallId\":\"call_3\"}]},{\"role\":\"tool\",\"content\":[{\"type\":\"tool-approval-response\",\"approvalId\":\"aprq_1\",\"approved\":false,\"reason\":\"owner said no\"}]},{\"role\":\"tool\",\"content\":[{\"type\":\"tool-result\",\"toolCallId\":\"call_3\",\"toolName\":\"alpha__wipe\",\"output\":{\"type\":\"execution-denied\",\"reason\":\"Not run: the owner did not approve it.\"}}]}]"
+ },
+ {
+  "name": "reasoning",
+  "json": "[{\"role\":\"assistant\",\"content\":[{\"type\":\"reasoning\",\"text\":\"Thinking about it.\",\"providerOptions\":{\"anthropic\":{\"signature\":\"sig_abc\"}}},{\"type\":\"text\",\"text\":\"Done ✅ ·   ok\"}]}]"
+ },
+ {
+  "name": "contentOutput",
+  "json": "[{\"role\":\"tool\",\"content\":[{\"type\":\"tool-result\",\"toolCallId\":\"call_4\",\"toolName\":\"attachments__read\",\"output\":{\"type\":\"content\",\"value\":[{\"type\":\"text\",\"text\":\"page 1\"},{\"type\":\"file\",\"data\":{\"type\":\"data\",\"data\":\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"},\"mediaType\":\"image/png\"}]}}]}]"
+ },
+ {
+  "name": "unicode",
+  "json": "[{\"role\":\"user\",\"content\":\"Ừ, được rồi 😀 \\\"quoted\\\" \\\\ back \\n new \\t tab </script> & <b>\"}]"
+ },
+ {
+  "name": "realApprovalRun",
+  "json": "[{\"role\":\"assistant\",\"content\":[{\"type\":\"reasoning\",\"text\":\"hmm\"},{\"type\":\"text\",\"text\":\"Sebentar.\"},{\"type\":\"tool-call\",\"toolCallId\":\"call_a\",\"toolName\":\"notes__add\",\"input\":{\"title\":\"x\"}},{\"type\":\"tool-approval-request\",\"approvalId\":\"aitxt-O8u7K5sY12ypblX0sPUy36HL\",\"toolCallId\":\"call_a\"},{\"type\":\"tool-call\",\"toolCallId\":\"call_b\",\"toolName\":\"notes__list\",\"input\":{}}]},{\"role\":\"tool\",\"content\":[{\"type\":\"tool-result\",\"toolCallId\":\"call_b\",\"toolName\":\"notes__list\",\"output\":{\"type\":\"json\",\"value\":{\"items\":[]}}}]}]"
+ }
+]

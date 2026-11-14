@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { StatusText } from "@/components/ui/status-text"
 import { Textarea } from "@/components/ui/textarea"
-import { getAgentsPage, saveAgentFn } from "@/lib/fns/agents"
+import { getAgentsPage, saveAgentFn } from "@/lib/api/agents"
 import { errorMessage } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 

@@ -10,29 +10,28 @@ You need a server with Docker and Docker Compose, a model provider (CLIProxyAPI 
 
 ### Install with Docker Compose
 
-Clone the repository (it's private for now, so you need access) and create a `.env` file next to `compose.yaml` with three keys:
+Clone the repository (it's private for now, so you need access) and create a `.env` file next to `compose.yaml` with two keys:
 
 ```bash
 git clone <repo-url> palui
 cd palui
-openssl rand -base64 32   # run twice: once for MASTER_KEY, once for BETTER_AUTH_SECRET
+openssl rand -base64 32   # for MASTER_KEY
 ```
 
 ```bash
 MASTER_KEY=<output of openssl rand -base64 32>
-BETTER_AUTH_SECRET=<a second output of openssl rand -base64 32>
 APP_URL=https://palui.example.com
 ```
 
-`APP_URL` is the public origin of your dashboard. Save a copy of `MASTER_KEY` in your password manager: every connector secret is encrypted with it, and a backup is useless without it.
+`APP_URL` is the public origin of your dashboard. Use a host name, not an IP address: passkeys need one. Save a copy of `MASTER_KEY` in your password manager: every connector secret is encrypted with it, and a backup is useless without it.
 
-Then build and start both services:
+Then build and start it:
 
 ```bash
 docker compose up -d --build --wait
 ```
 
-`--wait` returns once both services are healthy, and fails if either doesn't come up. See [Self-hosting](/docs/self-hosting) for what the two services do.
+`--wait` returns once the service is healthy, and fails if it doesn't come up. See [Self-hosting](/docs/self-hosting) for what runs inside it.
 
 </Step>
 <Step>

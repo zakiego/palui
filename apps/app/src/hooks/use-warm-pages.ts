@@ -25,7 +25,7 @@ export function useWarmPages() {
       for (const { to } of PAGES) router.preloadRoute({ to }).catch(() => {})
     }
 
-    // After the first paint and hydration, not in their way.
+    // After the first paint, not in its way.
     const first = window.setTimeout(warm, 300)
     const again = window.setInterval(warm, REWARM_MS)
     document.addEventListener("visibilitychange", warm)

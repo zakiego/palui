@@ -7,10 +7,10 @@ Palui keeps two kinds of backup: a local snapshot before every deploy, and an en
 
 ## Pre-deploy snapshots
 
-Before each deploy, `scripts/pre-deploy.sh` snapshots the database with the app's CLI, run inside the `app` container:
+Before each deploy, `scripts/pre-deploy.sh` snapshots the database with the `palui` CLI, run inside the `app` container:
 
 ```bash
-node .output/server/cli.mjs backup /data/backups/pre-deploy-<UTC>.db.gz
+palui backup /data/backups/pre-deploy-<UTC>.db.gz
 ```
 
 It keeps the 3 newest snapshots in `/data/backups/`. They're your quick way back if a deploy goes wrong. See [Upgrades](/docs/self-hosting/upgrades).
@@ -18,15 +18,15 @@ It keeps the 3 newest snapshots in `/data/backups/`. They're your quick way back
 ## Nightly encrypted backup
 
 <BackupDiagram>
-  Every night a job snapshots the database with the app's CLI and makes a tar archive of the WhatsApp auth directory. It encrypts both files with age, uploads them to Cloudflare R2, and checks that the uploaded size matches.
+  Every night a job snapshots the database and each WhatsApp session store with the palui CLI. It encrypts both with age, uploads them to Cloudflare R2, and checks that the uploaded size matches.
 </BackupDiagram>
 
 `scripts/backup.sh` runs every night at 03:30. On a macOS Docker host, `ops/install-backup.sh` copies it out of the checkout and installs it as a launchd agent, and `scripts/pre-deploy.sh` reinstalls it whenever the script changes. Each run:
 
-1. Snapshots the database with `node .output/server/cli.mjs backup` inside the `app` container, copies it out and checks the gzip.
-2. Streams a tar of `/data/wa-auth/` out of the `runtime` container straight into age, so the plaintext never lands on the host's disk. No auth dir (WhatsApp not paired) means no archive, and that's fine.
+1. Snapshots the database with `palui backup` inside the `app` container, copies it out and checks the gzip.
+2. Snapshots each WhatsApp store in `/data/wa/` with `palui snapshot` (a consistent copy, even while it's in use), then streams a tar of them out of the container straight into age, so the plaintext never lands on the host's disk. No store (WhatsApp not paired) means no archive, and that's fine.
 3. Encrypts the database snapshot with [age](https://age-encryption.org) to your public key. The WhatsApp archive was already encrypted as it streamed.
-4. Uploads them to the R2 bucket `palui-backups` as `palui/<date>/palui-<timestamp>.db.gz.age` and `palui/<date>/wa-auth-<timestamp>.tar.gz.age`.
+4. Uploads them to the R2 bucket `palui-backups` as `palui/<date>/palui-<timestamp>.db.gz.age` and `palui/<date>/wa-<timestamp>.tar.age`.
 5. Checks that each uploaded size matches the local file, then deletes every temp file.
 
 It refuses to run with under 500 MB free and logs every step to its own log file, trimmed once it passes 1 MB.
@@ -47,7 +47,7 @@ security find-generic-password -s palui-backup-age-identity -w \
 Keep a second copy of the identity in your password manager. A backup you can't decrypt is no backup.
 
 <Callout type="warn" title="The WhatsApp archive is a login">
-  The `wa-auth` archive on its own is enough to take over the bot's WhatsApp number. Never store or move it unencrypted, and treat the age key like a password.
+  The WhatsApp archive on its own is enough to take over the bot's WhatsApp number. Never store or move it unencrypted, and treat the age key like a password.
 </Callout>
 
 ## Restore
@@ -62,9 +62,9 @@ You need the backup file, the age private key, and the same `MASTER_KEY` the bac
    gunzip palui.db.gz
    ```
 
-2. Stop both services: `docker compose stop runtime app`.
+2. Stop the server: `docker compose stop app`.
 3. Replace `/data/palui.db` on the volume with the restored file. Make sure no `palui.db-wal` or `palui.db-shm` from the old database is left next to it.
-4. If you're also restoring WhatsApp, decrypt the `wa-auth` archive the same way and extract it to `/data/wa-auth/`. Otherwise, pair WhatsApp again after the restore.
+4. If you're also restoring WhatsApp, decrypt the `wa-<timestamp>.tar.age` archive the same way, untar it, and unpack each store with `gunzip -c wa/<id>.db.gz > /data/wa/<id>.db` (no `-wal` or `-shm` file next to it). Otherwise, pair WhatsApp again after the restore. A backup made before Palui moved to one service holds a `wa-auth-<timestamp>.tar.gz.age` archive instead; current versions can't use it, so pair again.
 5. Start again with `docker compose up -d --wait` and check `/health`.
 
 Restoring a pre-deploy snapshot works the same way, minus the decryption step.
@@ -80,12 +80,12 @@ scripts/restore-drill.sh [file]
 With no argument it takes the newest database backup in R2 from the last 7 days. With a file (`.db.gz.age`, `.db.gz` or `.db`) it uses that instead. It needs the production `MASTER_KEY` in its environment, because the point is to prove the backup and the key still go together, and the image already built on the host. It:
 
 1. Decrypts the backup with the identity from the Keychain.
-2. Restores it into a scratch compose project named `palui-drill`, with its own volume and the app on `127.0.0.1:4899`.
-3. Waits for `/health` to answer 200.
-4. Runs `node .output/server/cli.mjs secrets-check`, which tries every connector and webhook secret and exits non-zero if any of them fails to decrypt.
+2. Restores it into a scratch compose project named `palui-drill`, with its own volume and no network at all, and starts the server there with `--no-runtime`.
+3. Waits for `/health` to answer 200 and to report the runtime off.
+4. Runs `palui secrets-check`, which tries every connector and webhook secret and exits non-zero if any of them fails to decrypt, or if there was nothing to decrypt.
 5. Tears the scratch project down with its volume, whatever happened.
 6. Prints `PASS` or `FAIL`.
 
-Only the `app` service runs in the drill. Starting the runtime would open a second Telegram poller and a second WhatsApp session against the real bot.
+The drill never starts the runtime. Starting it would open a second Telegram poller and a second WhatsApp session against the real bot, so the server runs with `--no-runtime` and the container has no network as a second guard.
 
 A `FAIL` at step 4 usually means the `MASTER_KEY` doesn't match the one the backup was made with.

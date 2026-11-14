@@ -54,7 +54,7 @@ Multi-user, sign-up, billing. Everything marked deferred above. Native app. Repl
 | Thing | Where | How Palui uses it |
 |---|---|---|
 | utusan | `~/Code/JS/Node/2026/utusan` | Ideas, not imported code. Reused: the adapter contract, router outcomes (`ignore` with a reason sentence), fail-closed tool classes (unmatched means `destructive`), hot reload with a last-good config, the SSRF guard, phone JID vs LID handling (`adapters/types.ts`), and Baileys 440/428/reconnect handling. Avoided: reminders deleted before the send, non-atomic `threads.json` writes, container hostname used as the session id. |
-| recall | `recall.zakiego.com`, `~/selfhost/recall` | Memory connector (MCP for tools, REST for auto-recall and auto-save). Also the repo template: pnpm monorepo, TanStack Start + Nitro, Next 16 static Fumadocs site, edge Worker routing, Better Auth passkeys with CLI-only users, Drizzle + SQLite, pre-deploy DB snapshot, shadcn `base-nova` (`baseColor: neutral`), Geist, oklch tokens. |
+| recall | `recall.zakiego.com`, `~/selfhost/recall` | Memory connector (MCP for tools, REST for auto-recall and auto-save). Also the original repo template (the server has since moved to Go): pnpm monorepo, Next 16 static Fumadocs site, edge Worker routing, passkeys with CLI-only users, SQLite, pre-deploy DB snapshot, shadcn `base-nova` (`baseColor: neutral`), Geist, oklch tokens. |
 | CLIProxyAPI | Homebrew `cliproxyapi`, `127.0.0.1:8317` on the mini | Model connector. Claude-format `/v1/messages`, OpenAI-format `/v1/chat/completions`, `/v1/models`. Accounts: Claude (4), Antigravity/Gemini, OpenRouter. It has no built-in usage stats since v6.10.0. |
 | ai-gateway | `127.0.0.1:8793` | Second model connector and the fallback. |
 | zaki-selfhost | skill | Docker in OrbStack, port 4800 to 4899, tunnel, `deploy.sh`, auto-deploy webhook, m4-alerts. |
@@ -63,71 +63,65 @@ Multi-user, sign-up, billing. Everything marked deferred above. Native app. Repl
 ## 3. Architecture
 
 ```
- WhatsApp (Baileys)    Telegram (grammY)    Web chat (dashboard)
+ WhatsApp (whatsmeow)    Telegram (Bot API)    Web chat (dashboard)
           \                   |                    /
            +--------- channel connectors ---------+
                               |
                  INBOX (messages, status=pending)
                               v
-  +---------------------- runtime ---------------------------------+
+  +------------------- palui serve (one Go process) ----------------+
   |  router -> per-chat queue -> turn                               |
-  |    turn = session + memory + prompt -> AI SDK loop -> OUTBOX    |
+  |    turn = session + memory + prompt -> model loop -> OUTBOX     |
   |    approval needed -> pending_approvals, turn ends              |
-  |  scheduler (reminders, jobs) -> OUTBOX or a turn                |
+  |  scheduler (reminders, jobs, flows) -> OUTBOX or a turn         |
   |  outbox worker: claim, send, ack, retry                         |
-  |  connector supervisor: reconcile desired vs running                |
+  |  connector supervisor: reconcile desired vs running             |
+  |  HTTP: dashboard (embedded SPA), /api, auth, /health            |
   +-----------------------------------------------------------------+
-        |  SQLite WAL on volume  |  control API (compose network only)
-  +---------------------- app -------------------------------------+
-  |  TanStack Start: dashboard, REST API, auth, migrations, /health |
-  +-----------------------------------------------------------------+
+        |  SQLite WAL on the volume
         |
   CLIProxyAPI / ai-gateway (host)   recall (host :4800)   MCP servers
 ```
 
-### 3.1 Two services, one image
+### 3.1 One service, one binary
 
-- `app`: TanStack Start (Nitro). Dashboard, REST API, auth, `/health`. It's the only service that runs migrations.
-- `runtime`: a plain Node process. Channel sockets, turns, scheduler, outbox, supervisor.
+`palui serve` runs everything in one process: the HTTP server (the dashboard, `/api`, auth, `/health`), migrations, the connector supervisor, the turn engine, the schedulers and the outbox worker. The dashboard calls the runtime in process, so there's no control API, no token between services and no second container. Each connector and each background loop recovers its own panics, so one bad library can't take the dashboard down. Deploys still restart the process; the durable inbox and outbox handle that (section 8).
 
-Why the split: long-lived sockets (Baileys, grammY polling) don't belong in Nitro's bundle or its dev reload, and the runtime should stay small and boring. The split doesn't keep the socket up through deploys, since both restart on each push. The durable inbox and outbox handle deploys instead (section 8).
+Connector code: each connector type is a Go package in `apps/server/internal/connectors/<type>` that exports its manifest (zod-like schemas, UI metadata, setup steps) and its runtime (`Test`, `Start`, tools). The dashboard keeps a TS copy of every manifest in `apps/app/src/shared/connectors` for its forms. The dashboard's Test button is an RPC call that runs `Test` in process.
 
-Connector code is split so the app never bundles Baileys:
+The same binary is the admin CLI: `palui owner invite`, `palui connectors list|on|off|connect`, `palui backup`, `palui secrets-check`, `palui hook create`, `palui healthcheck`, `palui snapshot`, and `palui eval-reminders`.
 
-- `packages/connectors/<id>/manifest.ts`: zod schemas, UI metadata, setup steps. The app and runtime both import it.
-- `packages/connectors/<id>/runtime.ts`: `test`, `start`, `tools`. Only the runtime imports it. The dashboard's Test button goes through `POST /control/test/:id`.
+`compose.yaml` rules (deploy.sh runs `up -d --build --wait`, which waits on the healthcheck):
 
-`compose.yaml` rules (deploy.sh runs `up -d --build --wait`, which waits on every service):
-
-- Only `app` has `build:`. `runtime` uses `image: palui:latest` with `pull_policy: never`. M0 checks that compose builds it once and that `runtime` uses it.
-- The `runtime` healthcheck is liveness only: event loop responsive, DB open, schema version known. Connector state goes in the `/health` JSON body and m4-alerts, never in the exit code. A WhatsApp outage must not fail a deploy and trigger a rollback.
-- `runtime` has `depends_on: { app: { condition: service_healthy } }` and refuses to start on a schema it doesn't know.
-- `stop_grace_period: 60s` on both. The runtime drains on SIGTERM: stop taking new turns, finish the current step, release outbox claims.
-- `.dockerignore` excludes `apps/site`, `apps/edge` and docs. A docs commit then produces the same image layers and compose doesn't restart the containers.
-- deploy.sh only prints `app` logs on failure. The docs say to run `docker compose logs runtime` too.
-- The control port is never published. `app` is bound to 127.0.0.1.
+- One service, `app`, with `build:` and `image: palui:latest`.
+- The healthcheck is `palui healthcheck` (a GET on `/health` from inside the container). `/health` is liveness: it fails only when the database schema is newer than the code. Connector state goes in the `/health` JSON body and m4-alerts, never in the exit code. A WhatsApp outage must not fail a deploy and trigger a rollback.
+- `stop_grace_period: 60s`. The server drains on SIGTERM: stop taking new turns, finish the current step, release outbox claims (hard exit at 58 s).
+- `.dockerignore` keeps `apps/site`, `apps/edge`, `docs`, `ops` and `scripts` out (the workspace packages send only their `package.json`). A docs commit then produces the same image layers and compose doesn't restart the container.
+- `app` is bound to 127.0.0.1. The tunnel is the only way in.
+- `PALUI_NO_RUNTIME=1` (or `palui serve --no-runtime`) starts the HTTP side only: no connectors, turns, schedulers or outbox. The restore drill uses it.
 
 ### 3.2 Stack
 
 | Layer | Choice |
 |---|---|
-| Repo | pnpm monorepo: `apps/app`, `apps/runtime`, `apps/site`, `apps/edge`, `packages/core`, `packages/db`, `packages/connectors` |
-| Runtime | Node 24, TypeScript, bundled with tsdown |
-| Agent loop | AI SDK 7. The default role uses `@ai-sdk/anthropic` with `baseURL` on CLIProxyAPI `/v1/messages` and cache breakpoints on system and tools. `@ai-sdk/openai-compatible` covers Gemini and others. `@ai-sdk/mcp` for MCP clients. Exact APIs come from `node_modules/ai/docs` at build time. |
-| WhatsApp | Baileys 7, the same pinned rc as utusan |
-| Telegram | grammY, long polling |
-| DB | SQLite, better-sqlite3 + Drizzle, WAL, `busy_timeout` |
-| Time | Luxon (or Temporal if Node 24 ships it stable) for wall-clock math in the stored zone |
-| Auth | Better Auth, passkeys, `disableSignUp: true` from boot |
-| Dashboard | React 19, Tailwind 4, ui-sdk, `sidebar-07` layout, Sonner, lucide |
+| Repo | pnpm workspace plus a Go module: `apps/server` (Go), `apps/app` (dashboard), `apps/site`, `apps/edge`, `apps/host-bridge` |
+| Server | Go (version from `apps/server/go.mod`), one static binary, no cgo. The image is alpine plus the binary, about 42 MB |
+| Agent loop | Palui's own streaming clients: Anthropic Messages (`/v1/messages`, with cache breakpoints on system and tools) and OpenAI-compatible chat completions, both with a configurable base URL. The default role points at CLIProxyAPI. MCP clients use the official Go SDK (Streamable HTTP) |
+| WhatsApp | whatsmeow, with its session store in `$DATA_DIR/wa/<connectorId>.db` |
+| Telegram | Bot API long polling (a small in-house client) |
+| DB | SQLite through `modernc.org/sqlite` (pure Go), `database/sql` with handwritten SQL, WAL, `busy_timeout`. One write connection plus a read pool |
+| Time | Go's `time` with embedded tzdata, `rrule-go` for recurrence, wall-clock math in the stored zone |
+| Auth | Go sessions and passkeys (`go-webauthn`), no sign-up: the owner comes from a CLI invite |
+| Dashboard | React 19 SPA (Vite, TanStack Router), Tailwind 4, ui-sdk, `sidebar-07` layout, Sonner, lucide. Built to static files and embedded in the binary |
 | Site | Next 16 static export + Fumadocs on Pages |
 | Edge | Worker on `palui.zakiego.com`, copied from recall's `apps/edge/src/routing.ts` |
 
 ### 3.3 Hostnames and ports
 
 - `palui.zakiego.com`: the edge Worker. `/app`, `/api`, `/api/auth` and `/health` go to the tunnel, everything else goes to Pages.
-- Tunnel: one rule to `127.0.0.1:<port>` from `free-port.sh` (likely 4802).
-- Inside OrbStack: CLIProxyAPI is `http://host.docker.internal:8317`, ai-gateway is `:8793`, recall is `:4800`. That skips the tunnel and Cloudflare's 100 s limit.
+- Tunnel: one rule to `127.0.0.1:4802`, which compose maps to the container's port 3000.
+- Inside OrbStack: CLIProxyAPI is `http://host.docker.internal:8317`, ai-gateway is `:8793`, recall is `:4800`, the host bridge is `:4893`. That skips the tunnel and Cloudflare's 100 s limit.
+- Development: the dashboard's Vite server on 4890 proxies `/api` and `/health` to `palui serve` on 3000. The site runs on 4892.
 
 ## 4. Connectors
 
@@ -135,31 +129,31 @@ Everything optional is a connector of kind `channel`, `model`, `memory`, `tools`
 
 ### 4.1 Manifest
 
-```ts
-// packages/connectors/telegram/manifest.ts
-export default defineManifest({
-  id: "telegram",
-  kind: "channel",
-  name: "Telegram",
-  icon: "send",
-  summary: "Chat with Palui from a Telegram bot.",
-  config: z.object({}),
-  secrets: { botToken: z.string().regex(/^\d+:[\w-]{30,}$/) },
-  setup: [
-    { field: "botToken", label: "Bot token", help: "From @BotFather, /newbot" },
-    { action: "claimOwner", label: "Open the link and press Start" },
-  ],
-});
+```go
+// apps/server/internal/connectors/telegram/manifest.go
+var Manifest = connectors.Manifest{
+	ID:      "telegram",
+	Kind:    "channel",
+	Name:    "Telegram",
+	Icon:    "telegram",
+	Summary: "Chat from a Telegram bot.",
+	Setup: []connectors.SetupStep{
+		{Field: "botToken", Label: "Bot token", Help: "Send this to @BotFather, then paste the token.", Command: "/newbot", Secret: true},
+		{Action: "claimOwner", Label: "Open the link and press Start"},
+	},
+	ConfigZod: ConfigZod, // zod.Object(...): the same issue text as the dashboard's zod
+	SecretZod: SecretZod, // botToken matching ^\d+:[\w-]{30,}$
+}
 
-// packages/connectors/telegram/runtime.ts
-export default defineRuntime(manifest, {
-  test: async (ctx) => ({ ok: true, detail: "@palui_bot reachable" }),
-  start: async (ctx) => ({ stop: async () => {} }),
-  tools: (ctx) => ({}),
-});
+// apps/server/internal/connectors/telegram/runtime.go
+var Runtime = &connectors.Runtime{
+	Manifest: Manifest,
+	Test:     func(c connectors.Context) (connectors.TestResult, error) { ... }, // "@palui_bot reachable"
+	Start:    func(c connectors.Context) (*connectors.RunningConnector, error) { ... }, // stop, tools
+}
 ```
 
-Adding a connector means adding one folder. The dashboard card, setup wizard, status, chat commands and docs page skeleton are all generated from the manifest.
+The dashboard has the same manifest in TS (`apps/app/src/shared/connectors/telegram/manifest.ts`) for its forms. Adding a connector means one Go package, its entry in `internal/connectors/registry`, and the dashboard's manifest; both copies are checked against the manifest golden. The dashboard card, setup wizard, status, chat commands and docs page skeleton are all generated from the manifest.
 
 ### 4.2 States
 
@@ -190,7 +184,7 @@ not set up --connect--> connecting --ok--> on
 
 ### 4.4 Supervisor
 
-The desired state is the `connectors` rows (`enabled`, `config_hash`). The running state is the handles held in memory. It reconciles when the control API pokes it and every 30 s. Each connector is isolated, so a throw never takes the process down. Status changes go to `events`, so the dashboard, `/health` and chat all read the same thing.
+The desired state is the `connectors` rows (`enabled`, `config_hash`). The running state is the handles held in memory. It reconciles when a dashboard or CLI change pokes it and every 30 s. Each connector is isolated, so a throw never takes the process down. Status changes go to `events`, so the dashboard, `/health` and chat all read the same thing.
 
 ### 4.5 Secrets
 
@@ -208,17 +202,17 @@ Secrets are entered in the dashboard only and encrypted at rest with AES-256-GCM
 
 Telegram (the first channel built)
 - Connect: paste the token. Test calls `getMe` and shows `@bot_username`. The wizard then shows `t.me/<bot>?start=<nonce>` as a link and a QR. The nonce is single use and expires after 10 minutes. Only a `/start <nonce>` claims owner, and the wizard waits with a live status line until it arrives.
-- Runtime: grammY long polling, typing action during a turn, replies split at 4096 chars and sent as HTML.
+- Runtime: Bot API long polling, typing action during a turn, replies split at 4096 chars and sent as HTML.
 - Media in: photos (vision), voice (transcription skill), small documents (text extracted).
 - Inline keyboards for reminder actions, approvals and `/connectors`.
 
 WhatsApp
-- Connect: the wizard first asks for the owner's phone number. Then it pairs by phone-number code (8 chars, big Geist Mono, `ABCD-EFGH`, copy button), with QR as a fallback tab. Expiry is driven by Baileys `connection.update`: a new `qr` arrives on each rotation, and the pairing code is requested after the socket opens. A text label ("expires in about 2 min") isn't announced on every tick. Session files live in `/data/wa-auth`.
+- Connect: the wizard first asks for the owner's phone number. Then it pairs by phone-number code (8 chars, big Geist Mono, `ABCD-EFGH`, copy button), with QR as a fallback tab. Expiry is driven by the WhatsApp client's pairing events: a new QR code arrives on each rotation, and the pairing code is requested after the socket opens. A text label ("expires in about 2 min") isn't announced on every tick. The session lives in `/data/wa/<connectorId>.db` (whatsmeow's store).
 - Owner match: messages from the stored number are accepted. The LID is learned from the first DM whose `key.remoteJidAlt` (or the LID mapping) matches the number, and both are stored. Anything with `fromMe` is dropped.
 - Number: Palui's own number (D2), not utusan's. Nothing is shared with utusan, so there's no chat split and no utusan check. Every DM from the owner is answered. Groups and other people's DMs start outside the allowlist until they get an agent (section 19).
-- Runtime: a lock on the auth dir, reconnect with exponential backoff, and 440 means "another session took over", so it pauses with that reason instead of fighting. A logout means `error: unlinked`.
+- Runtime: a lock file next to the session store, reconnect with exponential backoff, and 440 means "another session took over", so it pauses with that reason instead of fighting. A logout means `error: unlinked`.
 - DMs, plus groups with an agent (section 19). An ⏳ reaction while thinking, cleared on reply. Each chat can turn it off or pick another emoji (`chats.ack`, `chats.ack_emoji`; `/ack on|off|<emoji>`, the Chats page or an agent's Chats tab); typing still shows.
-- Risk: Baileys is unofficial. Keep volume low, use one owner, never broadcast. Telegram is the reliable channel.
+- Risk: the WhatsApp client (whatsmeow) is unofficial. Keep volume low, use one owner, never broadcast. Telegram is the reliable channel.
 
 Web chat
 - Lives in the dashboard. It goes through the same router and turn, streamed, with tool calls visible. It's for testing without a phone.
@@ -288,7 +282,7 @@ The feature most likely to be judged by its failures.
 - Downtime: on start, overdue reminders fire once with "(telat, harusnya 09.00)". A recurring reminder that missed several runs fires once.
 - Actions: Done, and Snooze for 10m / 1h / tomorrow 09.00. Inline buttons on Telegram. On WhatsApp, reply "done" or "tunda 1j" quoting the reminder.
 - Plain reminders never call the model. A "smart reminder" option runs a prompt at fire time.
-- Scheduler: one timer armed for `min(fire_at - now, 60_000)`. Node clamps delays over about 24.8 days to 1 ms, so the cap avoids a tight loop. There's also a 30 s safety sweep. Both use the same idempotent claim: `UPDATE … SET status='firing' WHERE status='pending' AND fire_at<=now RETURNING`.
+- Scheduler: one timer armed for `min(fire_at - now, 60_000)`. The cap keeps a long sleep from drifting past a changed schedule. There's also a 30 s safety sweep. Both use the same idempotent claim: `UPDATE … SET status='firing' WHERE status='pending' AND fire_at<=now RETURNING`.
 - Tests (part of M2's done-when):
   - Fake-clock unit tests: America/New_York DST gap and overlap, "last Friday", the 31st in a 30-day month, the restart-with-overdue case, the 25-day-out timer.
   - A parse eval: 60 Indonesian and English phrases against a fixed "now", at least 95% exact.
@@ -299,12 +293,12 @@ Routines were the first generic automation (a time source, one action, a recap).
 
 ## 6c. Flows
 
-Automations the agent builds from chat out of triggers and steps (`packages/core/src/flows`, tools in the `flows` skill). Accepted from `docs/rfc/flows.md`, which keeps the reasoning and the rejected alternatives; this section is the source of truth for behavior. Flows replaced routines (6b).
+Automations the agent builds from chat out of triggers and steps (`apps/server/internal/flows`, tools in the `flows` skill). Accepted from `docs/rfc/flows.md`, which keeps the reasoning and the rejected alternatives; this section is the source of truth for behavior. Flows replaced routines (6b).
 
-- Definition: JSON `{ schema, name, description?, tz?, triggers[], steps[], limits? }`, validated by zod (`flows/schema.ts`) and by the graph and data checks in `flows/validate.ts`: unique literal ids, known branch targets, no cycles, nothing unreachable, at most 40 steps, 8 triggers, 32 KB. `schema` versions the format; `upgradeDefinition()` reads old shapes, so a format change needs no data migration.
+- Definition: JSON `{ schema, name, description?, tz?, triggers[], steps[], limits? }`, validated by the schema (`flows/schema.go`, with zod's issue text) and by the graph and data checks in `flows/validate.go`: unique literal ids, known branch targets, no cycles, nothing unreachable, at most 40 steps, 8 triggers, 32 KB. `schema` versions the format; `upgradeDefinition()` reads old shapes, so a format change needs no data migration.
 - Triggers: `schedule` (fixed `times`, an `rrule`, or times read daily from a read `tool`, `flows/source-config.ts`), `webhook` (a hook in mode `flow`, payload always tainted), `chat` (an owner command or exact phrase in the flow's chat, matched by the router before the model; built-in commands are refused), `poll` (a read tool every 5 to 1440 minutes; the first poll only seeds; fires on change or on a new non-empty value), `event` (`checkin.answered`, `checkin.missed`, `run.done`, `run.failed` from a named flow or `self`; chain depth over 3 is skipped; never your own `run.failed`), and manual (`run_flow`). Each fires at most once per run key.
 - Steps: `tool`, `if`, `set` (run or flow scope, flow state capped at 16 KB), `message` (optional literal `to` an owner or allowed chat), `checkin` (answers, re-asks, deadline `next` or `after`, `on.<answer>` and `onMissed` branches), `wait` (up to 7 days), `prompt` (a literal instruction, data in `<data>`/`<untrusted>` blocks, tools allowlisted, `"*"` for every tool under unattended rules), `each` (one child run per item, key-deduped across runs as `each:<step>:<key>`, 20 by default and 50 at most, no nesting). Every step has `next`, `onError` (`fail`, `continue` or a step id) and `timeoutSec`.
-- Data: templates `{{path | filter}}` only in tool args, message and check-in text, prompt input, set values, `wait.until` and `each.key`; ids, tool names, branch targets, `message.to` and the prompt instruction are literals. Expressions (`flows/expr.ts`) are parsed at save into an AST: and/or/not, comparisons, arithmetic (null counts as 0 in + and -), a fixed function list; no eval and no regex from the flow, bounded to 200 nodes.
+- Data: templates `{{path | filter}}` only in tool args, message and check-in text, prompt input, set values, `wait.until` and `each.key`; ids, tool names, branch targets, `message.to` and the prompt instruction are literals. Expressions (`flows/expr.go`) are parsed at save into an AST: and/or/not, comparisons, arithmetic (null counts as 0 in + and -), a fixed function list; no eval and no regex from the flow, bounded to 200 nodes.
 - Taint: per run, a set of roots (`trigger`, `steps.<id>`, `vars.<name>`, `flow.<name>`, `item`). Untrusted tools, webhook bodies, untrusted poll or source tools and tainted prompt turns taint their root; `set` and `each` carry it. Message values are sanitized (control characters out, sent as plain text); tainted ones also lose line breaks and are capped at 500 characters. Conditions read tainted values freely.
 - Tool calls: server-side through `connectorFlowCaller`, which resolves the class from the connector's tool list before calling and passes the flow's chat and id in the tool context. Destructive tools are refused at save and at run time. Read tools retry twice (30 s, 2 min).
 - Approvals: write calls (and `message.to` an allowed chat) are listed per version (`flow_versions.write_calls`) and approved once per version with `flowver:approve|deny:<versionId>`; an edit with the same write calls keeps the approval. Until then, runs stop at the write step as `awaiting_approval` / `not_approved` and continue on approval. A single run asks again through `pending_approvals` (10 minutes) when an argument is tainted, the tool's class or connector type changed since the approval, or the tool's `flowApproval` is `every_run` (per tool on the MCP tool list, or set by a connector on its tools, read at run time).
@@ -325,19 +319,19 @@ Automations the agent builds from chat out of triggers and steps (`packages/core
 
 ## 8. The agent turn
 
-1. Inbox: every inbound message is written to `messages` with `status=pending` before the channel handler returns. Pending rows are replayed on start. grammY confirms updates when it fetches the next batch, and Baileys delivers once, so this is what keeps a message sent mid-deploy.
+1. Inbox: every inbound message is written to `messages` with `status=pending` before the channel handler returns. Pending rows are replayed on start. Telegram confirms updates when the next batch is fetched, and WhatsApp delivers once, so this is what keeps a message sent mid-deploy.
 2. Router: identify the channel and sender. Non-owners are dropped, with the reason logged as a sentence, unless the chat is allowed and has an agent (section 19). A message that answers a pending approval ("ya"/"batal", or a button callback) is matched here, before the model sees it. Commands never start a turn: `/help`, `/new`, `/stop`, `/status`, `/usage`, `/connectors`, `/agent`, `/model`, `/models`, `/tools`, `/id`, `/report`, `/compact` and `/btw`. Only the last two call a model: `/compact` runs step 9 now (keeping the last 6 messages) in the chat's queue, and `/btw <question>` asks the `default` model one side question with no tools, the session as context, and nothing written back to the session. `/model <name>` edits the global `modelRoles` setting (the model goes first in the role's chain on every running connector that offers it). `/id` returns the chat, session and message ids, and those of a quoted message (looked up by its channel id in `messages`, then `outbox`). Slow commands (`/btw`, `/models`, `/model <name>`, `/tools`) answer off the routing chain, so `/stop` still lands while they work. `/report [note]` builds a plain-text debug snapshot of the chat for a coding agent (ids, recent runs and their errors, the last 10 messages, unsent outbox rows, warnings that name them), saves it in `reports` under an `rpt_` id and sends it. From a shared chat it goes to the owner's DM and the chat only gets the id (19.4).
 3. Per-chat queue: one turn at a time per chat. Messages that arrive mid-turn are batched into the next turn.
 4. Context: persona, now (date and WITA), the list of enabled capabilities, recall profile, and the session (summary plus the last 30 messages). The tool calls those turns made are replayed with them as real tool-call and tool-result parts (the result is the stored 500-character preview), so the model can tell what it ran from what it only said. Without that it distrusts its own replies and re-checks old work on every turn. A message that replies to another carries the quoted message in a `[Replying to ...]` block with `> ` lines, taken from the stored row or outbox when there is one, otherwise from the channel (WhatsApp `contextInfo.quotedMessage`). It is context only, never instructions. A quote of someone other than the owner or Palui taints the turn.
-5. Loop: AI SDK with tools from enabled connectors, within the section 5.2 budget.
-6. Approvals: tools that need approval (`destructive` always, `write` in tainted turns and jobs) use AI SDK 7 tool approval. `generateText` returns `tool-approval-request` parts and the turn ends. The `approvalId` and response messages are saved to `pending_approvals`, the queue is freed, and I get a prompt (buttons on Telegram, "ya/batal" on WhatsApp). The answer resumes it with a new call carrying a `tool-approval-response`. The AI SDK ran the other calls of that step when it asked, so on an approved resume their results are marked as taken before the approved call ran (the model calls again for the current state). After 10 minutes it resumes with a denial so the model can close the loop. This survives restarts. When the same call (same tool, same arguments) is made again in that chat while a request for it still waits, the older request is dropped without a follow-up: only the newest prompt is live.
+5. Loop: the model loop with tools from enabled connectors, within the section 5.2 budget.
+6. Approvals: tools that need approval (`destructive` always, `write` in tainted turns and jobs) use tool approval: the loop returns `tool-approval-request` parts and the turn ends. The `approvalId` and response messages are saved to `pending_approvals`, the queue is freed, and I get a prompt (buttons on Telegram, "ya/batal" on WhatsApp). The answer resumes it with a new call carrying a `tool-approval-response`. The loop ran the other calls of that step when it asked, so on an approved resume their results are marked as taken before the approved call ran (the model calls again for the current state). After 10 minutes it resumes with a denial so the model can close the loop. This survives restarts. When the same call (same tool, same arguments) is made again in that chat while a request for it still waits, the older request is dropped without a follow-up: only the newest prompt is live.
 7. Reply: written to the outbox, split and formatted per channel.
 8. Bookkeeping: tokens, tool calls and duration go into `runs`, tagged with `run_id` in logs.
 9. Compaction: past about 40 messages, the `fast` model writes a summary and older messages leave the context (they stay in the DB). Auto-save to recall runs here.
 
 Delivery is at least once. Outbox rows stuck in `sending` for more than 5 minutes go back to `pending`.
 
-## 9. Data model (SQLite, Drizzle)
+## 9. Data model (SQLite)
 
 | Table | Key columns |
 |---|---|
@@ -365,18 +359,18 @@ Delivery is at least once. Outbox rows stuck in `sending` for more than 5 minute
 | `reports` | id, chat_id, session_id, note, text, created_at (one row per `/report`, kept until deleted) |
 | `settings` | key, value |
 
-All writes go through transactions, with no JSON state files. Retention: `tool_calls` args and results for 30 days, media for 14 days, `events` for 90 days.
+The schema is handwritten SQL in `apps/server/internal/db/migrations` (one numbered file per change, embedded in the binary). The server applies new ones at start, each in one transaction, and records them in `_migrations`; a database that has a migration the binary doesn't know is reported as newer and `/health` fails. Timestamps are Unix ms, JSON columns are text, booleans are 0 or 1. All writes go through transactions, with no JSON state files. Retention: `tool_calls` args and results for 30 days, media for 14 days, `events` for 90 days.
 
 ## 10. Security
 
-- Dashboard: passkeys, `disableSignUp: true` from the first boot. The owner comes from `docker compose exec app palui owner invite`, a single-use link valid for 15 minutes, which is also the recovery path for a lost passkey (recall's pattern). App routes are `noindex`.
+- Dashboard: passkeys, no sign-up from the first boot. The owner comes from `docker compose exec app palui owner invite`, a single-use link valid for 15 minutes, which is also the recovery path for a lost passkey (recall's pattern). App routes are `noindex`.
 - Channel owner: claimed with a Telegram nonce link and a WhatsApp phone number plus learned LID (section 5.1). Everyone else is silently dropped and logged, except in chats the owner allowed and gave an agent (section 19).
 - Taint rule: a turn becomes tainted once it reads untrusted content (web fetch, a hook payload, results from an `external` MCP server). For the rest of that turn, every `write` tool needs approval too, and auto-save skips it. A label in the prompt isn't counted as a control.
 - recall auto-save stores only my messages and final replies, so tool output can't become a permanent injection through auto-recall.
 - Jobs and hooks: no `destructive` tools, `write` needs approval, and hook summaries run with zero tools.
 - Tool classes fail closed. Unknown means `destructive`.
 - Secrets: encrypted, write-only, redacted in logs.
-- Network: control API on the compose network only, `app` on 127.0.0.1, SSRF guard on every fetch the agent can steer.
+- Network: one process (no internal API between services), `app` on 127.0.0.1, SSRF guard on every fetch the agent can steer.
 - CLIProxyAPI logs: its config has `debug: true`, `logging-to-file: true` and `logs-max-total-size-mb: 0`, and the logs folder is already 154 MB. Prompts with recall memories would land there. D8 includes capping it.
 
 ## 11. Dashboard UI/UX
@@ -472,13 +466,13 @@ Follows the TASTE.md lines.
 
 ## 13. Deploy and operations
 
-- Compose as in section 3.1. `.env` keys, which I create: `MASTER_KEY`, `BETTER_AUTH_SECRET`, `APP_URL`. A copy of `MASTER_KEY` also goes into my password manager. Every other credential is encrypted in the DB.
-- `scripts/pre-deploy.sh`: snapshot the DB (copied from recall), keep 3.
+- Compose as in section 3.1: one service, `app`. `.env` keys, which I create: `MASTER_KEY` and `APP_URL` (a host name, since passkeys don't work on an IP address). A copy of `MASTER_KEY` also goes into my password manager. Every other credential is encrypted in the DB.
+- `scripts/pre-deploy.sh`: snapshot the DB with `palui backup`, keep 3. It also stops and removes a leftover `runtime` container from the two-service setup, so only one server ever runs on the volume.
 - `/health` fails when the DB schema is newer than the code, so a bad rollback shows as failed.
-- Nightly backup to R2: DB snapshot plus `wa-auth`, encrypted with age, with the key in Keychain. `wa-auth` alone can take over the bot's number.
-- Restore drill (part of M2): restore the latest R2 snapshot into a scratch compose project, check that `/health` is green and that one secret decrypts.
+- Nightly backup to R2 (`scripts/backup.sh`): a DB snapshot plus each WhatsApp store under `/data/wa/` (snapshotted with `palui snapshot`), encrypted with age, with the key in Keychain. A WhatsApp store alone can take over the bot's number.
+- Restore drill (`scripts/restore-drill.sh`): restore the latest R2 snapshot into a scratch compose project, `palui-drill`, that runs `palui serve --no-runtime` with no network, then check that `/health` is green and that the secrets decrypt (`palui secrets-check`). The runtime-off switch keeps the drill from starting connectors or sending anything.
 - Auto-deploy: add the repo to `webhook/apps.json` and create the GitHub hook (pre-approved).
-- m4-alerts: add the public `/health`. The runtime also messages me when a connector stays in `error` for 5 min, with Resend email as the fallback when no channel is up.
+- m4-alerts: add the public `/health`. The server also messages me when a connector stays in `error` for 5 min, with Resend email as the fallback when no channel is up.
 - Disk: the mini had 4.1 GB free on 2026-11-09, and `deploy.sh` refuses under 5 GB. Free space in M0.
 
 ## 14. Milestones
@@ -518,15 +512,15 @@ About 21 days in total. Every UI milestone runs the full zaki-design-ui pipeline
 | Tool calling through CLIProxyAPI is flaky for some models | Medium | M0 spike, anthropic protocol for Claude, ai-gateway failover |
 | Subscription quota burn from loops or jobs | Medium | Budgets and caps in M1, `/stop`, cache-friendly routing (D8) |
 | Prompt injection through recall, MCP, fetch or hooks | Medium | Taint rule, approvals, auto-save without tool output |
-| Baileys ban or protocol break | Low/Medium | Low volume, Telegram primary, pinned version |
+| WhatsApp ban or protocol break (whatsmeow) | Low/Medium | Low volume, Telegram primary, pinned version |
 | Disk on the mini | High | Free space in M0, retention, capped logs |
 | Deploy drops a message or reminder | Medium | Durable inbox, outbox, drain on SIGTERM, liveness-only runtime health |
 | Scope creep toward OpenClaw parity | High | The parity table. Every new feature must be a connector |
 
 ## 17. Testing and observability
 
-- Unit (`node --test` or vitest): scheduler and recurrence (fake clock), outbox state machine, router ownership including JID vs LID, connector reconcile and the section 4.3 rules, the taint rule, budget caps.
-- Integration: grammY with a test transport, Baileys behind a mocked socket, MCP against a local test server, AI SDK with a mock model for approvals and resume.
+- Unit (`go test` in `apps/server`, vitest for the dashboard, site, edge and host bridge): scheduler and recurrence (fake clock), outbox state machine, router ownership including JID vs LID, connector reconcile and the section 4.3 rules, the taint rule, budget caps.
+- Integration: Telegram with a test transport, WhatsApp behind a fake socket, MCP against a local test server, a scripted mock model for approvals and resume. Golden files in `apps/server/testdata`, exported once from the TypeScript build the Go server replaced, pin byte-level behavior (prompts, tool schemas, stored JSON, RPC answers); they're frozen now.
 - Evals: the reminder parse set (60 phrases), plus a small injection set (a poisoned fetch result tries a write tool and must ask for approval).
 - Post-deploy smoke: a script sends a Telegram message from a test account to the dev bot and expects a reply. On prod, `/health` plus the m4-alerts probe.
 - Logs: JSON lines tagged with `run_id`, `chat_id` and `connector_id`, with secrets redacted, capped per zaki-selfhost.

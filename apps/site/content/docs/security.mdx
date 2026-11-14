@@ -7,7 +7,7 @@ Palui has one owner and assumes everything else is untrusted: other people messa
 
 ## Dashboard access
 
-- Passkeys only, through Better Auth.
+- Passkeys only. Sessions live in the database and last 30 days.
 - There's no way to create an account over HTTP, from the first boot on.
 - The owner account comes from `docker compose exec app palui owner invite`, a single-use link valid for 15 minutes. You need shell access to the Docker host to run it.
 - The same command is the recovery path for a lost passkey.
@@ -36,13 +36,13 @@ recall auto-save stores only your messages and the final replies. It never store
 - Connector secrets are encrypted at rest with AES-256-GCM, keyed by `MASTER_KEY` from `.env`.
 - They're write-only. You can replace one, never read it back. The UI shows them masked, like `rcl_••••a91f`.
 - Logs redact API key patterns (such as `rcl_`, `zkg_` and `sk-` keys) and bot tokens.
-- `.env` holds only three keys: `MASTER_KEY`, `BETTER_AUTH_SECRET` and `APP_URL`. Keep a copy of `MASTER_KEY` in your password manager.
+- `.env` holds only two keys: `MASTER_KEY` and `APP_URL`. Keep a copy of `MASTER_KEY` in your password manager.
 - Backups are encrypted with age before they leave the machine. See [Backups](/docs/self-hosting/backups).
 
 ## Network
 
 - The app is bound to `127.0.0.1` on the Docker host and reached through your tunnel.
-- The runtime's control API lives on the compose network only. Its port is never published.
+- Palui is one process, so there's no internal API between services to protect.
 - An SSRF guard sits in front of every fetch the agent can steer, so a page or a prompt can't make Palui read internal addresses.
 
 ## Retention

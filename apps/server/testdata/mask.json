@@ -1,0 +1,54 @@
+[
+  {
+    "input": "",
+    "masked": ""
+  },
+  {
+    "input": "a",
+    "masked": "••••"
+  },
+  {
+    "input": "abcd",
+    "masked": "••••"
+  },
+  {
+    "input": "1234:abcd",
+    "masked": "••••"
+  },
+  {
+    "input": "abcdefghijkl",
+    "masked": "••••"
+  },
+  {
+    "input": "abcdefghijklm",
+    "masked": "••••jklm"
+  },
+  {
+    "input": "sk-abc",
+    "masked": "sk-••••"
+  },
+  {
+    "input": "rcl_abcdef123456a91f",
+    "masked": "rcl_••••a91f"
+  },
+  {
+    "input": "1234567:abcdefgh",
+    "masked": "••••efgh"
+  },
+  {
+    "input": "zkg_x",
+    "masked": "zkg_••••"
+  },
+  {
+    "input": "pk_live_1234567890abcdef",
+    "masked": "pk_••••cdef"
+  },
+  {
+    "input": "ghp_abcdefghijklmnopqrstuvwxyz",
+    "masked": "ghp_••••wxyz"
+  },
+  {
+    "input": "😀😀😀😀😀😀😀",
+    "masked": "••••😀😀"
+  }
+]

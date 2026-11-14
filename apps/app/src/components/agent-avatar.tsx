@@ -1,7 +1,7 @@
 // An agent's avatar (PLAN 19.7): its uploaded photo, else its icon on its color,
 // else Palui's mark for the default agent and a plain bot for the rest. The
-// names mirror AGENT_ICONS and AGENT_COLORS in @palui/core/agents (a test keeps
-// them in step); this file can't import that module, it pulls in the database.
+// names mirror AGENT_ICONS and AGENT_COLORS in src/shared/constants.ts (a test
+// keeps them in step).
 import {
   BookOpenIcon,
   BotIcon,

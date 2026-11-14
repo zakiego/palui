@@ -1,0 +1,56 @@
+// Chats page: the list, a transcript, the web chat input and approvals.
+import { noInput, withInput } from "./client"
+import type { AgentChoice, Channel, ChatKind, MessageRole, MessageStatus, ReplyMode, ToolCallView, ToolClass } from "./types"
+
+export type ChatListItem = {
+  id: string
+  channel: Channel
+  title: string
+  kind: ChatKind
+  allowed: boolean
+  replyMode: ReplyMode
+  ack: boolean
+  ackEmoji: string
+  lastAt: number
+  preview: string
+  previewRole: MessageRole | null
+}
+
+export type ChatsPage = { chats: ChatListItem[]; webChatId: string }
+
+export type TranscriptMessage = {
+  id: string
+  role: "assistant" | "user"
+  source: "hook" | null
+  sender: string | null
+  text: string
+  status: MessageStatus
+  createdAt: number
+  tools: ToolCallView[]
+}
+
+export type Transcript = {
+  chat: {
+    id: string
+    channel: Channel
+    title: string
+    kind: ChatKind
+    agentId: string | null
+    allowed: boolean
+    replyMode: ReplyMode
+    ack: boolean
+    ackEmoji: string
+    connectorId: string
+  }
+  messages: TranscriptMessage[]
+  approvals: { id: string; tool: string; class: ToolClass; argsPreview: string | null; expiresAt: number }[]
+  agent: { id: string; name: string; isDefault: boolean }
+  shared: boolean
+  agents: AgentChoice[]
+}
+
+export const getChats = noInput<ChatsPage>("getChats", "GET")
+export const getTranscript = withInput<{ chatId: string }, Transcript>("getTranscript", "GET")
+export const sendWebMessage = withInput<{ text: string }, { ok: true; chatId: string; messageId: string }>("sendWebMessage", "POST")
+export const decideApproval = withInput<{ id: string; approved: boolean }, { ok: boolean }>("decideApproval", "POST")
+export const stopTurn = withInput<{ chatId: string }, { ok: boolean }>("stopTurn", "POST")

@@ -1,8 +1,8 @@
 // Settings (PLAN 11.4): persona, timezone, language, model roles and failover,
 // budgets, passkeys, backup status, and inbound hooks.
 import * as React from "react"
-import { REASONING_EFFORTS } from "@palui/core/models/effort"
-import type { ModelChainLink } from "@palui/core/settings"
+import { REASONING_EFFORTS } from "@/shared/constants"
+import type { ModelChainLink } from "@/shared/constants"
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router"
 import { ArrowDownIcon, ArrowUpIcon, BoxIcon, BrainIcon, CircleAlertIcon, DatabaseBackupIcon, EllipsisIcon, FingerprintIcon, GaugeIcon, PlusIcon, Settings2Icon, ShieldIcon, TrashIcon, WebhookIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -41,8 +41,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { authClient, passkeyCancelled } from "@/lib/auth-client"
-import { removePasskey } from "@/lib/fns/session"
-import { createHookFn, getSettingsPage, listConnectorModels, saveSettings } from "@/lib/fns/settings"
+import { removePasskey } from "@/lib/api/session"
+import { createHookFn, getSettingsPage, listConnectorModels, saveSettings } from "@/lib/api/settings"
 import { ago, errorMessage, fullDate } from "@/lib/format"
 import { useLabel, useT } from "@/lib/i18n"
 
@@ -141,18 +141,17 @@ function GeneralTab({ data }: { data: Data }) {
   const [uiLanguage, setUiLanguage] = React.useState(s.uiLanguage)
   const [fallback, setFallback] = React.useState(s.fallbackChannel)
   const [timezoneError, setTimezoneError] = React.useState<string>()
-  // Filled after mount so the server and client markup match during hydration.
-  const [zones, setZones] = React.useState<string[]>([])
+  const [zones] = React.useState<string[]>(() => {
+    try {
+      return Intl.supportedValuesOf("timeZone")
+    } catch {
+      // Older engines without supportedValuesOf: the field still takes free text.
+      return []
+    }
+  })
   const timezoneRef = React.useRef<HTMLInputElement>(null)
   const t = useT()
   const { busy, save } = useSave()
-  React.useEffect(() => {
-    try {
-      setZones(Intl.supportedValuesOf("timeZone"))
-    } catch {
-      // Older engines without supportedValuesOf: the field still takes free text.
-    }
-  }, [])
   const submit = () => {
     const tz = timezone.trim()
     // The same check the server runs, so a typo shows up at the field instead of in a toast.

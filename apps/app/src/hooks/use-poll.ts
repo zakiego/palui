@@ -1,4 +1,4 @@
-// Load data from a server function inside a component (sheets and dialogs that
+// Load data from an RPC (src/lib/api) inside a component (sheets and dialogs that
 // aren't routes), optionally polling while open. Stale responses are dropped.
 import * as React from "react"
 

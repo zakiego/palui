@@ -7,7 +7,7 @@ description: Release Palui Agent. A T3 scheduled task runs this every night at 0
 
 The owner doesn't think about versions. Every night a T3 scheduled task ("Palui nightly release", 00:00 Asia/Makassar, new thread per run) runs the steps below. It opens a release PR when `## Unreleased` has something in it. The owner merges that PR when they want the release out, and the next nightly run tags it. No CI, no GitHub Release.
 
-The version lives only in `"version"` in the root `package.json`. `packages/core/src/version.ts` reads it, and `GET /health` reports it. The changelog is `apps/site/content/docs/changelog.mdx`. `apps/site/lib/changelog.test.ts` fails `pnpm test` when the two disagree. All mechanics go through `scripts/release.ts` (`pnpm release <cmd>`, or `node scripts/release.ts <cmd>` when node_modules isn't installed; it has no dependencies). Never edit the version or move changelog sections by hand.
+The version lives only in `"version"` in the root `package.json`. The Docker build stamps it into the Go binary (`apps/server/internal/version`), and `GET /health` reports it. The changelog is `apps/site/content/docs/changelog.mdx`. `apps/site/lib/changelog.test.ts` fails `pnpm test` when the two disagree. All mechanics go through `scripts/release.ts` (`pnpm release <cmd>`, or `node scripts/release.ts <cmd>` when node_modules isn't installed; it has no dependencies). Never edit the version or move changelog sections by hand.
 
 PRs other than the release PR never bump the version, so parallel PRs can't fight over a number.
 
@@ -87,5 +87,5 @@ When the owner asks for a release right now, run steps 1 to 6 yourself. Only whe
 - Heading shape is exact: `## 0.2.0 (2026-11-20)`. The test rejects `## v0.2.0`, `## 0.2.0 - 2026-11-20` and friends.
 - Merging to main redeploys. Check what's running:
   ```bash
-  curl -s https://palui.zakiego.com/health | jq '{version, runtime: .runtime.version}'
+  curl -s https://palui.zakiego.com/health | jq '{version, runtime}'
   ```

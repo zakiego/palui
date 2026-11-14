@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Palui</title>
+    <meta name="description" content="Palui Agent dashboard." />
+    <!-- Every dashboard route is private (PLAN 10). -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#141417" media="(prefers-color-scheme: dark)" />
+    <!-- A public file: Vite serves and writes it under the /app/ base. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Set the theme class before first paint so there's no light/dark flash. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("palui.theme") || "system"
+          var d = t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)
+          document.documentElement.classList.add(d ? "dark" : "light")
+          document.documentElement.style.colorScheme = d ? "dark" : "light"
+        } catch (e) {}
+      })()
+    </script>
+    <!-- The stylesheet (src/styles/app.css, with the self-hosted Inter and
+         Geist Mono) is linked here by the build from the import in main.tsx. -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,53 +1,41 @@
-import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router"
-import type { ReactNode } from "react"
+import * as React from "react"
+import { Outlet, createRootRoute, useRouterState } from "@tanstack/react-router"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
-import { APP_BASE } from "@/lib/app-path"
-import appCss from "@/styles/app.css?url"
 
-// Set the theme class before first paint so there's no light/dark flash.
-const THEME_SCRIPT = `(function(){try{
-var t=localStorage.getItem('palui.theme')||'system';
-var d=t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);
-document.documentElement.classList.add(d?'dark':'light');
-document.documentElement.style.colorScheme=d?'dark':'light';
-}catch(e){}})();`
-
+// index.html carries the document head (meta tags, favicon, the theme script
+// that prevents a light/dark flash, the stylesheet). Routes only set a title.
 export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "Palui" },
-      { name: "description", content: "Palui Agent dashboard." },
-      // Every dashboard route is private (PLAN 10).
-      { name: "robots", content: "noindex, nofollow" },
-      { name: "theme-color", content: "#fafafa", media: "(prefers-color-scheme: light)" },
-      { name: "theme-color", content: "#141417", media: "(prefers-color-scheme: dark)" },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/svg+xml", href: `${APP_BASE}/favicon.svg` },
-    ],
-  }),
-  shellComponent: RootDocument,
-  component: () => <Outlet />,
+  head: () => ({ meta: [{ title: "Palui" }] }),
+  component: RootComponent,
 })
 
-function RootDocument({ children }: { children: ReactNode }) {
+function RootComponent() {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-        <HeadContent />
-      </head>
-      <body>
-        <ThemeProvider>
-          {children}
-          <Toaster position="bottom-right" />
-        </ThemeProvider>
-        <Scripts />
-      </body>
-    </html>
+    <ThemeProvider>
+      <RouteTitle />
+      <Outlet />
+      <Toaster position="bottom-right" />
+    </ThemeProvider>
   )
+}
+
+const DEFAULT_TITLE = "Palui"
+
+// The deepest matched route's `head` title becomes document.title.
+export function RouteTitle() {
+  const title = useRouterState({
+    select: (s) => {
+      for (let i = s.matches.length - 1; i >= 0; i--) {
+        for (const m of s.matches[i]?.meta ?? []) {
+          if (m && typeof m.title === "string" && m.title) return m.title
+        }
+      }
+      return DEFAULT_TITLE
+    },
+  })
+  React.useEffect(() => {
+    document.title = title
+  }, [title])
+  return null
 }

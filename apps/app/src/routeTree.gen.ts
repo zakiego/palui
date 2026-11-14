@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
-import { Route as HealthRouteImport } from './routes/health'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppActivityRouteImport } from './routes/_app/activity'
@@ -29,22 +28,10 @@ import { Route as AppAgentsSlugRouteImport } from './routes/_app/agents_.$slug'
 import { Route as AppConnectorsIdRouteImport } from './routes/_app/connectors_.$id'
 import { Route as AppConnectorsNewRouteImport } from './routes/_app/connectors_.new'
 import { Route as AppFlowsIdRouteImport } from './routes/_app/flows_.$id'
-import { Route as ApiAttachmentsIdRouteImport } from './routes/api/attachments/$id'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
-import { Route as ApiChatStreamRouteImport } from './routes/api/chat/stream'
-import { Route as ApiEventsStreamRouteImport } from './routes/api/events/stream'
-import { Route as ApiHooksSlugRouteImport } from './routes/api/hooks/$slug'
-import { Route as ApiShareTokenRouteImport } from './routes/api/share/$token'
 import { Route as AppActivityRunsIdRouteImport } from './routes/_app/activity_.runs.$id'
-import { Route as ApiOauthGoogleCallbackRouteImport } from './routes/api/oauth/google/callback'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HealthRoute = HealthRouteImport.update({
-  id: '/health',
-  path: '/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -137,50 +124,14 @@ const AppFlowsIdRoute = AppFlowsIdRouteImport.update({
   path: '/flows/$id',
   getParentRoute: () => AppRoute,
 } as any)
-const ApiAttachmentsIdRoute = ApiAttachmentsIdRouteImport.update({
-  id: '/api/attachments/$id',
-  path: '/api/attachments/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiChatStreamRoute = ApiChatStreamRouteImport.update({
-  id: '/api/chat/stream',
-  path: '/api/chat/stream',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiEventsStreamRoute = ApiEventsStreamRouteImport.update({
-  id: '/api/events/stream',
-  path: '/api/events/stream',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiHooksSlugRoute = ApiHooksSlugRouteImport.update({
-  id: '/api/hooks/$slug',
-  path: '/api/hooks/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiShareTokenRoute = ApiShareTokenRouteImport.update({
-  id: '/api/share/$token',
-  path: '/api/share/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AppActivityRunsIdRoute = AppActivityRunsIdRouteImport.update({
   id: '/activity_/runs/$id',
   path: '/activity/runs/$id',
   getParentRoute: () => AppRoute,
 } as any)
-const ApiOauthGoogleCallbackRoute = ApiOauthGoogleCallbackRouteImport.update({
-  id: '/api/oauth/google/callback',
-  path: '/api/oauth/google/callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
-  '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/activity': typeof AppActivityRoute
   '/agents': typeof AppAgentsRoute
@@ -198,17 +149,9 @@ export interface FileRoutesByFullPath {
   '/connectors/$id': typeof AppConnectorsIdRoute
   '/connectors/new': typeof AppConnectorsNewRoute
   '/flows/$id': typeof AppFlowsIdRoute
-  '/api/attachments/$id': typeof ApiAttachmentsIdRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/chat/stream': typeof ApiChatStreamRoute
-  '/api/events/stream': typeof ApiEventsStreamRoute
-  '/api/hooks/$slug': typeof ApiHooksSlugRoute
-  '/api/share/$token': typeof ApiShareTokenRoute
   '/activity/runs/$id': typeof AppActivityRunsIdRoute
-  '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
 }
 export interface FileRoutesByTo {
-  '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/activity': typeof AppActivityRoute
   '/agents': typeof AppAgentsRoute
@@ -227,19 +170,11 @@ export interface FileRoutesByTo {
   '/connectors/$id': typeof AppConnectorsIdRoute
   '/connectors/new': typeof AppConnectorsNewRoute
   '/flows/$id': typeof AppFlowsIdRoute
-  '/api/attachments/$id': typeof ApiAttachmentsIdRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/chat/stream': typeof ApiChatStreamRoute
-  '/api/events/stream': typeof ApiEventsStreamRoute
-  '/api/hooks/$slug': typeof ApiHooksSlugRoute
-  '/api/share/$token': typeof ApiShareTokenRoute
   '/activity/runs/$id': typeof AppActivityRunsIdRoute
-  '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
-  '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/_app/activity': typeof AppActivityRoute
   '/_app/agents': typeof AppAgentsRoute
@@ -258,20 +193,12 @@ export interface FileRoutesById {
   '/_app/connectors_/$id': typeof AppConnectorsIdRoute
   '/_app/connectors_/new': typeof AppConnectorsNewRoute
   '/_app/flows_/$id': typeof AppFlowsIdRoute
-  '/api/attachments/$id': typeof ApiAttachmentsIdRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/chat/stream': typeof ApiChatStreamRoute
-  '/api/events/stream': typeof ApiEventsStreamRoute
-  '/api/hooks/$slug': typeof ApiHooksSlugRoute
-  '/api/share/$token': typeof ApiShareTokenRoute
   '/_app/activity_/runs/$id': typeof AppActivityRunsIdRoute
-  '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/health'
     | '/login'
     | '/activity'
     | '/agents'
@@ -289,17 +216,9 @@ export interface FileRouteTypes {
     | '/connectors/$id'
     | '/connectors/new'
     | '/flows/$id'
-    | '/api/attachments/$id'
-    | '/api/auth/$'
-    | '/api/chat/stream'
-    | '/api/events/stream'
-    | '/api/hooks/$slug'
-    | '/api/share/$token'
     | '/activity/runs/$id'
-    | '/api/oauth/google/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/health'
     | '/login'
     | '/activity'
     | '/agents'
@@ -318,18 +237,10 @@ export interface FileRouteTypes {
     | '/connectors/$id'
     | '/connectors/new'
     | '/flows/$id'
-    | '/api/attachments/$id'
-    | '/api/auth/$'
-    | '/api/chat/stream'
-    | '/api/events/stream'
-    | '/api/hooks/$slug'
-    | '/api/share/$token'
     | '/activity/runs/$id'
-    | '/api/oauth/google/callback'
   id:
     | '__root__'
     | '/_app'
-    | '/health'
     | '/login'
     | '/_app/activity'
     | '/_app/agents'
@@ -348,28 +259,13 @@ export interface FileRouteTypes {
     | '/_app/connectors_/$id'
     | '/_app/connectors_/new'
     | '/_app/flows_/$id'
-    | '/api/attachments/$id'
-    | '/api/auth/$'
-    | '/api/chat/stream'
-    | '/api/events/stream'
-    | '/api/hooks/$slug'
-    | '/api/share/$token'
     | '/_app/activity_/runs/$id'
-    | '/api/oauth/google/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
-  HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
   InviteTokenRoute: typeof InviteTokenRoute
-  ApiAttachmentsIdRoute: typeof ApiAttachmentsIdRoute
-  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
-  ApiChatStreamRoute: typeof ApiChatStreamRoute
-  ApiEventsStreamRoute: typeof ApiEventsStreamRoute
-  ApiHooksSlugRoute: typeof ApiHooksSlugRoute
-  ApiShareTokenRoute: typeof ApiShareTokenRoute
-  ApiOauthGoogleCallbackRoute: typeof ApiOauthGoogleCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -379,13 +275,6 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/health': {
-      id: '/health'
-      path: '/health'
-      fullPath: '/health'
-      preLoaderRoute: typeof HealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -514,61 +403,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFlowsIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/api/attachments/$id': {
-      id: '/api/attachments/$id'
-      path: '/api/attachments/$id'
-      fullPath: '/api/attachments/$id'
-      preLoaderRoute: typeof ApiAttachmentsIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/chat/stream': {
-      id: '/api/chat/stream'
-      path: '/api/chat/stream'
-      fullPath: '/api/chat/stream'
-      preLoaderRoute: typeof ApiChatStreamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/events/stream': {
-      id: '/api/events/stream'
-      path: '/api/events/stream'
-      fullPath: '/api/events/stream'
-      preLoaderRoute: typeof ApiEventsStreamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/hooks/$slug': {
-      id: '/api/hooks/$slug'
-      path: '/api/hooks/$slug'
-      fullPath: '/api/hooks/$slug'
-      preLoaderRoute: typeof ApiHooksSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/share/$token': {
-      id: '/api/share/$token'
-      path: '/api/share/$token'
-      fullPath: '/api/share/$token'
-      preLoaderRoute: typeof ApiShareTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_app/activity_/runs/$id': {
       id: '/_app/activity_/runs/$id'
       path: '/activity/runs/$id'
       fullPath: '/activity/runs/$id'
       preLoaderRoute: typeof AppActivityRunsIdRouteImport
       parentRoute: typeof AppRoute
-    }
-    '/api/oauth/google/callback': {
-      id: '/api/oauth/google/callback'
-      path: '/api/oauth/google/callback'
-      fullPath: '/api/oauth/google/callback'
-      preLoaderRoute: typeof ApiOauthGoogleCallbackRouteImport
-      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -617,26 +457,9 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
-  HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
   InviteTokenRoute: InviteTokenRoute,
-  ApiAttachmentsIdRoute: ApiAttachmentsIdRoute,
-  ApiAuthSplatRoute: ApiAuthSplatRoute,
-  ApiChatStreamRoute: ApiChatStreamRoute,
-  ApiEventsStreamRoute: ApiEventsStreamRoute,
-  ApiHooksSlugRoute: ApiHooksSlugRoute,
-  ApiShareTokenRoute: ApiShareTokenRoute,
-  ApiOauthGoogleCallbackRoute: ApiOauthGoogleCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

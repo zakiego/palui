@@ -2,20 +2,31 @@
 # Nightly encrypted backup of Palui to Cloudflare R2 (Zakiego Lab).
 #
 #   1. snapshot /data/palui.db inside the running app container with the bundled
-#      admin CLI (online backup API, gzipped), copy it out, check it, encrypt it
-#   2. stream a tar of the WhatsApp auth dir (/data/wa-auth, written by the
-#      runtime, read through the app container on the same volume) straight
-#      into age, so the plaintext never touches the host disk
-#   3. upload both to r2://palui-backups/palui/YYYY-MM-DD/ and check each size
-#   4. delete the snapshot in the container and every local temp file
+#      admin CLI (`palui backup`: VACUUM INTO, gzipped), copy it out, check it,
+#      encrypt it
+#   2. archive the WhatsApp sessions, whichever layout exists:
+#      - /data/wa/ (the Go server): one SQLite store per connector, <id>.db in
+#        WAL mode. Each is snapshotted with `palui snapshot` (VACUUM INTO, so
+#        the WAL is included and a write mid-copy can't tear it) into a staging
+#        dir in the volume, and that dir is tarred. Lock files are skipped.
+#      - /data/wa-auth/ (the old Node runtime's Baileys files), tarred as is
+#      Both stream from the container straight into age, so no plaintext
+#      touches the host disk
+#   3. upload everything to r2://palui-backups/palui/YYYY-MM-DD/ and check each size
+#   4. delete the snapshot and the staging dir in the container and every
+#      local temp file
 #
-# Both files are encrypted with age to the public key in
+# Every file is encrypted with age to the public key in
 # ~/.config/palui/age-recipient. The matching identity (private key) lives only
 # in the Keychain, never on disk and never in this repo; restore-drill.sh reads
 # it from there.
 #
-# Why wa-auth is encrypted too: the auth dir alone is enough to take over the
-# bot's WhatsApp number as a linked device. Treat that archive like a password.
+# Why the WhatsApp archives are encrypted too: a session alone is enough to
+# take over the bot's WhatsApp number as a linked device. Treat it like a password.
+#
+# Restoring a WhatsApp store: decrypt, `tar -xf`, then, with the server stopped,
+# `gunzip -c wa/<id>.db.gz > /data/wa/<id>.db` (no -wal or -shm next to it,
+# owned by 1000:1000).
 #
 # R2 credentials come from the Keychain through the cf-zakiego-lab wrapper.
 # Run by launchd (ops/com.zakiego.palui-backup.plist), or by hand.
@@ -55,15 +66,19 @@ day=$(date +%Y-%m-%d)
 ts=$(date +%Y%m%d-%H%M%S)
 db_name="palui-$ts.db.gz"
 db_key="palui/$day/$db_name.age"
-wa_key="palui/$day/wa-auth-$ts.tar.gz.age"
+wa_key="palui/$day/wa-$ts.tar.age"
+wa_auth_key="palui/$day/wa-auth-$ts.tar.gz.age"
 remote="/data/backups/$db_name"
+# Staging dir for the WhatsApp snapshots, inside the volume. The leading dot
+# keeps it out of the dashboard's "latest backup" listing.
+stage="/data/backups/.wa-$ts"
 tmpdir=""
 
 cleanup() {
   status=$?
   [ -n "$tmpdir" ] && rm -rf "$tmpdir"
-  # shellcheck disable=SC2016 # $1 expands inside the container's shell
-  (cd "$PALUI_DIR" && docker compose exec -T app sh -c 'rm -f "$1" "$1".tmp-*' _ "$remote") >/dev/null 2>&1 || true
+  # shellcheck disable=SC2016 # $1 and $2 expand inside the container's shell
+  (cd "$PALUI_DIR" && docker compose exec -T app sh -c 'rm -f "$1" "$1".tmp-*; rm -rf "$2"' _ "$remote" "$stage") >/dev/null 2>&1 || true
   if [ "$status" -eq 0 ]; then log "done"; else log "FAILED (exit $status)"; fi
 }
 trap cleanup EXIT
@@ -79,8 +94,9 @@ free_mb=$(df -m / | awk 'NR==2 {print $4}')
 
 cd "$PALUI_DIR"
 
+# `palui` is on the PATH in the Go image and in the old Node image alike.
 snapshot() {
-  docker compose exec -T app node .output/server/cli.mjs backup "$remote"
+  docker compose exec -T app palui backup "$remote"
 }
 
 # The container can be mid-restart (a deploy, a Docker update) at 03:30.
@@ -108,32 +124,72 @@ log "db snapshot $(stat -f %z "$plain") bytes, sha256 $(shasum -a 256 "$plain" |
 age -R "$RECIPIENT_FILE" -o "$db_file" "$plain"
 rm -f "$plain"
 
-# --- WhatsApp auth ----------------------------------------------------------
+# --- WhatsApp sessions ------------------------------------------------------
 # Read through the app container: it's up (the snapshot just worked) and
-# mounts the same volume, so a stopped runtime can't turn into "not paired".
-# Not paired yet (or WhatsApp removed): nothing to keep, and that's fine. Any
-# answer other than a clear yes or no fails the night.
+# mounts the volume. Not paired yet (or WhatsApp removed): nothing to keep,
+# and that's fine. Any answer other than a clear yes or no fails the night.
 wa_file=""
-wa_present=$(docker compose exec -T app sh -c 'if [ -d /data/wa-auth ]; then echo yes; else echo no; fi') || {
-  log "couldn't check /data/wa-auth through the app container"
+wa_auth_file=""
+wa_dirs=$(docker compose exec -T app sh -c 'for d in wa wa-auth; do if [ -d "/data/$d" ]; then echo "$d=yes"; else echo "$d=no"; fi; done') || {
+  log "couldn't check /data/wa and /data/wa-auth through the app container"
   exit 1
 }
-case "$wa_present" in
-  *yes)
-    wa_file="$tmpdir/wa-auth-$ts.tar.gz.age"
-    # Streamed: tar runs in the container, age on the host, the plaintext only
-    # ever exists in the pipe. Baileys may write mid-tar; it rewrites its key
-    # files atomically and a restore re-syncs, so a fuzzy copy is acceptable.
-    docker compose exec -T app tar -czf - -C /data wa-auth | age -R "$RECIPIENT_FILE" -o "$wa_file"
-    ;;
-  *no)
-    log "no /data/wa-auth in the volume, skipping the WhatsApp auth archive"
-    ;;
-  *)
-    log "unexpected answer checking /data/wa-auth: $wa_present"
+dir_answer() { printf '%s\n' "$wa_dirs" | tr -d '\r' | grep -E "^$1=(yes|no)\$" | cut -d= -f2 || true; }
+has_wa=$(dir_answer wa)
+has_wa_auth=$(dir_answer wa-auth)
+if [ -z "$has_wa" ] || [ -z "$has_wa_auth" ]; then
+  log "unexpected answer checking the WhatsApp dirs: $wa_dirs"
+  exit 1
+fi
+
+if [ "$has_wa" = yes ]; then
+  # `palui snapshot` is the Go image's. An older image (after a rollback to
+  # the Node image) never writes wa/, so there its files are at rest and a
+  # plain copy of each store with its -wal and -shm is consistent.
+  # shellcheck disable=SC2016 # $1 expands inside the container's shell
+  stores=$(docker compose exec -T app sh -c '
+    set -e
+    mkdir -p "$1/wa"
+    if palui snapshot 2>&1 | grep -q "usage: palui snapshot"; then
+      for f in /data/wa/*.db; do
+        [ -f "$f" ] || continue
+        palui snapshot "$f" "$1/wa/$(basename "$f").gz" >/dev/null
+        basename "$f"
+      done
+    else
+      for f in /data/wa/*.db; do
+        [ -f "$f" ] || continue
+        cp -p "$f" "$1/wa/"
+        for x in wal shm; do [ ! -f "$f-$x" ] || cp -p "$f-$x" "$1/wa/"; done
+        echo "$(basename "$f") (raw copy: this image has no palui snapshot)"
+      done
+    fi' _ "$stage") || {
+    log "couldn't snapshot the WhatsApp stores in /data/wa"
     exit 1
-    ;;
-esac
+  }
+  stores=$(printf '%s' "$stores" | tr -d '\r' | tr '\n' ' ')
+  if [ -n "$stores" ]; then
+    wa_file="$tmpdir/wa-$ts.tar.age"
+    # The .gz snapshots are compressed already, so a plain tar.
+    docker compose exec -T app tar -cf - -C "$stage" wa | age -R "$RECIPIENT_FILE" -o "$wa_file"
+    log "WhatsApp stores: $stores"
+  else
+    log "/data/wa has no store, skipping the WhatsApp archive"
+  fi
+  # shellcheck disable=SC2016
+  docker compose exec -T app sh -c 'rm -rf "$1"' _ "$stage" || log "couldn't remove $stage (cleanup tries again)"
+else
+  log "no /data/wa in the volume, skipping the WhatsApp archive"
+fi
+
+if [ "$has_wa_auth" = yes ]; then
+  # The old Baileys layout. Baileys rewrote its key files atomically and a
+  # restore re-syncs, so a fuzzy copy is acceptable. It stays until the owner
+  # deletes /data/wa-auth after pairing WhatsApp again on the Go server.
+  wa_auth_file="$tmpdir/wa-auth-$ts.tar.gz.age"
+  docker compose exec -T app tar -czf - -C /data wa-auth | age -R "$RECIPIENT_FILE" -o "$wa_auth_file"
+  log "archived /data/wa-auth (the old Baileys session)"
+fi
 
 # --- upload -----------------------------------------------------------------
 r2_size() {
@@ -162,4 +218,7 @@ upload() {
 upload "$db_file" "$db_key" || exit 1
 if [ -n "$wa_file" ]; then
   upload "$wa_file" "$wa_key" || exit 1
+fi
+if [ -n "$wa_auth_file" ]; then
+  upload "$wa_auth_file" "$wa_auth_key" || exit 1
 fi

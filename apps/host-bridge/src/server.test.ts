@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import { createLogger } from "@palui/core/log"
+import { createLogger } from "./log.ts"
 import { afterEach, describe, expect, it } from "vitest"
 import { parseConfig } from "./config.ts"
 import { startBridge, type Bridge } from "./server.ts"

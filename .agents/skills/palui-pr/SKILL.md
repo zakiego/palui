@@ -8,14 +8,15 @@ description: Open a pull request in zakiego/palui the repo's way. Branches from 
 ## Before pushing
 
 1. The branch is based on `origin/main`, and the PR targets `main`. Never `feat/v1` or another feature branch.
-2. Commits are Conventional Commits, one logical change each, tests passing at every commit. Scopes in use: `app`, `runtime`, `site`, `edge`, `db`, `core`, `connectors`, or the connector name (`whatsapp`, `telegram`...). Breaking changes get `!`.
+2. Commits are Conventional Commits, one logical change each, tests passing at every commit. Scopes in use: `server` (the Go server, or a narrower area like `db`, `auth`, `flows`), `app` (the dashboard), `site`, `edge`, `host-bridge`, `connectors`, or the connector name (`whatsapp`, `telegram`...). Breaking changes get `!`.
 3. Run the checks for every package the diff touches (find them with `git diff --name-only origin/main...`):
    ```bash
-   (cd <package> && npx tsc --noEmit && npx vitest run)
+   (cd apps/server && gofmt -l . && go vet ./... && go test ./...)   # Go; gofmt must print nothing
+   (cd <package> && npx tsc --noEmit && npx vitest run)               # each TS package
    ```
-   For `apps/site`, typecheck is `pnpm typecheck` (it runs `next typegen` first). Run `pnpm build` only when the change touches build config, the Dockerfile or bundling.
+   For `apps/site`, typecheck is `pnpm typecheck` (it runs `next typegen` first). The root `pnpm typecheck`, `pnpm test` and `pnpm build` run every package and then the Go module, so they're the full gate. Run `pnpm build` when the change touches build config, the Dockerfile or bundling.
 4. Changelog: if the change is user-visible, `## Unreleased` in `apps/site/content/docs/changelog.mdx` has its bullet (`palui-changelog`). `pnpm release check` passes. Don't bump the version in the PR: that happens in the nightly release PR (`palui-release`).
-5. Schema changed? `src/migrations.gen.ts` is regenerated and committed (`palui-schema-change`).
+5. Schema changed? The new `apps/server/internal/db/migrations/NNNN_*.sql` file is numbered after main's last one and `schema.go` matches it (`palui-schema-change`).
 6. Visible dashboard change? It passed `palui-ui-check`, and you have before and after screenshots.
 7. No em dashes in code, comments, docs or the PR. English everywhere except bot-facing copy, which is casual Indonesian.
 

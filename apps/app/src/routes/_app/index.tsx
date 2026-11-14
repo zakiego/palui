@@ -24,7 +24,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, 
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLiveRefresh } from "@/hooks/use-live-events"
 import { compact, duration, errorMessage, inOtherZone, inZone } from "@/lib/format"
-import { dismissChecklist, getHome } from "@/lib/fns/home"
+import { dismissChecklist, getHome } from "@/lib/api/home"
 import { useCount, useLabel, useLocale, useT, type Key } from "@/lib/i18n"
 import { manifestFor } from "@/lib/manifests"
 import { RUN_TONE, runTitle } from "@/lib/runs"

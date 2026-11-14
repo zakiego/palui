@@ -10,10 +10,11 @@ import { CopyButton } from "@/components/copy-button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { authClient, authErrorMessage, passkeyCancelled } from "@/lib/auth-client"
 import { errorMessage } from "@/lib/format"
-import { getSession } from "@/lib/fns/session"
+import { getSession } from "@/lib/api/session"
 import { translate } from "@/lib/i18n"
 import { forgetViewer } from "@/lib/viewer"
 
@@ -21,13 +22,21 @@ const t = (k: Parameters<typeof translate>[1]) => translate("en", k)
 
 export const Route = createFileRoute("/login")({
   validateSearch: z.object({ next: z.string().optional() }),
+  // Runs in the browser: a signed-in visitor goes straight on to the dashboard.
   beforeLoad: async () => {
     const session = await getSession()
     if (session.viewer) throw redirect({ to: "/" })
-    return { configured: session.configured, ownerExists: session.ownerExists }
+    return { ownerExists: session.ownerExists }
   },
   head: () => ({ meta: [{ title: "Log in · Palui" }] }),
   component: LoginPage,
+  // While the session check is out (shown after the router's 300 ms).
+  pendingComponent: () => (
+    <AuthFrame>
+      <Skeleton className="mx-auto h-8 w-40" />
+      <Skeleton className="h-10 rounded-lg" />
+    </AuthFrame>
+  ),
 })
 
 // Only same-site paths, never an absolute URL from the query string.
@@ -36,7 +45,7 @@ export function safeNext(next: string | undefined) {
 }
 
 function LoginPage() {
-  const { configured, ownerExists } = Route.useRouteContext()
+  const { ownerExists } = Route.useRouteContext()
   const { next } = Route.useSearch()
   const router = useRouter()
   const [busy, setBusy] = React.useState(false)
@@ -67,13 +76,7 @@ function LoginPage() {
         <h1 className="font-heading text-title">{t("login.title")}</h1>
       </div>
 
-      {!configured && (
-        <Alert variant="destructive">
-          <AlertTitle>{t("login.notConfigured")}</AlertTitle>
-          <AlertDescription>{t("login.notConfiguredBody")}</AlertDescription>
-        </Alert>
-      )}
-      {configured && !ownerExists && (
+      {!ownerExists && (
         <Alert>
           <AlertTitle>{t("login.noOwner")}</AlertTitle>
           <AlertDescription>

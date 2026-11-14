@@ -1,53 +1,39 @@
 ---
 title: Self-hosting
-description: Run Palui with Docker Compose as two services from one image, sharing one SQLite volume, configured by three keys in .env.
+description: Run Palui with Docker Compose as one service and one SQLite volume, configured by two keys in .env.
 ---
 
-Palui runs as two Compose services built from one image. Both share a single data volume.
+Palui runs as one Compose service with a single data volume.
 
 <ArchitectureDiagram>
-  Messages arrive from three channels: WhatsApp, Telegram and the dashboard web chat. They flow into the runtime container, which holds the router, agent turns, the scheduler, the outbox and the connector supervisor. Next to it, the app container serves the dashboard, the REST API, authentication, the /health endpoint and database migrations. Both containers share one SQLite database on a single volume. Model providers, the recall memory service and MCP servers sit outside both containers and are reached over the network.
+  Messages arrive from three channels: WhatsApp, Telegram and the dashboard web chat. They flow into the one Palui container, which holds the router, agent turns, the scheduler, the outbox and the connector supervisor, and also serves the dashboard, the API, authentication, the /health endpoint and database migrations. It keeps one SQLite database and the WhatsApp session on a single volume. Model providers, the recall memory service and MCP servers sit outside the container and are reached over the network.
 </ArchitectureDiagram>
 
-| Service | What it runs |
-|---|---|
-| `app` | The dashboard, the REST API, auth and `/health`. It's the only service that runs database migrations. |
-| `runtime` | A plain Node process: channel sockets, agent turns, the scheduler, the outbox and the connector supervisor. |
-
-Long-lived sockets (WhatsApp, Telegram polling) live in the runtime so the app stays a normal web server. Both restart on a deploy. The durable inbox and outbox are what keep messages safe through that, see [Upgrades](/docs/self-hosting/upgrades).
+`palui serve` is one Go process. It runs the channel sockets, agent turns, the scheduler, the outbox and the connector supervisor, and it serves the dashboard, the API, auth and `/health`. It also runs the database migrations on start. A deploy restarts it, and the durable inbox and outbox are what keep messages safe through that, see [Upgrades](/docs/self-hosting/upgrades).
 
 ## compose.yaml
 
-A trimmed example. The repository's `compose.yaml` is the real one, with the exact healthcheck commands.
+A trimmed example. The repository's `compose.yaml` is the real one.
 
 ```yaml
 services:
   app:
     build: .
     image: palui:latest
+    restart: unless-stopped
     env_file: .env
     environment:
       DATA_DIR: /data
-      RUNTIME_URL: http://runtime:4891
     ports:
       - "127.0.0.1:4802:3000" # loopback only, your tunnel connects here
     volumes:
       - palui-data:/data
+    healthcheck:
+      test: ["CMD", "palui", "healthcheck"]
+      interval: 30s
+      start_period: 30s
+      start_interval: 2s
     stop_grace_period: 60s
-
-  runtime:
-    image: palui:latest
-    pull_policy: never
-    env_file: .env
-    environment:
-      DATA_DIR: /data
-    volumes:
-      - palui-data:/data
-    depends_on:
-      app:
-        condition: service_healthy
-    stop_grace_period: 60s
-    # no ports: the control API stays on the compose network
 
 volumes:
   palui-data:
@@ -55,11 +41,12 @@ volumes:
 
 The rules behind it:
 
-- Only `app` has `build:`. `runtime` uses the same `palui:latest` image with `pull_policy: never`, so Compose builds once and never tries to pull it from a registry.
-- `runtime` waits for `app` to be healthy, which means migrations have run. It refuses to start on a schema it doesn't know.
-- `stop_grace_period: 60s` on both. On SIGTERM the runtime drains: it stops taking new turns, finishes the current step and releases its outbox claims.
-- The `runtime` healthcheck is liveness only: the event loop responds, the database is open and the schema version is known. Connector state goes in the `/health` body, never in the exit code, so a WhatsApp outage can't fail a deploy.
-- `app` is bound to `127.0.0.1`. The runtime's control port is never published.
+- One service. The image is about 42 MB: a small Alpine base and the `palui` binary with the dashboard built in.
+- The healthcheck is liveness only: `/health` answers 200 unless the database schema is newer than the code. Connector state goes in the `/health` body, never in the exit code, so a WhatsApp outage can't fail a deploy.
+- `stop_grace_period: 60s`. On SIGTERM the server drains: it stops taking new turns, finishes the current step and releases its outbox claims.
+- `app` is bound to `127.0.0.1`. Your tunnel is the only way in.
+
+The same binary is the admin CLI. Run any command with `docker compose exec app palui <command>`: `owner invite`, `connectors list`, `backup`, `secrets-check`, `version`.
 
 ## Volume
 
@@ -68,20 +55,19 @@ One volume, mounted at `/data`:
 | Path | What it holds |
 |---|---|
 | `/data/palui.db` | The SQLite database (WAL mode): connectors, encrypted secrets, chats, reminders, jobs, everything |
-| `/data/wa-auth/` | The WhatsApp linked-device session |
+| `/data/wa/` | The WhatsApp linked-device sessions, one SQLite file per WhatsApp connector |
 | `/data/backups/` | Pre-deploy snapshots |
 
 There are no JSON state files. Every write goes through a database transaction. Retention: tool call arguments and results are kept 30 days, media 14 days, events 90 days.
 
-## The three keys
+## The two keys
 
-`.env` holds exactly three keys. Every other credential is entered in the dashboard and stored encrypted in the database.
+`.env` holds two keys. Every other credential is entered in the dashboard and stored encrypted in the database.
 
 | Key | What it is |
 |---|---|
 | `MASTER_KEY` | Encrypts every connector secret (AES-256-GCM). Generate with `openssl rand -base64 32`. |
-| `BETTER_AUTH_SECRET` | Signs dashboard sessions. Generate the same way. |
-| `APP_URL` | The public origin of the dashboard, like `https://palui.example.com`. Used for cookies, the passkey domain and invite links. |
+| `APP_URL` | The public origin of the dashboard, like `https://palui.example.com`. Used for cookies, the passkey domain and invite links. Use a host name: passkeys don't work on an IP address, so with `http://192.168.1.20:4802` the server starts but passkey sign-in is off (an owner invite still signs you in). |
 
 <Callout type="warn" title="Keep a copy of MASTER_KEY">
   Store `MASTER_KEY` in your password manager. Every connector secret is encrypted with it. If you lose it, a restored backup can't decrypt any API key or bot token, and you'll have to enter them all again.
@@ -91,9 +77,8 @@ There are no JSON state files. Every write goes through a database transaction. 
 
 ```bash
 docker compose logs app
-docker compose logs runtime
 ```
 
-Check both when something's wrong. Channel, turn and scheduler problems show up in `runtime`. Logs are JSON lines tagged with run, chat and connector ids, with secrets redacted.
+Channel, turn, scheduler and dashboard problems all show up there. Logs are JSON lines tagged with run, chat and connector ids, with secrets redacted.
 
 Next: [Backups](/docs/self-hosting/backups), [Upgrades](/docs/self-hosting/upgrades), [Tunnel](/docs/self-hosting/tunnel).

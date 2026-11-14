@@ -8,11 +8,16 @@
 #   2. decrypt it with age, using the identity from the Keychain
 #      (`security find-generic-password -w`, never written to disk)
 #   3. restore it into a scratch compose project, `palui-drill`, with its own
-#      volume and the app on 127.0.0.1:4899. Only the app runs: starting the
-#      runtime would open a second Telegram poller and a second WhatsApp
-#      session against the real bot.
-#   4. wait for /health to answer 200, then run
-#      `cli.mjs secrets-check --require-some`, which decrypts every connector
+#      volume, and start the server as `palui serve --no-runtime` (plus
+#      PALUI_NO_RUNTIME=1): HTTP only, no connectors, engine, scheduler or
+#      outbox. The Go server is one process, so a plain `palui serve` would
+#      start the real connectors and open a second Telegram poller and a
+#      second WhatsApp session against the owner's accounts. As a second
+#      guard the container has no network at all (`network_mode: none`), so
+#      every check below runs inside it.
+#   4. wait for /health to answer 200 and check it reports the runtime off
+#      ("runtime": "unreachable"; anything else fails at once), then run
+#      `palui secrets-check --require-some`, which decrypts every connector
 #      and hook secret with MASTER_KEY and exits non-zero on any failure, or
 #      when there was nothing to decrypt (an empty DB proves nothing)
 #   5. tear the drill project down with its volume, whatever happened
@@ -20,8 +25,8 @@
 # Prints PASS or FAIL as the last line and exits 0 or 1.
 #
 # Needs: docker, age, MASTER_KEY in the environment (the production key: the
-# point is to prove the backup and the key still go together), and the image
-# already built on this host (palui:latest, or PALUI_IMAGE).
+# point is to prove the backup and the key still go together), and the Go
+# image already built on this host (palui:latest, or PALUI_IMAGE).
 set -euo pipefail
 
 BUCKET="${BACKUP_BUCKET:-palui-backups}"
@@ -29,9 +34,6 @@ CF="${CF_WRAPPER:-$HOME/.agents/skills/cf-zakiego-lab/scripts/cf-zakiego-lab}"
 KEYCHAIN_SERVICE="${AGE_KEYCHAIN_SERVICE:-palui-backup-age-identity}"
 IMAGE="${PALUI_IMAGE:-palui:latest}"
 PROJECT="palui-drill"
-PORT="${DRILL_PORT:-4899}"
-# The port the app listens on inside the container.
-APP_PORT="${PALUI_APP_PORT:-3000}"
 HEALTH_TIMEOUT="${DRILL_HEALTH_TIMEOUT:-120}"
 LOOKBACK_DAYS=7
 
@@ -61,10 +63,11 @@ trap finish EXIT
 command -v docker >/dev/null || { log "docker not found"; exit 1; }
 [ -n "${MASTER_KEY:-}" ] || { log "MASTER_KEY isn't set. Export the production key first (from your password manager)."; exit 1; }
 docker image inspect "$IMAGE" >/dev/null 2>&1 || { log "image $IMAGE not found on this host (set PALUI_IMAGE)"; exit 1; }
-if lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  log "port $PORT is already in use"
-  exit 1
-fi
+# The old Node image has no --no-runtime; never run it here.
+case "$(docker image inspect --format '{{json .Config.Cmd}}' "$IMAGE")" in
+  *'"palui","serve"'*) ;;
+  *) log "image $IMAGE isn't the Go server (its command isn't palui serve), refusing to start it"; exit 1 ;;
+esac
 
 tmpdir=$(mktemp -d /tmp/palui-drill.XXXXXX)
 chmod 700 "$tmpdir"
@@ -121,9 +124,10 @@ esac
 log "database $(stat -f %z "$work") bytes"
 
 # --- 3. scratch compose project -----------------------------------------------
-# Its own file, not compose.yaml plus an override: overrides append ports, so
-# the production port would come along. MASTER_KEY reaches the container from
-# this process's environment and is never written into the file.
+# Its own file, not compose.yaml plus an override: overrides append ports and
+# keep the network, so production's port and host access would come along.
+# MASTER_KEY reaches the container from this process's environment and is
+# never written into the file. No restart policy: a crash stays a crash.
 compose_file="$tmpdir/compose.drill.yaml"
 cat > "$compose_file" <<YAML
 name: $PROJECT
@@ -131,15 +135,15 @@ services:
   app:
     image: $IMAGE
     pull_policy: never
+    command: ["palui", "serve", "--no-runtime"]
+    network_mode: none
     environment:
       NODE_ENV: production
       DATA_DIR: /data
-      PORT: "$APP_PORT"
-      APP_URL: http://127.0.0.1:$PORT
+      PALUI_NO_RUNTIME: "1"
+      # A host name, not an IP: the passkey relying party id must be a domain.
+      APP_URL: http://localhost:3000
       MASTER_KEY: \${MASTER_KEY:?MASTER_KEY is required}
-      BETTER_AUTH_SECRET: drill-$(openssl rand -hex 16)
-    ports:
-      - "127.0.0.1:$PORT:$APP_PORT"
     volumes:
       - data:/data
 volumes:
@@ -149,29 +153,39 @@ YAML
 log "restoring into volume ${PROJECT}_data"
 drill create app >/dev/null
 # Copy the file in as root, then hand it to whoever owns /data in the image.
-docker run --rm --user root --entrypoint sh \
+docker run --rm --user root --network none --entrypoint sh \
   -v "${PROJECT}_data:/data" -v "$tmpdir:/restore:ro" "$IMAGE" \
   -c 'cp /restore/palui.db /data/palui.db && chown "$(stat -c %u:%g /data)" /data/palui.db'
 
-log "starting the app on 127.0.0.1:$PORT"
+log "starting the server with the runtime off (no network)"
 drill up -d app >/dev/null
 
 # --- 4. checks ----------------------------------------------------------------
+# Inside the container: it has no network, so the host can't reach it.
 deadline=$((SECONDS + HEALTH_TIMEOUT))
-code=""
-until [ "$code" = "200" ]; do
+until drill exec -T app palui healthcheck 2>/dev/null; do
   if [ "$SECONDS" -ge "$deadline" ]; then
-    log "/health didn't answer 200 within ${HEALTH_TIMEOUT}s (last: ${code:-no answer})"
+    log "/health didn't answer 200 within ${HEALTH_TIMEOUT}s"
     drill logs --tail 50 app || true
     exit 1
   fi
   sleep 2
-  code=$(curl -s -o "$tmpdir/health.json" -w '%{http_code}' -m 5 "http://127.0.0.1:$PORT/health" || true)
 done
-log "/health is green: $(head -c 300 "$tmpdir/health.json")"
+health=$(drill exec -T app wget -q -O - http://127.0.0.1:3000/health) || {
+  log "couldn't read /health"
+  exit 1
+}
+log "/health is green: $(printf '%s' "$health" | head -c 300)"
+case "$health" in
+  *'"runtime":"unreachable"'*) log "runtime is off, no connector started" ;;
+  *)
+    log "the runtime is NOT off in the drill container, stopping it now"
+    exit 1
+    ;;
+esac
 
 log "checking that every connector and hook secret decrypts"
-if ! drill exec -T app node .output/server/cli.mjs secrets-check --require-some; then
+if ! drill exec -T app palui secrets-check --require-some; then
   log "secrets-check failed: the backup has no secrets, or it and this MASTER_KEY don't go together"
   exit 1
 fi

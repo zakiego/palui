@@ -6,7 +6,7 @@
 import * as React from "react"
 import { Link } from "@tanstack/react-router"
 import { ArrowLeftIcon } from "lucide-react"
-import type { ConnectorManifest } from "@palui/core/connectors/define"
+import type { ConnectorManifest } from "@/shared/connectors/define"
 
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"

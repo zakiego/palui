@@ -11,7 +11,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { StatusText } from "@/components/ui/status-text"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useLiveRefresh } from "@/hooks/use-live-events"
-import { getFlows } from "@/lib/fns/flows"
+import { getFlows } from "@/lib/api/flows"
 import { ago, inZone } from "@/lib/format"
 import { useCount, useLabel, useT } from "@/lib/i18n"
 import { FLOW_RUN_TONE, FlowBadges } from "@/components/flow-badges"

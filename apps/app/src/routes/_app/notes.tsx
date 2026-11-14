@@ -21,7 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useLiveRefresh } from "@/hooks/use-live-events"
-import { deletePreferenceFn, getNotes, setPreferenceFn } from "@/lib/fns/notes"
+import { deletePreferenceFn, getNotes, setPreferenceFn } from "@/lib/api/notes"
 import { errorMessage } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 

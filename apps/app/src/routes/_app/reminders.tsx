@@ -36,7 +36,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { cancelReminderFn, createReminderFn, getReminders, parseReminder, snoozeReminderFn } from "@/lib/fns/reminders"
+import { cancelReminderFn, createReminderFn, getReminders, parseReminder, snoozeReminderFn } from "@/lib/api/reminders"
 import { clip, errorMessage, inOtherZone, inZone } from "@/lib/format"
 import { useLabel, useT } from "@/lib/i18n"
 

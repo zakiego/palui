@@ -1,4 +1,5 @@
 import { createRouter } from "@tanstack/react-router"
+import { APP_BASE } from "@/lib/app-path"
 import { routeTree } from "./routeTree.gen"
 
 // How long a page's loaded data stays usable after you leave it. Coming back
@@ -9,6 +10,7 @@ const KEEP_MS = 30 * 60_000
 export function getRouter() {
   return createRouter({
     routeTree,
+    basepath: APP_BASE,
     scrollRestoration: true,
     // Start loading the moment a link is hovered or touched, not 50 ms later.
     defaultPreload: "intent",

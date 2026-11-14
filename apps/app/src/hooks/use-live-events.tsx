@@ -1,6 +1,7 @@
 // One EventSource per tab on /api/events/stream, shared through context. The
 // header reads the summary; pages subscribe to rows to refresh what they show.
 import * as React from "react"
+import { notifyUnauthorized } from "@/lib/api/client"
 
 export type LiveEvent = { id: number; at: number; level: string; connectorId: string | null; kind: string; message: string }
 export type LiveSummary = { total: number; on: number; attention: { id: string; label: string; status: string }[] }
@@ -37,6 +38,12 @@ export function LiveEventsProvider({ initial, children }: { initial: LiveSummary
       } catch {
         // a malformed frame is skipped
       }
+    })
+    // Sent once before the server closes a stream whose session is gone.
+    es.addEventListener("unauthorized", () => {
+      es.close()
+      setConnected(false)
+      notifyUnauthorized()
     })
     return () => es.close()
   }, [])

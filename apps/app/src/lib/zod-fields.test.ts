@@ -38,4 +38,14 @@ describe("boolean config fields in the connector wizard", () => {
     expect(config.shape.notify.safeParse(on.config.notify)).toEqual({ success: true, data: true })
     expect(config.shape.notify.safeParse(off.config.notify)).toEqual({ success: true, data: false })
   })
+
+  it("sends a number box's text when it isn't a number (JSON has no NaN)", () => {
+    const m = { config: z.object({ port: z.number().int().optional() }), secrets: {}, setup: [{ field: "port", label: "Port" }] }
+    expect(wizardPayload(m, { port: "8080" }).config).toEqual({ port: 8080 })
+    expect(wizardPayload(m, { port: "" }).config).toEqual({ port: "" })
+    const junk = wizardPayload(m, { port: " 80a " }).config
+    expect(junk).toEqual({ port: "80a" })
+    expect(JSON.parse(JSON.stringify(junk))).toEqual(junk)
+    expect(m.config.shape.port.safeParse(junk.port).success).toBe(false)
+  })
 })

@@ -26,7 +26,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { StatusText } from "@/components/ui/status-text"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { deleteInstructionFn, saveInstructionFn, setInstructionEnabledFn } from "@/lib/fns/notes"
+import { deleteInstructionFn, saveInstructionFn, setInstructionEnabledFn } from "@/lib/api/notes"
 import { errorMessage } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 

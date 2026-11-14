@@ -25,7 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useLiveRefresh } from "@/hooks/use-live-events"
-import { getEvents, getRuns, getUsage } from "@/lib/fns/activity"
+import { getEvents, getRuns, getUsage } from "@/lib/api/activity"
 import { compact, duration, inZone } from "@/lib/format"
 import { useCount, useLabel, useT } from "@/lib/i18n"
 import { RUN_TONE, runTitle } from "@/lib/runs"

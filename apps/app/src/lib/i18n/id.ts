@@ -61,8 +61,6 @@ export const id: Record<Key, string> = {
   "login.lockedOutAfter": "lalu buka tautan yang muncul.",
   "login.noOwner": "Belum ada pemilik",
   "login.noOwnerBody": "Klaim dasbor ini dulu: di server, jalankan",
-  "login.notConfigured": "Login belum diatur di server ini",
-  "login.notConfiguredBody": "Isi BETTER_AUTH_SECRET (minimal 32 karakter) dan APP_URL di .env, lalu restart app.",
   "login.failed": "Passkey itu gagal. Coba lagi, atau buat tautan pemilik baru.",
   "invite.title": "Klaim Palui",
   "invite.recoveryTitle": "Pulihkan akses",

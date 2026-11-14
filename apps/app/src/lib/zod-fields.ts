@@ -1,6 +1,6 @@
 // Reads manifest zod schemas as form fields. Pure, so the client wizard and the
 // server validation share it.
-import type { ConnectorManifest, SetupStep } from "@palui/core/connectors/define"
+import type { ConnectorManifest, SetupStep } from "@/shared/connectors/define"
 import type { z } from "zod"
 
 type Def = { type?: string; innerType?: z.ZodType; options?: unknown; defaultValue?: unknown; entries?: Record<string, unknown> }
@@ -76,7 +76,10 @@ export function wizardInitialValues(m: Pick<ConnectorManifest, "config" | "secre
 
 // The form's values split into config and secrets for saveConnectorDraft. A
 // boolean is always sent as true or false, never as an empty string, so
-// switching it off is saved instead of clearing the field.
+// switching it off is saved instead of clearing the field. The payload is
+// JSON, which has no NaN: a number box holding something that isn't a number
+// sends its text, so the server's check names the field instead of reading
+// null (which clears it).
 export function wizardPayload(
   m: Pick<ConnectorManifest, "config" | "secrets" | "setup">,
   values: WizardValues,
@@ -93,8 +96,13 @@ export function wizardPayload(
       continue
     }
     if (info.kind === "boolean") config[step.field] = v === true
-    else if (info.kind === "number") config[step.field] = v === "" ? "" : Number(v)
+    else if (info.kind === "number") config[step.field] = v === "" ? "" : numberOrText(v)
     else config[step.field] = typeof v === "string" ? v.trim() : v
   }
   return { config, secrets }
+}
+
+function numberOrText(v: string | boolean): number | string {
+  const n = Number(v)
+  return Number.isNaN(n) ? String(v).trim() : n
 }

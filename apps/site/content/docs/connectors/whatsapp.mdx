@@ -6,7 +6,7 @@ description: Chat with Palui from WhatsApp. It links as a device on a number, pa
 Kind: `channel`. Chat with Palui from WhatsApp. Palui links to a WhatsApp number as a linked device, the same way WhatsApp Web does, and answers DMs from your own number only.
 
 <Callout type="warn" title="Unofficial library">
-  The WhatsApp connector uses Baileys, an unofficial library. Keep volume low, use one owner and never broadcast. Telegram is the reliable channel.
+  The WhatsApp connector uses whatsmeow, an unofficial library. Keep volume low, use one owner and never broadcast. Telegram is the reliable channel.
 </Callout>
 
 ## Connect
@@ -35,7 +35,7 @@ Send a DM from your number. Palui learns your WhatsApp LID from that first messa
 </Step>
 </Steps>
 
-Session files live in `/data/wa-auth` on the data volume.
+The session lives in `/data/wa/<connector id>.db` on the data volume.
 
 ## Settings
 
@@ -64,5 +64,5 @@ None. WhatsApp is a channel.
 - Remove: "This unlinks the WhatsApp device. You'll need to pair again." The session files are deleted.
 
 <Callout type="error" title="Back up the session carefully">
-  The files in `/data/wa-auth` are enough to act as the bot's number. The [nightly backup](/docs/self-hosting/backups) encrypts them. Never copy them anywhere unencrypted.
+  The session files in `/data/wa/` are enough to act as the bot's number. The [nightly backup](/docs/self-hosting/backups) encrypts them. Never copy them anywhere unencrypted.
 </Callout>

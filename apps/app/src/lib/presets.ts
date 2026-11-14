@@ -1,6 +1,6 @@
 // Connector presets: a manifest's prefilled configs (the MCP server's Vorneo,
 // Linear...). The Add connector page lists them apart from the custom setup.
-import type { ConnectorManifest } from "@palui/core/connectors/define"
+import type { ConnectorManifest } from "@/shared/connectors/define"
 
 export type Preset = NonNullable<ConnectorManifest["presets"]>[number]
 

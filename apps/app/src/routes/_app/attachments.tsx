@@ -27,7 +27,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { createAttachmentShareFn, deleteAttachmentFn, getAttachments, getAttachmentShares, revokeAttachmentShareFn } from "@/lib/fns/attachments"
+import { createAttachmentShareFn, deleteAttachmentFn, getAttachments, getAttachmentShares, revokeAttachmentShareFn } from "@/lib/api/attachments"
 import { ago, errorMessage, inZone } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -120,10 +120,6 @@ function FileCell({ row, timezone }: { row: Row; timezone: string }) {
   const { id } = Route.useSearch()
   const [open, setOpen] = React.useState(false)
   const [broken, setBroken] = React.useState(false)
-  // An image that failed before hydration never fires onError, so check it once mounted.
-  const thumb = React.useCallback((img: HTMLImageElement | null) => {
-    if (img?.complete && img.naturalWidth === 0) setBroken(true)
-  }, [])
   React.useEffect(() => {
     if (id === row.id) setOpen(true)
   }, [id, row.id])
@@ -138,7 +134,7 @@ function FileCell({ row, timezone }: { row: Row; timezone: string }) {
         onClick={() => setOpen(true)}
       >
         {row.preview === "image" && !broken ? (
-          <img ref={thumb} src={fileUrl(row.id, true)} alt="" loading="lazy" decoding="async" className="size-full object-cover" onError={() => setBroken(true)} />
+          <img src={fileUrl(row.id, true)} alt="" loading="lazy" decoding="async" className="size-full object-cover" onError={() => setBroken(true)} />
         ) : (
           <Icon className="size-5" />
         )}

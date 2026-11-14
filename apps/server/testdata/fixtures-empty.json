@@ -1,0 +1,160 @@
+{
+ "fixture": "empty",
+ "now": 1794621600000,
+ "tables": {
+  "account": {
+   "columns": ["id","account_id","provider_id","user_id","access_token","refresh_token","id_token","access_token_expires_at","refresh_token_expires_at","scope","password","created_at","updated_at"],
+   "rows": []
+  },
+  "agents": {
+   "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat"],
+   "rows": []
+  },
+  "attachment_shares": {
+   "columns": ["id","attachment_id","token_hash","visibility","created_by","expires_at","revoked_at","open_count","last_opened_at","created_at"],
+   "rows": []
+  },
+  "chats": {
+   "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji"],
+   "rows": []
+  },
+  "claims": {
+   "columns": ["nonce","channel","expires_at","used_at","used_by","created_at"],
+   "rows": []
+  },
+  "connectors": {
+   "columns": ["id","type","kind","label","enabled","status","status_detail","trust","config","secrets","config_hash","error_since","alerted_at","sort_order","created_at","updated_at","agent_id"],
+   "rows": []
+  },
+  "contacts": {
+   "columns": ["id","agent_id","name","channel","address","chat_id","policy","note","created_at","updated_at","removed_at"],
+   "rows": []
+  },
+  "events": {
+   "columns": ["id","at","level","connector_id","kind","message","data"],
+   "rows": []
+  },
+  "flow_runs": {
+   "columns": ["id","flow_id","version_id","chat_id","trigger_id","trigger_kind","run_key","parent_run_id","item_index","status","skip_reason","trigger","vars","taint","cursor","wait","wake_at","lease_until","steps_done","messages_sent","scheduled_at","started_at","ended_at","error","legacy_occurrence_id","dry_run","updated_at"],
+   "rows": []
+  },
+  "flow_step_runs": {
+   "columns": ["id","run_id","seq","step_id","kind","attempt","status","input","output","tainted","branch","tool_call_id","turn_run_id","error","started_at","ms"],
+   "rows": []
+  },
+  "flow_triggers": {
+   "columns": ["id","flow_id","trigger_id","kind","match","status","next_fire_at","next_occ","cursor","source_state","next_refresh_at","poll_state","last_error","updated_at"],
+   "rows": []
+  },
+  "flow_versions": {
+   "columns": ["id","flow_id","n","definition","hash","write_calls","created_by","note","approved_at","approved_via","created_at"],
+   "rows": []
+  },
+  "flows": {
+   "columns": ["id","chat_id","name","tz","enabled","paused_until","current_version_id","approved_version_id","state","consecutive_failures","agent_id","legacy_routine_id","shadow","last_error","notice_for","created_at","updated_at"],
+   "rows": []
+  },
+  "hooks": {
+   "columns": ["id","slug","name","secret","mode","chat_id","enabled","last_at","created_at"],
+   "rows": []
+  },
+  "identities": {
+   "columns": ["id","channel","external_id","alt_id","display_name","role","created_at"],
+   "rows": []
+  },
+  "instructions": {
+   "columns": ["id","title","body","enabled","created_at","updated_at","agent_id"],
+   "rows": []
+  },
+  "jobs": {
+   "columns": ["id","name","kind","rrule","tz","local_start","prompt","chat_id","model_role","tool_scope","enabled","next_run_at","status","last_run_at","last_status","last_result","daily_token_cap","created_at","updated_at"],
+   "rows": []
+  },
+  "messages": {
+   "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],
+   "rows": []
+  },
+  "outbound_messages": {
+   "columns": ["id","agent_id","contact_id","text","origin","origin_ref","approved_by","owner_chat_id","rrule","tz","local_start","fire_at","status","last_outbox_id","created_at","updated_at"],
+   "rows": []
+  },
+  "outbox": {
+   "columns": ["id","chat_id","channel","payload","status","attempts","next_attempt_at","claimed_at","channel_msg_id","source","error","fallback_from","created_at","expires_at","sent_at","connector_id"],
+   "rows": []
+  },
+  "owner_invites": {
+   "columns": ["id","token_hash","expires_at","used_at","created_at"],
+   "rows": []
+  },
+  "passkey": {
+   "columns": ["id","name","public_key","user_id","credential_id","counter","device_type","backed_up","transports","created_at","aaguid"],
+   "rows": [
+    ["pk_real","Real key","x","user_owner","cred_real",0,"multiDevice",1,null,null,null]
+   ]
+  },
+  "pending_approvals": {
+   "columns": ["id","run_id","chat_id","approval_id","tool_call_id","tool","tool_class","args_preview","messages","context","prompt_msg_id","expires_at","status","decided_at","created_at","ask_chat_id"],
+   "rows": []
+  },
+  "preferences": {
+   "columns": ["key","value","updated_at"],
+   "rows": []
+  },
+  "reminders": {
+   "columns": ["id","chat_id","text","rrule","tz","local_start","fire_at","scheduled_for","status","last_fired_at","snoozed_until","smart_prompt","last_outbox_id","created_at","updated_at"],
+   "rows": []
+  },
+  "reports": {
+   "columns": ["id","chat_id","session_id","note","text","created_at"],
+   "rows": []
+  },
+  "routine_occurrences": {
+   "columns": ["id","routine_id","chat_id","key","label","scheduled_at","fired_at","status","answer","answered_at","answers","follow_ups","next_follow_up_at","deadline_at","fallback","created_at","updated_at"],
+   "rows": []
+  },
+  "routines": {
+   "columns": ["id","chat_id","name","tz","days","source","action","recap","late_grace_min","enabled","paused_until","status","next_fire_at","next_occ","cursor","source_state","next_refresh_at","next_recap_at","last_error","created_at","updated_at"],
+   "rows": []
+  },
+  "runs": {
+   "columns": ["id","chat_id","job_id","trigger","model","model_connector_id","tokens_in","tokens_out","tokens_cached","steps","tainted","status","error","result_preview","started_at","ms","agent_id","tokens_cache_write"],
+   "rows": []
+  },
+  "saved_attachments": {
+   "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at"],
+   "rows": []
+  },
+  "session": {
+   "columns": ["id","expires_at","token","created_at","updated_at","ip_address","user_agent","user_id"],
+   "rows": []
+  },
+  "sessions": {
+   "columns": ["id","chat_id","summary","summarized_until","saved_to_recall_at","created_at","closed_at","loaded_tools"],
+   "rows": []
+  },
+  "settings": {
+   "columns": ["key","value","updated_at"],
+   "rows": [
+    ["devFixture","\"empty\"",1794621600000]
+   ]
+  },
+  "tool_calls": {
+   "columns": ["id","run_id","connector_id","tool","class","args","result_preview","status","ms","created_at"],
+   "rows": []
+  },
+  "usage": {
+   "columns": ["key","value","updated_at"],
+   "rows": []
+  },
+  "user": {
+   "columns": ["id","name","email","email_verified","image","username","display_username","created_at","updated_at"],
+   "rows": [
+    ["user_owner","Owner","owner@palui.invalid",0,null,"owner",null,1794621600000,1794621600000]
+   ]
+  },
+  "verification": {
+   "columns": ["id","identifier","value","expires_at","created_at","updated_at"],
+   "rows": []
+  }
+ }
+}
