@@ -11,6 +11,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.9.0 (2026-11-15)
+
 ### Breaking
 
 - Palui now runs as one service instead of two. The server, the channels, agent turns, the scheduler and the dashboard are a single program, so `compose.yaml` has only `app`, and the image is about 42 MB instead of 399 MB. On the same test database, idle memory went from about 153 MB for the two old containers to about 11 MB. Your database, connectors, chats and settings carry over as they are. After you upgrade: sign in to the dashboard again (old sessions end; your passkey still works, and `docker compose exec app palui owner invite` gets you in if it doesn't), and pair WhatsApp again from its connector page, since the WhatsApp session is stored in a new format under `/data/wa/`. Once WhatsApp works, you can delete the old session with `docker compose exec app rm -r /data/wa-auth`. `BETTER_AUTH_SECRET`, `RUNTIME_URL` and `CONTROL_PORT` are no longer read, so you can remove them from `.env`; keep `MASTER_KEY` and `APP_URL`. `scripts/pre-deploy.sh` removes the old `runtime` container on the first deploy. `APP_URL` should use a host name: with an IP address the server still starts, but passkeys are off and the log says why. The nightly backup now uploads WhatsApp as `wa-<timestamp>.tar.age`.
