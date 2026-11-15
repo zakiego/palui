@@ -135,7 +135,23 @@ function AlertDialogDescription({
   )
 }
 
-const AlertDialogAction = Button
+// The action closes the dialog after its onClick runs, like Cancel. A plain Button left
+// it open whenever the row behind it stayed mounted (e.g. switching a contact to Always allow).
+function AlertDialogAction({
+  className,
+  variant = "default",
+  size = "default",
+  ...props
+}: React.ComponentProps<typeof AlertDialogClose> &
+  Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
+  return (
+    <AlertDialogClose
+      className={className}
+      render={partRender(<Button variant={variant} size={size} />)}
+      {...props}
+    />
+  )
+}
 
 function AlertDialogCancel({
   className,

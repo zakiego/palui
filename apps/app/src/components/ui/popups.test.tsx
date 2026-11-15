@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render, screen } from "@testing-library/react"
+import { act, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createAgent } from "@ui-sdk/react/agent"
 import * as React from "react"
@@ -170,6 +170,32 @@ test("alert dialog: Cancel closes it, the action runs, and the trigger isn't reg
   await userEvent.click(trigger)
   await userEvent.click(await screen.findByRole("button", { name: "Delete forever" }))
   expect(removed).toEqual(["note"])
+  expect(screen.queryByRole("alertdialog")).toBeNull()
+})
+
+test("alert dialog: a controlled action closes it while its owner stays mounted", async () => {
+  const saved: string[] = []
+  function Row() {
+    const [open, setOpen] = React.useState(true)
+    return (
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Always allow messages?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction onClick={() => saved.push("allow")}>Always allow</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )
+  }
+  render(<Row />)
+  await screen.findByRole("alertdialog", { name: "Always allow messages?" })
+  await userEvent.click(screen.getByRole("button", { name: "Always allow" }))
+  expect(saved).toEqual(["allow"])
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
 })
 
 test("dialog is named by its title and closes from its icon button", async () => {
