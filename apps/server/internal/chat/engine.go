@@ -119,6 +119,10 @@ func NewEngine(o EngineOptions) *Engine {
 			ok, err := owner.IsOwner(o.DB, owner.Sender{Channel: channel, ExternalID: externalID, AltID: altID})
 			return ok && err == nil
 		},
+		WantsMedia: func(m connectors.InboundMessage) bool {
+			ok, err := MediaWanted(o.DB, m, e.Ctx.Clock())
+			return ok && err == nil
+		},
 	}
 	return e
 }
