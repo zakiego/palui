@@ -260,9 +260,12 @@ func capabilityList(c *EngineCtx, collected *tools.Collected, agentID string) []
 		if len(waiting) == 0 {
 			if loaded > 0 {
 				out = append(out, fmt.Sprintf("%s (%d tools)", e.Row.Label, loaded))
-			} else {
+			} else if e.Row.Kind == "memory" {
+				// Recall still works without tools: it runs before the turn.
 				out = append(out, e.Row.Label)
 			}
+			// A connector with no tools in this turn (a guest turn, a denied
+			// connector) isn't named: the model would promise what it can't do.
 			continue
 		}
 		shown := strings.Join(waiting[:min(8, len(waiting))], ", ")

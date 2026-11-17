@@ -488,4 +488,15 @@ func TestDashboardPrompt(t *testing.T) {
 	})
 }
 
+func TestBuildSystemGuestLimits(t *testing.T) {
+	base := chat.SystemInput{Persona: "P", Channel: "whatsapp", Trigger: "message", Shared: &chat.SharedInfo{Kind: "group"}}
+	notContains(t, chat.BuildSystem(base), "never suggest trying again later")
+	base.Shared.Guest = true
+	p := chat.BuildSystem(base)
+	contains(t, p, "never suggest trying again later")
+	// Nothing about the owner's setup or where to change it.
+	notContains(t, p, "dashboard")
+	notContains(t, p, "DM")
+}
+
 var _ = json.Marshal
