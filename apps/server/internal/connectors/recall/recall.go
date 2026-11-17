@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/kit"
 	mcpconn "github.com/zakiego/palui/apps/server/internal/connectors/mcp"
@@ -556,6 +557,23 @@ func New(opts Options) *connectors.Runtime {
 							title = def.Name
 						}
 						set.Set(def.Name, connectors.PaluiTool{Data: connectors.DataAgent, Tool: withContainer(t, cls, &scope), Class: cls, Title: title})
+					}
+					if c.DB != nil {
+						now := turn.Now
+						if now == 0 {
+							now = time.Now().UnixMilli()
+						}
+						down, err := agents.CanReadDown(c.DB, turn, now)
+						if err != nil {
+							return nil, err
+						}
+						if down {
+							more := ReadDownTools(c.DB, api, aiTools)
+							for _, k := range more.Keys() {
+								pt, _ := more.Get(k)
+								set.Set(k, pt)
+							}
+						}
 					}
 					mu.Lock()
 					had := mcpError != ""

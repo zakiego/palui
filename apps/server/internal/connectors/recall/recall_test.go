@@ -37,6 +37,8 @@ type fakeOpts struct {
 	profileDelay time.Duration
 	profile      map[string]any
 	profileDown  bool
+	// What /v1/containers lists; nil is default and zaki.
+	containers func() []string
 }
 
 type fake struct {
@@ -117,6 +119,12 @@ func fakeRecall(t *testing.T, o fakeOpts) *fake {
 			return send(w, 401, map[string]any{"error": map[string]any{"type": "unauthorized", "message": "missing or invalid API key"}})
 		}
 		switch {
+		case r.URL.Path == "/v1/containers" && o.containers != nil:
+			list := []any{}
+			for _, c := range o.containers() {
+				list = append(list, map[string]any{"container": c, "memories": 1, "documents": 0, "lastActivity": 1})
+			}
+			return send(w, 200, map[string]any{"containers": list})
 		case r.URL.Path == "/v1/containers":
 			return send(w, 200, map[string]any{"containers": []any{map[string]any{"container": "default", "memories": 3, "documents": 1, "lastActivity": 1}, map[string]any{"container": "zaki", "memories": 9, "documents": 2, "lastActivity": 2}}})
 		case r.URL.Path == "/v1/profile":
