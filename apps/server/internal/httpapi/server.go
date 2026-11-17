@@ -4,7 +4,8 @@
 // attachment, share, hook and OAuth callback routes, and the dashboard SPA
 // under /app.
 //
-// Routes (the edge Worker forwards /app, /api and /health to this server):
+// Routes (the edge Worker forwards /app, /api, /health, /mcp and the OAuth
+// well-known documents to this server):
 //
 //	GET  /health                       no auth; 503 only for a database a newer build migrated
 //	*    /api/auth/...                 sessions and passkeys (auth.go)
@@ -16,6 +17,9 @@
 //	GET  /api/oauth/google/callback    the gcal OAuth redirect
 //	GET|POST /api/rpc/{name}           dashboard server functions (rpc.go)
 //	POST /api/admin/reconcile          loopback only, admin token: the CLI's poke
+//	*    /mcp                          Palui's own MCP server, bearer token only (mcp.go)
+//	*    /api/oauth/...                the OAuth server for /mcp, and its
+//	GET  /.well-known/oauth-*          discovery documents (oauth.go)
 //	GET  /app/...                      the dashboard
 //	GET  /                             302 to /app
 package httpapi
@@ -155,6 +159,8 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/oauth/google/callback", s.googleCallback)
 	m.HandleFunc("/api/rpc/{name}", s.rpc)
 	m.HandleFunc("POST /api/admin/reconcile", s.adminReconcile)
+	s.oauthRoutes()
+	s.mcpRoutes()
 	m.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 404, map[string]string{"error": "NOT_FOUND"})
 	})
