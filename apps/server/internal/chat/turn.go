@@ -516,10 +516,13 @@ func FinishResumedRun(q db.Q, runID string) error {
 	return err
 }
 
-// taintFromReplay starts the turn tainted when the history it replays holds
-// the result of an untrusted call: that content is in front of the model
-// again. A call to a tool this turn doesn't have counts as untrusted and as
-// other people's words (fail closed). Calls that never ran carry nothing.
+// taintFromReplay marks the turn replay-tainted when the history it replays
+// holds the result of an untrusted call: that content is in front of the
+// model again, so approvals treat the turn as tainted. It doesn't touch the
+// run's own taint (runs.tainted, TurnResult.Tainted, the auto-save skip),
+// which keeps meaning "this run read something untrusted". A call to a tool
+// this turn doesn't have counts as untrusted (fail closed). Calls that never
+// ran carry nothing.
 func taintFromReplay(calls []ToolCallRow, meta map[string]*tools.ToolMeta, tainted, othersWrote *atomic.Bool, log *logx.Logger) {
 	for _, pc := range calls {
 		if pc.Status != "ok" && pc.Status != "error" {
@@ -530,7 +533,7 @@ func taintFromReplay(calls []ToolCallRow, meta map[string]*tools.ToolMeta, taint
 			continue
 		}
 		if !tainted.Load() {
-			log.Info("turn tainted by an untrusted call in its history", logx.Fields{"tool": pc.Tool})
+			log.Info("turn replay-tainted by an untrusted call in its history", logx.Fields{"tool": pc.Tool})
 		}
 		tainted.Store(true)
 		if m == nil || m.OthersWrote {
@@ -565,6 +568,9 @@ func resumeContextJSON(rc approvals.ResumeContext, scope, names *[]string, syste
 	o.Set("tainted", rc.Tainted)
 	if rc.OthersWrote {
 		o.Set("othersWrote", true)
+	}
+	if rc.ReplayTainted {
+		o.Set("replayTainted", true)
 	}
 	o.Set("sessionId", rc.SessionID)
 	o.Set("system", system)
@@ -843,6 +849,11 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 	// from then on no write runs on its own, "allow" included.
 	var othersWrote atomic.Bool
 	othersWrote.Store(rs != nil && rs.Context.OthersWrote)
+	// The history replays an untrusted result: approvals see a tainted turn,
+	// the run's own taint stays as is.
+	var replayTainted atomic.Bool
+	replayTainted.Store(rs != nil && rs.Context.ReplayTainted)
+	approvalTainted := func() bool { return tainted.Load() || replayTainted.Load() }
 	timer := &toolTimer{starts: map[string]int64{}}
 	var channel connectors.ChannelHandle
 	if chat.Channel != "web" {
@@ -934,7 +945,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		turnInfo := connectors.TurnInfo{
 			RunID: runID, ChatID: chat.ID, Channel: chat.Channel, Trigger: input.Trigger, TZ: all.Timezone, Now: startedAt,
 			JobID: jobID, BatchRunID: batchRunID, AgentID: agent.ID, Origin: origin, Mode: mode,
-			Tainted: tainted.Load, OwnerText: ownerText,
+			Tainted: approvalTainted, OwnerText: ownerText,
 			Memory: &connectors.MemoryScope{Container: scope.Container, Read: scope.Read, Locked: scope.Locked},
 		}
 		outside := audience == tools.AudienceOutside && !legacy
@@ -1116,7 +1127,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					}
 					pastCalls = kept
 				}
-				taintFromReplay(pastCalls, collected.Meta, &tainted, &othersWrote, rlog)
+				taintFromReplay(pastCalls, collected.Meta, &replayTainted, &othersWrote, rlog)
 			}
 			var base []models.Message
 			if isMessage {
@@ -1249,7 +1260,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					Class:       class,
 					Permission:  tools.PermissionFor(&perms, call.ToolName),
 					OwnerTurn:   ownerTurn,
-					Tainted:     tainted.Load(),
+					Tainted:     approvalTainted(),
 					OthersWrote: othersWrote.Load(),
 					Strict:      strict,
 					SendsFile:   len(attachments.FindRefs(call.Input)) > 0,
@@ -1326,7 +1337,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		case len(requests) > 0 && status != "error" && status != "aborted":
 			rc := approvals.ResumeContext{
 				Trigger: input.Trigger, OriginTrigger: origin, JobID: jobID, ModelRole: role, Deliver: deliver,
-				SilentToken: silentToken, Tainted: tainted.Load(), OthersWrote: othersWrote.Load(), SessionID: chat.SessionID,
+				SilentToken: silentToken, Tainted: tainted.Load(), OthersWrote: othersWrote.Load(), ReplayTainted: replayTainted.Load(), SessionID: chat.SessionID,
 				BatchRunID: batchRunID, AgentID: agent.ID, Mode: mode,
 			}
 			ctxJSON := resumeContextJSON(rc, toolScope, toolNames, system)

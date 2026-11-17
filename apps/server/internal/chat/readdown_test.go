@@ -90,29 +90,45 @@ func TestReadDown(t *testing.T) {
 		h.sendIdle("oke makasih")
 		eq(t, len(notes.get()), 0)
 		eq(t, allApprovals(t, h.DB, "")[0].Tool, "notes__add")
-		eq(t, count(t, h.DB, "runs WHERE tainted = 1"), 2)
+		// Only the run that read is stored tainted; the replay drives approvals only.
+		eq(t, count(t, h.DB, "runs WHERE tainted = 1"), 1)
+		if !strings.Contains(jsonx.Stringify(allApprovals(t, h.DB, "")[0].Context), `"replayTainted":true`) {
+			t.Fatal(jsonx.Stringify(allApprovals(t, h.DB, "")[0].Context))
+		}
 	})
 
-	t.Run("an ordinary untrusted call in the history taints the next turn", func(t *testing.T) {
+	t.Run("an ordinary untrusted call in the history makes a later write ask, but plain turns stay untainted and auto-saved", func(t *testing.T) {
 		notes := &executedLog{}
+		saved := &executedLog{}
+		mem := memHandle(func(in connectors.SaveInput) { saved.add(in.Content) }, nil, false, true)
 		fetch := connectors.PaluiTool{Class: "read", Untrusted: true, Tool: conntest.FnTool("get", func(*jsonx.Object) (any, error) { return "page text", nil })}
 		h := basic(t, []models.Step{
 			models.CallTool("web__get", objOf(), "w1"),
 			models.Say("Ini isinya."),
+			models.Say("Oke, semoga lancar pindahannya."),
 			models.CallTool("notes__add", objOf("text", "a"), "n1"),
-			models.CallTool("notes__add", objOf("text", "b"), "n2"),
 		}, extra{
 			registry: map[string]*connectors.Runtime{
-				"web":   toolsRT("web", tools("get", fetch)),
-				"notes": toolsRT("notes", tools("add", connectors.PaluiTool{Class: "write", Tool: conntest.FnTool("add", func(in *jsonx.Object) (any, error) { notes.add(str(in, "text")); return nil, nil })})),
+				"web":    toolsRT("web", tools("get", fetch)),
+				"notes":  toolsRT("notes", tools("add", connectors.PaluiTool{Class: "write", Tool: conntest.FnTool("add", func(in *jsonx.Object) (any, error) { notes.add(str(in, "text")); return nil, nil })})),
+				"recall": conntest.MemoryRuntime(mem),
 			},
-			rows: []chattest.Row{{"web", "tools"}, {"notes", "tools"}},
+			rows: []chattest.Row{{"web", "tools"}, {"notes", "tools"}, {"recall", "memory"}},
 		})
 
 		h.sendIdle("baca halaman ini")
+		h.sendIdle("aku pindah ke Bandung bulan depan")
 		h.sendIdle("catat ya")
 		eq(t, len(notes.get()), 0)
 		eq(t, allApprovals(t, h.DB, "")[0].Tool, "notes__add")
-		eq(t, count(t, h.DB, "runs WHERE tainted = 1"), 2)
+		eq(t, count(t, h.DB, "runs WHERE tainted = 1"), 1)
+		var plain int
+		testutil.Must(t, h.DB.QueryRow("SELECT r.tainted FROM runs r JOIN messages m ON m.run_id = r.id WHERE m.text = 'Oke, semoga lancar pindahannya.'").Scan(&plain))
+		eq(t, plain, 0)
+		h.sendIdle("/new")
+		got := jsonx.Stringify(saved.get())
+		if !strings.Contains(got, `Owner: aku pindah ke Bandung bulan depan\nPalui: Oke, semoga lancar pindahannya.`) || strings.Contains(got, "baca halaman ini") {
+			t.Fatal(got)
+		}
 	})
 }

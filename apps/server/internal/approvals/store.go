@@ -32,8 +32,11 @@ type ResumeContext struct {
 	SilentToken string    `json:"silentToken,omitempty"`
 	Tainted     bool      `json:"tainted"`
 	// The turn read what other people wrote: writes ask even when allowed.
-	OthersWrote bool    `json:"othersWrote,omitempty"`
-	SessionID   *string `json:"sessionId"`
+	OthersWrote bool `json:"othersWrote,omitempty"`
+	// The asking turn's history replayed an untrusted result: approvals in the
+	// resumed run treat it as tainted, but the run itself isn't stored tainted.
+	ReplayTainted bool    `json:"replayTainted,omitempty"`
+	SessionID     *string `json:"sessionId"`
 	// The system prompt as sent, block by block (a plain string on old rows).
 	System     json.RawMessage `json:"system"`
 	BatchRunID string          `json:"batchRunId,omitempty"`

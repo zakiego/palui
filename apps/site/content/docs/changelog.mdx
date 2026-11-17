@@ -21,7 +21,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Changed
 
-- A tool result stays untrusted on the next turns. Palui shows past tool results to the model again, so a turn whose history holds a web page, an `external` MCP result or another chat it read now starts tainted, and its writes ask you first. Before, only the turn that read it did.
+- A tool result stays untrusted on the next turns. Palui shows past tool results to the model again, so in a turn whose history holds a web page, an `external` MCP result or another chat it read, writes now ask you first. Before, only the turn that read it did. Auto-save still keeps those later turns.
 
 - A group no longer sees your list of agents. When you mention the bot in a WhatsApp group that has no agent yet, or type `/agent` in any group or someone else's DM, the chat only hears that no agent is set up, and the `/agent <name>` choices go to your own DM. `/usage` in a group only shows that group's agent.
 

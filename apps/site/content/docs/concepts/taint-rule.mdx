@@ -16,7 +16,7 @@ Reading another agent's chats or memory is stricter. Anyone in a group with an a
 
 ## The next turn
 
-A tool result stays in the conversation, and Palui shows it to the model again on the next turns. So a turn whose history holds the result of an untrusted call starts tainted, and one whose history holds another agent's chat or memory starts with the stricter rule. That lasts as long as the result is in the history Palui sends. A past call to a tool the turn no longer has (its connector paused, say) counts as both.
+A tool result stays in the conversation, and Palui shows it to the model again on the next turns. So in a turn whose history holds the result of an untrusted call, writes ask as if the turn were tainted, and in one whose history holds another agent's chat or memory, the stricter rule applies. That lasts as long as the result is in the history Palui sends. It only changes what asks for approval: auto-save still keeps those later turns, and the run is only marked tainted when it reads something untrusted itself. A past call to a tool the turn no longer has (its connector paused, say) counts as both.
 
 A label in the prompt ("the following is untrusted") isn't counted as a control. The runtime enforces the rule, not the model.
 
