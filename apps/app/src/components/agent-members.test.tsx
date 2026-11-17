@@ -101,3 +101,37 @@ test("renders nothing for the default agent", () => {
   expect(container.innerHTML).toBe("")
   expect(api.getAgentMembersFn).not.toHaveBeenCalled()
 })
+
+const onlyHere: Members = {
+  ...filled,
+  members: [{ ...filled.members[0], agents: [{ id: "agt_arisan", slug: "arisan", name: "Arisan" }] }],
+}
+
+test("removing a member who is only in this agent asks first and says they are deleted", async () => {
+  api.getAgentMembersFn.mockResolvedValue(onlyHere)
+  api.setAgentMemberFn.mockResolvedValue(undefined)
+  const user = userEvent.setup()
+  render(<AgentMembers agent={agent} />)
+  await user.click(await screen.findByRole("button", { name: "Remove Bu Sari" }))
+  const dialog = await screen.findByRole("alertdialog")
+  expect(dialog.textContent).toContain("deletes the member and every account they have")
+  expect(api.setAgentMemberFn).not.toHaveBeenCalled()
+
+  await user.click(screen.getByRole("button", { name: "Cancel" }))
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  expect(api.setAgentMemberFn).not.toHaveBeenCalled()
+
+  await user.click(screen.getByRole("button", { name: "Remove Bu Sari" }))
+  await user.click(await screen.findByRole("button", { name: "Remove and delete" }))
+  await waitFor(() => expect(api.setAgentMemberFn).toHaveBeenCalledWith({ data: { agentId: "agt_arisan", memberId: "mem_1", on: false } }))
+})
+
+test("removing a member who is in other agents too needs no confirm", async () => {
+  api.getAgentMembersFn.mockResolvedValue(filled)
+  api.setAgentMemberFn.mockResolvedValue(undefined)
+  const user = userEvent.setup()
+  render(<AgentMembers agent={agent} />)
+  await user.click(await screen.findByRole("button", { name: "Remove Bu Sari" }))
+  await waitFor(() => expect(api.setAgentMemberFn).toHaveBeenCalledTimes(1))
+  expect(screen.queryByRole("alertdialog")).toBeNull()
+})

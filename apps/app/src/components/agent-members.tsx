@@ -7,6 +7,16 @@ import { toast } from "sonner"
 import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
 import { SimpleSelect } from "@/components/simple-select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -39,6 +49,7 @@ export function AgentMembers({ agent }: { agent: AgentRef }) {
   const [state, setState] = React.useState<{ data?: Members; error?: string }>({})
   const [version, setVersion] = React.useState(0)
   const [target, setTarget] = React.useState<Target | null>(null)
+  const [confirm, setConfirm] = React.useState<{ member: MemberView; open: boolean } | null>(null)
   const reload = () => setVersion((v) => v + 1)
 
   React.useEffect(() => {
@@ -55,12 +66,15 @@ export function AgentMembers({ agent }: { agent: AgentRef }) {
 
   if (agent.isDefault) return null
 
+  // Taking a member out of their last agent deletes them and their accounts.
+  const isLast = (m: MemberView) => m.agents.every((a) => a.id === agent.id)
+
   const remove = async (m: MemberView) => {
     const before = state.data
     if (before) setState({ data: { ...before, members: before.members.filter((x) => x.id !== m.id) } })
     try {
       await setAgentMemberFn({ data: { agentId: agent.id, memberId: m.id, on: false } })
-      toast.success(t("agents.members.removed", { name: m.name, agent: agent.name }))
+      toast.success(isLast(m) ? t("agents.members.deleted", { name: m.name }) : t("agents.members.removed", { name: m.name, agent: agent.name }))
       reload()
     } catch (err) {
       setState({ data: before })
@@ -109,7 +123,7 @@ export function AgentMembers({ agent }: { agent: AgentRef }) {
         <>
           <ItemGroup className="gap-3">
             {data.members.map((m) => (
-              <MemberRow key={m.id} member={m} agentId={agent.id} onEdit={() => setTarget({ kind: "edit", member: m })} onRemove={() => void remove(m)} />
+              <MemberRow key={m.id} member={m} agentId={agent.id} onEdit={() => setTarget({ kind: "edit", member: m })} onRemove={() => (isLast(m) ? setConfirm({ member: m, open: true }) : void remove(m))} />
             ))}
           </ItemGroup>
           <Button variant="outline" size="sm" className="self-start" onClick={() => setTarget({ kind: "new" })}>
@@ -119,6 +133,27 @@ export function AgentMembers({ agent }: { agent: AgentRef }) {
         </>
       )}
       <p className="text-caption text-pretty text-muted-foreground">{t("agents.members.telegramGroups")}</p>
+      <AlertDialog open={confirm?.open ?? false} onOpenChange={(o) => !o && setConfirm((c) => c && { ...c, open: false })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="[overflow-wrap:anywhere]">{t("agents.members.deleteTitle", { name: confirm?.member.name ?? "" })}</AlertDialogTitle>
+            <AlertDialogDescription className="[overflow-wrap:anywhere]">
+              {t("agents.members.deleteBody", { name: confirm?.member.name ?? "", agent: agent.name })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="danger"
+              onClick={() => {
+                if (confirm) void remove(confirm.member)
+              }}
+            >
+              {t("agents.members.deleteAction")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {target && (
         <MemberDialog
           key={target.kind === "edit" ? target.member.id : "new"}
