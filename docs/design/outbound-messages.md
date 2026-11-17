@@ -16,7 +16,7 @@ Status: reviewed and built, 2026-11-13. Author: Palui agent session. Reviewer: Z
 - Reminders only go to the chat they were set in. The reminders tools (`apps/server/internal/connectors/reminders`) reject any other chat, and the scheduler sends to `reminders.chat_id`.
 - A flow `message` step has `to` (`apps/server/internal/flows/schema.go`). It must be a literal chat id that already exists and is the owner's or allowed (`validate.go`). A number that never wrote to Palui has no chat row, so it can't be a target. That matches what `search_chats` showed.
 - No model tool sends to another chat. The outbox (`apps/server/internal/outbox`) sends to any chat row it's given and checks nothing about the recipient: no allowlist, no rate limit.
-- Approvals (`apps/server/internal/chat/turn.go`): destructive always asks, write asks when the turn is tainted or "strict" (schedule, reminder, flow, hook, shared chat), otherwise runs. The prompt shows `preview(args, 300)`, so a long text is cut off in the prompt. On approval the SDK runs the stored call, so the args that run are exactly the args the model emitted. Nothing re-generates them.
+- Approvals (`apps/server/internal/chat/turn.go`): destructive always asks, write asks when the turn is tainted or "strict" (schedule, reminder, flow, hook), otherwise runs; a shared chat has no approvals at all. The prompt shows `preview(args, 300)`, so a long text is cut off in the prompt. On approval the SDK runs the stored call, so the args that run are exactly the args the model emitted. Nothing re-generates them.
 - Taint: a turn is tainted by an untrusted tool call or result (web fetch, chat search, calendar, external MCP), by a hook, or by quoting someone else. Auto-recall does not taint, and guest chat text can land in memory.
 
 ### Which number WhatsApp sends from
@@ -141,7 +141,7 @@ To make that possible, `PaluiTool` gets two optional fields, and `TurnInfo` gets
 PaluiTool.needsApproval?: (input: unknown) => boolean   // extra "ask" on top of class rules
 PaluiTool.preview?: (input: unknown) => string          // approval prompt text instead of the JSON cut
 TurnInfo.origin?: "message" | "schedule" | "hook" | "reminder" | "flow"
-TurnInfo.mode?: "owner" | "guest" | "sharedOwner"
+TurnInfo.mode?: "owner" | "members" | "outside"
 TurnInfo.tainted?: () => boolean
 TurnInfo.ownerText?: string                             // the owner's messages in this batch
 ```

@@ -617,7 +617,7 @@ Data scope is `PaluiTool.Data` from the connector contract: `none`, `chat`, `age
 - A tool left out isn't in the turn at all: not in the tool list, not in "Enabled capabilities", not found by `palui__search_tools`, not named anywhere in the prompt. In `members` and `outside` turns the search tool itself takes the shared form: no `for` parameter, nothing about flows or destructive tools in its schema, and a no-match note that doesn't mention the owner. The prompt there doesn't talk about approvals or destructive tools either. The reply to "how much did the owner spend?" is the same whether a finance server exists or not.
 - `members` and `outside` turns have no approvals. A tool in the turn runs right away, with no limit on what it can do inside its scope (a recurring reminder in the group is fine). Destructive tools are never in those turns, and a call whose tool asks for approval on its own (`NeedsApproval`) is refused with a note to the model. Accepted risk: anyone in the chat can make the agent change that chat's data or that agent's data, and nothing past it.
 - `owner` turns keep today's rules: destructive asks, a write after untrusted content asks, `allow`/`ask`/`deny` per tool apply.
-- Approvals only ever happen in the owner's own chats now, so a shared chat never sends a prompt to the owner's DM.
+- Approvals only ever happen in the owner's own chats now, so a shared chat never sends a prompt to the owner's DM. A request that resumes in a chat with no approvals (asked before this rule, or the chat stopped being the owner's) is answered as denied and runs nothing.
 - Attachments in a shared chat leave out the share and unshare tools, the dashboard link and file refs, so public file links are made from the owner's chats only. T3 Code's chat thread list has no scope of its own and follows the connector.
 - A group Palui answers in is a shared chat like any agent's, so the owner's own message there gets the same tools as everyone else's.
 
@@ -658,4 +658,4 @@ Roles beyond owner and member (utusan IAM), sharing one agent's data with anothe
 2. Members: `members`, `member_accounts`, `agent_members`, WhatsApp participant lists, the `members` audience, the agent sheet.
 3. Reading down: Palui's read tools for other agents' chats and memory.
 4. Tools tab: audience labels and the "Holds no private data" switch.
-5. Drop `owner_powers` and the shared-chat approval routing (`pending_approvals.ask_chat_id` stays for old rows until they expire).
+5. `owner_powers` is gone from the API, the MCP tools, the dashboard and the row type, and approval prompts are no longer routed to the owner's DM. The columns `agents.owner_powers` and `pending_approvals.ask_chat_id` stay in the database: nothing writes them, and `ask_chat_id` is only read for requests asked before step 1. A later release drops both with a table rebuild.

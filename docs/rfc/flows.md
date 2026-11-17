@@ -462,7 +462,7 @@ How it works:
 3. Until it's approved, runs of the new version that reach a write step stop with `awaiting_approval` and `skip_reason: not_approved`. Read-only paths of the same version run. Read-only edits (only messages, conditions or read tools changed) don't need a new approval because `write_calls` didn't change.
 4. Per-run approval still happens when: an argument of a write call is tainted at run time; the tool's class changed since approval (an owner override on the Connectors page, or an MCP annotation); or the tool's connector id resolves to a different connector type. The run waits (`wait.kind = "approval"`) and the prompt goes out through the existing `pending_approvals` path, with the same 10-minute expiry. Expiry fails the step and runs `onError`.
 5. Some write tools should ask every time no matter what (posting to someone else's GitHub issue, sending an email). Each tool gets a per-tool setting on the Connectors page next to its class: `flowApproval: "version" | "every_run"`, default `version`. A connector manifest can set the default for its own tools (an email connector would ship `every_run`). An `every_run` tool asks on each run through the same `pending_approvals` path as point 4. The setting is read at run time, so tightening it applies to existing flows at once.
-6. Approval rides on the existing ask-chat rule: prompts go to the owner's DM (PLAN 19.4).
+6. The prompt is asked in the flow's own chat, which is the owner's (PLAN 19.4).
 7. Creating or editing a flow is itself a `write` tool call by the agent. In a tainted turn that call already needs approval, so a web page can't quietly install a flow.
 
 Destructive tools are refused at save, like jobs, and that's permanent, not an MVP cut. A flow runs when nobody is watching, and a 10-minute approval window on a delete that fires at 03:00 is a prompt that gets approved half-asleep or expires. When a flow needs something destroyed, it asks with a `checkin` and the owner does it from chat, where the normal destructive approval applies.
@@ -521,7 +521,7 @@ On failure: retries as in 5.1, then `onError`. A failed run notifies the owner o
 
 A new built-in skill connector `flows` (replacing `routines`). Names are English, a verb plus the product noun, so `create_flow` like `set_reminder`. "Flow" is the one product word everywhere (tools, dashboard, docs, events), and the agent still understands "rutinitas" or "alur" in chat. All tools are scoped to the turn's chat.
 
-The tools are only offered in owner turns that aren't strict: the owner's DMs and the web chat. Guest turns and shared chats never see them, even with `owner_powers: approve` (12.9).
+The tools are only offered in owner turns that aren't strict: the owner's DMs and the web chat. Guest turns and shared chats never see them.
 
 | Tool | Class | Args | What it does |
 |---|---|---|---|
