@@ -17,6 +17,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - An agent's Tools tab now says whose data each tool touches: "Data: per chat", "Data: this agent" or "Data: all agents", next to the tool count. Use it to check what an agent in a friends' group can reach. A server you switch between Only this agent and Global changes its label with it.
 - Agents can search the web. Web fetch gets a `search_web` tool that returns the top results (title, link and snippet) for a query, so an agent finds the right page before reading it instead of guessing URLs. Guests in a group can use it too, like `fetch_page`.
 
+### Changed
+
+- In a group, an agent now reads the whole conversation but still only answers when it's @mentioned or replied to. Before, it only ever saw the messages addressed to it, so "@agent what do you think?" came with no idea what was being discussed. The talk around a mention is kept as context and is never answered on its own. It also tells people plainly what it can read: everyone's text, and photos, files and voice notes only from you.
+
 ### Fixed
 
 - In a group, an agent no longer tells people a tool is "not open right now" and to try again later. It used to list every connector as available even when the group couldn't use them, so it promised things like reminders it had no tool for. Now it only names what that chat can actually use and says plainly when it can't do something there.

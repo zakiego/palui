@@ -1012,6 +1012,20 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			if origin == "message" {
 				dashboard = DashboardPrompt(c.AppURL, agent.Slug)
 			}
+			var inbound *InboundInfo
+			if origin == "message" {
+				inbound = &InboundInfo{}
+				for _, e := range c.Host.Running() {
+					if e.Handle.Transcribe != nil {
+						inbound.Voice = true
+						break
+					}
+				}
+			}
+			replyMode := ""
+			if chat.Kind == "group" {
+				replyMode = chat.ReplyMode
+			}
 			summary := ""
 			if isMessage && session != nil && session.Summary != nil {
 				summary = *session.Summary
@@ -1026,6 +1040,8 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				Trigger:      origin,
 				Shared:       sharedInfo,
 				Dashboard:    dashboard,
+				ReplyMode:    replyMode,
+				Inbound:      inbound,
 			}), summary)
 			checkins := ""
 			// Flow check-ins are the owner's; a shared chat never sees them.

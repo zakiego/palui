@@ -71,6 +71,9 @@ type SenderVerdict struct {
 	FromOwner bool
 	Reason    string
 	Quiet     bool
+	// Context: a group message nobody addressed to the agent, in a chat set
+	// up with one. It's stored as context for later turns and never answered.
+	Context bool
 }
 
 // SenderCheck is senderCheck: checks that need only the inbound message and
@@ -91,9 +94,15 @@ func SenderCheck(q db.Q, msg connectors.InboundMessage, now int64) (SenderVerdic
 	}
 	group := msg.ChatKind == "group"
 	addressed := !group || msg.Addressed || (found && chat.Allowed && chat.ReplyMode == "all")
+	// In a set-up group the agent reads everything and answers only what's
+	// addressed to it, so the rest is kept as context.
+	asContext := found && chat.Allowed && chat.AgentID != nil
 	if isOwner {
 		// Commands and buttons always go through, even before the chat is set up.
 		if !addressed && msg.Callback == nil && !strings.HasPrefix(strx.Trim(msg.Text), "/") {
+			if asContext {
+				return SenderVerdict{OK: true, FromOwner: true, Context: true}, nil
+			}
 			return SenderVerdict{Reason: "Group message not addressed to the agent.", Quiet: true}, nil
 		}
 		return SenderVerdict{OK: true, FromOwner: true}, nil
@@ -109,6 +118,9 @@ func SenderCheck(q db.Q, msg connectors.InboundMessage, now int64) (SenderVerdic
 		}
 	}
 	if !addressed {
+		if asContext {
+			return SenderVerdict{OK: true, Context: true}, nil
+		}
 		return SenderVerdict{Reason: "Group message not addressed to the agent.", Quiet: true}, nil
 	}
 	if !chat.Allowed || chat.AgentID == nil {

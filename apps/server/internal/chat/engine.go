@@ -210,7 +210,8 @@ type InboundResult struct {
 }
 
 // Inbound is inbound: the sender check, the pending row, then routing in
-// arrival order. Nil when the message was dropped.
+// arrival order. Nil when the message was dropped, or kept only as group
+// context (status 'context', never answered).
 func (e *Engine) Inbound(msg connectors.InboundMessage) (*InboundResult, error) {
 	c := e.Ctx
 	now := c.Clock()
@@ -224,8 +225,22 @@ func (e *Engine) Inbound(msg connectors.InboundMessage) (*InboundResult, error) 
 		}
 		return nil, nil
 	}
+	if verdict.Context && len(msg.Media) > 0 {
+		// Group talk is only ever shown as text later ("[gambar dari
+		// sebelumnya]"), so its media bytes aren't worth keeping.
+		media := make([]connectors.InboundMedia, len(msg.Media))
+		for i, m := range msg.Media {
+			m.Data = ""
+			media[i] = m
+		}
+		msg.Media = media
+	}
 	chat, row, err := WriteInbound(c.DB, msg, now, verdict.FromOwner)
 	if err != nil {
+		return nil, err
+	}
+	if verdict.Context {
+		_, err := c.DB.Exec("UPDATE messages SET status = 'context' WHERE id = ?", row.ID)
 		return nil, err
 	}
 	if chat.Channel == "web" {
