@@ -8,7 +8,12 @@
   },
   "agent_members": {
    "columns": ["agent_id","member_id","created_at"],
-   "rows": []
+   "rows": [
+    ["<agt#1>","<mem#1>",1794621600000],
+    ["<agt#2>","<mem#1>",1794621600000],
+    ["<agt#1>","<mem#2>",1794621600000],
+    ["<agt#2>","<mem#3>",1794621600000]
+   ]
   },
   "agents": {
    "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat"],
@@ -358,11 +363,23 @@
   },
   "member_accounts": {
    "columns": ["id","member_id","channel","external_id","alt_id","display_name","created_at"],
-   "rows": []
+   "rows": [
+    ["<mac#1>","<mem#1>","whatsapp","6281200000011@s.whatsapp.net","100000000000011@lid",null,1794621600000],
+    ["<mac#2>","<mem#1>","whatsapp","100000000000012@lid",null,"Nurul 🧕🏽",1794621600000],
+    ["<mac#3>","<mem#1>","telegram","12345678901234567890",null,null,1794621600000],
+    ["<mac#4>","<mem#1>","whatsapp","6281200000013@s.whatsapp.net",null,null,1794621600000],
+    ["<mac#5>","<mem#1>","whatsapp","447700900013@s.whatsapp.net",null,null,1794621600000],
+    ["<mac#6>","<mem#2>","telegram","1000000099",null,null,1794621600000],
+    ["<mac#7>","<mem#3>","whatsapp","6281200000014@s.whatsapp.net",null,null,1794621600000]
+   ]
   },
   "members": {
    "columns": ["id","name","created_at","updated_at"],
-   "rows": []
+   "rows": [
+    ["<mem#1>","Nurul Hidayah binti H. Abdul Gani نور الهداية 🧕🏽 Bendahara",1794621600000,1794621600000],
+    ["<mem#2>","M",1794621600000,1794621600000],
+    ["<mem#3>","Admin Gudang",1794621600000,1794621600000]
+   ]
   },
   "messages": {
    "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],

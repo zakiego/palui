@@ -278,6 +278,34 @@ func (k *Kit) Agent(v Agent) string {
 	return id
 }
 
+// Member is a person the owner shares agents with (PLAN 19.4). Agents are
+// agent ids, linked in order.
+type Member struct {
+	Name     string
+	Accounts []MemberAccount
+	Agents   []string
+}
+
+type MemberAccount struct {
+	Channel, ExternalID string
+	AltID, DisplayName  *string
+}
+
+// Member writes raw rows into members, member_accounts and agent_members, so
+// values can sit at the limits.
+func (k *Kit) Member(v Member) string {
+	id := secret.NewID("mem")
+	k.insert("members", col{"id", id}, col{"name", v.Name}, col{"created_at", k.Now}, col{"updated_at", k.Now})
+	for _, a := range v.Accounts {
+		k.insert("member_accounts", col{"id", secret.NewID("mac")}, col{"member_id", id}, col{"channel", a.Channel}, col{"external_id", a.ExternalID},
+			col{"alt_id", nullable(a.AltID)}, col{"display_name", nullable(a.DisplayName)}, col{"created_at", k.Now})
+	}
+	for _, agentID := range v.Agents {
+		k.insert("agent_members", col{"agent_id", agentID}, col{"member_id", id}, col{"created_at", k.Now})
+	}
+	return id
+}
+
 // OwnConnector: the agent that owns a tool connector (an agent-scoped MCP server).
 func (k *Kit) OwnConnector(id, agentID string) {
 	k.exec("UPDATE connectors SET agent_id = ? WHERE id = ?", agentID, id)
