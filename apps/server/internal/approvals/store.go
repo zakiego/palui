@@ -54,14 +54,13 @@ func DecodeContext(ctx *jsonx.Object) (ResumeContext, error) {
 	return out, err
 }
 
-// askedIn: approvals asked in this chat, its own and those of shared chats asked here.
+// askedIn: approvals asked in this chat. ask_chat_id is only set on rows from
+// before PLAN 19.9 step 5, which were asked in the owner's DM for a shared chat.
 const askedIn = "(ask_chat_id = ? OR (ask_chat_id IS NULL AND chat_id = ?))"
 
 type CreateInput struct {
-	RunID  string
-	ChatID string
-	// Where the prompt goes when that isn't ChatID (a shared chat asks in the owner's DM).
-	AskChatID   *string
+	RunID       string
+	ChatID      string
 	ApprovalID  string
 	ToolCallID  string
 	Tool        string
@@ -93,8 +92,8 @@ func Create(q db.Q, in CreateInput, now int64, ttlMs int64) (db.Approval, error)
 	if len(msgs) == 0 {
 		msgs = db.RawJSON("[]")
 	}
-	return db.ScanApproval(q.WQueryRow("INSERT INTO pending_approvals (id, run_id, chat_id, ask_chat_id, approval_id, tool_call_id, tool, tool_class, args_preview, messages, context, expires_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?) RETURNING "+db.ApprovalCols,
-		secret.NewID("apr"), in.RunID, in.ChatID, in.AskChatID, in.ApprovalID, in.ToolCallID, in.Tool, in.ToolClass, in.ArgsPreview, msgs, ctx, now+ttlMs, now))
+	return db.ScanApproval(q.WQueryRow("INSERT INTO pending_approvals (id, run_id, chat_id, approval_id, tool_call_id, tool, tool_class, args_preview, messages, context, expires_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?) RETURNING "+db.ApprovalCols,
+		secret.NewID("apr"), in.RunID, in.ChatID, in.ApprovalID, in.ToolCallID, in.Tool, in.ToolClass, in.ArgsPreview, msgs, ctx, now+ttlMs, now))
 }
 
 func Get(q db.Q, id string) (db.Approval, bool, error) {

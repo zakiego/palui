@@ -69,9 +69,12 @@ func TestCreateDecideExpireAndResume(t *testing.T) {
 	}
 }
 
-func TestAskedInIncludesSharedChatsAskedHere(t *testing.T) {
+func TestAskedInStillFindsOldRowsAskedHere(t *testing.T) {
 	d, chatID, otherID := testutil.Setup(t)
-	_, err := approvals.Create(d, approvals.CreateInput{RunID: "run_s", ChatID: otherID, AskChatID: &chatID, ApprovalID: "ap", Tool: "x__a", ToolClass: "write", Context: approvals.ResumeContext{System: []byte(`""`)}}, 1, 0)
+	row, err := approvals.Create(d, approvals.CreateInput{RunID: "run_s", ChatID: otherID, ApprovalID: "ap", Tool: "x__a", ToolClass: "write", Context: approvals.ResumeContext{System: []byte(`""`)}}, 1, 0)
+	testutil.Must(t, err)
+	// Only rows from before PLAN 19.9 step 5 have ask_chat_id.
+	_, err = d.Exec("UPDATE pending_approvals SET ask_chat_id = ? WHERE id = ?", chatID, row.ID)
 	testutil.Must(t, err)
 	if p, _ := approvals.PendingForChat(d, chatID); len(p) != 1 {
 		t.Fatal(len(p))

@@ -413,9 +413,9 @@ func sendToOwner(c *EngineCtx, from db.Chat, text string) {
 	}
 }
 
-// SendApprovalPrompt is sendApprovalPrompt. from is the shared chat the
-// request came from, when the prompt is asked elsewhere.
-func SendApprovalPrompt(c *EngineCtx, chat db.Chat, row db.Approval, title string, from *db.Chat) {
+// SendApprovalPrompt is sendApprovalPrompt. The prompt is asked in the chat
+// the request came from, which is always the owner's (PLAN 19.4).
+func SendApprovalPrompt(c *EngineCtx, chat db.Chat, row db.Approval, title string) {
 	name := title
 	if name == "" {
 		name = strings.Replace(row.Tool, "__", " › ", 1)
@@ -424,23 +424,11 @@ func SendApprovalPrompt(c *EngineCtx, chat db.Chat, row db.Approval, title strin
 	if row.ToolClass == "destructive" {
 		kind = "aksi destruktif"
 	}
-	where := ""
-	if from != nil {
-		place := "chat"
-		if from.Kind == "group" {
-			place = "grup"
-		}
-		label := from.ExternalID
-		if t := strx.Trim(from.Title); t != "" {
-			label = "\"" + strx.Slice16(t, 60) + "\""
-		}
-		where = fmt.Sprintf(" di %s %s", place, label)
-	}
 	preview := ""
 	if row.ArgsPreview != nil {
 		preview = *row.ArgsPreview
 	}
-	text := fmt.Sprintf("Boleh aku jalanin %s%s? (%s)\n%s\n\nBalas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.", name, where, kind, preview)
+	text := fmt.Sprintf("Boleh aku jalanin %s? (%s)\n%s\n\nBalas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.", name, kind, preview)
 	c.send(chat, text, "approval:"+row.ID, SendExtra{Actions: []db.OutboxAction{{ID: "approve:" + row.ID, Label: "Ya"}, {ID: "deny:" + row.ID, Label: "Batal"}}})
 	c.Bus.Publish(TurnEvent{Type: "approval", ChatID: chat.ID, RunID: row.RunID, ApprovalID: row.ID, Tool: row.Tool, Class: row.ToolClass, ArgsPreview: preview})
 }
@@ -1305,18 +1293,6 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			if text != "" && deliver && !silent {
 				DeliverReply(c, chat, runID, text)
 			}
-			// A shared chat never sees the prompt: it goes to the owner's DM (PLAN 19.4).
-			// Since 19.9 step 1 a shared chat never asks; step 5 removes this routing.
-			askChat := chat
-			if shared {
-				if dm, ok := ownerChatFor(c, chat.Channel); ok {
-					askChat = dm
-				}
-			}
-			var askChatID *string
-			if askChat.ID != chat.ID {
-				askChatID = &askChat.ID
-			}
 			for _, r := range requests {
 				meta := collected.Meta[r.toolName]
 				supersede(r.toolName, r.inputJSON)
@@ -1328,7 +1304,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					return approvals.Preview(labeled, 300)
 				})
 				row, err := approvals.Create(q, approvals.CreateInput{
-					RunID: runID, ChatID: chat.ID, AskChatID: askChatID, ApprovalID: r.approvalID, ToolCallID: r.toolCallID,
+					RunID: runID, ChatID: chat.ID, ApprovalID: r.approvalID, ToolCallID: r.toolCallID,
 					Tool: r.toolName, ToolClass: classOf(r.toolName), ArgsPreview: preview, Messages: db.RawJSON(stored), ContextJSON: ctxJSON,
 				}, c.Clock(), c.ApprovalTTLMs)
 				if err != nil {
@@ -1338,11 +1314,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				if meta != nil {
 					title = meta.Title
 				}
-				var from *db.Chat
-				if askChat.ID != chat.ID {
-					from = &chat
-				}
-				SendApprovalPrompt(c, askChat, row, title, from)
+				SendApprovalPrompt(c, chat, row, title)
 			}
 			status = "awaiting_approval"
 		case status == "ok":

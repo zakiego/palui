@@ -222,7 +222,7 @@ type Approval struct {
 	ID          string        `json:"id"`
 	RunID       string        `json:"runId"`
 	ChatID      string        `json:"chatId"`
-	AskChatID   *string       `json:"askChatId"`
+	AskChatID   *string       `json:"askChatId"` // old rows only: nothing writes it since PLAN 19.9 step 5
 	ApprovalID  string        `json:"approvalId"`
 	ToolCallID  *string       `json:"toolCallId"`
 	Tool        string        `json:"tool"`

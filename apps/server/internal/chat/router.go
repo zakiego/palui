@@ -202,7 +202,8 @@ func ParseYesNo(text string) (yes bool, ok bool) {
 }
 
 // quotedApproval: the approval whose prompt this message quotes, by the
-// prompt's channel id or through the outbox row that sent it.
+// prompt's channel id or through the outbox row that sent it. ask_chat_id is
+// set on old rows only (asked in the owner's DM before PLAN 19.9 step 5).
 func quotedApproval(q db.Q, chatID, channelMsgID string) (string, error) {
 	var id string
 	err := q.QueryRow("SELECT id FROM pending_approvals WHERE (ask_chat_id = ? OR (ask_chat_id IS NULL AND chat_id = ?)) AND prompt_msg_id = ?", chatID, chatID, channelMsgID).Scan(&id)
