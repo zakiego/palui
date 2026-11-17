@@ -54,7 +54,7 @@ func MCPTools() []MCPTool {
 		{Name: "create_webhook", RPC: "createHookFn", Title: "Create webhook", Description: "Create an inbound webhook that posts into a chat. mode forward sends the text as is; summarize runs a tool-less turn. Returns the URL and signing secret once."},
 
 		// Agents
-		{Name: "list_agents", RPC: "getAgentsPage", Title: "List agents", Description: "Every agent with its id, slug, name, persona summary, powers and the chats it serves."},
+		{Name: "list_agents", RPC: "getAgentsPage", Title: "List agents", Description: "Every agent with its id, slug, name, persona summary, guest tools setting and the chats it serves."},
 		{Name: "get_agent", RPC: "getAgentPage", Title: "Get agent", Description: "One agent in full, by slug (from list_agents): persona, guest tools, token cap, recall settings, chats."},
 		{Name: "get_agent_tools", RPC: "getAgentToolsFn", Title: "Get agent tools", Description: "The tools an agent can call and each one's permission (allow, ask, deny). id is the agent id."},
 		{Name: "get_agent_memory", RPC: "getAgentMemoryFn", Title: "Get agent memory", Description: "What an agent remembers in its recall memory. id is the agent id."},
