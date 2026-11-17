@@ -215,7 +215,6 @@ func worst(k *Kit) {
 		Slug:        within("koordinator-arisan-haul-", L.agentSlug),
 		Name:        within("Koordinator Arisan & Haul Bani Abdurrahm", L.agentName),
 		Persona:     fill("Kamu koordinator arisan keluarga. Catat siapa yang sudah bayar, ingatkan jadwal haul, dan jawab sopan dalam bahasa Banjar kalau ditanya pakai bahasa Banjar. ", L.persona),
-		OwnerPowers: "approve",
 		AvatarIcon:  ptr("chef-hat"),
 		AvatarColor: ptr("violet"),
 		// Allow-all on, one tool of every other kind, so the Tools tab shows each select value and both group counts.

@@ -128,7 +128,7 @@ type TurnInfo struct {
 	FlowID     string
 	// What started the turn, kept across approval resumes.
 	Origin string
-	// owner or outside. sharedOwner only on an approval asked before PLAN 19.9 step 1.
+	// owner, members or outside: who can read the chat (PLAN 19.4).
 	Mode string
 	// Whether untrusted content reached the turn so far; read when the tool runs.
 	Tainted func() bool

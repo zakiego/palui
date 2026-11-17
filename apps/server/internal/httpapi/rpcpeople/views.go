@@ -22,7 +22,6 @@ type agentViewT struct {
 	Name                 string             `json:"name"`
 	Persona              string             `json:"persona"`
 	IsDefault            bool               `json:"isDefault"`
-	OwnerPowers          string             `json:"ownerPowers"`
 	GuestTools           string             `json:"guestTools"`
 	DailyTokenCap        int64              `json:"dailyTokenCap"`
 	ToolPermissions      db.ToolPermissions `json:"toolPermissions"`
@@ -57,7 +56,7 @@ func agentView(q db.Q, a db.Agent, chatCount int, now int64) (agentViewT, error)
 		return agentViewT{}, err
 	}
 	return agentViewT{
-		ID: a.ID, Slug: a.Slug, Name: a.Name, Persona: a.Persona, IsDefault: a.IsDefault, OwnerPowers: a.OwnerPowers, GuestTools: a.GuestTools,
+		ID: a.ID, Slug: a.Slug, Name: a.Name, Persona: a.Persona, IsDefault: a.IsDefault, GuestTools: a.GuestTools,
 		DailyTokenCap: a.DailyTokenCap, ToolPermissions: permissionsOf(a), RecallContainer: a.RecallContainer, RecallReadContainers: agents.ReadContainers(a),
 		RecallPerChat: a.RecallPerChat, Container: agents.Container(a, ""), TelegramConnectorID: a.TelegramConnectorID,
 		AvatarImage: a.AvatarImage, AvatarIcon: a.AvatarIcon, AvatarColor: a.AvatarColor,

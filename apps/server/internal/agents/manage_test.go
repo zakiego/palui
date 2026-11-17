@@ -197,8 +197,8 @@ func TestAvatar(t *testing.T) {
 func TestPaluiHasNoSharedChatRules(t *testing.T) {
 	d := testutil.DB(t)
 	palui := def(t, d)
-	r := update(t, d, palui.ID, agents.Input{OwnerPowers: s("approve"), GuestTools: s("none"), TelegramConnectorID: s("tgbot-x"), Name: s("Palui 2")})
-	if r.OwnerPowers != "off" || r.GuestTools != "safe" || r.TelegramConnectorID != nil || r.Name != "Palui 2" {
+	r := update(t, d, palui.ID, agents.Input{GuestTools: s("none"), TelegramConnectorID: s("tgbot-x"), Name: s("Palui 2")})
+	if r.GuestTools != "safe" || r.TelegramConnectorID != nil || r.Name != "Palui 2" {
 		t.Fatalf("%+v", r)
 	}
 	if _, err := agents.Delete(d, palui.ID, 3); !isAgentErr(err) {

@@ -600,6 +600,7 @@ func (e *Engine) decideApproval(id string, approved bool, by string, chat *db.Ch
 	}
 	if found && chat != nil {
 		asked := row.ChatID
+		// Old rows only: before PLAN 19.9 step 5 a shared chat asked in the owner's DM.
 		if row.AskChatID != nil {
 			asked = *row.AskChatID
 		}
@@ -723,7 +724,8 @@ func (e *Engine) maybeResume(runID string) {
 		return
 	}
 	chatID := rows[0].ChatID
-	// Where the owner was asked: a shared chat's requests are asked in the owner's DM.
+	// Where the owner was asked. ask_chat_id is set on old rows only: before
+	// PLAN 19.9 step 5 a shared chat asked in the owner's DM.
 	askChatID := chatID
 	if rows[0].AskChatID != nil {
 		askChatID = *rows[0].AskChatID

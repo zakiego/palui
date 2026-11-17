@@ -657,6 +657,7 @@ func reportText(c *EngineCtx, chat db.Chat, id, note, skipID string, now int64) 
 		reminders = append(reminders, r)
 	}
 	remRows.Close()
+	// ask_chat_id: old rows only, asked in the owner's DM before PLAN 19.9 step 5.
 	aprows, err := q.Query("SELECT "+db.ApprovalCols+" FROM pending_approvals WHERE status = 'pending' AND (chat_id = ? OR ask_chat_id = ?) ORDER BY created_at ASC", chat.ID, chat.ID)
 	openApprovals, err := db.All(aprows, err, db.ScanApproval)
 	if err != nil {

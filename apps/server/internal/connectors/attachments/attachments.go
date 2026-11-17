@@ -165,10 +165,8 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 	}
 	// A shared chat (PLAN 19.4) gets no dashboard links, no fileRef notes and no
 	// share links: a public link made there would push the chat's file out with
-	// nobody asked. "" is the owner shape (the registry golden and tests). A
-	// sharedOwner approval asked before PLAN 19.9 step 1 resumes with the tools
-	// it was asked with.
-	ownerChat := turn.Mode == "" || turn.Mode == "owner" || turn.Mode == "sharedOwner"
+	// nobody asked. "" is the owner shape (the registry golden and tests).
+	ownerChat := turn.Mode == "" || turn.Mode == "owner"
 	hint := ""
 	if ownerChat {
 		hint = " " + fileRefHint

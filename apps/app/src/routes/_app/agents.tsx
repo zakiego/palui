@@ -138,7 +138,6 @@ function NewAgentSheet({ open, onClose }: { open: boolean; onClose: () => void }
           slug: slug.trim(),
           name: name.trim(),
           persona: persona.trim(),
-          ownerPowers: "off",
           guestTools: "safe",
           dailyTokenCap: 0,
           recallContainer: null,

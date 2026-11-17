@@ -33,6 +33,8 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 - Agents in groups and in other people's DMs now get reminders, saved files, web search and web fetch for everyone in that chat, with no approval prompts. They never get destructive tools or anything that reaches your notes, contacts, memory, jobs, accounts or MCP servers, and can't find out those exist. Your own message in a group gets the same set, Palui's groups included, and a tool you set to "Ask first" or "Off" isn't offered there. The "When you write there" setting on the agent sheet is gone, and the Tools tab marks each tool a shared chat gets. A scheduled job that posts into a group keeps only those tools.
 
+- The agents API and the `get_agent` and `save_agent` MCP tools no longer have `ownerPowers`. It did nothing since groups stopped asking for approval. An AI agent or script that still sends it keeps working, and the value is ignored. The unused `owner_powers` column stays in the database for now; a later release drops it.
+
 ### Fixed
 
 - A flow whose schedule takes its times from a tool (like prayer times from an external MCP server) no longer asks for approval on every write once its version is approved. The tool only hands back times, so the scheduled time, date and item label aren't treated as outside data anymore. A list source that copies labels from the tool still asks.

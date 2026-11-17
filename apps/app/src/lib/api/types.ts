@@ -22,7 +22,6 @@ export type MessageStatus = "pending" | "handled" | "ignored" | "context"
 export type ToolClass = "read" | "write" | "destructive"
 export type ReplyMode = "mention" | "all"
 export type ChatKind = "dm" | "group"
-export type OwnerPowers = "off" | "approve"
 export type GuestTools = "none" | "safe"
 export type ToolPermission = "allow" | "ask" | "deny"
 export type ToolPermissions = { allowAll: boolean; tools: { [tool: string]: ToolPermission } }
@@ -93,7 +92,6 @@ export type AgentView = {
   name: string
   persona: string
   isDefault: boolean
-  ownerPowers: OwnerPowers
   guestTools: GuestTools
   dailyTokenCap: number
   toolPermissions: ToolPermissions

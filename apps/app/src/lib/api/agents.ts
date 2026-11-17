@@ -2,7 +2,7 @@
 // recall container, Telegram bot, tools and memory, and the per-chat switches.
 import { withInput, noInput } from "./client"
 import type { AgentColor, AgentIcon } from "@/shared/constants"
-import type { AgentView, Channel, ChatKind, ConnectorStatus, GuestTools, Instruction, Ok, OwnerPowers, ReplyMode, TelegramBot, ToolClass, ToolPermission, ToolPermissions } from "./types"
+import type { AgentView, Channel, ChatKind, ConnectorStatus, GuestTools, Instruction, Ok, ReplyMode, TelegramBot, ToolClass, ToolPermission, ToolPermissions } from "./types"
 
 export type AgentsPage = { agents: AgentView[]; bots: TelegramBot[] }
 
@@ -63,7 +63,6 @@ export type AgentMemory =
 export type SaveAgentInput = {
   name: string
   persona: string
-  ownerPowers: OwnerPowers
   guestTools: GuestTools
   dailyTokenCap: number
   recallContainer: string | null

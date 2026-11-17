@@ -412,23 +412,23 @@ func agentToolRegistry(ran *executedLog) map[string]*connectors.Runtime {
 
 var webAlphaRows = []chattest.Row{{"web", "tools"}, {"alpha", "tools"}, {"rem", "tools"}}
 
-// legacyApproval is a pending approval asked from the group before PLAN 19.9
+// staleApproval is a pending approval asked from the group before PLAN 19.9
 // step 1: mode sharedOwner, asked in the owner's DM.
-func legacyApproval(t *testing.T, h *agentWorld) db.Approval {
-	return legacyApprovalAs(t, h, "sharedOwner", h.chef.ID, true)
+func staleApproval(t *testing.T, h *agentWorld) db.Approval {
+	return staleApprovalAs(t, h, "sharedOwner", h.chef.ID, true)
 }
 
-// legacyApprovalAs builds that row for a mode and agent; askInDM sends the
+// staleApprovalAs builds that row for a mode and agent; askInDM sends the
 // prompt to the owner's DM (a non-default agent), else to the group (Palui).
-func legacyApprovalAs(t *testing.T, h *agentWorld, mode, agentID string, askInDM bool) db.Approval {
+func staleApprovalAs(t *testing.T, h *agentWorld, mode, agentID string, askInDM bool) db.Approval {
 	t.Helper()
-	return legacyApprovalFor(t, h, mode, agentID, "alpha__note", askInDM)
+	return staleApprovalFor(t, h, mode, agentID, "alpha__note", askInDM)
 }
 
-// legacyApprovalFor is legacyApprovalAs for a given tool.
-func legacyApprovalFor(t *testing.T, h *agentWorld, mode, agentID, tool string, askInDM bool) db.Approval {
+// staleApprovalFor is staleApprovalAs for a given tool.
+func staleApprovalFor(t *testing.T, h *agentWorld, mode, agentID, tool string, askInDM bool) db.Approval {
 	t.Helper()
-	// The owner's DM, where the legacy prompt was asked.
+	// The owner's DM, where the old prompt was asked.
 	h.sendIdle("/help")
 	g := groupChat(t, h.DB)
 	dm := chatWhere(t, h.DB, "external_id = '42'")
@@ -437,15 +437,16 @@ func legacyApprovalFor(t *testing.T, h *agentWorld, mode, agentID, tool string, 
 		models.AssistantParts(models.ToolCallPart("c1", tool, objOf()), models.ToolApprovalRequestPart("aprq_1", "c1")),
 	}))
 	sys := need(models.MarshalMessages([]models.Message{models.System("Kamu Chef, ahli masak.")}))
-	var ask *string
-	if askInDM {
-		ask = &dm.ID
-	}
-	return need(approvals.Create(h.DB, approvals.CreateInput{
-		RunID: "run_legacy", ChatID: g.ID, AskChatID: ask, ApprovalID: "aprq_1", ToolCallID: "c1", Tool: tool, ToolClass: "write", ArgsPreview: "{}",
+	row := need(approvals.Create(h.DB, approvals.CreateInput{
+		RunID: "run_stale", ChatID: g.ID, ApprovalID: "aprq_1", ToolCallID: "c1", Tool: tool, ToolClass: "write", ArgsPreview: "{}",
 		Messages: msgs,
 		Context:  approvals.ResumeContext{Trigger: "message", OriginTrigger: "message", ModelRole: "default", Deliver: true, AgentID: agentID, Mode: mode, System: sys},
 	}, h.Clock.Now(), 0))
+	if askInDM {
+		need(h.DB.Exec("UPDATE pending_approvals SET ask_chat_id = ? WHERE id = ?", dm.ID, row.ID))
+		row.AskChatID = &dm.ID
+	}
+	return row
 }
 
 func TestAgentsToolsAndApprovals(t *testing.T) {
@@ -475,10 +476,9 @@ func TestAgentsToolsAndApprovals(t *testing.T) {
 		eq(t, len(ran.get()), 0)
 	})
 
-	t.Run("owner powers is ignored: the owner's write in the group isn't offered or asked", func(t *testing.T) {
+	t.Run("the owner's write in the group isn't offered or asked", func(t *testing.T) {
 		ran := &executedLog{}
 		h := agentsWorld(t, []models.Step{models.CallTool("alpha__note", objOf(), "c1"), models.Say("dicatat")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
-		need(agents.Update(h.DB, h.chef.ID, agents.Input{OwnerPowers: sp("approve")}, 1))
 		h.owner("/agent chef")
 		h.Engine.Idle()
 		h.owner("@bot catat ini", addressed)
@@ -629,57 +629,58 @@ func TestAgentsToolsAndApprovals(t *testing.T) {
 		notContains(t, p, "alpha")
 	})
 
-	t.Run("Palui's owner approval asked in a group before the change resumes with its tool", func(t *testing.T) {
-		ran := &executedLog{}
-		h := agentsWorld(t, []models.Step{models.Say("dicatat")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
-		h.owner("/agent palui")
-		h.Engine.Idle()
-		palui := need(agents.GetDefault(h.DB, 1))
-		legacyApprovalAs(t, h, "owner", palui.ID, false)
-		h.owner("ya", addressed)
-		h.Engine.Idle()
-		jsonEq(t, ran.get(), `["note"]`)
-		reply := lastRow(t, h.DB)
-		eq(t, reply.ChatID, groupChat(t, h.DB).ID)
-		eq(t, reply.Payload.Text, "dicatat")
+	t.Run("an approval answered in a chat with no approvals runs nothing", func(t *testing.T) {
+		for _, tc := range []struct {
+			name, mode, tool string
+			palui, askInDM   bool
+		}{
+			{name: "Palui's owner approval asked in the group", mode: "owner", tool: "alpha__note", palui: true},
+			{name: "a sharedOwner approval asked in the DM", mode: "sharedOwner", tool: "alpha__note", askInDM: true},
+			// The outside audience has rem__set, and it still must not run.
+			{name: "a guest approval asked in the DM", mode: "guest", tool: "rem__set", askInDM: true},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				ran := &executedLog{}
+				h := agentsWorld(t, []models.Step{models.Say("gak bisa di sini")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
+				agentID := h.chef.ID
+				if tc.palui {
+					h.owner("/agent palui")
+					agentID = need(agents.GetDefault(h.DB, 1)).ID
+				} else {
+					h.owner("/agent chef")
+				}
+				h.Engine.Idle()
+				row := staleApprovalFor(t, h, tc.mode, agentID, tc.tool, tc.askInDM)
+				if tc.askInDM {
+					h.sendIdle("ya")
+				} else {
+					h.owner("ya", addressed)
+					h.Engine.Idle()
+				}
+				eq(t, len(ran.get()), 0)
+				reply := lastRow(t, h.DB)
+				eq(t, reply.ChatID, groupChat(t, h.DB).ID)
+				eq(t, reply.Payload.Text, "gak bisa di sini")
+				runs := allRuns(t, h.DB)
+				eq(t, runs[len(runs)-1].Status, "ok")
+				for _, e := range listEvents(t, h.DB) {
+					if e.Level == "error" {
+						t.Fatal(e.Kind, e.Message)
+					}
+				}
+				status := ""
+				need(0, h.DB.QueryRow("SELECT status FROM pending_approvals WHERE id = ?", row.ID).Scan(&status))
+				eq(t, status, "approved")
+			})
+		}
 	})
 
-	t.Run("a legacy sharedOwner approval resumes with its tool when the owner says ya in the DM", func(t *testing.T) {
-		ran := &executedLog{}
-		h := agentsWorld(t, []models.Step{models.Say("dicatat")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
-		h.owner("/agent chef")
-		h.Engine.Idle()
-		legacyApproval(t, h)
-		h.sendIdle("ya")
-		jsonEq(t, ran.get(), `["note"]`)
-		reply := lastRow(t, h.DB)
-		eq(t, reply.ChatID, groupChat(t, h.DB).ID)
-		eq(t, reply.Payload.Text, "dicatat")
-	})
-
-	t.Run("a guest approval on a tool set to ask resumes with its tool", func(t *testing.T) {
-		ran := &executedLog{}
-		h := agentsWorld(t, []models.Step{models.Say("udah diingetin")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
-		ask := "ask"
-		perms := jsonx.NewMap[*string]()
-		perms.Set("rem__set", &ask)
-		need(agents.SetToolPermissions(h.DB, h.chef.ID, agents.PermissionsPatch{Tools: perms}, 1))
-		h.owner("/agent chef")
-		h.Engine.Idle()
-		legacyApprovalFor(t, h, "guest", h.chef.ID, "rem__set", true)
-		h.sendIdle("ya")
-		jsonEq(t, ran.get(), `["set"]`)
-		reply := lastRow(t, h.DB)
-		eq(t, reply.ChatID, groupChat(t, h.DB).ID)
-		eq(t, reply.Payload.Text, "udah diingetin")
-	})
-
-	t.Run("a legacy sharedOwner approval that expires ends ok in the group", func(t *testing.T) {
+	t.Run("a stale sharedOwner approval that expires ends ok in the group", func(t *testing.T) {
 		ran := &executedLog{}
 		h := agentsWorld(t, []models.Step{models.Say("oke, gak jadi")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
 		h.owner("/agent chef")
 		h.Engine.Idle()
-		legacyApproval(t, h)
+		staleApproval(t, h)
 		h.Engine.ExpireApprovals(h.Clock.Now() + 10*60_000)
 		h.Engine.Idle()
 		eq(t, len(ran.get()), 0)
