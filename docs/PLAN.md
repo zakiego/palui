@@ -658,4 +658,4 @@ Roles beyond owner and member (utusan IAM), sharing one agent's data with anothe
 2. Members: `members`, `member_accounts`, `agent_members`, WhatsApp participant lists, the `members` audience, the agent sheet.
 3. Reading down: Palui's read tools for other agents' chats and memory.
 4. Tools tab: audience labels and the "Holds no private data" switch.
-5. `owner_powers` is gone from the API, the MCP tools, the dashboard and the row type, and approval prompts are no longer routed to the owner's DM. The columns `agents.owner_powers` and `pending_approvals.ask_chat_id` stay in the database: nothing writes them, and `ask_chat_id` is only read for requests asked before step 1. A later release drops both with a table rebuild.
+5. `owner_powers` is gone from the API, the MCP tools, the dashboard and the row type, and approval prompts are no longer routed to the owner's DM. The columns `agents.owner_powers` and `pending_approvals.ask_chat_id` stay in the database: nothing writes them, and `ask_chat_id` is only read for requests asked before step 5. A later release drops both with a table rebuild.
