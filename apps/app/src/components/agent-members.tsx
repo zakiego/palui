@@ -211,6 +211,8 @@ function MemberRow({ member, agentId, onEdit, onRemove }: { member: MemberView; 
   )
 }
 
+const isNameRefusal = (message: string) => message === "Give the member a name." || message.startsWith("A member's name is at most")
+
 let nextKey = 0
 const row = (channel: MemberChannel = "whatsapp", address = ""): AccountRow => ({ key: ++nextKey, channel, address })
 
@@ -266,9 +268,10 @@ function MemberDialog({
       toast.success(t("agents.members.saved", { name: name.trim() }))
       onSaved()
     } catch (err) {
-      // A refusal ("That account already belongs to ...") belongs to the field.
+      // Match only the server's two name refusals: other refusals can quote a
+      // member's name, which may contain the word "name".
       if (err instanceof RpcError && err.code === "BAD_REQUEST") {
-        setErrors(/name/i.test(err.message) ? { name: err.message } : { accounts: err.message })
+        setErrors(isNameRefusal(err.message) ? { name: err.message } : { accounts: err.message })
       } else {
         toast.error(errorMessage(err))
       }
