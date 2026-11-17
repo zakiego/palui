@@ -233,3 +233,28 @@ func TestLocalTimeHelpers(t *testing.T) {
 	eq(t, local(flows.NextLocalTime("10:30", WITA, NOW)), "2026-11-10T10:30", "today")
 	eq(t, flows.LocalDate(NOW, WITA), "2026-11-10", "date")
 }
+
+func TestScheduleSourceTaint(t *testing.T) {
+	label := "title"
+	items := flows.Source{Kind: "tool", ConnectorID: "c", Items: []flows.SourceItem{{Field: "times.fajr"}}}
+	listNoLabel := flows.Source{Kind: "tool", ConnectorID: "c", List: &flows.SourceList{Path: "events", At: "start"}}
+	listLabel := flows.Source{Kind: "tool", ConnectorID: "c", List: &flows.SourceList{Path: "events", At: "start", Label: &label}}
+	cases := []struct {
+		name      string
+		src       flows.Source
+		untrusted bool
+		want      []string
+	}{
+		{"items from an external connector", items, true, []string{}},
+		{"list without a label path", listNoLabel, true, []string{}},
+		{"list that copies a label from the tool", listLabel, true, []string{"trigger"}},
+		{"list from a trusted connector", listLabel, false, []string{}},
+		{"times source", flows.Source{Kind: "times"}, true, []string{}},
+	}
+	for _, c := range cases {
+		got := flows.ScheduleSourceTaint(c.src, c.untrusted)
+		if strings.Join(got, ",") != strings.Join(c.want, ",") || got == nil {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}

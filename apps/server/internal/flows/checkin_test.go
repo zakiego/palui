@@ -165,6 +165,16 @@ func TestCheckinSteps(t *testing.T) {
 		eq(t, texts(t, h.db)[0], "Udah sholat Zuhur (12.00)?", "ask")
 		eq(t, waitDeadline(run), at("2026-11-10T15:25"), "deadline")
 	})
+	t.Run("an untrusted tool source in items mode leaves the trigger clean", func(t *testing.T) {
+		fp := &fakePrayer{}
+		h := newHarness(t, harnessOptions{readSource: fp.caller(), sourceUntrusted: func(string) bool { return true }})
+		flow := h.create(SHOLAT).Flow
+		h.run(at("2026-11-10T10:00"))
+		h.run(at("2026-11-10T12:00"))
+		run := runsOf(t, h.db, flow.ID)[0]
+		eq(t, run.RunKey, "2026-11-10:times.dhuhr", "run key")
+		eq(t, run.Taint, []string{}, "taint")
+	})
 	t.Run("a tool source is called with the flow agent's locked recall scope", func(t *testing.T) {
 		fp := &fakePrayer{}
 		var scopes []*tools.CallScope

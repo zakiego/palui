@@ -436,6 +436,22 @@ func (e *Engine) refreshes(now int64) (int, error) {
 
 // --- fire (schedule triggers) --------------------------------------------------------------
 
+// ScheduleSourceTaint is the taint a schedule run starts with. A tool source
+// in items mode only hands back timestamps: the label and key come from the
+// definition, and at, time, date and nextAt are formatted by Palui from a
+// parsed time, so no text from the tool reaches the payload. A list source
+// can copy a label (and so the key) out of the tool's data, which keeps the
+// whole trigger tainted when the connector is untrusted.
+func ScheduleSourceTaint(src Source, untrusted bool) Taint {
+	if src.Kind != "tool" || !untrusted {
+		return []string{}
+	}
+	if src.List == nil || src.List.Label == nil {
+		return []string{}
+	}
+	return []string{"trigger"}
+}
+
 func (e *Engine) schedulePayload(flow *db.Flow, t *Trigger, occ Occurrence, following *Occurrence, now int64) *jsonx.Object {
 	var nextAt any
 	if following != nil {
@@ -510,10 +526,8 @@ func (e *Engine) fireOne(row db.FlowTrigger, now int64) error {
 		late = now-occ.At > int64(deref(spec.LateGraceMin, 60))*60_000
 	}
 	payload := e.schedulePayload(flow, spec, *occ, following, now)
-	sourceTaint := []string{}
-	if spec.Source.Kind == "tool" && e.o.SourceUntrusted != nil && e.o.SourceUntrusted(spec.Source.ConnectorID) {
-		sourceTaint = []string{"trigger"}
-	}
+	untrusted := e.o.SourceUntrusted != nil && e.o.SourceUntrusted(spec.Source.ConnectorID)
+	sourceTaint := ScheduleSourceTaint(spec.Source, untrusted)
 	return q.Tx(func(tx db.Q) error {
 		reason := ""
 		if late {

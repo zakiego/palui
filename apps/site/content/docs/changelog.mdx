@@ -25,6 +25,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Fixed
 
+- A flow whose schedule takes its times from a tool (like prayer times from an external MCP server) no longer asks for approval on every write once its version is approved. The tool only hands back times, so the scheduled time, date and item label aren't treated as outside data anymore. A list source that copies labels from the tool still asks.
 - In a group, an agent no longer tells people a tool is "not open right now" and to try again later. It used to list every connector as available even when the group couldn't use them, so it promised things like reminders it had no tool for. Now it only names what that chat can actually use and says plainly when it can't do something there.
 - Agents keep to their own jobs, MCP servers and connectors. `list_jobs` now lists only the jobs that post into the asking agent's chats, so an agent in a friends' group can't read your briefings. An MCP server added from a chat with any agent but the default belongs to that agent, and that agent can't remove a server every agent uses. `get_settings` lists only the connectors the agent can call.
 

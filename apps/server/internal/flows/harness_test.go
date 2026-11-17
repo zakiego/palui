@@ -400,8 +400,10 @@ func fails(msg string) runFn {
 type harnessOptions struct {
 	connectors []*fakeConnector
 	readSource flows.ToolCaller
-	prompt     func(h *harness, r flows.PromptRequest) (flows.PromptResponse, error)
-	concurrent bool
+	// sourceUntrusted marks a tool source's connector as external.
+	sourceUntrusted func(connectorID string) bool
+	prompt          func(h *harness, r flows.PromptRequest) (flows.PromptResponse, error)
+	concurrent      bool
 }
 
 type harness struct {
@@ -429,11 +431,12 @@ func newHarness(t *testing.T, o harnessOptions) *harness {
 	entries := fakeEntries(conns, h.calls)
 	h.tools = flows.NewConnectorFlowCaller(func() []connectors.RunningEntry { return entries })
 	h.engine = flows.NewEngine(flows.EngineOptions{
-		DB:         d,
-		Clock:      h.now,
-		Tools:      h.tools,
-		ReadSource: o.readSource,
-		Serial:     !o.concurrent,
+		DB:              d,
+		Clock:           h.now,
+		Tools:           h.tools,
+		ReadSource:      o.readSource,
+		SourceUntrusted: o.sourceUntrusted,
+		Serial:          !o.concurrent,
 		RunPrompt: func(_ context.Context, r flows.PromptRequest) (flows.PromptResponse, error) {
 			h.promptsMu.Lock()
 			h.prompts = append(h.prompts, r)
