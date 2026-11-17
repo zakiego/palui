@@ -357,6 +357,34 @@ func TestCollectResolvesDataScope(t *testing.T) {
 	}
 }
 
+// An MCP server the owner marked as holding no private data reaches outside and
+// members turns with its non-destructive tools; its destructive ones never do.
+func TestCollectMarkedMCPReachesSharedTurns(t *testing.T) {
+	ctx := context.Background()
+	e := entry("mcp-prayer", "tools", "Prayer times", "external", []def{{name: "times", class: "read"}, {name: "wipe", class: "destructive"}})
+	e.Row.Type = "mcp"
+	e.Row.Config = jsonx.NewMap[any]()
+	e.Row.Config.Set(connectors.NoPrivateDataKey, true)
+	for _, aud := range []string{tools.AudienceOutside, tools.AudienceMembers} {
+		o := opts(64, nil)
+		o.Audience = aud
+		c := tools.Collect(ctx, []connectors.RunningEntry{e}, o)
+		if m := c.Meta["mcp-prayer__times"]; m == nil || m.Scope != connectors.DataNone {
+			t.Fatal(aud, m)
+		}
+		if c.Meta["mcp-prayer__wipe"] != nil {
+			t.Fatal(aud, "destructive tool offered")
+		}
+	}
+	// Unmarked, the same global server stays with the owner.
+	e.Row.Config = jsonx.NewMap[any]()
+	o := opts(64, nil)
+	o.Audience = tools.AudienceOutside
+	if c := tools.Collect(ctx, []connectors.RunningEntry{e}, o); c.Meta["mcp-prayer__times"] != nil {
+		t.Fatal("unmarked server reached an outside turn")
+	}
+}
+
 func TestCollectWrapsUntrustedAndTimes(t *testing.T) {
 	ctx := context.Background()
 	var tainted, started []string

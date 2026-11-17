@@ -199,19 +199,58 @@ func ServesAgent(row db.Connector, agentID string) bool {
 	return row.AgentID == nil || *row.AgentID == "" || *row.AgentID == agentID
 }
 
+// NoPrivateDataKey is the MCP config key the owner sets on the agent's Tools
+// tab to say a server keeps nothing about anyone (PLAN 19.4).
+const NoPrivateDataKey = "noPrivateData"
+
+// NoPrivateData: the owner marked this MCP server as holding no private data.
+// Only the boolean true on an mcp row counts. A string, a number, false, a
+// missing key or any other connector type is unmarked (fail closed).
+func NoPrivateData(row db.Connector) bool {
+	if row.Type != "mcp" || row.Config == nil {
+		return false
+	}
+	v, _ := row.Config.Get(NoPrivateDataKey)
+	return v == true
+}
+
 // ResolveData is a tool's data scope on the server. A declared chat, agent,
 // shared or none stands as is. Anything else (no scope, or an unknown string)
-// follows the connector: DataAgent when one agent owns it, DataShared when it's
-// global. Unknown never becomes chat or none (fail closed).
+// is DataNone on an MCP server the owner marked as holding no private data
+// (NoPrivateData), and otherwise follows the connector: DataAgent when one
+// agent owns it, DataShared when it's global. Unknown never becomes chat, and
+// becomes none only through the owner's mark (fail closed).
 func ResolveData(declared string, row db.Connector) string {
 	switch declared {
 	case DataChat, DataAgent, DataShared, DataNone:
 		return declared
 	}
+	if NoPrivateData(row) {
+		return DataNone
+	}
 	if row.AgentID != nil && *row.AgentID != "" {
 		return DataAgent
 	}
 	return DataShared
+}
+
+// SetNoPrivateData sets (on) or removes (off) the owner's no-private-data mark.
+// Like PatchConfig it leaves config_hash alone: the MCP runtime never reads
+// the key, so the server isn't restarted, and ResolveData reads the fresh row
+// on the next turn. It doesn't check the type; NoPrivateData and the RPC do.
+func SetNoPrivateData(q db.Q, id string, on bool, now int64) (db.Connector, bool, error) {
+	row, ok, err := Get(q, id)
+	if err != nil || !ok {
+		return db.Connector{}, ok, err
+	}
+	config := row.Config.Clone()
+	if on {
+		config.Set(NoPrivateDataKey, true)
+	} else {
+		config.Delete(NoPrivateDataKey)
+	}
+	return db.One(q.WQueryRow("UPDATE connectors SET config = ?, updated_at = ? WHERE id = ? RETURNING "+db.ConnectorCols,
+		db.JSON[*jsonx.Object]{V: config}, now, id), db.ScanConnector)
 }
 
 func ptr(s string) *string { return &s }
