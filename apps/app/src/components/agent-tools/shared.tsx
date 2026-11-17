@@ -9,7 +9,9 @@ import { IconTile } from "@/components/icon-tile"
 import { SimpleSelect } from "@/components/simple-select"
 import { CLASS_TONE } from "@/components/tool-trace"
 import { Button } from "@/components/ui/button"
+import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { StatusText } from "@/components/ui/status-text"
+import { Switch } from "@/components/ui/switch"
 import type { DataScope, getAgentToolsFn } from "@/lib/api/agents"
 import { useCount, useLabel, useT } from "@/lib/i18n"
 import { manifestFor } from "@/lib/manifests"
@@ -27,6 +29,9 @@ export type ToolsViewProps = {
   query: string
   ownerOf: (connectorId: string) => string | null
   setScope: (connectorId: string, scope: string) => void
+  // Whether the owner marked an MCP server as holding no private data.
+  noPrivate: (connectorId: string) => boolean
+  setNoPrivate: (connectorId: string, on: boolean) => void
   // The agent's tool permissions, as changed on this tab. null: the default.
   permissions: { allowAll: boolean; tools: Record<string, Permission> }
   setPermission: (name: string, p: Permission | null) => void
@@ -43,16 +48,17 @@ export function groupTools(tools: ToolItem[], query: string) {
   return [...by.values()]
 }
 
-// Whose data a tool touches. A tool that doesn't say follows its server: the
-// agent's when this agent owns the server, every agent's when it's global.
-export function dataOf(x: ToolItem, owned: boolean): DataScope {
-  return x.data ?? (owned ? "agent" : "shared")
+// Whose data a tool touches. A tool that doesn't say follows its server: none
+// when the owner marked it as holding no private data, else the agent's when
+// this agent owns the server, every agent's when it's global.
+export function dataOf(x: ToolItem, owned: boolean, noPrivate = false): DataScope {
+  return x.data ?? (noPrivate ? "none" : owned ? "agent" : "shared")
 }
 
 // The widest scope in a server: one shared tool makes the whole server shared.
 const DATA_RANK: Record<DataScope, number> = { none: 0, chat: 1, agent: 2, shared: 3 }
-export function groupData(list: ToolItem[], owned: boolean): DataScope {
-  return list.map((x) => dataOf(x, owned)).reduce((a, b) => (DATA_RANK[b] > DATA_RANK[a] ? b : a), "none")
+export function groupData(list: ToolItem[], owned: boolean, noPrivate = false): DataScope {
+  return list.map((x) => dataOf(x, owned, noPrivate)).reduce((a, b) => (DATA_RANK[b] > DATA_RANK[a] ? b : a), "none")
 }
 
 // Whose data, in the words of the two cards above.
@@ -173,24 +179,40 @@ export function ScopeSelect({ connectorLabel, scope, onChange }: { connectorLabe
   return <SimpleSelect size="sm" className="w-fit max-w-full min-w-0" aria-label={t("agents.tools.scopeFor", { name: connectorLabel })} value={value} options={options} onChange={onChange} />
 }
 
-// The global-or-own select (when the connector has one) and a way to its page.
+// The global-or-own select (when the connector has one), a way to its page,
+// and for an MCP server the owner's "holds no private data" switch.
 export function GroupActions({ head, props }: { head: ToolItem; props: ToolsViewProps }) {
   const t = useT()
+  const id = `no-private-${head.connectorId}`
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {head.connectorId in props.data.scopes && (
-        <ScopeSelect connectorLabel={head.connectorLabel} scope={props.ownerOf(head.connectorId)} onChange={(v) => props.setScope(head.connectorId, v)} />
+    <div className="flex flex-col gap-4 pb-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {head.connectorId in props.data.scopes && (
+          <ScopeSelect connectorLabel={head.connectorLabel} scope={props.ownerOf(head.connectorId)} onChange={(v) => props.setScope(head.connectorId, v)} />
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-me-2.5 ms-auto"
+          render={<Link to="/connectors/$id" params={{ id: head.connectorId }} />}
+          aria-label={t("agents.tools.openFor", { name: head.connectorLabel })}
+        >
+          {t("common.open")}
+          <ArrowUpRightIcon data-icon="inline-end" />
+        </Button>
+      </div>
+      {head.connectorType === "mcp" && (
+        <Field orientation="horizontal" className="max-w-2xl">
+          <FieldContent>
+            <FieldLabel htmlFor={id}>{t("agents.tools.noPrivate")}</FieldLabel>
+            <FieldDescription>
+              {t("agents.tools.noPrivateHint")}
+              {props.ownerOf(head.connectorId) === null && ` ${t("agents.tools.noPrivateGlobal")}`}
+            </FieldDescription>
+          </FieldContent>
+          <Switch id={id} checked={props.noPrivate(head.connectorId)} onCheckedChange={(v) => props.setNoPrivate(head.connectorId, v)} />
+        </Field>
       )}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="-me-2.5 ms-auto"
-        render={<Link to="/connectors/$id" params={{ id: head.connectorId }} />}
-        aria-label={t("agents.tools.openFor", { name: head.connectorLabel })}
-      >
-        {t("common.open")}
-        <ArrowUpRightIcon data-icon="inline-end" />
-      </Button>
     </div>
   )
 }

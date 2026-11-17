@@ -21,6 +21,16 @@ describe("data scope", () => {
     expect(dataOf(tool("x"), false)).toBe("shared")
   })
 
+  it("touches no data on a server marked as holding no private data", () => {
+    expect(dataOf(tool("x"), true, true)).toBe("none")
+    expect(dataOf(tool("x"), false, true)).toBe("none")
+    expect(groupData([tool("a"), tool("b")], false, true)).toBe("none")
+  })
+
+  it("keeps a declared scope on a marked server", () => {
+    expect(dataOf(tool("x", "shared"), true, true)).toBe("shared")
+  })
+
   it("keeps a declared scope whoever owns the server", () => {
     expect(dataOf(tool("x", "chat"), false)).toBe("chat")
     expect(dataOf(tool("x", "shared"), true)).toBe("shared")
