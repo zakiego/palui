@@ -765,7 +765,11 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		return TurnResult{}, err
 	}
 	if audience == tools.AudienceMembers {
-		outsider, err := HistoryHasOutsider(q, chat, agent.ID, history)
+		sessionID := ""
+		if session != nil {
+			sessionID = session.ID
+		}
+		outsider, err := HistoryHasOutsider(q, chat, agent.ID, sessionID, history)
 		if err != nil {
 			return TurnResult{}, err
 		}

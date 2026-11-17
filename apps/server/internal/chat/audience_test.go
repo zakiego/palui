@@ -270,3 +270,28 @@ func TestMembersGroupWithAnOutsiderInHistory(t *testing.T) {
 	notContains(t, text, "crm")
 	contains(t, text, "rem (")
 }
+
+// The check reads every sender of the session, so an outsider's line that has
+// left the history window still counts.
+func TestHistoryHasOutsiderReadsTheWholeSession(t *testing.T) {
+	w := audienceSetup(t, true)
+	g := w.chat(t, "whatsapp", waGroup, "group")
+	if g.SessionID == nil {
+		t.Fatal("chat has no session")
+	}
+	add := func(id, sender string) {
+		t.Helper()
+		_, err := w.h.DB.Exec("INSERT INTO messages (id, chat_id, session_id, role, content, text, sender_id, from_owner, created_at) VALUES (?, ?, ?, 'user', '{}', 'x', ?, 0, 1)", id, g.ID, *g.SessionID, sender)
+		testutil.Must(t, err)
+	}
+	add("m1", waAni)
+	add("m2", "hook:abc")
+	got, err := chat.HistoryHasOutsider(w.h.DB, g, w.chef.ID, *g.SessionID, nil)
+	testutil.Must(t, err)
+	eq(t, got, false)
+	// Not in the loaded history (nil here), only in the session.
+	add("m3", waStranger)
+	got, err = chat.HistoryHasOutsider(w.h.DB, g, w.chef.ID, *g.SessionID, nil)
+	testutil.Must(t, err)
+	eq(t, got, true)
+}

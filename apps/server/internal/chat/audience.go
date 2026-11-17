@@ -118,18 +118,43 @@ func Audience(c *EngineCtx, chat db.Chat, agent db.Agent) (string, error) {
 	return tools.AudienceMembers, nil
 }
 
-// HistoryHasOutsider reports whether the loaded history holds a message from
+// HistoryHasOutsider reports whether the session holds a message from
 // someone who is neither the owner nor a member of this agent, such as a
 // stranger who has since left the group. Their text would reach a members
-// turn as if a member wrote it, so the turn runs as outside until the session
-// rolls over. Hook messages are left to the taint of their own turn.
-func HistoryHasOutsider(q db.Q, chat db.Chat, agentID string, history []db.Message) (bool, error) {
-	seen := map[string]bool{}
-	for _, m := range history {
-		if m.Role != "user" || m.FromOwner || m.SenderID == nil || *m.SenderID == "" {
-			continue
+// turn as if a member wrote it (in the history window or folded into the
+// summary), so the turn runs as outside until the session starts over. It
+// reads every sender of the session, not only the loaded window, plus the
+// loaded history for messages of this batch. Hook messages are left to the
+// taint of their own turn.
+func HistoryHasOutsider(q db.Q, chat db.Chat, agentID, sessionID string, history []db.Message) (bool, error) {
+	var ids []string
+	if sessionID != "" {
+		rows, err := q.Query("SELECT DISTINCT sender_id FROM messages WHERE session_id = ? AND role = 'user' AND from_owner = 0 AND sender_id IS NOT NULL AND sender_id != ''", sessionID)
+		if err != nil {
+			return true, err
 		}
-		id := *m.SenderID
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return true, err
+			}
+			ids = append(ids, id)
+		}
+		if err := rows.Close(); err != nil {
+			return true, err
+		}
+		if err := rows.Err(); err != nil {
+			return true, err
+		}
+	}
+	for _, m := range history {
+		if m.Role == "user" && !m.FromOwner && m.SenderID != nil && *m.SenderID != "" {
+			ids = append(ids, *m.SenderID)
+		}
+	}
+	seen := map[string]bool{}
+	for _, id := range ids {
 		if seen[id] || strings.HasPrefix(id, "hook:") {
 			continue
 		}

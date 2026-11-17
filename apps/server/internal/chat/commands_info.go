@@ -284,7 +284,7 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		outsider, err := HistoryHasOutsider(q, chat, agent.ID, history)
+		outsider, err := HistoryHasOutsider(q, chat, agent.ID, session.ID, history)
 		if err != nil {
 			return "", err
 		}
