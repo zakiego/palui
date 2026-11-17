@@ -521,8 +521,9 @@ func FinishResumedRun(q db.Q, runID string) error {
 // model again, so approvals treat the turn as tainted. It doesn't touch the
 // run's own taint (runs.tainted, TurnResult.Tainted, the auto-save skip),
 // which keeps meaning "this run read something untrusted". A call to a tool
-// this turn doesn't have counts as untrusted (fail closed). Calls that never
-// ran carry nothing.
+// this turn doesn't have counts as untrusted (fail closed), and as other
+// people's words only when its name is a read-down tool. Calls that never ran
+// carry nothing.
 func taintFromReplay(calls []ToolCallRow, meta map[string]*tools.ToolMeta, tainted, othersWrote *atomic.Bool, log *logx.Logger) {
 	for _, pc := range calls {
 		if pc.Status != "ok" && pc.Status != "error" {
@@ -536,7 +537,7 @@ func taintFromReplay(calls []ToolCallRow, meta map[string]*tools.ToolMeta, taint
 			log.Info("turn replay-tainted by an untrusted call in its history", logx.Fields{"tool": pc.Tool})
 		}
 		tainted.Store(true)
-		if m == nil || m.OthersWrote {
+		if (m == nil && agents.IsReadDownTool(pc.Tool)) || (m != nil && m.OthersWrote) {
 			othersWrote.Store(true)
 		}
 	}

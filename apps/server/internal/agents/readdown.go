@@ -6,11 +6,36 @@ package agents
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/zakiego/palui/apps/server/internal/chats"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/db"
 )
+
+// The four read-down tools, by their bare name.
+const (
+	ToolListAgentChats    = "list_agent_chats"
+	ToolReadAgentChat     = "read_agent_chat"
+	ToolSearchAgentMemory = "search_agent_memory"
+	ToolListAgentMemory   = "list_agent_memory"
+)
+
+// ReadDownTools lists the bare names of the tools that read other agents'
+// chats and memory.
+var ReadDownTools = []string{ToolListAgentChats, ToolReadAgentChat, ToolSearchAgentMemory, ToolListAgentMemory}
+
+// IsReadDownTool says whether a namespaced tool name (`<connectorId>__<tool>`)
+// is one of the read-down tools. It goes by name alone, so it still answers
+// for a call whose connector is gone.
+func IsReadDownTool(name string) bool {
+	for _, t := range ReadDownTools {
+		if strings.HasSuffix(name, "__"+t) {
+			return true
+		}
+	}
+	return false
+}
 
 // CanReadDown says whether a turn gets the read-down tools: the default agent,
 // answering the owner (mode "" or owner) in the owner's own DM or the web

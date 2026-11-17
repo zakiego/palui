@@ -261,7 +261,7 @@ func readTargets(ctx context.Context, tool connectors.Tool, targets []memoryTarg
 func ReadDownTools(d *db.DB, api *API, recallTools map[string]connectors.Tool, timeout func(context.Context) (context.Context, context.CancelFunc)) *connectors.ToolSet {
 	set := connectors.NewToolSet()
 	if search, ok := recallTools["search_memories"]; ok && search.Execute != nil {
-		set.Set("search_agent_memory", connectors.PaluiTool{
+		set.Set(agents.ToolSearchAgentMemory, connectors.PaluiTool{
 			Data:        connectors.DataShared,
 			Class:       "read",
 			Untrusted:   true,
@@ -285,7 +285,7 @@ func ReadDownTools(d *db.DB, api *API, recallTools map[string]connectors.Tool, t
 		})
 	}
 	if list, ok := recallTools["list_memories"]; ok && list.Execute != nil {
-		set.Set("list_agent_memory", connectors.PaluiTool{
+		set.Set(agents.ToolListAgentMemory, connectors.PaluiTool{
 			Data:        connectors.DataShared,
 			Class:       "read",
 			Untrusted:   true,

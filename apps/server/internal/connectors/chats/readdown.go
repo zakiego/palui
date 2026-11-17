@@ -163,7 +163,7 @@ func ReadDownTools(d *db.DB, turn connectors.TurnInfo, clock func() int64, appUR
 	tz := turn.TZ
 	red := NewRedactor(appURL)
 	set := connectors.NewToolSet()
-	set.Set("list_agent_chats", connectors.PaluiTool{
+	set.Set(agents.ToolListAgentChats, connectors.PaluiTool{
 		Data:        connectors.DataShared,
 		Class:       "read",
 		Untrusted:   true,
@@ -208,7 +208,7 @@ func ReadDownTools(d *db.DB, turn connectors.TurnInfo, clock func() int64, appUR
 				return kit.O("ok", true, "count", len(views), "agents", views, "message", kit.If(len(views) == 0, "Belum ada agent lain selain Palui.")), nil
 			}),
 	})
-	set.Set("read_agent_chat", connectors.PaluiTool{
+	set.Set(agents.ToolReadAgentChat, connectors.PaluiTool{
 		Data:        connectors.DataShared,
 		Class:       "read",
 		Untrusted:   true,

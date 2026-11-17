@@ -131,4 +131,47 @@ func TestReadDown(t *testing.T) {
 			t.Fatal(got)
 		}
 	})
+
+	t.Run("a replayed call to a missing tool keeps allow-all unless it was a read-down tool", func(t *testing.T) {
+		notes := &executedLog{}
+		ref := connectors.PaluiTool{Class: "read", Tool: conntest.FnTool("get", func(*jsonx.Object) (any, error) { return "ref text", nil })}
+		h := basic(t, []models.Step{
+			models.CallTool("ref__get", objOf(), "g1"),
+			models.Say("Ini isinya."),
+			models.CallTool("notes__add", objOf("text", "a"), "n1"),
+		}, extra{
+			registry: map[string]*connectors.Runtime{
+				"ref":   toolsRT("ref", tools("get", ref)),
+				"notes": toolsRT("notes", tools("add", connectors.PaluiTool{Class: "write", Tool: conntest.FnTool("add", func(in *jsonx.Object) (any, error) { notes.add(str(in, "text")); return nil, nil })})),
+			},
+			rows: []chattest.Row{{"ref", "tools"}, {"notes", "tools"}},
+		})
+		allowAll(t, h.DB, "", nil)
+
+		h.sendIdle("baca referensinya")
+		testutil.Must(t, connectors.Pause(h.DB, "ref", "", 1))
+		h.sendIdle("catat ya")
+		jsonEq(t, notes.get(), `["a"]`)
+		eq(t, count(t, h.DB, "pending_approvals"), 0)
+		eq(t, count(t, h.DB, "runs WHERE tainted = 1"), 0)
+	})
+
+	t.Run("a replayed call to a missing read-down tool still asks with allow-all", func(t *testing.T) {
+		h, notes := readDownWorld(t,
+			models.CallTool("chats__read_agent_chat", objOf("chat", "chat_club"), "r1"),
+			models.Say("Grup buku lagi bahas jadwal."),
+			models.CallTool("notes__add", objOf("text", "planted"), "n1"),
+		)
+		allowAll(t, h.DB, "", nil)
+
+		h.sendIdle("apa kata grup buku hari ini?")
+		testutil.Must(t, connectors.Pause(h.DB, "chats", "", 1))
+		h.sendIdle("oke makasih")
+		eq(t, len(notes.get()), 0)
+		p := allApprovals(t, h.DB, "")[0]
+		eq(t, p.Tool, "notes__add")
+		if !strings.Contains(jsonx.Stringify(p.Context), `"othersWrote":true`) {
+			t.Fatal(jsonx.Stringify(p.Context))
+		}
+	})
 }
