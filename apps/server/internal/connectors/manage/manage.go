@@ -207,6 +207,15 @@ func SaveDraft(q db.Q, in DraftInput, masterKey string, now int64) (db.Connector
 			return db.Connector{}, fail("That agent doesn't exist anymore.")
 		}
 	}
+	// The owner vouched for the server at the old address, not the new one: a
+	// changed (or cleared) URL drops the no-private-data mark, even when the
+	// same draft sends it.
+	if found && m.ID == "mcp" && urlChanged(in.Config, config, existing.Config) {
+		config.Delete(connectors.NoPrivateDataKey)
+		if !slices.Contains(clear, connectors.NoPrivateDataKey) {
+			clear = append(clear, connectors.NoPrivateDataKey)
+		}
+	}
 	up := connectors.UpsertInput{ID: in.ID, Manifest: m.Row(), Label: in.Label, Config: config, Secrets: secrets, Trust: in.Trust, ClearConfig: clear}
 	if m.Kind == "tools" && in.AgentIDSet {
 		up.AgentIDSet = true
@@ -215,6 +224,17 @@ func SaveDraft(q db.Q, in DraftInput, masterKey string, now int64) (db.Connector
 		}
 	}
 	return connectors.Upsert(q, up, masterKey, now)
+}
+
+// urlChanged: the draft sends a url and it isn't the stored one. sent is the
+// draft as given, parsed the checked config (no url when it was emptied).
+func urlChanged(sent, parsed, stored *jsonx.Object) bool {
+	if _, ok := sent.Get("url"); !ok {
+		return false
+	}
+	next, _ := parsed.Get("url")
+	prev, _ := stored.Get("url")
+	return next != prev
 }
 
 // MissingForConnect is missingForConnect: required config fields and secrets

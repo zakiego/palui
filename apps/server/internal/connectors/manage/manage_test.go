@@ -140,6 +140,59 @@ func TestAgentScopedConnectors(t *testing.T) {
 	}
 }
 
+// The owner vouched for the server at one address: pointing it elsewhere
+// drops the no-private-data mark. Anything else keeps it.
+func TestSaveDraftClearsTheNoPrivateDataMarkOnANewURL(t *testing.T) {
+	d := testutil.DB(t)
+	mark := func() {
+		t.Helper()
+		_, _, err := connectors.SetNoPrivateData(d, "mcp-x", true, 1500)
+		testutil.Must(t, err)
+	}
+	marked := func() bool {
+		t.Helper()
+		row, _, err := connectors.Get(d, "mcp-x")
+		testutil.Must(t, err)
+		return connectors.NoPrivateData(row)
+	}
+	_, err := manage.SaveDraft(d, manage.DraftInput{ID: "mcp-x", Type: "mcp", Config: config("url", "https://prayer.example.com/mcp")}, testutil.TestKey, 1000)
+	testutil.Must(t, err)
+	mark()
+
+	// The same url, or only tool preferences: the mark stays.
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-x", Type: "mcp", Config: config("url", "https://prayer.example.com/mcp")}, testutil.TestKey, 2000)
+	testutil.Must(t, err)
+	if !marked() {
+		t.Fatal("same url cleared the mark")
+	}
+	prefs := jsonx.NewMap[any]()
+	prefs.Set("get_times", config("enabled", true, "class", "read"))
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-x", Type: "mcp", Config: config("toolPrefs", prefs)}, testutil.TestKey, 3000)
+	testutil.Must(t, err)
+	if !marked() {
+		t.Fatal("tool prefs cleared the mark")
+	}
+
+	// A new url clears it, even when the draft sends the mark too.
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-x", Type: "mcp", Config: config("url", "https://other.example.com/mcp", connectors.NoPrivateDataKey, true)}, testutil.TestKey, 4000)
+	testutil.Must(t, err)
+	row, _, _ := connectors.Get(d, "mcp-x")
+	if _, has := row.Config.Get(connectors.NoPrivateDataKey); has {
+		t.Fatal(row.Config)
+	}
+	if u, _ := row.Config.Get("url"); u != "https://other.example.com/mcp" {
+		t.Fatal(row.Config)
+	}
+
+	// An emptied url clears it too.
+	mark()
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-x", Type: "mcp", Config: config("url", "")}, testutil.TestKey, 5000)
+	testutil.Must(t, err)
+	if marked() {
+		t.Fatal("emptied url kept the mark")
+	}
+}
+
 func TestPauseAndResume(t *testing.T) {
 	d := testutil.DB(t)
 	_, err := manage.SaveDraft(d, manage.DraftInput{ID: "telegram", Type: "telegram", Secrets: secrets("botToken", token)}, testutil.TestKey, 1000)
