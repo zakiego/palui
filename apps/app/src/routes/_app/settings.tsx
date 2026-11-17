@@ -1,18 +1,15 @@
 // Settings (PLAN 11.4): persona, timezone, language, model roles and failover,
 // budgets, passkeys, MCP access, backup status, and inbound hooks.
 import * as React from "react"
-import { REASONING_EFFORTS } from "@/shared/constants"
-import type { ModelChainLink } from "@/shared/constants"
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowDownIcon, ArrowUpIcon, BoxIcon, BrainIcon, CircleAlertIcon, DatabaseBackupIcon, EllipsisIcon, FingerprintIcon, GaugeIcon, PlusIcon, Settings2Icon, ShieldIcon, TrashIcon, WebhookIcon } from "lucide-react"
+import { BoxIcon, DatabaseBackupIcon, FingerprintIcon, GaugeIcon, PlusIcon, Settings2Icon, ShieldIcon, TrashIcon, WebhookIcon } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
 import { AppError } from "@/components/app-error"
-import { connectorIcon } from "@/components/connector-icon"
 import { CopyButton } from "@/components/copy-button"
 import { McpAccessCard } from "@/components/mcp-access-card"
-import { ModelPicker, type ModelCatalog } from "@/components/model-picker"
+import { connectorOptions, ModelChain, ROLE_HELP, ROLES, stripKeys, useCatalogs, useLinkKeys, type KeyedLink, type Role } from "@/components/model-chain"
 import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending, LineTabsSkeleton, SkeletonButton, SkeletonText } from "@/components/page-pending"
 import { SimpleSelect } from "@/components/simple-select"
@@ -33,7 +30,6 @@ import { StatusText } from "@/components/ui/status-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -44,7 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { authClient, passkeyCancelled } from "@/lib/auth-client"
 import { removePasskey } from "@/lib/api/session"
 import { getMcpAccess } from "@/lib/api/mcp"
-import { createHookFn, getSettingsPage, listConnectorModels, saveSettings } from "@/lib/api/settings"
+import { createHookFn, getSettingsPage, saveSettings } from "@/lib/api/settings"
 import { ago, errorMessage, fullDate } from "@/lib/format"
 import { useLabel, useT } from "@/lib/i18n"
 
@@ -270,63 +266,17 @@ function GeneralTab({ data }: { data: Data }) {
   )
 }
 
-type Role = "default" | "fast" | "vision"
-const ROLES: Role[] = ["default", "fast", "vision"]
-const ROLE_HELP = { default: "settings.role.default", fast: "settings.role.fast", vision: "settings.role.vision" } as const
-
-type ChainLink = ModelChainLink
-// `key` is client only: it lets a row's DOM node, and focus, follow its item on reorder.
-type KeyedLink = ChainLink & { key: string }
-// The effort select's value for "no effort set", which leaves the provider's default.
-const DEFAULT_EFFORT = "default"
-
 function ModelsTab({ data }: { data: Data }) {
-  const keyPrefix = React.useId()
-  const keyCount = React.useRef(0)
-  const newKey = () => `${keyPrefix}link-${keyCount.current++}`
+  const withKeys = useLinkKeys()
   const [roles, setRoles] = React.useState(() => {
-    const withKeys = (chain: ChainLink[]): KeyedLink[] => chain.map((link) => ({ ...link, key: newKey() }))
     const r = data.settings.modelRoles
     return { default: withKeys(r.default), fast: withKeys(r.fast), vision: withKeys(r.vision) }
   })
   const t = useT()
   const { busy, save } = useSave()
-  const options = data.models.map((m) => {
-    const Icon = connectorIcon(m.icon)
-    return { value: m.id, label: m.label, icon: <Icon aria-hidden="true" className="text-muted-foreground" /> }
-  })
-  const known = new Set(options.map((o) => o.value))
-  const effortOptions = [
-    { value: DEFAULT_EFFORT, label: t("settings.effort.default") },
-    ...REASONING_EFFORTS.map((e) => ({ value: e, label: t(`settings.effort.${e}`) })),
-  ].map((o) => ({ ...o, icon: <BrainIcon aria-hidden="true" className="text-muted-foreground" /> }))
+  const options = connectorOptions(data.models)
+  const catalogs = useCatalogs(ROLES.map((r) => roles[r]), new Set(options.map((o) => o.value)))
   const setChain = (role: Role, chain: KeyedLink[]) => setRoles((r) => ({ ...r, [role]: chain }))
-  const setLink = (role: Role, i: number, patch: Partial<ChainLink>) => setChain(role, roles[role].map((x, j) => (j === i ? { ...x, ...patch } : x)))
-  const stripKeys = (chain: KeyedLink[]): ChainLink[] => chain.map(({ connectorId, model, effort }) => ({ connectorId, model, ...(effort ? { effort } : {}) }))
-
-  // The model list of every connector a chain uses, fetched once per connector.
-  const [catalogs, setCatalogs] = React.useState<Record<string, ModelCatalog>>({})
-  const usedConnectors = [...new Set(ROLES.flatMap((r) => roles[r].map((x) => x.connectorId)))].filter((id) => known.has(id)).sort().join(",")
-  const requested = React.useRef(new Set<string>())
-  React.useEffect(() => {
-    for (const id of usedConnectors ? usedConnectors.split(",") : []) {
-      if (requested.current.has(id)) continue
-      requested.current.add(id)
-      setCatalogs((c) => ({ ...c, [id]: { state: "loading" } }))
-      listConnectorModels({ data: { id } })
-        .then((r) => setCatalogs((c) => ({ ...c, [id]: { state: "ok", models: r.models } })))
-        .catch((e: unknown) => setCatalogs((c) => ({ ...c, [id]: { state: "error", error: e instanceof Error ? e.message : String(e) } })))
-    }
-  }, [usedConnectors])
-
-  // Remove unmounts the row that holds the open menu's trigger, so the menu has nowhere to return focus. Move it by hand, after the menu's own attempt.
-  const focusAfterRemove = React.useRef<string | null>(null)
-  React.useEffect(() => {
-    const key = focusAfterRemove.current
-    if (!key) return
-    focusAfterRemove.current = null
-    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-chain-actions="${CSS.escape(key)}"]`)?.focus())
-  }, [roles])
 
   return (
     <Card>
@@ -341,103 +291,15 @@ function ModelsTab({ data }: { data: Data }) {
             <AlertDescription>{t("settings.models.noneBody")}</AlertDescription>
           </Alert>
         )}
-        {ROLES.map((role) => {
-          const chain = roles[role]
-          return (
-            <FieldSet key={role} className="gap-2">
-              <FieldLegend variant="label" className="font-mono">
-                {role}
-              </FieldLegend>
-              <FieldDescription>{t(ROLE_HELP[role])}</FieldDescription>
-              <ol className="flex flex-col gap-2">
-                {chain.map((link, i) => {
-                  const missing = !known.has(link.connectorId)
-                  // With no model connectors at all, the alert above already says so: skip the per-step note.
-                  const showMissing = missing && options.length > 0
-                  const missingId = `${link.key}-missing`
-                  return (
-                    <li key={link.key} className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-2 @2xl/main:grid-cols-[1.25rem_11rem_minmax(0,1fr)_9.5rem_auto]">
-                      <span className="font-mono text-caption text-muted-foreground tabular-nums">{i + 1}.</span>
-                      <SimpleSelect
-                        aria-label={t("settings.models.stepConnector", { role, n: i + 1 })}
-                        aria-invalid={missing}
-                        aria-describedby={showMissing ? missingId : undefined}
-                        className="col-span-2 w-full @2xl/main:col-span-1"
-                        value={link.connectorId}
-                        options={missing ? [{ value: link.connectorId, label: t("settings.models.missing", { id: link.connectorId }) }, ...options] : options}
-                        onChange={(v) => setLink(role, i, { connectorId: v })}
-                      />
-                      <ModelPicker
-                        aria-label={t("settings.models.stepModel", { role, n: i + 1 })}
-                        className="col-span-2 col-start-2 @2xl/main:col-span-1 @2xl/main:col-start-auto"
-                        value={link.model}
-                        catalog={catalogs[link.connectorId]}
-                        onChange={(v) => setLink(role, i, { model: v })}
-                      />
-                      <SimpleSelect
-                        aria-label={t("settings.models.stepEffort", { role, n: i + 1 })}
-                        className="col-start-2 w-full @2xl/main:col-start-auto"
-                        value={link.effort ?? DEFAULT_EFFORT}
-                        options={effortOptions}
-                        onChange={(v) => setLink(role, i, { effort: v === DEFAULT_EFFORT ? undefined : (v as ChainLink["effort"]) })}
-                      />
-                      <DropdownMenu>
-                        <DropdownMenuTrigger data-chain-actions={link.key} render={<Button variant="ghost" size="icon" aria-label={t("settings.models.stepActions", { role, n: i + 1 })} />}>
-                          <EllipsisIcon aria-hidden="true" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-auto min-w-40">
-                          <DropdownMenuItem className="pointer-coarse:py-2.5" disabled={i === 0} onSelect={() => setChain(role, swap(chain, i, i - 1))}>
-                            <ArrowUpIcon aria-hidden="true" />
-                            {t("settings.models.up")}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="pointer-coarse:py-2.5" disabled={i === chain.length - 1} onSelect={() => setChain(role, swap(chain, i, i + 1))}>
-                            <ArrowDownIcon aria-hidden="true" />
-                            {t("settings.models.down")}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="pointer-coarse:py-2.5"
-                            variant="destructive"
-                            disabled={chain.length === 1}
-                            onSelect={() => {
-                              focusAfterRemove.current = (chain[i + 1] ?? chain[i - 1])?.key ?? null
-                              setChain(role, chain.filter((_, j) => j !== i))
-                            }}
-                          >
-                            <TrashIcon aria-hidden="true" />
-                            {t("connectors.remove")}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      {showMissing && (
-                        <p id={missingId} className="col-span-2 col-start-2 flex items-start gap-1.5 text-caption text-destructive-fg @2xl/main:col-span-4">
-                          <CircleAlertIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-                          <span className="min-w-0 break-words">
-                            {t("settings.models.notSetUp", { id: link.connectorId })}{" "}
-                            <Link to="/connectors" className="underline underline-offset-2">
-                              {t("nav.connectors")}
-                            </Link>
-                            .
-                          </span>
-                        </p>
-                      )}
-                    </li>
-                  )
-                })}
-              </ol>
-              <Button
-                variant="outline"
-                size="sm"
-                className="self-start"
-                disabled={chain.length >= 6}
-                onClick={() => setChain(role, [...chain, { key: newKey(), connectorId: options[0]?.value ?? "ai-gateway", model: chain.at(-1)?.model ?? "", ...(chain.at(-1)?.effort ? { effort: chain.at(-1)!.effort } : {}) }])}
-              >
-                <PlusIcon data-icon="inline-start" />
-                {t("settings.models.add")}
-              </Button>
-            </FieldSet>
-          )
-        })}
+        {ROLES.map((role) => (
+          <FieldSet key={role} className="gap-2">
+            <FieldLegend variant="label" className="font-mono">
+              {role}
+            </FieldLegend>
+            <FieldDescription>{t(ROLE_HELP[role])}</FieldDescription>
+            <ModelChain role={role} chain={roles[role]} onChange={(c) => setChain(role, c)} options={options} catalogs={catalogs} newKey={withKeys} />
+          </FieldSet>
+        ))}
       </CardContent>
       <CardFooter className="justify-end border-t">
         <Button
@@ -454,12 +316,6 @@ function ModelsTab({ data }: { data: Data }) {
       </CardFooter>
     </Card>
   )
-}
-
-function swap<T>(list: T[], a: number, b: number): T[] {
-  const next = [...list]
-  ;[next[a], next[b]] = [next[b]!, next[a]!]
-  return next
 }
 
 function LimitsTab({ data }: { data: Data }) {
