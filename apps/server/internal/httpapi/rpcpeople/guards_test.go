@@ -18,6 +18,8 @@ var mine = map[string]string{
 	"getAgentsPage": "GET", "getAgentPage": "GET", "getAgentToolsFn": "GET", "getAgentMemoryFn": "GET",
 	"saveAgentFn": "POST", "deleteAgentFn": "POST", "setAgentToolPermissionsFn": "POST", "setChatAgentFn": "POST",
 	"setChatReplyModeFn": "POST", "setChatAckFn": "POST", "setChatAllowedFn": "POST", "setChatDeployNoticeFn": "POST",
+	// members (agents.ts)
+	"getAgentMembersFn": "GET", "saveMemberFn": "POST", "setAgentMemberFn": "POST",
 	// chats.ts
 	"getChats": "GET", "getTranscript": "GET", "sendWebMessage": "POST", "decideApproval": "POST", "stopTurn": "POST",
 	// notes.ts
@@ -38,8 +40,8 @@ func names() []string {
 }
 
 func TestEveryFunctionIsRegisteredWithItsMethodAndGuard(t *testing.T) {
-	if len(mine) != 28 {
-		t.Fatalf("%d names, want 28", len(mine))
+	if len(mine) != 31 {
+		t.Fatalf("%d names, want 31", len(mine))
 	}
 	got := map[string]httpapi.Handler{}
 	for _, h := range httpapi.Handlers() {
