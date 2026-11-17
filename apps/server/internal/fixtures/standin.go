@@ -167,6 +167,14 @@ var builtinTools = map[string][]struct {
 	"chats":    {{tool: "cari_obrolan", class: "read"}},
 }
 
+// builtinData is each built-in skill's data scope, as the real tools declare it.
+var builtinData = map[string]string{
+	"reminders": connectors.DataChat,
+	"webfetch":  connectors.DataNone,
+	"notes":     connectors.DataAgent,
+	"chats":     connectors.DataAgent,
+}
+
 // demoToolSet is demo-runtime.ts's agentTools for one connector: the fake MCP
 // list for an MCP connector and the built-in list for a skill, only while
 // the connector is on. A call answers with a fixed text; nothing runs.
@@ -192,7 +200,7 @@ func demoToolSet(q db.Q, id, typ string) (*connectors.ToolSet, error) {
 					return "demo runtime: nothing ran", nil
 				},
 			},
-			Class: class, Title: title, GuestSafe: guestSafe, Untrusted: untrusted,
+			Class: class, Title: title, GuestSafe: guestSafe, Untrusted: untrusted, Data: builtinData[typ],
 		})
 	}
 	if typ == "mcp" {

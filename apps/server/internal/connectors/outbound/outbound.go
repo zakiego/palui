@@ -266,6 +266,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) (*connectors.
 	}
 	set := connectors.NewToolSet()
 	set.Set("list_contacts", connectors.PaluiTool{
+		Data:  connectors.DataAgent,
 		Class: "read",
 		Title: "List contacts",
 		Tool: kit.Tool("List the contacts Palui may message for the owner, with each one's approval setting.", zod.Object(),
@@ -286,6 +287,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) (*connectors.
 			}),
 	})
 	set.Set("list_outbound_messages", connectors.PaluiTool{
+		Data:  connectors.DataAgent,
 		Class: "read",
 		Title: "List messages to contacts",
 		Tool: kit.Tool("List messages to contacts: scheduled = waiting or repeating, recent = the latest requests with their delivery status.", listMessagesInput,
@@ -365,6 +367,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) (*connectors.
 	}
 
 	set.Set("send_message", connectors.PaluiTool{
+		Data:  connectors.DataAgent,
 		Class: "write",
 		Title: "Kirim pesan ke kontak",
 		NeedsApproval: func(raw json.RawMessage) bool {
@@ -455,6 +458,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) (*connectors.
 			}),
 	})
 	set.Set("add_contact", connectors.PaluiTool{
+		Data:  connectors.DataAgent,
 		Class: "write",
 		Title: "Tambah kontak",
 		NeedsApproval: func(raw json.RawMessage) bool {
@@ -506,6 +510,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) (*connectors.
 			}),
 	})
 	set.Set("cancel_message", connectors.PaluiTool{
+		Data:  connectors.DataAgent,
 		Class: "write",
 		Title: "Batalin pesan ke kontak",
 		Tool: kit.Tool("Cancel a message to a contact that hasn't gone out: a scheduled one, a repeating series, or one still in its undo window. Ids from list_outbound_messages.", cancelInput,

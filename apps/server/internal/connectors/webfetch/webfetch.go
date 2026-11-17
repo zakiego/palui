@@ -241,7 +241,7 @@ var Runtime = &connectors.Runtime{
 			Stop: func(context.Context) error { return nil },
 			Tools: func(context.Context, connectors.TurnInfo) (*connectors.ToolSet, error) {
 				set := connectors.NewToolSet()
-				set.Set("fetch_page", connectors.PaluiTool{Tool: t, Class: "read", Untrusted: true, GuestSafe: true, Title: "Read a web page"})
+				set.Set("fetch_page", connectors.PaluiTool{Data: connectors.DataNone, Tool: t, Class: "read", Untrusted: true, GuestSafe: true, Title: "Read a web page"})
 				return set, nil
 			},
 		}, nil

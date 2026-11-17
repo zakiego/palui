@@ -111,7 +111,7 @@ func goldenTools(t *testing.T, d *db.DB, connector string, turn connectors.TurnI
 	case "reminders":
 		return remindersconn.Tools(d, turn, clock)
 	case "jobs":
-		return jobsconn.Tools(d, clock)
+		return jobsconn.Tools(d, clock, turn.AgentID)
 	case "notes":
 		return must(notesconn.Tools(d, clock, turn.AgentID))
 	case "attachments":
@@ -127,7 +127,7 @@ func goldenTools(t *testing.T, d *db.DB, connector string, turn connectors.TurnI
 		set.Set("recap", flowsconn.RecapTool(d, turn, clock))
 		return set
 	case "remote-mcp":
-		return remotemcp.Tools(remotemcp.Deps{DB: d, MasterKey: config.DevMasterKey, Clock: clock, Resolver: privateResolver})
+		return remotemcp.Tools(remotemcp.Deps{DB: d, MasterKey: config.DevMasterKey, Clock: clock, Resolver: privateResolver, AgentID: turn.AgentID})
 	case "webfetch":
 		set := connectors.NewToolSet()
 		set.Set("fetch_page", connectors.PaluiTool{Tool: webfetchconn.FetchPageTool(nil), Class: "read"})

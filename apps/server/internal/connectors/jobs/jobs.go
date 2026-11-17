@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/kit"
 	"github.com/zakiego/palui/apps/server/internal/db"
@@ -36,19 +37,25 @@ var listJobsInput = zod.Object(
 	zod.F("includePaused", zod.Default(zod.Bool(), true).Describe("Include paused jobs.")),
 )
 
-// Tools is jobTools(db, clock).
-func Tools(d *db.DB, clock func() int64) *connectors.ToolSet {
+// Tools is jobTools(db, clock), for one agent: it lists only the jobs that
+// post into that agent's chats, so an agent in a friends' group never sees the
+// owner's briefings. agentID "" is the default agent.
+func Tools(d *db.DB, clock func() int64, agentID string) *connectors.ToolSet {
 	if clock == nil {
 		clock = func() int64 { return time.Now().UnixMilli() }
 	}
 	set := connectors.NewToolSet()
 	set.Set("list_jobs", connectors.PaluiTool{
+		Data:  connectors.DataAgent,
 		Class: "read",
 		Title: "List scheduled jobs",
 		Tool: kit.Tool("List scheduled jobs (morning briefing, heartbeat, custom prompts) with their schedule, next run and last result. Jobs are created and edited in the dashboard.", listJobsInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				now := clock()
-				opts := jobs.ListOptions{}
+				opts, err := scopeFor(d, agentID)
+				if err != nil {
+					return nil, err
+				}
 				if !in.True("includePaused") {
 					on := true
 					opts.Enabled = &on
@@ -86,6 +93,26 @@ func Tools(d *db.DB, clock func() int64) *connectors.ToolSet {
 	return set
 }
 
+// scopeFor keeps the jobs in the chats the agent answers in (ServesChat). The
+// default agent also keeps the jobs whose chat row is gone.
+func scopeFor(d *db.DB, agentID string) (jobs.ListOptions, error) {
+	if agentID == "" {
+		return jobs.ListOptions{Chats: `("chats"."agent_id" is null or "chats"."agent_id" not in (select "id" from "agents" where "is_default" = 0))`, OrphanChats: true}, nil
+	}
+	a, ok, err := agents.Get(d, agentID)
+	if err != nil {
+		return jobs.ListOptions{}, err
+	}
+	if !ok {
+		return jobs.ListOptions{Chats: "0"}, nil
+	}
+	where, args, err := agents.ChatsServedBy(d, a.ID)
+	if err != nil {
+		return jobs.ListOptions{}, err
+	}
+	return jobs.ListOptions{Chats: where, ChatsArgs: args, OrphanChats: a.IsDefault}, nil
+}
+
 var Runtime = &connectors.Runtime{
 	Manifest: Manifest,
 	Test: func(c connectors.Context) (connectors.TestResult, error) {
@@ -102,8 +129,8 @@ var Runtime = &connectors.Runtime{
 	Start: func(c connectors.Context) (*connectors.RunningConnector, error) {
 		return &connectors.RunningConnector{
 			Stop: func(context.Context) error { return nil },
-			Tools: func(context.Context, connectors.TurnInfo) (*connectors.ToolSet, error) {
-				return Tools(c.DB, nil), nil
+			Tools: func(_ context.Context, turn connectors.TurnInfo) (*connectors.ToolSet, error) {
+				return Tools(c.DB, nil, turn.AgentID), nil
 			},
 		}, nil
 	},

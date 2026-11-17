@@ -358,10 +358,10 @@ func TestCatalogAgentScopedConnector(t *testing.T) {
 	fn := conntest.FnTool("x", func(*jsonx.Object) (any, error) { return "[]", nil })
 	d, sup := catalogHarness(t, map[string]*connectors.Runtime{
 		"web": conntest.ToolsRuntime("web", func() *connectors.ToolSet {
-			return conntest.Tools("fetch", connectors.PaluiTool{Tool: fn, Class: "read"})
+			return conntest.Tools("fetch", connectors.PaluiTool{Tool: fn, Class: "read", Data: connectors.DataNone})
 		}, "", nil),
 		"crm": conntest.ToolsRuntime("crm", func() *connectors.ToolSet {
-			return conntest.Tools("deals", connectors.PaluiTool{Tool: fn, Class: "read"})
+			return conntest.Tools("deals", connectors.PaluiTool{Tool: fn, Class: "read"}, "notes", connectors.PaluiTool{Tool: fn, Class: "read", Data: connectors.DataChat})
 		}, "", nil),
 	}, map[string]string{"web": "tools", "crm": "tools"})
 	sales := "agt_sales"
@@ -370,17 +370,18 @@ func TestCatalogAgentScopedConnector(t *testing.T) {
 	names := func(agent string) string {
 		var out []string
 		for _, c := range tools.Catalog(ctx, sup.Running(), tools.CatalogOptions{AgentID: agent, ChatID: "chat_x", Channel: "web", TZ: "Asia/Makassar", Now: testutil.NOW}) {
-			out = append(out, c.Name)
+			out = append(out, c.Name+":"+c.Data)
 		}
 		sort.Strings(out)
 		return strings.Join(out, ",")
 	}
-	if names("agt_sales") != "crm__deals,web__fetch" || names("agt_other") != "web__fetch" {
+	// The catalog sends the declared scope; "" follows the connector's owner.
+	if names("agt_sales") != "crm__deals:,crm__notes:chat,web__fetch:none" || names("agt_other") != "web__fetch:none" {
 		t.Fatal(names("agt_sales"), names("agt_other"))
 	}
 	_, _, err = connectors.SetOwner(d, "crm", nil, 3)
 	testutil.Must(t, err)
-	if names("agt_other") != "crm__deals,web__fetch" {
+	if names("agt_other") != "crm__deals:,crm__notes:chat,web__fetch:none" {
 		t.Fatal(names("agt_other"))
 	}
 }

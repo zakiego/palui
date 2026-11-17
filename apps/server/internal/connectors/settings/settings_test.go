@@ -8,6 +8,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/cliproxy"
 	"github.com/zakiego/palui/apps/server/internal/connectors/conntest"
+	mcpconn "github.com/zakiego/palui/apps/server/internal/connectors/mcp"
 	settingsconn "github.com/zakiego/palui/apps/server/internal/connectors/settings"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/events"
@@ -147,5 +148,24 @@ func TestGivesOtherAgentsTheReadToolOnly(t *testing.T) {
 	testutil.Must(t, err)
 	if keys := tools(t, d, nil, a.ID).Keys(); strings.Join(keys, ",") != "get_settings" {
 		t.Fatal(keys)
+	}
+}
+
+func TestListsOnlyTheConnectorsTheAgentCanCall(t *testing.T) {
+	d := testutil.DB(t)
+	a, err := agents.Create(d, agents.Input{Slug: "kerja", Name: testutil.Ptr("Kerja"), Persona: testutil.Ptr("Asisten kerja.")}, 1)
+	testutil.Must(t, err)
+	for _, id := range []string{"mcp-mine", "mcp-theirs"} {
+		_, err := connectors.Upsert(d, connectors.UpsertInput{ID: id, Manifest: mcpconn.Manifest.Row()}, KEY, 1)
+		testutil.Must(t, err)
+	}
+	other := "agt_other"
+	for id, owner := range map[string]*string{"mcp-mine": &a.ID, "mcp-theirs": &other} {
+		_, _, err := connectors.SetOwner(d, id, owner, 1)
+		testutil.Must(t, err)
+	}
+	ids := strings.Join(conntest.Call(t, tools(t, d, nil, a.ID), "get_settings", `{}`).Strs("connectors", "id"), ",")
+	if !strings.Contains(ids, "mcp-mine") || strings.Contains(ids, "mcp-theirs") {
+		t.Fatal(ids)
 	}
 }

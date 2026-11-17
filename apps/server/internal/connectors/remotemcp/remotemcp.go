@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/config"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/kit"
@@ -64,6 +65,13 @@ type Deps struct {
 	// The HTTP client the probe goes through (wrapped by the public guard).
 	Client *http.Client
 	Clock  func() int64
+	// The agent whose chat this is ("" is the default agent): it lists and
+	// removes only the servers it can call.
+	AgentID string
+	// Servers added here belong to AgentID instead of every agent. True for
+	// every agent but the default, so a friends' group agent can't change
+	// what the owner's agent calls.
+	Own bool
 }
 
 func shownURL(raw string) any {
@@ -130,8 +138,15 @@ func Tools(deps Deps) *connectors.ToolSet {
 	if clock == nil {
 		clock = func() int64 { return time.Now().UnixMilli() }
 	}
+	data := connectors.DataShared
+	var owner *string
+	if deps.Own {
+		data = connectors.DataAgent
+		owner = &deps.AgentID
+	}
 	set := connectors.NewToolSet()
 	set.Set("add_mcp_server", connectors.PaluiTool{
+		Data:  data,
 		Class: "destructive",
 		Title: "Add an MCP server",
 		Tool: kit.Tool("Add a public remote MCP server (Streamable HTTP, no auth) as a connector, only when the owner asks for it with the URL. Checks the URL, connects once to list its tools, then saves it. The tools are usable from the owner's next message. Servers that need a token: tell the owner to add them on the Connectors page instead.", addInput,
@@ -179,7 +194,8 @@ func Tools(deps Deps) *connectors.ToolSet {
 				label, trust, on := name, "external", true
 				if _, err := connectors.Upsert(d, connectors.UpsertInput{
 					ID: id, Manifest: mcpconn.Manifest.Row(), Label: &label, Trust: &trust, Enabled: &on,
-					Config: kit.O("url", u.Href(), "authMode", "none", "toolPrefs", prefs, "addedFromChat", true),
+					Config:  kit.O("url", u.Href(), "authMode", "none", "toolPrefs", prefs, "addedFromChat", true),
+					AgentID: owner, AgentIDSet: owner != nil,
 				}, deps.MasterKey, now); err != nil {
 					return nil, err
 				}
@@ -196,6 +212,7 @@ func Tools(deps Deps) *connectors.ToolSet {
 			}),
 	})
 	set.Set("list_mcp_servers", connectors.PaluiTool{
+		Data:  data,
 		Class: "read",
 		Title: "List MCP servers",
 		Tool: kit.Tool("List the MCP server connectors with their status and how many tools are on. Never shows tokens.", zod.Object(),
@@ -206,7 +223,7 @@ func Tools(deps Deps) *connectors.ToolSet {
 				}
 				var list []any
 				for _, r := range rows {
-					if r.Type == "mcp" {
+					if r.Type == "mcp" && connectors.ServesAgent(r, deps.AgentID) {
 						list = append(list, serverView(r))
 					}
 				}
@@ -217,6 +234,7 @@ func Tools(deps Deps) *connectors.ToolSet {
 			}),
 	})
 	set.Set("remove_mcp_server", connectors.PaluiTool{
+		Data:  data,
 		Class: "destructive",
 		Title: "Remove an MCP server",
 		Tool: kit.Tool("Remove an MCP server that was added from chat, by name or id (from list_mcp_servers). Servers set up on the Connectors page are removed there.", removeInput,
@@ -226,8 +244,11 @@ func Tools(deps Deps) *connectors.ToolSet {
 				if err != nil {
 					return nil, err
 				}
-				if !found || row.Type != "mcp" {
+				if !found || row.Type != "mcp" || !connectors.ServesAgent(row, deps.AgentID) {
 					return kit.Fail(fmt.Sprintf("Nggak ada server MCP %s. Panggil list_mcp_servers untuk lihat id-nya.", id)), nil
+				}
+				if deps.Own && (row.AgentID == nil || *row.AgentID != deps.AgentID) {
+					return kit.Fail(fmt.Sprintf("%s dipakai semua agent. Hapus dari halaman Connectors ya.", row.Label)), nil
 				}
 				if !mcpconn.ConfigFrom(row.Config).AddedFromChat {
 					return kit.Fail(fmt.Sprintf("%s dipasang dari dashboard. Hapus dari halaman Connectors ya.", row.Label)), nil
@@ -271,8 +292,18 @@ var Runtime = &connectors.Runtime{
 		}}
 		return &connectors.RunningConnector{
 			Stop: func(context.Context) error { return nil },
-			Tools: func(context.Context, connectors.TurnInfo) (*connectors.ToolSet, error) {
-				return Tools(deps), nil
+			Tools: func(_ context.Context, turn connectors.TurnInfo) (*connectors.ToolSet, error) {
+				d := deps
+				d.AgentID = turn.AgentID
+				if turn.AgentID != "" {
+					a, ok, err := agents.Get(c.DB, turn.AgentID)
+					if err != nil {
+						return nil, err
+					}
+					// An agent that's gone keeps to itself (fail closed).
+					d.Own = !ok || !a.IsDefault
+				}
+				return Tools(d), nil
 			},
 		}, nil
 	},

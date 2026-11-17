@@ -301,6 +301,12 @@ type ListOptions struct {
 	ChatID  string
 	Enabled *bool
 	Kind    string
+	// Chats, when set, keeps the jobs whose chat matches this SQL filter on
+	// table `chats` (agents.ChatsServedBy). A job whose chat row is gone stays
+	// only with OrphanChats.
+	Chats       string
+	ChatsArgs   []any
+	OrphanChats bool
 }
 
 // List orders by next run then name, with paused jobs (next_run_at null) last.
@@ -318,6 +324,14 @@ func List(q db.Q, o ListOptions) ([]db.Job, error) {
 	if o.Kind != "" {
 		where = append(where, "kind = ?")
 		args = append(args, o.Kind)
+	}
+	if o.Chats != "" {
+		in := `chat_id IN (SELECT "chats"."id" FROM "chats" WHERE ` + o.Chats + `)`
+		if o.OrphanChats {
+			in = "(" + in + ` OR chat_id NOT IN (SELECT "id" FROM "chats"))`
+		}
+		where = append(where, in)
+		args = append(args, o.ChatsArgs...)
 	}
 	w := ""
 	if len(where) > 0 {

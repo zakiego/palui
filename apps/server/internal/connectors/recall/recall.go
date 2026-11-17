@@ -531,8 +531,8 @@ func New(opts Options) *connectors.Runtime {
 						}
 					}
 					set := connectors.NewToolSet()
-					set.Set("forget_memory", connectors.PaluiTool{Tool: ForgetTool(api, &scope), Class: "destructive", Title: "Forget memory"})
-					set.Set("forget_document", connectors.PaluiTool{Tool: ForgetDocumentTool(api, &scope), Class: "destructive", Title: "Delete document"})
+					set.Set("forget_memory", connectors.PaluiTool{Data: connectors.DataAgent, Tool: ForgetTool(api, &scope), Class: "destructive", Title: "Forget memory"})
+					set.Set("forget_document", connectors.PaluiTool{Data: connectors.DataAgent, Tool: ForgetDocumentTool(api, &scope), Class: "destructive", Title: "Delete document"})
 					defs, err := conn.ListTools(ctx, false, 0)
 					var aiTools map[string]connectors.Tool
 					if err == nil {
@@ -555,7 +555,7 @@ func New(opts Options) *connectors.Runtime {
 						if title == "" {
 							title = def.Name
 						}
-						set.Set(def.Name, connectors.PaluiTool{Tool: withContainer(t, cls, &scope), Class: cls, Title: title})
+						set.Set(def.Name, connectors.PaluiTool{Data: connectors.DataAgent, Tool: withContainer(t, cls, &scope), Class: cls, Title: title})
 					}
 					mu.Lock()
 					had := mcpError != ""

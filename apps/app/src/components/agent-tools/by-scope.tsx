@@ -26,8 +26,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useT } from "@/lib/i18n";
 import {
   ConnectorGlyph,
+  dataOf,
   GroupActions,
   GroupMeta,
+  groupData,
   ToolRow,
   useSearchOpen,
   type ToolItem,
@@ -232,6 +234,15 @@ function Groups({
       >
         {groups.map((list) => {
           const head = list[0]!;
+          // Whose data, from every tool on the server (not only the search
+          // hits). Each tool says its own only when the server mixes scopes.
+          const owned = props.ownerOf(head.connectorId) !== null;
+          const all = props.tools.filter(
+            (x) => x.connectorId === head.connectorId,
+          );
+          const scope = groupData(all, owned);
+          const mixed =
+            new Set(all.map((x) => dataOf(x, owned))).size > 1;
           return (
             <AccordionItem
               key={head.connectorId}
@@ -252,14 +263,23 @@ function Groups({
                       <Badge variant="outline">MCP</Badge>
                     )}
                   </span>
-                  <GroupMeta list={list} permissions={props.permissions} />
+                  <GroupMeta
+                    list={list}
+                    scope={scope}
+                    permissions={props.permissions}
+                  />
                 </span>
               </AccordionTrigger>
               <AccordionContent className="flex flex-col gap-1 px-4 pb-4 @xl/main:ps-16">
                 <GroupActions head={head} props={props} />
                 <ul className="flex flex-col divide-y">
                   {list.map((x) => (
-                    <ToolRow key={x.name} x={x} props={props} />
+                    <ToolRow
+                      key={x.name}
+                      x={x}
+                      props={props}
+                      scope={mixed ? dataOf(x, owned) : undefined}
+                    />
                   ))}
                 </ul>
               </AccordionContent>

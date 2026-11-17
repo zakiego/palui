@@ -217,6 +217,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) (*connectors.
 	}
 	set := connectors.NewToolSet()
 	set.Set("search_chats", connectors.PaluiTool{
+		Data:      connectors.DataAgent,
 		Class:     "read",
 		Untrusted: true,
 		Title:     "Find chats",
@@ -244,6 +245,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) (*connectors.
 			}),
 	})
 	set.Set("read_chat", connectors.PaluiTool{
+		Data:      connectors.DataAgent,
 		Class:     "read",
 		Untrusted: true,
 		Title:     "Read a chat",

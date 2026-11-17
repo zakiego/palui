@@ -177,6 +177,10 @@ type PaluiTool struct {
 	Title     string
 	// May run in a turn started by someone other than the owner.
 	GuestSafe bool
+	// Whose data the tool reads or writes: DataChat, DataAgent, DataShared or
+	// DataNone. "" follows the connector: the agent's when the connector is
+	// owned by one agent, shared otherwise.
+	Data string
 	// Flow write tools: "version" (default) or "every_run".
 	FlowApproval string
 	// Ask the owner for this call even where the class rules wouldn't.
@@ -184,6 +188,18 @@ type PaluiTool struct {
 	// The approval prompt's text for this call.
 	Preview func(input json.RawMessage) string
 }
+
+// Data scopes for PaluiTool.Data, shown on the agent's Tools tab.
+const (
+	// Each chat sees only its own rows (reminders, attachments, flows).
+	DataChat = "chat"
+	// Only the agent that wrote it sees it (instructions, contacts, memory).
+	DataAgent = "agent"
+	// Every agent with the tool sees the same data (settings, the calendar).
+	DataShared = "shared"
+	// Keeps nothing (web fetch).
+	DataNone = "none"
+)
 
 // ToolSet is a connector's tools keyed by bare name, in JS object key order.
 type ToolSet = jsonx.Map[PaluiTool]

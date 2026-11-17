@@ -173,6 +173,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 
 	set := connectors.NewToolSet()
 	set.Set("save_attachment", connectors.PaluiTool{
+		Data:  connectors.DataChat,
 		Class: "write",
 		Title: "Save an attachment",
 		Tool: kit.Tool("Save a file the owner sent in this chat (photo, PDF, document) so it can be found later. Only save files that are worth keeping: identity documents (KTP, SIM, passport, KK), receipts and invoices, tickets and bookings, contracts, certificates, medical or school records, or anything the owner asks you to keep. Do NOT save casual photos, memes, screenshots of chats or files that are only needed for this one answer, unless the owner asks. When unsure, ask the owner first. By default it saves from the current message. A file from an earlier message (shown as [gambar dari sebelumnya]) can still be saved with `earlier: true`, for example a receipt sent before the owner confirmed: call it without `nomor` first to see the recent files with when they were sent and their caption, then again with the right `nomor`. Never tell the owner a file is saved unless this tool returned ok. Give it a clear title and a one-sentence description of what it is (dates, numbers, names that help find it later). Tell the owner it was saved. "+fileRefHint, saveInput,
@@ -249,6 +250,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 			}),
 	})
 	set.Set("list_attachments", connectors.PaluiTool{
+		Data:  connectors.DataChat,
 		Class: "read",
 		Title: "List saved attachments",
 		Tool: kit.Tool("List files saved in this chat with save_attachment, newest first. Use `query` to search titles, descriptions and file names, e.g. when the owner asks where their KTP or a ticket is. "+fileRefHint, listInput,
@@ -269,6 +271,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 			}),
 	})
 	set.Set("get_attachment", connectors.PaluiTool{
+		Data:  connectors.DataChat,
 		Class: "read",
 		Title: "Get a saved attachment",
 		Tool: kit.Tool("Get one saved file's details by id: title, description, type, size, when it was saved, and the dashboard link where the owner can open or download it after signing in. Files can't be sent back into the chat yet; to give someone the file itself, call share_attachment. "+fileRefHint, idInput,
@@ -281,6 +284,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 			}),
 	})
 	set.Set("share_attachment", connectors.PaluiTool{
+		Data:  connectors.DataChat,
 		Class: "write",
 		Title: "Share a saved attachment",
 		Tool: kit.Tool(`Make a temporary link that opens a saved file directly (images and PDFs show in the browser, other files download). visibility "private" (the default) only opens for the owner signed in to the dashboard. visibility "public" opens for anyone who has the link, so only use it when the owner asks to share the file with someone else, and never for identity documents unless the owner says so explicitly. Links expire after `+"`expires`"+` (default 24h, at most 7d) and the owner can turn them off on the Attachments page. Each call makes a new link; send the url as it is.`, shareInput,
@@ -313,6 +317,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 			}),
 	})
 	set.Set("unshare_attachment", connectors.PaluiTool{
+		Data:  connectors.DataChat,
 		Class: "write",
 		Title: "Turn off links to an attachment",
 		Tool: kit.Tool("Turn off every live share link to a saved file, e.g. when the owner says a link shouldn't work anymore. The file itself stays saved.", idInput,
@@ -333,6 +338,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 			}),
 	})
 	set.Set("delete_attachment", connectors.PaluiTool{
+		Data:  connectors.DataChat,
 		Class: "destructive",
 		Title: "Delete a saved attachment",
 		Tool: kit.Tool("Delete a saved file for good, only when the owner asks. Always needs the owner's approval.", idInput,

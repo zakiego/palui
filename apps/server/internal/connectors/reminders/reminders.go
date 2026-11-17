@@ -142,6 +142,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) *connectors.T
 	}
 	set := connectors.NewToolSet()
 	set.Set("set_reminder", connectors.PaluiTool{
+		Data:  connectors.DataChat,
 		Class: "write",
 		Title: "Set a reminder",
 		Tool: kit.Tool("Create a reminder in this chat. Work out the local date and time yourself from the current time in the system prompt (a date with no time means 09:00). Repeat the returned `echo` to the user so a wrong time shows right away.", setInput,
@@ -171,6 +172,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) *connectors.T
 			}),
 	})
 	set.Set("list_reminders", connectors.PaluiTool{
+		Data:  connectors.DataChat,
 		Class: "read",
 		Title: "List reminders",
 		Tool: kit.Tool("List this chat's reminders. upcoming = pending by next fire time, recurring = repeating ones, done = finished or cancelled (latest first).", listInput,
@@ -198,6 +200,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) *connectors.T
 			}),
 	})
 	set.Set("update_reminder", connectors.PaluiTool{
+		Data:  connectors.DataChat,
 		Class: "write",
 		Title: "Change a reminder",
 		Tool: kit.Tool("Change a reminder's text, time, repeat rule or zone. Changing the time reschedules it. Pass rrule null to make it a one-off.", updateInput,
@@ -237,6 +240,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) *connectors.T
 			}),
 	})
 	set.Set("cancel_reminder", connectors.PaluiTool{
+		Data:  connectors.DataChat,
 		Class: "write",
 		Title: "Cancel a reminder",
 		Tool: kit.Tool("Cancel a reminder (a repeating one stops for good). It stays in the done list.", cancelInput,
@@ -262,6 +266,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) *connectors.T
 			}),
 	})
 	set.Set("snooze_reminder", connectors.PaluiTool{
+		Data:  connectors.DataChat,
 		Class: "write",
 		Title: "Snooze a reminder",
 		Tool: kit.Tool("Snooze a reminder: preset 10m, 1h or tomorrow (tomorrow 09:00 in the reminder's zone), or an exact localDateTime. A repeating reminder keeps its rule afterwards.", snoozeInput,
