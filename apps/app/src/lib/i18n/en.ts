@@ -712,7 +712,7 @@ export const en = {
   "agents.tools.youAllowAll": "Every tool runs without asking, except the ones set to ask.",
   "agents.perm.title": "Permissions",
   "agents.perm.allowAll": "Allow every tool without asking",
-  "agents.perm.allowAllHint": "Only your messages. Ask and Off below still apply.",
+  "agents.perm.allowAllHint": "Only your messages. Ask and Off below still apply, and after Palui reads another agent's chats or memory, writes ask again.",
   "agents.perm.for": "Permission for {name}",
   "agents.perm.default": "Default",
   "agents.perm.defaultAllow": "Default (allow)",

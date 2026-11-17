@@ -711,7 +711,7 @@ export const id: Record<Key, string> = {
   "agents.tools.youAllowAll": "Semua tool jalan tanpa minta izin, kecuali yang diatur minta izin.",
   "agents.perm.title": "Izin",
   "agents.perm.allowAll": "Izinkan semua tool tanpa bertanya",
-  "agents.perm.allowAllHint": "Cuma pesanmu. Minta izin dan Mati di bawah tetap berlaku.",
+  "agents.perm.allowAllHint": "Cuma pesanmu. Minta izin dan Mati di bawah tetap berlaku, dan setelah Palui baca chat atau memori agent lain, tool yang menulis tetap minta izin.",
   "agents.perm.for": "Izin untuk {name}",
   "agents.perm.default": "Bawaan",
   "agents.perm.defaultAllow": "Bawaan (izinkan)",
