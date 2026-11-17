@@ -336,9 +336,10 @@ Delivery is at least once. Outbox rows stuck in `sending` for more than 5 minute
 | Table | Key columns |
 |---|---|
 | `connectors` | id, type, kind, label, enabled, status, status_detail, trust, config json, secrets (encrypted), config_hash, updated_at |
-| `identities` | id, channel, external_id, alt_id (LID), display_name, role (`owner` or `member`), member_id |
-| `members` | id, name, created_at (19.4) |
-| `agent_members` | agent_id, member_id (19.4) |
+| `identities` | id, channel, external_id, alt_id (LID), display_name, role (owner only) |
+| `members` | id, name, created_at, updated_at (19.4) |
+| `member_accounts` | id, member_id, channel, external_id (unique per channel), alt_id, display_name, created_at (19.4) |
+| `agent_members` | agent_id, member_id, created_at (19.4) |
 | `claims` | nonce, channel, expires_at, used_at |
 | `agents` | id, slug, name, persona, is_default, recall_container, guest_tools, daily_token_cap, telegram_connector_id, avatar_image, avatar_icon, avatar_color |
 | `chats` | id, channel, connector_id, external_id, title, kind, session_id, allowed, agent_id |
@@ -585,17 +586,21 @@ One rule: a turn only gets tools whose data everyone who can read the chat may s
 
 People:
 
-- The owner, as today (`identities.role = 'owner'`).
-- Members: people the owner names, each with one or more channel accounts (`members`, plus `identities.role = 'member'` with `identities.member_id`). `agent_members` links a member to the agents they share. A member of one agent is an outsider to every other agent.
+- The owner, as today (`identities`).
+- Members: people the owner names, each with one or more channel accounts (`members` and `member_accounts`). `agent_members` links a member to the agents they share. A member of one agent is an outsider to every other agent.
 - Outsiders: everyone else.
+
+Member accounts never live in `identities`: every query there assumes the row is the owner.
 
 Audience, worked out when the turn starts:
 
 | Audience | When |
 |---|---|
 | `owner` | The owner's DM or the web chat. |
-| `members` | A shared chat where every participant is the owner or a member of this chat's agent: a DM with a member, or a WhatsApp group whose participant list (`GetGroupInfo`, cached, refreshed on participant changes) holds nobody else. |
+| `members` | A shared chat where every participant is the owner or a member of this chat's agent: a DM with a member, or a WhatsApp group whose participant list (`GetGroupInfo`, cached, refreshed on participant changes) holds nobody else. The agent needs at least one member; Palui has none, so it never gets this audience. |
 | `outside` | Anything else. A participant list Palui can't read counts as `outside` (fail closed), and so does every Telegram group, since a bot can't list a group's members. |
+
+On WhatsApp the participant list is cached for 10 minutes and dropped on a group change event, on reconnect and when a sender outside the list writes. A cache miss waits at most 3 s, then counts as `outside`.
 
 Data scope is `PaluiTool.Data` from the connector contract: `none`, `chat`, `agent` or `shared`. A tool without one follows its connector: `agent` when one agent owns the connector, `shared` when it's global. MCP servers, Google Calendar and T3 Code are `agent` or `shared` that way. The owner can mark an MCP server as `none` on the agent's Tools tab (a prayer times server holds nothing private); that's the only override, since Palui can't check what an outside server keeps.
 
