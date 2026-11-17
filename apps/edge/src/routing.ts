@@ -6,11 +6,22 @@
 //   /api/*       the REST API: Better Auth (/api/auth), inbound hooks
 //                (/api/hooks/:slug) and the dashboard's own endpoints
 //   /health      the healthcheck
+//   /mcp         Palui's own MCP server, for the owner's AI agents
+//   /.well-known/oauth-protected-resource, /.well-known/oauth-authorization-server
+//                the OAuth discovery documents MCP clients read for /mcp.
+//                Other /.well-known paths stay with the site.
 //
 // Everything else ("/", /docs, /_next, /og, /search.json, robots.txt...) is
 // the site. The site's search index lives at /search.json, not /api/search,
 // because /api belongs to the app here.
-const APP_PREFIXES = ["/app", "/api", "/health"]
+const APP_PREFIXES = [
+  "/app",
+  "/api",
+  "/health",
+  "/mcp",
+  "/.well-known/oauth-protected-resource",
+  "/.well-known/oauth-authorization-server",
+]
 
 const underAny = (pathname: string, prefixes: string[]) =>
   prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
