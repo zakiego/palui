@@ -672,23 +672,32 @@ function ChatRow({ chat }: { chat: AgentChat }) {
 }
 
 // Loads a tab's data when the tab opens. Memory and Tools ask the runtime, so
-// they never hold up the page.
+// they never hold up the page. `refresh` loads again behind the data on
+// screen; only the newest request lands, and a failed one keeps the old data.
 function useTabData<T>(load: () => Promise<T>, key: string) {
   const [state, setState] = React.useState<{ data?: T; error?: string }>({})
+  const latest = React.useRef(0)
+  const loadRef = React.useRef(load)
+  loadRef.current = load
   React.useEffect(() => {
-    let live = true
+    const req = ++latest.current
     setState({})
-    load().then(
-      (data) => live && setState({ data }),
-      (err: unknown) => live && setState({ error: errorMessage(err) }),
+    loadRef.current().then(
+      (data) => req === latest.current && setState({ data }),
+      (err: unknown) => req === latest.current && setState({ error: errorMessage(err) }),
     )
     return () => {
-      live = false
+      latest.current++
     }
-    // `load` is a new closure every render; `key` says when it changed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
-  return state
+  const refresh = React.useCallback(() => {
+    const req = ++latest.current
+    loadRef.current().then(
+      (data) => req === latest.current && setState({ data }),
+      () => {},
+    )
+  }, [])
+  return { ...state, refresh }
 }
 
 function LoadError({ message }: { message: string }) {
@@ -786,7 +795,7 @@ function MemoryStats({ agent }: { agent: Agent }) {
 function ToolsTab({ agent }: { agent: Agent }) {
   const t = useT()
   const [query, setQuery] = React.useState("")
-  const { data, error } = useTabData(() => getAgentToolsFn({ data: { id: agent.id } }), agent.id)
+  const { data, error, refresh } = useTabData(() => getAgentToolsFn({ data: { id: agent.id } }), agent.id)
   // Owners changed here, on top of what the tab loaded. A changed server
   // moves to the other part of the list.
   const [owners, setOwners] = React.useState<Record<string, string | null>>({})
@@ -803,7 +812,10 @@ function ToolsTab({ agent }: { agent: Agent }) {
     } catch (err) {
       setOwners((o) => ({ ...o, [connectorId]: before }))
       toast.error(errorMessage(err))
+      return
     }
+    // Who gets each tool depends on the owner, and only the server knows.
+    refresh()
   }
   // Tool permissions save at once, like the scope. Rolled back when the save fails.
   const router = useRouter()
