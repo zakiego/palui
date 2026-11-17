@@ -553,8 +553,13 @@ func TestBuildSystemInbound(t *testing.T) {
 		notContains(t, p, "can't see what they sent")
 		in.Inbound = &chat.InboundInfo{Voice: true}
 		p = chat.BuildSystem(in)
-		contains(t, p, "Voice notes reach you as a transcript")
+		contains(t, p, "The owner's voice notes reach you as a transcript")
+		contains(t, p, "Anyone else's reach you only as a note that they weren't transcribed")
 		notContains(t, p, "can't hear them")
+		in.Shared = nil
+		p = chat.BuildSystem(in)
+		contains(t, p, "Voice notes reach you as a transcript")
+		notContains(t, p, "Anyone else's")
 	})
 	t.Run("leaves media out when no message started the turn", func(t *testing.T) {
 		in := group
