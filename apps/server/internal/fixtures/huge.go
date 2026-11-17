@@ -169,6 +169,11 @@ func huge(k *Kit) {
 		k.Passkey(Passkey{Name: ptr(fmt.Sprintf("%s's device %d", name(i), i+1)), DeviceType: deviceType, CreatedAt: ptr(now - i*D)})
 	}
 
+	// MCP access: the 50-token cap.
+	for i := int64(0); i < 50; i++ {
+		k.MCPGrant(MCPGrant{Name: fmt.Sprintf("%s's agent %d", name(i), i+1), Hint: ptr(fmt.Sprintf("%04d", i)), CreatedAt: now - i*D})
+	}
+
 	// Flows: the 50-per-chat cap in a few chats, and a run log a year of use leaves.
 	flowChats := []db.Chat{k.WebChat()}
 	for i := int64(0); i < Huge.FlowChats; i++ {

@@ -25,5 +25,6 @@ func one(k *Kit) {
 	k.FlowRun(flow, FlowRun{Status: "done", TriggerID: ptr("main"), StartedAt: now - MIN, Steps: []FlowStep{{StepID: "say", Kind: "message", Status: "ok", Output: obj("text", "Minum air")}}})
 
 	k.Passkey(Passkey{Name: ptr("MacBook Air"), CreatedAt: ptr(now - 24*H)})
+	k.MCPGrant(MCPGrant{Name: "Claude Code", Hint: ptr("x7Qe"), CreatedAt: now - 2*H, LastUsedAt: ptr(now - 10*MIN)})
 	k.Hook(Hook{Name: "Uptime", ChatID: web.ID, LastAt: ptr(now - H)})
 }

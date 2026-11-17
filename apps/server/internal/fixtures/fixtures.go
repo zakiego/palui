@@ -56,8 +56,12 @@ func clearProductData(q db.Q) error {
 			return err
 		}
 	}
-	_, err := q.Exec("DELETE FROM passkey WHERE id LIKE ?", FixturePasskeyPrefix+"%")
-	return err
+	for _, t := range []string{"passkey", "mcp_grants", "oauth_clients"} {
+		if _, err := q.Exec("DELETE FROM "+t+" WHERE id LIKE ?", FixturePasskeyPrefix+"%"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Current is currentFixture: the loaded fixture, or "" when a fixture didn't

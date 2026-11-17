@@ -342,6 +342,16 @@
     ["<job#14>","Benachrichtigungseinstellungen-Synchronisierung","heartbeat","FREQ=MINUTELY;INTERVAL=30","Europe/Berlin","2026-01-01T07:00:00","x","<chat#2>","default",null,1,1794623400000,"idle",1794619800000,"running",null,50000,1794535200013,1794621600000]
    ]
   },
+  "mcp_grants": {
+   "columns": ["id","kind","name","user_id","client_id","scope","token_hint","access_hash","access_expires_at","refresh_hash","refresh_expires_at","prev_refresh_hash","rotated_at","created_at","last_used_at"],
+   "rows": [
+    ["fx_<mcpg#1>","token","Claude Code on the office build server in rack B, slot 12 v2","user_owner",null,null,"Zq9_","fixture-fx_<mcpg#1>",null,null,null,null,null,1760061600000,null],
+    ["fx_<mcpg#2>","token","J","user_owner",null,null,"-_-_","fixture-fx_<mcpg#2>",null,null,null,null,null,1794621580000,1794621599000],
+    ["fx_<mcpg#3>","token","وكيل الذكاء الاصطناعي في المكتب","user_owner",null,null,"a1B2","fixture-fx_<mcpg#3>",null,null,null,null,null,1794362400000,1794614400000],
+    ["fx_<mcpg#4>","oauth","Claude","user_owner","fx_<plc#1>",null,null,"fixture-fx_<mcpg#4>",null,null,1797213600000,null,null,1793757600000,1794621300000],
+    ["fx_<mcpg#5>","oauth","Workspace Automation Assistant for the Finance and Operations Team (staging environment, do not use)","user_owner","fx_<plc#2>",null,null,"fixture-fx_<mcpg#5>",null,null,1797213600000,null,null,1731549600000,null]
+   ]
+  },
   "messages": {
    "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],
    "rows": [
@@ -385,6 +395,17 @@
     ["<msg#38>","<chat#2>","<ses#1>","user","{\"text\":\"ini belum dibalas\"}","ini belum dibalas",null,null,null,"pending",null,null,1794611580000,null,1],
     ["<msg#39>","<chat#2>","<ses#1>","user","{\"text\":\"ini diabaikan\"}","ini diabaikan",null,null,null,"ignored","not on the allowlist",null,1794611640000,null,1]
    ]
+  },
+  "oauth_clients": {
+   "columns": ["id","name","client_uri","redirect_uris","auth_method","secret_hash","created_at"],
+   "rows": [
+    ["fx_<plc#1>","Claude","https://claude.ai","[\"https://claude.ai/api/mcp/auth_callback\"]","none",null,1793757600000],
+    ["fx_<plc#2>","Workspace Automation Assistant for the Finance and Operations Team (staging environment, do not use)","https://very-long-subdomain-for-an-internal-tool.automation.example.com/integrations/model-context-protocol/callback","[\"https://claude.ai/api/mcp/auth_callback\"]","none",null,1731549600000]
+   ]
+  },
+  "oauth_requests": {
+   "columns": ["id","client_id","redirect_uri","state","scope","code_challenge","user_id","code_hash","created_at","expires_at"],
+   "rows": []
   },
   "outbound_messages": {
    "columns": ["id","agent_id","contact_id","text","origin","origin_ref","approved_by","owner_chat_id","rrule","tz","local_start","fire_at","status","last_outbox_id","created_at","updated_at"],

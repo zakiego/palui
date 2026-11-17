@@ -642,6 +642,38 @@ func (k *Kit) Passkey(v Passkey) {
 		col{"counter", int64(0)}, col{"device_type", deviceType}, col{"backed_up", db.Bool(backedUp)}, col{"transports", "internal"}, col{"created_at", created})
 }
 
+// MCPGrant is a personal token (no Client) or an OAuth connection (Client
+// set) for Settings > Security. Like Passkey it needs an owner. The hashes
+// are fake, so no fixture token opens /mcp.
+type MCPGrant struct {
+	Name       string
+	Hint       *string
+	Client     *string
+	ClientURI  *string
+	CreatedAt  int64
+	LastUsedAt *int64
+}
+
+func (k *Kit) MCPGrant(v MCPGrant) {
+	if k.ownerID == "" {
+		return
+	}
+	id := FixturePasskeyPrefix + secret.NewID("mcpg")
+	kind := "token"
+	var clientID, refreshExpires any
+	if v.Client != nil {
+		kind = "oauth"
+		cid := FixturePasskeyPrefix + secret.NewID("plc")
+		k.insert("oauth_clients", col{"id", cid}, col{"name", *v.Client}, col{"client_uri", nullable(v.ClientURI)},
+			col{"redirect_uris", `["https://claude.ai/api/mcp/auth_callback"]`}, col{"auth_method", "none"}, col{"created_at", v.CreatedAt})
+		clientID = cid
+		refreshExpires = k.Now + 30*24*60*60*1000
+	}
+	k.insert("mcp_grants", col{"id", id}, col{"kind", kind}, col{"name", v.Name}, col{"user_id", k.ownerID}, col{"client_id", clientID},
+		col{"token_hint", nullable(v.Hint)}, col{"access_hash", "fixture-" + id}, col{"refresh_expires_at", refreshExpires},
+		col{"created_at", v.CreatedAt}, col{"last_used_at", nullable(v.LastUsedAt)})
+}
+
 // Instruction: no AgentID means Palui's (PLAN 19.1).
 type Instruction struct {
 	Title, Body string
