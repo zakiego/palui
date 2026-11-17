@@ -71,7 +71,7 @@
     ["notes","notes","skill","Instructions & preferences",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
     ["settings","settings","skill","Settings",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
     ["remote-mcp","remote-mcp","skill","Remote MCP setup",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
-    ["mcp-jadwal-sholat","mcp","tools","jadwal-sholat",1,"on",null,"external","{\"url\":\"https://sholat.zakiego.com/mcp\",\"authMode\":\"none\",\"addedFromChat\":true}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
+    ["mcp-jadwal-sholat","mcp","tools","jadwal-sholat",1,"on",null,"external","{\"url\":\"https://sholat.zakiego.com/mcp\",\"authMode\":\"none\",\"addedFromChat\":true,\"noPrivateData\":true}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
     ["attachments","attachments","skill","Attachments",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
     ["voice","voice","skill","Voice notes",0,"not_set_up",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null]
    ]

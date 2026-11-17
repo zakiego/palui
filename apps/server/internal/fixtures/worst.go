@@ -141,10 +141,10 @@ func worst(k *Kit) {
 		Config: obj("url", worstLongURL),
 	})
 	k.Connector("mcp-j", "mcp", ConnectorOpts{Label: ptr("J"), Status: "on", Config: obj("url", "https://j.example.com/mcp")})
-	k.Connector("mcp-files", "mcp", ConnectorOpts{Label: ptr("خادم الملفات المشتركة"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://files.example.com/mcp")})
+	k.Connector("mcp-files", "mcp", ConnectorOpts{Label: ptr("خادم الملفات المشتركة"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://files.example.com/mcp", "noPrivateData", true)})
 	k.Connector("mcp-fox", "mcp", ConnectorOpts{Label: ptr("🦊"), Status: "paused", Config: obj("url", "https://fox.example.com/mcp")})
 	// A label with no break opportunity: someone pasted the host as the name.
-	k.Connector("mcp-host", "mcp", ConnectorOpts{Label: ptr(within("mcp.internal.northwind-industries-holdings.example.com/v2/sse", L.connectorLabel)), Status: "on", Config: obj("url", "https://mcp.internal.northwind-industries-holdings.example.com/v2/sse")})
+	k.Connector("mcp-host", "mcp", ConnectorOpts{Label: ptr(within("mcp.internal.northwind-industries-holdings.example.com/v2/sse", L.connectorLabel)), Status: "on", Config: obj("url", "https://mcp.internal.northwind-industries-holdings.example.com/v2/sse", "noPrivateData", true)})
 	k.Connector("mcp-rnd", "mcp", ConnectorOpts{Label: ptr(`<b>R&D</b> **beta** &amp; "quotes"`), Status: "on", Config: obj("url", "https://rnd.example.com/mcp")})
 	k.Connector("mcp-de", "mcp", ConnectorOpts{Label: ptr("Benachrichtigungseinstellungen"), Status: "connecting", Config: obj("url", "https://de.example.com/mcp")})
 	k.Connector("mcp-notion", "mcp", ConnectorOpts{Label: ptr("Notion"), Status: "on", Config: obj("url", "https://notion.example.com/mcp")})

@@ -35,7 +35,7 @@ func demo(k *Kit) {
 	k.Connector("notes", "notes", ConnectorOpts{Status: "on"})
 	k.Connector("settings", "settings", ConnectorOpts{Status: "on"})
 	k.Connector("remote-mcp", "remote-mcp", ConnectorOpts{Status: "on"})
-	k.Connector("mcp-jadwal-sholat", "mcp", ConnectorOpts{Label: ptr("jadwal-sholat"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://sholat.zakiego.com/mcp", "authMode", "none", "addedFromChat", true)})
+	k.Connector("mcp-jadwal-sholat", "mcp", ConnectorOpts{Label: ptr("jadwal-sholat"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://sholat.zakiego.com/mcp", "authMode", "none", "addedFromChat", true, "noPrivateData", true)})
 	k.Instruction(Instruction{Title: "Jadwal sholat", Body: "Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai JSON API di https://sholat.zakiego.com/api/v1 lewat web fetch.", CreatedAt: ptr(now - 3*H)})
 	k.Instruction(Instruction{Title: "Ringkasan pagi", Body: "Mulai dengan cuaca, lalu agenda, lalu pengingat hari ini.", Enabled: ptr(false), CreatedAt: ptr(now - 2*H)})
 	k.Preference("default_city", "Banjarmasin")
