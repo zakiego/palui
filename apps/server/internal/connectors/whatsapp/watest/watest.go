@@ -33,6 +33,8 @@ type FakeSocket struct {
 	seq             int
 	updates         map[int]func(whatsapp.Update)
 	upserts         map[int]func(whatsapp.Upsert)
+	groupChanges    map[int]func(string)
+	groupCalls      int
 	sent            []Sent
 	presence        []Presence
 	pairingRequests []string
@@ -50,6 +52,10 @@ type FakeSocket struct {
 	downloads []string
 	// GroupSubjects answers GroupSubject.
 	GroupSubjects map[string]string
+	// GroupMembers and GroupMembersErr answer GroupParticipants; a group in
+	// neither is an error.
+	GroupMembers    map[string][]whatsapp.GroupMember
+	GroupMembersErr map[string]error
 }
 
 // New is new FakeSocket({ registered }).
@@ -57,7 +63,8 @@ func New(registered bool) *FakeSocket {
 	return &FakeSocket{
 		updates: map[int]func(whatsapp.Update){}, upserts: map[int]func(whatsapp.Upsert){},
 		PairingCode: "ABCD1234", registered: registered, Lids: map[string]string{}, nextID: 1,
-		GroupSubjects: map[string]string{},
+		GroupSubjects: map[string]string{}, groupChanges: map[int]func(string){},
+		GroupMembers: map[string][]whatsapp.GroupMember{}, GroupMembersErr: map[string]error{},
 	}
 }
 
@@ -203,6 +210,54 @@ func (f *FakeSocket) GroupSubject(_ context.Context, jid string) (string, error)
 		return s, nil
 	}
 	return "", fmt.Errorf("no metadata for %s", jid)
+}
+
+func (f *FakeSocket) GroupParticipants(_ context.Context, jid string) ([]whatsapp.GroupMember, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.groupCalls++
+	if err, ok := f.GroupMembersErr[jid]; ok {
+		return nil, err
+	}
+	if list, ok := f.GroupMembers[jid]; ok {
+		return append([]whatsapp.GroupMember(nil), list...), nil
+	}
+	return nil, fmt.Errorf("no participants for %s", jid)
+}
+
+// GroupMemberCalls is how many times GroupParticipants was called.
+func (f *FakeSocket) GroupMemberCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.groupCalls
+}
+
+func (f *FakeSocket) OnGroupChange(fn func(string)) func() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.seq++
+	id := f.seq
+	f.groupChanges[id] = fn
+	return func() {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		delete(f.groupChanges, id)
+	}
+}
+
+// EmitGroupChange reports that a group's metadata or participants changed.
+func (f *FakeSocket) EmitGroupChange(jid string) {
+	f.mu.Lock()
+	fns := make([]func(string), 0, len(f.groupChanges))
+	for i := 1; i <= f.seq; i++ {
+		if fn, ok := f.groupChanges[i]; ok {
+			fns = append(fns, fn)
+		}
+	}
+	f.mu.Unlock()
+	for _, fn := range fns {
+		fn(jid)
+	}
 }
 
 func (f *FakeSocket) PNForLID(_ context.Context, lid string) (string, error) {

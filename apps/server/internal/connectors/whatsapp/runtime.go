@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,6 +44,7 @@ const (
 	ExpiresHint       = "expires in about 2 min"
 	recentMax         = 200
 	groupTitleTTL     = 3600_000
+	groupMembersTTL   = 10 * 60_000
 	defaultLeadMs     = 1500
 	defaultRefreshMs  = 8000
 	defaultTypingMax  = 10 * 60_000
@@ -203,6 +205,13 @@ type titleEntry struct {
 	at    int64
 }
 
+type membersEntry struct {
+	list []connectors.Participant
+	at   int64
+}
+
+var _ connectors.GroupLister = (*wa)(nil)
+
 type wa struct {
 	c         connectors.Context
 	o         Options
@@ -228,6 +237,9 @@ type wa struct {
 	lastInbound map[string]Key
 	thinking    map[string]*thinking
 	groupTitles map[string]titleEntry
+	// Group participant lists (PLAN 19.4), dropped on any group change, on
+	// reconnect and when a sender outside the list writes.
+	groupMembers map[string]membersEntry
 
 	queue chan delivery
 	quit  chan struct{}
@@ -277,6 +289,7 @@ func start(c connectors.Context, o Options) (*connectors.RunningConnector, error
 		lastInbound:     map[string]Key{},
 		thinking:        map[string]*thinking{},
 		groupTitles:     map[string]titleEntry{},
+		groupMembers:    map[string]membersEntry{},
 		queue:           make(chan delivery, 256),
 		quit:            make(chan struct{}),
 	}
@@ -479,6 +492,8 @@ func (w *wa) onUpdate(s Socket, u Update) {
 	}
 	switch u.Connection {
 	case "open":
+		// Changes made while offline may never be reported.
+		w.groupMembers = map[string]membersEntry{}
 		w.attempt = 0
 		w.clearPairingLocked()
 		w.live.Connection = "open"
@@ -602,9 +617,15 @@ func (w *wa) connect() {
 			}
 		}
 	})
+	offGroup := s.OnGroupChange(func(jid string) {
+		w.mu.Lock()
+		delete(w.groupMembers, jid)
+		w.mu.Unlock()
+	})
 	w.detach = func() {
 		offUpdate()
 		offUpsert()
+		offGroup()
 	}
 	w.mu.Unlock()
 	s.Open()
@@ -701,6 +722,14 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		}
 	}
 
+	if group {
+		w.mu.Lock()
+		if e, ok := w.groupMembers[jid]; ok && !inParticipants(e.list, BareJID(sender), alt) {
+			delete(w.groupMembers, jid)
+		}
+		w.mu.Unlock()
+	}
+
 	text := TextOf(content)
 	info := MediaOf(content)
 	var media []connectors.InboundMedia
@@ -788,6 +817,85 @@ func (w *wa) Reachable() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return !w.stopped && w.live.Connection == "open"
+}
+
+func inParticipants(list []connectors.Participant, ids ...string) bool {
+	for _, p := range list {
+		for _, id := range ids {
+			if id != "" && (p.ExternalID == id || p.AltID == id) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// GroupParticipants is who is in a group right now, without this account
+// (connectors.GroupLister). The list is cached for 10 minutes and never served
+// while disconnected, since change events can't arrive then.
+func (w *wa) GroupParticipants(ctx context.Context, jid string) ([]connectors.Participant, error) {
+	if !IsGroupChat(jid) {
+		return nil, fmt.Errorf("%s is not a group", jid)
+	}
+	s := w.openSocket()
+	if s == nil {
+		return nil, errors.New(ReasonNotConnected)
+	}
+	now := w.o.Now()
+	w.mu.Lock()
+	hit, ok := w.groupMembers[jid]
+	w.mu.Unlock()
+	if ok && now-hit.at < groupMembersTTL {
+		return slices.Clone(hit.list), nil
+	}
+	got, err := s.GroupParticipants(ctx, jid)
+	if err != nil {
+		return nil, err
+	}
+	user := s.User()
+	if user == nil {
+		return nil, errors.New("this WhatsApp account is not known yet")
+	}
+	self := map[string]bool{}
+	for _, id := range []string{user.ID, user.LID} {
+		if id != "" {
+			self[BareJID(id)] = true
+		}
+	}
+	list := make([]connectors.Participant, 0, len(got))
+	foundSelf := false
+	for _, m := range got {
+		id, alt := BareJID(m.ID), ""
+		if m.Alt != "" {
+			alt = BareJID(m.Alt)
+		} else {
+			var found string
+			var err error
+			if IsLID(id) {
+				found, err = s.PNForLID(ctx, id)
+			} else {
+				found, err = s.LIDForPN(ctx, id)
+			}
+			if err == nil && found != "" {
+				alt = BareJID(found)
+			}
+		}
+		if alt == id {
+			alt = ""
+		}
+		if self[id] || (alt != "" && self[alt]) {
+			foundSelf = true
+			continue
+		}
+		list = append(list, connectors.Participant{ExternalID: id, AltID: alt})
+	}
+	if !foundSelf {
+		return nil, fmt.Errorf("this WhatsApp account is not in %s", jid)
+	}
+	w.mu.Lock()
+	w.groupMembers[jid] = membersEntry{list: list, at: w.o.Now()}
+	w.mu.Unlock()
+	return slices.Clone(list), nil
 }
 
 func (w *wa) openSocket() Socket {
