@@ -430,6 +430,8 @@ type ToolPermissions struct {
 	Tools    *jsonx.Map[string] `json:"tools"`
 }
 
+// Agent: the table still has owner_powers (PLAN 19.9 step 5). Nothing reads
+// or writes it, and a later release drops the column with a table rebuild.
 type Agent struct {
 	ID                   string                    `json:"id"`
 	Slug                 string                    `json:"slug"`
@@ -439,7 +441,6 @@ type Agent struct {
 	RecallContainer      *string                   `json:"recallContainer"`
 	RecallReadContainers NullJSON[[]string]        `json:"recallReadContainers"`
 	RecallPerChat        bool                      `json:"recallPerChat"`
-	OwnerPowers          string                    `json:"ownerPowers"`
 	GuestTools           string                    `json:"guestTools"`
 	DailyTokenCap        int64                     `json:"dailyTokenCap"`
 	ToolPermissions      NullJSON[ToolPermissions] `json:"toolPermissions"`
@@ -451,11 +452,11 @@ type Agent struct {
 	UpdatedAt            int64                     `json:"updatedAt"`
 }
 
-const AgentCols = "id, slug, name, persona, is_default, recall_container, recall_read_containers, recall_per_chat, owner_powers, guest_tools, daily_token_cap, tool_permissions, telegram_connector_id, avatar_image, avatar_icon, avatar_color, created_at, updated_at"
+const AgentCols = "id, slug, name, persona, is_default, recall_container, recall_read_containers, recall_per_chat, guest_tools, daily_token_cap, tool_permissions, telegram_connector_id, avatar_image, avatar_icon, avatar_color, created_at, updated_at"
 
 func ScanAgent(s Scanner) (Agent, error) {
 	var a Agent
-	err := s.Scan(&a.ID, &a.Slug, &a.Name, &a.Persona, &a.IsDefault, &a.RecallContainer, &a.RecallReadContainers, &a.RecallPerChat, &a.OwnerPowers, &a.GuestTools, &a.DailyTokenCap, &a.ToolPermissions, &a.TelegramConnectorID, &a.AvatarImage, &a.AvatarIcon, &a.AvatarColor, &a.CreatedAt, &a.UpdatedAt)
+	err := s.Scan(&a.ID, &a.Slug, &a.Name, &a.Persona, &a.IsDefault, &a.RecallContainer, &a.RecallReadContainers, &a.RecallPerChat, &a.GuestTools, &a.DailyTokenCap, &a.ToolPermissions, &a.TelegramConnectorID, &a.AvatarImage, &a.AvatarIcon, &a.AvatarColor, &a.CreatedAt, &a.UpdatedAt)
 	return a, err
 }
 

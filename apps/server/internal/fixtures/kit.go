@@ -228,7 +228,6 @@ func (k *Kit) Chat(channel, externalID, title string, o ChatOpts) db.Chat {
 // form limits.
 type Agent struct {
 	Slug, Name, Persona  string
-	OwnerPowers          string
 	GuestTools           string
 	DailyTokenCap        *int64
 	ToolPermissions      any
@@ -245,9 +244,6 @@ type Agent struct {
 func (k *Kit) Agent(v Agent) string {
 	id := secret.NewID("agt")
 	cols := []col{{"id", id}, {"slug", v.Slug}, {"name", v.Name}, {"persona", v.Persona}}
-	if v.OwnerPowers != "" {
-		cols = append(cols, col{"owner_powers", v.OwnerPowers})
-	}
 	if v.GuestTools != "" {
 		cols = append(cols, col{"guest_tools", v.GuestTools})
 	}
