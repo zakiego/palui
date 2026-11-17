@@ -11,6 +11,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.10.0 (2026-11-18)
+
 ### Added
 
 - Save your own chat commands on the dashboard. The new Commands page stores a prompt under a `/name`, for every agent or for one agent, and typing it runs a normal turn with that prompt. `{{args}}` takes the text typed after the command, and "Attach a debug report" adds the `/report` snapshot, so a command like `/report-fix` can hand a bug straight to a T3 Code thread. Your commands show up in `/help`, and four new MCP tools manage them. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
