@@ -6,6 +6,10 @@
    "columns": ["id","account_id","provider_id","user_id","access_token","refresh_token","id_token","access_token_expires_at","refresh_token_expires_at","scope","password","created_at","updated_at"],
    "rows": []
   },
+  "agent_members": {
+   "columns": ["agent_id","member_id","created_at"],
+   "rows": []
+  },
   "agents": {
    "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat"],
    "rows": [
@@ -351,6 +355,14 @@
     ["fx_<mcpg#4>","oauth","Claude","user_owner","fx_<plc#1>",null,null,"fixture-fx_<mcpg#4>",null,null,1797213600000,null,null,1793757600000,1794621300000],
     ["fx_<mcpg#5>","oauth","Workspace Automation Assistant for the Finance and Operations Team (staging environment, do not use)","user_owner","fx_<plc#2>",null,null,"fixture-fx_<mcpg#5>",null,null,1797213600000,null,null,1731549600000,null]
    ]
+  },
+  "member_accounts": {
+   "columns": ["id","member_id","channel","external_id","alt_id","display_name","created_at"],
+   "rows": []
+  },
+  "members": {
+   "columns": ["id","name","created_at","updated_at"],
+   "rows": []
   },
   "messages": {
    "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],

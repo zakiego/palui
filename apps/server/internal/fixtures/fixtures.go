@@ -44,7 +44,7 @@ var productTables = []string{
 	"connectors", "identities", "claims", "chats", "sessions", "messages", "runs", "tool_calls", "pending_approvals", "reminders",
 	"contacts", "outbound_messages", "jobs", "routines", "routine_occurrences", "outbox", "events", "reports", "hooks", "instructions",
 	"agents", "preferences", "attachment_shares", "saved_attachments", "usage", "settings", "flow_step_runs", "flow_runs", "flow_triggers",
-	"flow_versions", "flows",
+	"flow_versions", "flows", "agent_members", "member_accounts", "members",
 }
 
 // RealDataError is the refusal on a database a fixture didn't fill.

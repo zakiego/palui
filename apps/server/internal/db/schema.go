@@ -74,6 +74,55 @@ func ScanIdentity(s Scanner) (Identity, error) {
 	return r, err
 }
 
+// --- members, member_accounts, agent_members (PLAN 19.4) ---------------------------
+
+type Member struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
+const MemberCols = "id, name, created_at, updated_at"
+
+func ScanMember(s Scanner) (Member, error) {
+	var r Member
+	err := s.Scan(&r.ID, &r.Name, &r.CreatedAt, &r.UpdatedAt)
+	return r, err
+}
+
+type MemberAccount struct {
+	ID          string  `json:"id"`
+	MemberID    string  `json:"memberId"`
+	Channel     string  `json:"channel"`
+	ExternalID  string  `json:"externalId"`
+	AltID       *string `json:"altId"`
+	DisplayName *string `json:"displayName"`
+	CreatedAt   int64   `json:"createdAt"`
+}
+
+const MemberAccountCols = "id, member_id, channel, external_id, alt_id, display_name, created_at"
+
+func ScanMemberAccount(s Scanner) (MemberAccount, error) {
+	var r MemberAccount
+	err := s.Scan(&r.ID, &r.MemberID, &r.Channel, &r.ExternalID, &r.AltID, &r.DisplayName, &r.CreatedAt)
+	return r, err
+}
+
+type AgentMember struct {
+	AgentID   string `json:"agentId"`
+	MemberID  string `json:"memberId"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+const AgentMemberCols = "agent_id, member_id, created_at"
+
+func ScanAgentMember(s Scanner) (AgentMember, error) {
+	var r AgentMember
+	err := s.Scan(&r.AgentID, &r.MemberID, &r.CreatedAt)
+	return r, err
+}
+
 // --- chats, sessions, messages ---------------------------------------------------
 
 type Chat struct {
