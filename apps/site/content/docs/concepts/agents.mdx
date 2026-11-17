@@ -21,6 +21,16 @@ Open an agent on the Agents page and pick a section:
 
 Palui is your personal agent. Its memory is your memory and its preferences are your personal data, so it never answers anyone else. A group you never gave an agent keeps the old rule: Palui answers only your own messages there.
 
+## Palui reads the other agents
+
+Palui can read what your other agents see, so you can ask it in your DM "what did the book club group say today?" or "what does the shop agent remember about that order?". It gets four read tools for this, and only in your own DM or the web chat, on your messages and your scheduled jobs:
+
+- `chats__list_agent_chats` lists the other agents and the chats each one answers in.
+- `chats__read_agent_chat` reads one of those chats, 30 messages by default and 100 at most, and pages further back. Each message says whether you wrote it, someone else did (with the name their app shows), a webhook sent it, or the agent replied. Saved file references and dashboard links are hidden.
+- `recall__search_agent_memory` and `recall__list_agent_memory` read an agent's memory: its own container and, with separate memory per chat, its 10 most recent chats' containers, or one chat you name. They never read your memory or the agent's shared containers.
+
+What Palui reads there was written by other people, so it counts as untrusted: after reading, any write in that turn asks you first. No other agent gets these tools, and no agent can read Palui's chats or memory. Groups, other people's DMs, webhooks, flows and reminders never get them either.
+
 ## Give a chat an agent
 
 1. Create the agent on the Agents page: a name, a slug like `chef`, and a persona.
@@ -70,7 +80,7 @@ Separate memory per chat gives each chat its own container (`agent-<slug>-c<hash
 
 Shared containers are read only. List up to 5 on the Memory tab, like a `kb-shop` container you fill yourself with product facts or an FAQ. Auto-recall reads them next to the agent's own memory and labels them as reference, never instructions. Palui's container is your memory, so no other agent can use it, read only or not.
 
-An agent's recall tools follow the same rule. `search_memories` and the other read tools reach its own container and its shared ones, `add_memory` writes only to its own, and `forget_memory` only deletes a memory that's in its own container. Naming any other container is an error. Palui is locked the same way: its tools reach your memory and the shared containers on its Memory tab, never another agent's. To let Palui read an agent's memory, add that agent's container (like `agent-finansial`) to Palui's shared list. Flow steps and flow sources run with the flow's agent, so a flow gets the same limits.
+An agent's recall tools follow the same rule. `search_memories` and the other read tools reach its own container and its shared ones, `add_memory` writes only to its own, and `forget_memory` only deletes a memory that's in its own container. Naming any other container is an error. Palui's own memory tools are locked the same way: they reach your memory and the shared containers on its Memory tab. To read another agent's memory, Palui uses `search_agent_memory` and `list_agent_memory` (see [Palui reads the other agents](#palui-reads-the-other-agents)), which taint the turn. Flow steps and flow sources run with the flow's agent, so a flow gets the same limits.
 
 ## Daily cap
 
