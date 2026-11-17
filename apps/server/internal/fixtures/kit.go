@@ -238,6 +238,7 @@ type Agent struct {
 	AvatarImage          *string
 	AvatarIcon           *string
 	AvatarColor          *string
+	ModelRoles           any
 	TokensToday          int64
 }
 
@@ -266,6 +267,9 @@ func (k *Kit) Agent(v Agent) string {
 		col{"avatar_icon", nullable(v.AvatarIcon)},
 		col{"avatar_color", nullable(v.AvatarColor)},
 		col{"created_at", k.Now}, col{"updated_at", k.Now})
+	if v.ModelRoles != nil {
+		cols = append(cols, col{"model_roles", str(v.ModelRoles)})
+	}
 	k.insert("agents", cols...)
 	if v.TokensToday != 0 {
 		tz := must(settings.Timezone(k.Q))

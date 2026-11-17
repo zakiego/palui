@@ -2122,7 +2122,7 @@
    },
    {
     "payload": {
-     "text": "Oke, model default sekarang cliproxy/claude-sonnet-4-6.\nUrutannya: cliproxy/claude-sonnet-4-6 → gateway/claude-sonnet-4-6 → cliproxy/m → gateway/m\nBerlaku mulai pesan berikutnya, buat semua chat dan agent.\nPesan bergambar tetap pakai cliproxy/m. Ganti pakai /model vision <nama>."
+     "text": "Oke, model default sekarang cliproxy/claude-sonnet-4-6.\nUrutannya: cliproxy/claude-sonnet-4-6 → gateway/claude-sonnet-4-6 → cliproxy/m → gateway/m\nBerlaku mulai pesan berikutnya, buat semua agent yang ikut model global.\nPesan bergambar tetap pakai cliproxy/m. Ganti pakai /model vision <nama>."
     },
     "source": "system"
    },
@@ -2134,7 +2134,7 @@
    },
    {
     "payload": {
-     "text": "Oke, model fast sekarang gateway/gpt-5.\nUrutannya: gateway/gpt-5 → cliproxy/m → gateway/m\nBerlaku mulai pesan berikutnya, buat semua chat dan agent."
+     "text": "Oke, model fast sekarang gateway/gpt-5.\nUrutannya: gateway/gpt-5 → cliproxy/m → gateway/m\nBerlaku mulai pesan berikutnya, buat semua agent yang ikut model global."
     },
     "source": "system"
    },

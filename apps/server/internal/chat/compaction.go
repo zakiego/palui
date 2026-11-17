@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/chats"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/logx"
@@ -110,7 +111,18 @@ func CompactSession(c *EngineCtx, sessionID string, after, keep int) (CompactRes
 	}
 	fold := all[:len(all)-keep]
 	until := fold[len(fold)-1].CreatedAt
-	chain, err := models.ResolveChain(q, c.Host, "fast")
+	// The chat's agent may run its own fast model.
+	var own db.AgentModels
+	if row, found, err := chats.Get(q, session.ChatID); err != nil {
+		return CompactResult{}, err
+	} else if found {
+		agent, err := agents.ForChat(q, row.AgentID, c.Clock())
+		if err != nil {
+			return CompactResult{}, err
+		}
+		own = agent.ModelRoles.V
+	}
+	chain, err := models.ResolveAgentChain(q, c.Host, own, "fast")
 	if err != nil {
 		return CompactResult{}, err
 	}

@@ -11,7 +11,7 @@
    "rows": []
   },
   "agents": {
-   "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat"],
+   "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat","model_roles"],
    "rows": []
   },
   "attachment_shares": {

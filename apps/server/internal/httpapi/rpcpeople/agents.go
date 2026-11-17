@@ -56,24 +56,31 @@ func agentFields(extra ...zod.Field) *zod.ObjectS {
 		zod.F("avatarImage", zod.Nullable(zod.String().Max(agents.MaxAvatarImage))),
 		zod.F("avatarIcon", zod.Nullable(zod.Enum(agents.AgentIcons...))),
 		zod.F("avatarColor", zod.Nullable(zod.Enum(agents.AgentColors...))),
+		// Left out keeps the agent's models; an empty role uses the global chain.
+		zod.F("modelRoles", zod.Optional(zod.Object(roleChain("default"), roleChain("fast"), roleChain("vision")))),
 	}
 	return zod.Object(append(fields, extra...)...)
 }
 
+func roleChain(role string) zod.Field {
+	return zod.F(role, zod.Array(settings.ModelLinkZod()).Max(6))
+}
+
 type agentInput struct {
-	ID                   *string  `json:"id"`
-	Slug                 *string  `json:"slug"`
-	Name                 string   `json:"name"`
-	Persona              string   `json:"persona"`
-	GuestTools           string   `json:"guestTools"`
-	DailyTokenCap        int64    `json:"dailyTokenCap"`
-	RecallContainer      *string  `json:"recallContainer"`
-	RecallReadContainers []string `json:"recallReadContainers"`
-	RecallPerChat        bool     `json:"recallPerChat"`
-	TelegramConnectorID  *string  `json:"telegramConnectorId"`
-	AvatarImage          *string  `json:"avatarImage"`
-	AvatarIcon           *string  `json:"avatarIcon"`
-	AvatarColor          *string  `json:"avatarColor"`
+	ID                   *string         `json:"id"`
+	Slug                 *string         `json:"slug"`
+	Name                 string          `json:"name"`
+	Persona              string          `json:"persona"`
+	GuestTools           string          `json:"guestTools"`
+	DailyTokenCap        int64           `json:"dailyTokenCap"`
+	RecallContainer      *string         `json:"recallContainer"`
+	RecallReadContainers []string        `json:"recallReadContainers"`
+	RecallPerChat        bool            `json:"recallPerChat"`
+	TelegramConnectorID  *string         `json:"telegramConnectorId"`
+	AvatarImage          *string         `json:"avatarImage"`
+	AvatarIcon           *string         `json:"avatarIcon"`
+	AvatarColor          *string         `json:"avatarColor"`
+	ModelRoles           *db.AgentModels `json:"modelRoles"`
 }
 
 // nullable maps a JSON string or null onto agents.Input's "" = null.
@@ -97,8 +104,29 @@ type agentPageChat struct {
 	DeployNotice bool   `json:"deployNotice"`
 }
 
+// agentModels is the agent's own chains next to the global ones it falls back to.
+type agentModels struct {
+	Own        roleChains            `json:"own"`
+	Global     settings.ModelRoles   `json:"global"`
+	Connectors []httpapi.ModelOption `json:"connectors"`
+}
+
+type roleChains struct {
+	Default []db.ModelLink `json:"default"`
+	Fast    []db.ModelLink `json:"fast"`
+	Vision  []db.ModelLink `json:"vision"`
+}
+
+func orNone(l []db.ModelLink) []db.ModelLink {
+	if l == nil {
+		return []db.ModelLink{}
+	}
+	return l
+}
+
 type agentPage struct {
 	Agent        agentViewT       `json:"agent"`
+	Models       agentModels      `json:"models"`
 	Bots         []telegramBot    `json:"bots"`
 	Instructions []db.Instruction `json:"instructions"`
 	Chats        []agentPageChat  `json:"chats"`
@@ -243,7 +271,17 @@ func init() {
 				}
 				list = append(list, agentPageChat{ID: ch.ID, Title: ch.Title, Channel: ch.Channel, Kind: ch.Kind, LastAt: ch.LastAt, Allowed: ch.Allowed, ReplyMode: ch.ReplyMode, Ack: ch.Ack, AckEmoji: ch.AckEmoji, DeployNotice: slices.Contains(notice, ch.ID)})
 			}
-			return agentPage{Agent: view, Bots: free, Instructions: instructionsOrEmpty(ins), Chats: list, ChatsTotal: len(own)}, nil
+			global, err := settings.Get[settings.ModelRoles](q, "modelRoles")
+			if err != nil {
+				return nil, err
+			}
+			options, err := httpapi.ModelOptions(q)
+			if err != nil {
+				return nil, err
+			}
+			mine := row.ModelRoles.V
+			models := agentModels{Own: roleChains{orNone(mine.Default), orNone(mine.Fast), orNone(mine.Vision)}, Global: global, Connectors: options}
+			return agentPage{Agent: view, Models: models, Bots: free, Instructions: instructionsOrEmpty(ins), Chats: list, ChatsTotal: len(own)}, nil
 		},
 	})
 
@@ -300,6 +338,7 @@ func init() {
 				Name: &in.Name, Persona: &in.Persona, GuestTools: &in.GuestTools, DailyTokenCap: &in.DailyTokenCap,
 				RecallContainer: nullable(in.RecallContainer), RecallReadContainers: &list, RecallPerChat: &in.RecallPerChat,
 				TelegramConnectorID: nullable(in.TelegramConnectorID), AvatarImage: nullable(in.AvatarImage), AvatarIcon: nullable(in.AvatarIcon), AvatarColor: nullable(in.AvatarColor),
+				ModelRoles: in.ModelRoles,
 			}
 			var row db.Agent
 			var err error

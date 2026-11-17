@@ -16,6 +16,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/logx"
 	"github.com/zakiego/palui/apps/server/internal/memory"
+	"github.com/zakiego/palui/apps/server/internal/models"
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 )
@@ -83,7 +84,7 @@ func RunCommand(c *EngineCtx, chat db.Chat, name string, args []string, msg *Com
 	case "stop":
 		return cmdStop(c, chat), nil
 	case "status":
-		t, err := StatusText(c)
+		t, err := StatusText(c, chat)
 		return CommandReply{Text: t}, err
 	case "connectors":
 		return cmdConnectors(c, chat, args)
@@ -455,10 +456,15 @@ func cmdStop(c *EngineCtx, chat db.Chat) CommandReply {
 }
 
 // StatusText is statusText.
-func StatusText(c *EngineCtx) (string, error) {
+func StatusText(c *EngineCtx, chat db.Chat) (string, error) {
 	q := c.DB
 	now := c.Clock()
 	all, err := settings.All(q)
+	if err != nil {
+		return "", err
+	}
+	// The chain this chat's agent runs, its own or the global one.
+	agent, err := agents.ForChat(q, chat.AgentID, now)
 	if err != nil {
 		return "", err
 	}
@@ -468,7 +474,7 @@ func StatusText(c *EngineCtx) (string, error) {
 		running[e.ID] = true
 	}
 	var links []string
-	for _, l := range all.ModelRoles.Default {
+	for _, l := range models.EffectiveChain(all.ModelRoles, agent.ModelRoles.V, "default") {
 		off := ""
 		if !running[l.ConnectorID] {
 			off = " (off)"

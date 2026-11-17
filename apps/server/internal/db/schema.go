@@ -454,6 +454,36 @@ type ToolPermissions struct {
 	Tools    *jsonx.Map[string] `json:"tools"`
 }
 
+// ModelLink is one step of a model chain: a model connector, a model id and
+// an optional reasoning effort.
+type ModelLink struct {
+	ConnectorID string `json:"connectorId"`
+	Model       string `json:"model"`
+	Effort      string `json:"effort,omitempty"`
+}
+
+// AgentModels is agents.model_roles: the chains one agent uses instead of the
+// global modelRoles setting. A role left empty uses the global chain.
+type AgentModels struct {
+	Default []ModelLink `json:"default,omitempty"`
+	Fast    []ModelLink `json:"fast,omitempty"`
+	Vision  []ModelLink `json:"vision,omitempty"`
+}
+
+// Role returns the chain for "default", "fast" or "vision".
+func (m AgentModels) Role(role string) []ModelLink {
+	switch role {
+	case "fast":
+		return m.Fast
+	case "vision":
+		return m.Vision
+	}
+	return m.Default
+}
+
+// Empty says whether every role uses the global chain.
+func (m AgentModels) Empty() bool { return len(m.Default)+len(m.Fast)+len(m.Vision) == 0 }
+
 // Agent: the table still has owner_powers (PLAN 19.9 step 5). Nothing reads
 // or writes it, and a later release drops the column with a table rebuild.
 type Agent struct {
@@ -474,13 +504,14 @@ type Agent struct {
 	AvatarColor          *string                   `json:"avatarColor"`
 	CreatedAt            int64                     `json:"createdAt"`
 	UpdatedAt            int64                     `json:"updatedAt"`
+	ModelRoles           NullJSON[AgentModels]     `json:"modelRoles"`
 }
 
-const AgentCols = "id, slug, name, persona, is_default, recall_container, recall_read_containers, recall_per_chat, guest_tools, daily_token_cap, tool_permissions, telegram_connector_id, avatar_image, avatar_icon, avatar_color, created_at, updated_at"
+const AgentCols = "id, slug, name, persona, is_default, recall_container, recall_read_containers, recall_per_chat, guest_tools, daily_token_cap, tool_permissions, telegram_connector_id, avatar_image, avatar_icon, avatar_color, created_at, updated_at, model_roles"
 
 func ScanAgent(s Scanner) (Agent, error) {
 	var a Agent
-	err := s.Scan(&a.ID, &a.Slug, &a.Name, &a.Persona, &a.IsDefault, &a.RecallContainer, &a.RecallReadContainers, &a.RecallPerChat, &a.GuestTools, &a.DailyTokenCap, &a.ToolPermissions, &a.TelegramConnectorID, &a.AvatarImage, &a.AvatarIcon, &a.AvatarColor, &a.CreatedAt, &a.UpdatedAt)
+	err := s.Scan(&a.ID, &a.Slug, &a.Name, &a.Persona, &a.IsDefault, &a.RecallContainer, &a.RecallReadContainers, &a.RecallPerChat, &a.GuestTools, &a.DailyTokenCap, &a.ToolPermissions, &a.TelegramConnectorID, &a.AvatarImage, &a.AvatarIcon, &a.AvatarColor, &a.CreatedAt, &a.UpdatedAt, &a.ModelRoles)
 	return a, err
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/owner"
 	"github.com/zakiego/palui/apps/server/internal/secret"
+	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 	"github.com/zakiego/palui/apps/server/internal/tools"
 )
@@ -237,6 +238,40 @@ type Input struct {
 	AvatarImage          *string
 	AvatarIcon           *string
 	AvatarColor          *string
+	// ModelRoles: nil leaves it; a role left empty uses the global chain.
+	ModelRoles *db.AgentModels
+}
+
+// cleanModels validates each chain the agent sets and returns them trimmed.
+func cleanModels(m db.AgentModels) (db.AgentModels, error) {
+	var out db.AgentModels
+	for _, r := range []struct {
+		name string
+		in   []db.ModelLink
+		out  *[]db.ModelLink
+	}{{"default", m.Default, &out.Default}, {"fast", m.Fast, &out.Fast}, {"vision", m.Vision, &out.Vision}} {
+		if len(r.in) == 0 {
+			continue
+		}
+		chain, err := settings.ValidateModelChain("modelRoles."+r.name, r.in)
+		if err != nil {
+			return db.AgentModels{}, errf("Model %s: %s", r.name, err.Error())
+		}
+		*r.out = chain
+	}
+	return out, nil
+}
+
+func modelsValue(p *db.AgentModels) db.NullJSON[db.AgentModels] {
+	if p == nil || p.Empty() {
+		return db.NullJSON[db.AgentModels]{}
+	}
+	return db.SomeJSON(*p)
+}
+
+// SetModels sets the chains an agent uses instead of the global ones.
+func SetModels(q db.Q, id string, m db.AgentModels, now int64) (db.Agent, error) {
+	return Update(q, id, Input{ModelRoles: &m}, now)
 }
 
 func readList(list []string) []string {
@@ -386,6 +421,13 @@ func Create(q db.Q, in Input, now int64) (db.Agent, error) {
 	}
 	f.Name, f.Persona = &name, &persona
 	f.RecallReadContainers = readListPtr(in.RecallReadContainers)
+	if in.ModelRoles != nil {
+		m, err := cleanModels(*in.ModelRoles)
+		if err != nil {
+			return db.Agent{}, err
+		}
+		f.ModelRoles = &m
+	}
 	if err := checkFields(q, f, "", false); err != nil {
 		return db.Agent{}, err
 	}
@@ -405,8 +447,8 @@ func Create(q db.Q, in Input, now int64) (db.Agent, error) {
 		cap = *f.DailyTokenCap
 	}
 	perChat := f.RecallPerChat != nil && *f.RecallPerChat
-	return db.ScanAgent(q.WQueryRow("INSERT INTO agents (id, slug, name, persona, guest_tools, daily_token_cap, recall_container, recall_read_containers, recall_per_chat, telegram_connector_id, avatar_image, avatar_icon, avatar_color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.AgentCols,
-		secret.NewID("agt"), slug, name, persona, guestTools, cap, orNull(f.RecallContainer), listValue(f.RecallReadContainers), db.Bool(perChat), orNull(f.TelegramConnectorID), orNull(f.AvatarImage), orNull(f.AvatarIcon), orNull(f.AvatarColor), now, now))
+	return db.ScanAgent(q.WQueryRow("INSERT INTO agents (id, slug, name, persona, guest_tools, daily_token_cap, recall_container, recall_read_containers, recall_per_chat, telegram_connector_id, avatar_image, avatar_icon, avatar_color, model_roles, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.AgentCols,
+		secret.NewID("agt"), slug, name, persona, guestTools, cap, orNull(f.RecallContainer), listValue(f.RecallReadContainers), db.Bool(perChat), orNull(f.TelegramConnectorID), orNull(f.AvatarImage), orNull(f.AvatarIcon), orNull(f.AvatarColor), modelsValue(f.ModelRoles), now, now))
 }
 
 // Update is updateAgent (Slug is ignored).
@@ -426,6 +468,13 @@ func Update(q db.Q, id string, patch Input, now int64) (db.Agent, error) {
 		f.Persona = str(clean(*patch.Persona))
 	}
 	f.RecallReadContainers = readListPtr(patch.RecallReadContainers)
+	if patch.ModelRoles != nil {
+		m, err := cleanModels(*patch.ModelRoles)
+		if err != nil {
+			return db.Agent{}, err
+		}
+		f.ModelRoles = &m
+	}
 	// The default agent never runs in shared chats: no shared-chat rules or bot of its own.
 	if row.IsDefault {
 		f.GuestTools, f.TelegramConnectorID = nil, nil
@@ -471,6 +520,9 @@ func Update(q db.Q, id string, patch Input, now int64) (db.Agent, error) {
 	}
 	if f.AvatarColor != nil {
 		set("avatar_color", orNull(f.AvatarColor))
+	}
+	if f.ModelRoles != nil {
+		set("model_roles", modelsValue(f.ModelRoles))
 	}
 	args = append(args, id)
 	return db.ScanAgent(q.WQueryRow("UPDATE agents SET "+strings.Join(sets, ", ")+" WHERE id = ? RETURNING "+db.AgentCols, args...))

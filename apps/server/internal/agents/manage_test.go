@@ -384,3 +384,27 @@ func TestSharedChatsAndServing(t *testing.T) {
 		}
 	}
 }
+
+func TestModelRoles(t *testing.T) {
+	d := testutil.DB(t)
+	a := create(t, d, agents.Input{Slug: "chef", Name: s("Chef"), Persona: s("Masak.")})
+	if a.ModelRoles.Valid {
+		t.Fatalf("a new agent uses the global models: %+v", a.ModelRoles)
+	}
+	a = update(t, d, a.ID, agents.Input{ModelRoles: &db.AgentModels{Fast: []db.ModelLink{{ConnectorID: "gw", Model: "  fast-1 ", Effort: "low"}}}})
+	if !a.ModelRoles.Valid || len(a.ModelRoles.V.Default) != 0 || a.ModelRoles.V.Fast[0].Model != "fast-1" {
+		t.Fatalf("%+v", a.ModelRoles)
+	}
+	// A patch without models leaves them.
+	a = update(t, d, a.ID, agents.Input{Name: s("Chef 2")})
+	if !a.ModelRoles.Valid {
+		t.Fatal("a patch without models cleared them")
+	}
+	if _, err := agents.Update(d, a.ID, agents.Input{ModelRoles: &db.AgentModels{Default: []db.ModelLink{{ConnectorID: "gw", Model: "m", Effort: "turbo"}}}}, 3); !isAgentErr(err) {
+		t.Fatal(err)
+	}
+	a = update(t, d, a.ID, agents.Input{ModelRoles: &db.AgentModels{}})
+	if a.ModelRoles.Valid {
+		t.Fatal("empty models should go back to the global ones")
+	}
+}
