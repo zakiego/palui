@@ -5,17 +5,18 @@
 // they do on Notes and Chats. Memory and Tools ask the runtime when opened.
 import * as React from "react"
 import { createFileRoute, Link, useBlocker, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon, AtSignIcon, BrainIcon, CircleAlertIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
+import { ArrowLeftIcon, AtSignIcon, BrainIcon, CircleAlertIcon, ContactIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
 import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
 import { z } from "zod"
 import { toast } from "sonner"
 
 import { AgentAvatar } from "@/components/agent-avatar"
+import { AgentMembers } from "@/components/agent-members"
 import { AvatarPicker } from "@/components/agents/avatar-picker"
 import { AppError } from "@/components/app-error"
 import { ConnectorStatusBadge } from "@/components/connector-status"
 import { ToolsByScope } from "@/components/agent-tools/by-scope"
-import { groupTools, inSharedChats, type Permission } from "@/components/agent-tools/shared"
+import { groupTools, inMemberChats, inSharedChats, type Permission } from "@/components/agent-tools/shared"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
@@ -336,6 +337,12 @@ function AgentSettings({ data }: { data: Loaded }) {
                     </FieldDescription>
                   </Field>
                 </FieldGroup>
+              </Section>
+            )}
+
+            {!isDefault && (
+              <Section id="members" title={t("agents.members")} description={t("agents.membersBody")}>
+                <AgentMembers agent={agent} />
               </Section>
             )}
 
@@ -829,6 +836,9 @@ function ToolsTab({ agent }: { agent: Agent }) {
   // everyone there, never asking first.
   const sharedCount = tools?.filter((x) => inSharedChats(x, agent.guestTools, permissions)).length ?? null
   const sharedRule = agent.guestTools === "none" ? t("agents.tools.none") : sharedCount === null ? t("agents.tools.sharedRuleLoading") : t("agents.tools.sharedRule", { n: sharedCount.toLocaleString() })
+  // A DM with a member, or a WhatsApp group of only you and members.
+  const memberCount = tools?.filter((x) => inMemberChats(x, permissions)).length ?? null
+  const membersRule = memberCount === null ? t("agents.tools.membersRuleLoading") : t("agents.tools.membersRule", { n: memberCount.toLocaleString() })
 
   return (
     <>
@@ -842,6 +852,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
 
       <ItemGroup className="gap-1">
         <Rule icon={<UserIcon />} label={t("agents.tools.you")} value={youRule} />
+        {!agent.isDefault && <Rule icon={<ContactIcon />} label={t("agents.tools.members")} value={membersRule} />}
         <Rule icon={<UsersIcon />} label={t("agents.tools.shared")} value={sharedRule} />
       </ItemGroup>
 

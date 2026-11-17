@@ -2,7 +2,7 @@
 // global-or-own select, and the open state that follows a search.
 import * as React from "react"
 import { Link } from "@tanstack/react-router"
-import { ArrowUpRightIcon, BotIcon, CircleOffIcon, GlobeIcon, LockIcon, Share2Icon, UsersIcon } from "lucide-react"
+import { ArrowUpRightIcon, BotIcon, CircleOffIcon, ContactIcon, GlobeIcon, LockIcon, Share2Icon, UsersIcon } from "lucide-react"
 
 import { connectorIcon } from "@/components/connector-icon"
 import { IconTile } from "@/components/icon-tile"
@@ -73,6 +73,13 @@ export function DataScopeText({ scope }: { scope: DataScope }) {
 export function inSharedChats(x: ToolItem, guestTools: string, permissions: ToolsViewProps["permissions"]) {
   const p = permissions.tools[x.name]
   return x.guestSafe && guestTools === "safe" && p !== "ask" && p !== "deny"
+}
+
+// Whether a members chat (PLAN 19.4) gets this tool: the server marks it
+// member-safe and the owner didn't set it to ask first or off.
+export function inMemberChats(x: ToolItem, permissions: ToolsViewProps["permissions"]) {
+  const p = permissions.tools[x.name]
+  return x.memberSafe === true && p !== "ask" && p !== "deny"
 }
 
 export function countClass(list: ToolItem[], cls: string) {
@@ -173,6 +180,11 @@ export function ToolRow({ x, props, scope }: { x: ToolItem; props: ToolsViewProp
           {inSharedChats(x, agent.guestTools, props.permissions) && (
             <StatusText tone="secondary" icon={<UsersIcon aria-hidden="true" />}>
               {t("agents.tools.guests")}
+            </StatusText>
+          )}
+          {!agent.isDefault && inMemberChats(x, props.permissions) && !inSharedChats(x, agent.guestTools, props.permissions) && (
+            <StatusText tone="secondary" icon={<ContactIcon aria-hidden="true" />}>
+              {t("agents.tools.memberTag")}
             </StatusText>
           )}
           {off && (
