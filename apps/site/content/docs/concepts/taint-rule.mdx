@@ -9,7 +9,7 @@ Content from the outside world can carry instructions aimed at the model: a web 
 
 A turn becomes tainted once it reads untrusted content. For the rest of that turn:
 
-- Every `write` tool needs your approval, not only `destructive` ones. A tool you set to allow on the agent's Tools tab (or "Allow every tool without asking") still runs without asking.
+- Every `write` tool needs your approval, not only `destructive` ones. A tool you set to allow on the agent's Tools tab (or "Allow every tool without asking") still runs without asking, with two exceptions: a call that sends a saved file, and a message to a contact, ask even when allowed.
 - recall auto-save skips the turn, so nothing from it becomes a permanent memory.
 
 Reading another agent's chats or memory is stricter. Anyone in a group with an agent can write a line there and wait for Palui to read it, so after that every `write` and `destructive` call asks you, even one you set to allow.
