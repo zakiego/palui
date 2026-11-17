@@ -107,8 +107,14 @@ func TestRouterOwnership(t *testing.T) {
 		r := need(h.Engine.Inbound(own("halo @Palui", true)))
 		h.Engine.Idle()
 		eq(t, messageByID(t, d, r.MessageID).Status, "handled")
-		contains(t, lastText(t, d), "Aku belum aktif di grup ini. Pilih siapa yang jawab:")
-		contains(t, lastText(t, d), "• /agent palui: Palui, cuma jawab kamu")
+		// The group only hears that no agent is set; the choices go to the owner's DM.
+		rows := outboxRows(t, d)
+		toDm, toGroup := rows[len(rows)-2], rows[len(rows)-1]
+		eq(t, toGroup.Payload.Text, "Aku belum di-setup di grup ini, belum ada agent yang dipilih.\nPilihan agent-nya udah aku kirim ke chat pribadi kamu.")
+		notContains(t, toGroup.Payload.Text, "/agent palui")
+		dm := found(chats.Get(d, toDm.ChatID))
+		eq(t, dm.Kind+" "+dm.ExternalID, "dm 628123456789@s.whatsapp.net")
+		contains(t, toDm.Payload.Text, "• /agent palui: Palui, cuma jawab kamu")
 		eq(t, chatWhere(t, d, "external_id = ?", "123@g.us").Allowed, false)
 		sent := count(t, d, "outbox")
 		for _, text := range []string{"/status", "/Users/me/notes.txt"} {

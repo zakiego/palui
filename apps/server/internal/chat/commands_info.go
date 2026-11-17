@@ -224,8 +224,20 @@ func UsageText(c *EngineCtx, chat db.Chat) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// A shared chat never learns the owner's other agents (PLAN 19.4).
+	shared, err := agents.IsSharedChat(q, chat)
+	if err != nil {
+		return "", err
+	}
+	chatAgent, err := agents.ForChat(q, chat.AgentID, now)
+	if err != nil {
+		return "", err
+	}
 	var shown []db.Agent
 	for _, a := range list {
+		if shared && a.ID != chatAgent.ID {
+			continue
+		}
 		if byAgent[a.ID] != nil {
 			shown = append(shown, a)
 		}
