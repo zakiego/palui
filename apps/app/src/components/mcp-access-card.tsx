@@ -1,6 +1,7 @@
 // Settings > Security: who may call Palui's own MCP server. The URL goes into
-// Claude (OAuth, consent on /oauth/consent); a personal token is for agents
-// that run in a terminal and can send a header. Tokens are shown once.
+// an AI app that signs in with OAuth (consent on /oauth/consent); a personal
+// token is for agents that run in a terminal and can send a header. Tokens
+// are shown once.
 import * as React from "react"
 import { useRouter } from "@tanstack/react-router"
 import { BotIcon, KeyRoundIcon, PlugIcon, PlusIcon, TrashIcon } from "lucide-react"
@@ -154,7 +155,7 @@ export function McpAccessCard({ access }: { access: McpAccess }) {
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="mcp-token-name">{t("settings.mcp.name")}</FieldLabel>
-                  <Input id="mcp-token-name" autoFocus maxLength={MAX_NAME} value={name} onChange={(e) => setName(e.target.value)} placeholder="Claude Code on my laptop" />
+                  <Input id="mcp-token-name" autoFocus maxLength={MAX_NAME} value={name} onChange={(e) => setName(e.target.value)} placeholder="Agent on my laptop" />
                   <FieldDescription>{t("settings.mcp.nameHelp")}</FieldDescription>
                 </Field>
               </FieldGroup>

@@ -1,5 +1,5 @@
-// Where /api/oauth/authorize sends the owner when an app (claude.ai, another
-// MCP client) asks to connect to /mcp. Signed out, it goes through the login
+// Where /api/oauth/authorize sends the owner when an MCP client asks to
+// connect to /mcp. Signed out, it goes through the login
 // page and comes back. Allow or Cancel sends the browser back to the app.
 import * as React from "react"
 import { createFileRoute, redirect, type ErrorComponentProps } from "@tanstack/react-router"
