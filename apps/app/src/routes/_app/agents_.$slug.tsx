@@ -86,7 +86,6 @@ const CHANNEL = {
 type Form = {
   name: string
   persona: string
-  ownerPowers: "off" | "approve"
   guestTools: "none" | "safe"
   cap: string
   container: string
@@ -104,7 +103,6 @@ function formFor(a: Agent): Form {
   return {
     name: a.name,
     persona: a.persona,
-    ownerPowers: a.ownerPowers,
     guestTools: a.guestTools,
     cap: String(a.dailyTokenCap),
     container: a.recallContainer ?? "",
@@ -207,7 +205,6 @@ function AgentSettings({ data }: { data: Loaded }) {
           id: agent.id,
           name: clean.name,
           persona: clean.persona,
-          ownerPowers: clean.ownerPowers,
           guestTools: clean.guestTools,
           dailyTokenCap: cap,
           recallContainer: clean.container || null,
