@@ -247,6 +247,9 @@ type MessageQuery struct {
 	Since *int64
 	// Case-insensitive substring of the message text.
 	Query string
+	// Only messages older than this one, in read order (created_at, then id),
+	// for paging back without skipping messages that share a millisecond.
+	BeforeMessage *db.Message
 }
 
 const (
@@ -266,6 +269,10 @@ func ReadMessages(q db.Q, chatID string, mq MessageQuery) ([]db.Message, error) 
 	if mq.Since != nil {
 		where = append(where, "created_at >= ?")
 		args = append(args, *mq.Since)
+	}
+	if m := mq.BeforeMessage; m != nil {
+		where = append(where, "(created_at < ? or (created_at = ? and id < ?))")
+		args = append(args, m.CreatedAt, m.CreatedAt, m.ID)
 	}
 	if text := strx.Trim(mq.Query); text != "" {
 		where = append(where, `text like ? escape '\'`)
@@ -302,4 +309,9 @@ func Resolve(q db.Q, ref, channel string) ([]db.Chat, error) {
 	}
 	rows, err := q.Query("SELECT "+db.ChatCols+" FROM chats WHERE external_id = ?", ref)
 	return db.All(rows, err, db.ScanChat)
+}
+
+// GetMessage is one message of a chat by id.
+func GetMessage(q db.Q, chatID, id string) (db.Message, bool, error) {
+	return db.One(q.QueryRow("SELECT "+db.MessageCols+" FROM messages WHERE id = ? AND chat_id = ?", id, chatID), db.ScanMessage)
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/chats"
+	"github.com/zakiego/palui/apps/server/internal/config"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/kit"
 	"github.com/zakiego/palui/apps/server/internal/db"
@@ -315,6 +316,39 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) (*connectors.
 	return set, nil
 }
 
+// RuntimeTools is what a running chats connector offers a turn: its own chat
+// tools in a DM or the web chat, plus the read-down tools when the turn is
+// Palui's in the owner's own chat.
+func RuntimeTools(d *db.DB, turn connectors.TurnInfo, clock func() int64, appURL string) (*connectors.ToolSet, error) {
+	if clock == nil {
+		clock = func() int64 { return time.Now().UnixMilli() }
+	}
+	set := connectors.NewToolSet()
+	ok, err := OffersChatTools(d, turn)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		own, err := Tools(d, turn, clock)
+		if err != nil {
+			return nil, err
+		}
+		set = own
+	}
+	down, err := agents.CanReadDown(d, turn, clock())
+	if err != nil {
+		return nil, err
+	}
+	if down {
+		more := ReadDownTools(d, turn, clock, appURL)
+		for _, k := range more.Keys() {
+			pt, _ := more.Get(k)
+			set.Set(k, pt)
+		}
+	}
+	return set, nil
+}
+
 var Runtime = &connectors.Runtime{
 	Manifest: Manifest,
 	Test: func(c connectors.Context) (connectors.TestResult, error) {
@@ -336,14 +370,7 @@ var Runtime = &connectors.Runtime{
 		return &connectors.RunningConnector{
 			Stop: func(context.Context) error { return nil },
 			Tools: func(ctx context.Context, turn connectors.TurnInfo) (*connectors.ToolSet, error) {
-				ok, err := OffersChatTools(c.DB, turn)
-				if err != nil {
-					return nil, err
-				}
-				if !ok {
-					return connectors.NewToolSet(), nil
-				}
-				return Tools(c.DB, turn, nil)
+				return RuntimeTools(c.DB, turn, nil, config.Get().AppURL)
 			},
 		}, nil
 	},
