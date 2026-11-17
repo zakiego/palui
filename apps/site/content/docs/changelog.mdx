@@ -19,6 +19,8 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Changed
 
+- A group no longer sees your list of agents. When you mention the bot in a WhatsApp group that has no agent yet, or type `/agent` in any group or someone else's DM, the chat only hears that no agent is set up, and the `/agent <name>` choices go to your own DM. `/usage` in a group only shows that group's agent.
+
 - In a group, an agent now reads the whole conversation but still only answers when it's @mentioned or replied to. Before, it only ever saw the messages addressed to it, so "@agent what do you think?" came with no idea what was being discussed. The talk around a mention is kept as context and is never answered on its own. It also tells people plainly what it can read: everyone's text, and photos, files and voice notes only from you.
 
 - Agents in groups and in other people's DMs now get reminders, saved files, web search and web fetch for everyone in that chat, with no approval prompts. They never get destructive tools or anything that reaches your notes, contacts, memory, jobs, accounts or MCP servers, and can't find out those exist. Your own message in a group gets the same set, Palui's groups included, and a tool you set to "Ask first" or "Off" isn't offered there. The "When you write there" setting on the agent sheet is gone, and the Tools tab marks each tool a shared chat gets. A scheduled job that posts into a group keeps only those tools.
