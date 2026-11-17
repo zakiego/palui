@@ -695,6 +695,31 @@ func (k *Kit) Instruction(v Instruction) {
 		col{"agent_id", nullable(v.AgentID)}, col{"created_at", at}, col{"updated_at", at})
 }
 
+// CustomCommand is a custom_commands row. Name has no slash; AgentID nil is
+// every agent.
+type CustomCommand struct {
+	Name         string
+	Description  string
+	Prompt       string
+	AttachReport bool
+	Enabled      *bool
+	AgentID      *string
+	CreatedAt    *int64
+}
+
+func (k *Kit) CustomCommand(v CustomCommand) {
+	at := k.Now
+	if v.CreatedAt != nil {
+		at = *v.CreatedAt
+	}
+	enabled := true
+	if v.Enabled != nil {
+		enabled = *v.Enabled
+	}
+	k.insert("custom_commands", col{"id", secret.NewID("cmd")}, col{"agent_id", nullable(v.AgentID)}, col{"name", v.Name}, col{"description", v.Description},
+		col{"prompt", v.Prompt}, col{"attach_report", db.Bool(v.AttachReport)}, col{"enabled", db.Bool(enabled)}, col{"created_at", at}, col{"updated_at", at})
+}
+
 // Preference is a raw insert: fixtures may use values the service would
 // normalize or refuse.
 func (k *Kit) Preference(key, value string) {

@@ -103,6 +103,7 @@ type StoredContent struct {
 	Media    []StoredMedia   `json:"media,omitempty"`
 	Callback *StoredCallback `json:"callback,omitempty"`
 	Hook     *StoredHook     `json:"hook,omitempty"`
+	Command  *StoredCommand  `json:"command,omitempty"`
 	// Set once audio and documents were turned into text.
 	Prepared bool `json:"prepared,omitempty"`
 }
@@ -712,6 +713,9 @@ func ToModelMessages(rows []db.Message, withImages map[string]bool, calls []Tool
 		own := r.Text
 		if own == "" {
 			own = c.Text
+		}
+		if c.Command != nil && c.Command.Prompt != "" {
+			own = c.Command.Prompt
 		}
 		body := own
 		if c.Quoted != nil {
