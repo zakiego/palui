@@ -344,9 +344,10 @@ Example: `/report-fix` with the report attached and a prompt telling the agent t
 | Table | Key columns |
 |---|---|
 | `connectors` | id, type, kind, label, enabled, status, status_detail, trust, config json, secrets (encrypted), config_hash, updated_at |
-| `identities` | id, channel, external_id, alt_id (LID), display_name, role (`owner` or `member`), member_id |
-| `members` | id, name, created_at (19.4) |
-| `agent_members` | agent_id, member_id (19.4) |
+| `identities` | id, channel, external_id, alt_id (LID), display_name, role (owner only) |
+| `members` | id, name, created_at, updated_at (19.4) |
+| `member_accounts` | id, member_id, channel, external_id (unique per channel), alt_id, display_name, created_at (19.4) |
+| `agent_members` | agent_id, member_id, created_at (19.4) |
 | `claims` | nonce, channel, expires_at, used_at |
 | `agents` | id, slug, name, persona, is_default, recall_container, guest_tools, daily_token_cap, telegram_connector_id, avatar_image, avatar_icon, avatar_color |
 | `chats` | id, channel, connector_id, external_id, title, kind, session_id, allowed, agent_id |
@@ -593,17 +594,21 @@ One rule: a turn only gets tools whose data everyone who can read the chat may s
 
 People:
 
-- The owner, as today (`identities.role = 'owner'`).
-- Members: people the owner names, each with one or more channel accounts (`members`, plus `identities.role = 'member'` with `identities.member_id`). `agent_members` links a member to the agents they share. A member of one agent is an outsider to every other agent.
+- The owner, as today (`identities`).
+- Members: people the owner names, each with one or more channel accounts (`members` and `member_accounts`). `agent_members` links a member to the agents they share. A member of one agent is an outsider to every other agent.
 - Outsiders: everyone else.
+
+Member accounts never live in `identities`: every query there assumes the row is the owner.
 
 Audience, worked out when the turn starts:
 
 | Audience | When |
 |---|---|
 | `owner` | The owner's DM or the web chat. |
-| `members` | A shared chat where every participant is the owner or a member of this chat's agent: a DM with a member, or a WhatsApp group whose participant list (`GetGroupInfo`, cached, refreshed on participant changes) holds nobody else. |
+| `members` | A shared chat where every participant is the owner or a member of this chat's agent: a DM with a member, or a WhatsApp group whose participant list (`GetGroupInfo`, cached, refreshed on participant changes) holds nobody else. The agent needs at least one member; Palui has none, so it never gets this audience. |
 | `outside` | Anything else. A participant list Palui can't read counts as `outside` (fail closed), and so does every Telegram group, since a bot can't list a group's members. |
+
+On WhatsApp the participant list is cached for 10 minutes and dropped on a group change event, on reconnect and when a sender outside the list writes. A cache miss waits at most 3 s, then counts as `outside`.
 
 Data scope is `PaluiTool.Data` from the connector contract: `none`, `chat`, `agent` or `shared`. A tool without one follows its connector: `agent` when one agent owns the connector, `shared` when it's global. MCP servers, Google Calendar and T3 Code are `agent` or `shared` that way. The owner can mark an MCP server as `none` on the agent's Tools tab (a prayer times server holds nothing private); that's the only override, since Palui can't check what an outside server keeps.
 
@@ -644,7 +649,7 @@ Reading down: Palui can read other agents' chats and memory (new read tools on P
 ### 19.7 Dashboard
 
 - Agents page: list with avatar, name, chats, tokens today against the cap. A sheet to create or edit: avatar, name, slug, persona, members, guest tools, daily cap, recall container, Telegram bot, and a link to the agent's instructions on Notes. Palui's sheet hides the shared-chat fields.
-- Members: added from the agent sheet with a name and one or more accounts, picked from people who already wrote in a chat (sender id and name) or typed in. One member can be in several agents.
+- Members: a section on the Settings tab of the agent page that saves at once, outside the settings form. Each member has a name and one or more accounts, picked from people who already wrote in a chat (sender id and name) or from DM chats that have no stored message yet, or typed in. One member can be in several agents.
 - Tools tab: each tool says which audiences get it (owner only, members, everyone in the chat), next to the data label from #110. MCP servers get a "Holds no private data" switch that sets them to `none`.
 - Avatar: an uploaded photo (cropped square and re-encoded as a 256 px WebP in the browser, stored as a data URL of at most 96 KB), else one of 24 icons on one of 9 colors, else Palui's mark for the default agent and a plain bot for the rest. Columns `avatar_image`, `avatar_icon`, `avatar_color`.
 - Chats page: each chat shows its agent and an Allowed switch, with a Select to change the agent.
@@ -657,7 +662,7 @@ Roles beyond owner and member (utusan IAM), sharing one agent's data with anothe
 ### 19.9 Rollout
 
 1. Audience `owner` or `outside` only (no members yet): tools filtered by data scope, no approvals in shared chats, destructive left out, `owner_powers` ignored. This alone lets a friends' group set reminders.
-2. Members: `members`, `agent_members`, the `identities` change, WhatsApp participant lists, the `members` audience, the agent sheet.
+2. Members: `members`, `member_accounts`, `agent_members`, WhatsApp participant lists, the `members` audience, the agent sheet.
 3. Reading down: Palui's read tools for other agents' chats and memory.
 4. Tools tab: audience labels and the "Holds no private data" switch.
 5. Drop `owner_powers` and the shared-chat approval routing (`pending_approvals.ask_chat_id` stays for old rows until they expire).

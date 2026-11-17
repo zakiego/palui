@@ -259,8 +259,9 @@ type TypingOptions struct {
 	Reaction *string
 }
 
-// ChannelHandle is a running channel (outbox.Channel). Typing and
-// AnswerCallback are optional (Typer, CallbackAnswerer).
+// ChannelHandle is a running channel (outbox.Channel). Typing,
+// AnswerCallback and GroupParticipants are optional (Typer, CallbackAnswerer,
+// GroupLister).
 type ChannelHandle = outbox.Channel
 
 type Typer interface {
@@ -269,6 +270,17 @@ type Typer interface {
 
 type CallbackAnswerer interface {
 	AnswerCallback(ctx context.Context, callbackID, text string) error
+}
+
+// Participant is one account in a group chat. AltID is its other form on
+// WhatsApp (LID or phone JID), "" when unknown.
+type Participant struct{ ExternalID, AltID string }
+
+// GroupLister is a channel that can say who is in a group chat right now,
+// without the channel's own account. Any error means the list is unknown,
+// and the caller treats the chat as having outsiders.
+type GroupLister interface {
+	GroupParticipants(ctx context.Context, chatExternalID string) ([]Participant, error)
 }
 
 type RecallOptions struct {

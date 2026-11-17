@@ -98,6 +98,9 @@ type EngineCtx struct {
 	TurnTimeoutMs int64
 	// RetryDelay is the model retry's first wait (2 s); tests shorten it.
 	RetryDelay time.Duration
+	// GroupLookupTimeout overrides the wait on a group's participant list
+	// (GroupLookupTimeout, 3 s); tests shorten it.
+	GroupLookupTimeout time.Duration
 	// Monotonic is performance.now() in ms.
 	Monotonic func() float64
 	// ResumeRun queues the resume of a run whose requests are all decided.
@@ -757,9 +760,23 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		}
 	}
 	// Who can read the chat decides the tools, not who sent the message (PLAN 19.4).
-	audience := tools.AudienceOwner
-	if shared {
-		audience = tools.AudienceOutside
+	audience, err := Audience(c, chat, agent)
+	if err != nil {
+		return TurnResult{}, err
+	}
+	if audience == tools.AudienceMembers {
+		sessionID := ""
+		if session != nil {
+			sessionID = session.ID
+		}
+		outsider, err := HistoryHasOutsider(q, chat, agent.ID, sessionID, history)
+		if err != nil {
+			return TurnResult{}, err
+		}
+		if outsider {
+			tlog.Info("members chat counted as outside", logx.Fields{"reason": "history holds a message from someone who is not a member"})
+			audience = tools.AudienceOutside
+		}
 	}
 	// Palui's approval asked in a group before 19.9 step 1 ran as the owner's
 	// turn; it resumes with that tool set. A fresh shared turn never asks.
@@ -814,16 +831,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 	var tainted atomic.Bool
 	tainted.Store(input.UntrustedInput || (rs != nil && rs.Context.Tainted) || QuotesOutsider(history, batch))
 	timer := &toolTimer{starts: map[string]int64{}}
-	var channel connectors.ChannelHandle
-	if chat.Channel != "web" {
-		if chat.ConnectorID != "" {
-			if e, ok := c.Host.Get(chat.ConnectorID); ok && e.Handle != nil {
-				channel = e.Handle.Channel
-			}
-		} else {
-			channel = c.Host.ChannelFor(chat.Channel)
-		}
-	}
+	channel := channelOf(c, chat)
 	typing := func(on bool) {
 		t, ok := channel.(connectors.Typer)
 		if !ok {
@@ -908,6 +916,8 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			Memory: &connectors.MemoryScope{Container: scope.Container, Read: scope.Read, Locked: scope.Locked},
 		}
 		outside := audience == tools.AudienceOutside && !legacy
+		// Members and outside turns have nobody to ask (PLAN 19.4).
+		open := tools.NoApprovals(audience) && !legacy
 		noTools := input.NoTools || origin == "hook" || (outside && agent.GuestTools == "none")
 		toolScope := input.ToolScope
 		toolNames := input.ToolNames
@@ -917,8 +927,8 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		perms := agent.ToolPermissions.V
 		collectAudience := ""
 		deny := tools.DeniedTools(&perms)
-		if outside {
-			collectAudience = tools.AudienceOutside
+		if open {
+			collectAudience = audience
 			// No approvals here: a tool the owner wants a say on isn't offered at
 			// all. A resume keeps it: its approved call was already asked for.
 			if rs == nil {
@@ -1017,7 +1027,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			}
 			var sharedInfo *SharedInfo
 			if shared {
-				sharedInfo = &SharedInfo{Kind: chat.Kind, Guest: outside}
+				sharedInfo = &SharedInfo{Kind: chat.Kind, Guest: open, Members: audience == tools.AudienceMembers}
 			}
 			dashboard := ""
 			if origin == "message" {
@@ -1072,7 +1082,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				if pastCalls, err = LoadToolCalls(q, history); err != nil {
 					return err
 				}
-				if outside {
+				if open {
 					// A tool this turn doesn't have (one an older turn ran) isn't
 					// replayed by name and result.
 					kept := pastCalls[:0]
@@ -1195,9 +1205,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					rlog.Info("turn tainted by an untrusted tool call", logx.Fields{"tool": meta.Name})
 					tainted.Store(true)
 				}
-				// An outside turn has no approvals. Its tools run right away, and the
-				// tool wrapper refuses a call whose tool asks on its own.
-				if outside {
+				// A members or outside turn has no approvals. Its tools run right
+				// away, and the tool wrapper refuses a call whose tool asks on its own.
+				if open {
 					return false
 				}
 				// A tool's own rule asks first, and no per-agent "allow" skips it.

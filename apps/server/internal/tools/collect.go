@@ -27,6 +27,7 @@ const (
 	SearchTool = "palui" + ToolSep + "search_tools"
 	// Who can read the chat a turn runs in (PLAN 19.4). "" counts as owner.
 	AudienceOwner   = "owner"
+	AudienceMembers = "members"
 	AudienceOutside = "outside"
 	// Matches loaded per search call.
 	SearchLimit = 5
@@ -124,21 +125,30 @@ func Namespaced(connectorID, tool string) string {
 }
 
 // InAudience says whether a tool with this resolved data scope and class may
-// be in a turn for this audience. The owner gets everything. An outside turn
-// gets tools whose data stays in that chat or that keep nothing, never a
-// destructive one. Any other audience gets nothing (fail closed).
+// be in a turn for this audience. The owner gets everything. A members turn
+// also gets the agent's own data, an outside turn only tools whose data stays
+// in that chat or that keep nothing; neither ever gets a destructive one or
+// shared data. Any other audience or scope gets nothing (fail closed).
 func InAudience(audience, scope, class string) bool {
 	switch audience {
 	case "", AudienceOwner:
 		return true
+	case AudienceMembers:
+		return (scope == connectors.DataNone || scope == connectors.DataChat || scope == connectors.DataAgent) && class != "destructive"
 	case AudienceOutside:
 		return (scope == connectors.DataChat || scope == connectors.DataNone) && class != "destructive"
 	}
 	return false
 }
 
+// NoApprovals says a turn for this audience has nobody to ask: every audience
+// but the owner's. An unknown audience has no tools anyway and must never ask.
+func NoApprovals(audience string) bool {
+	return audience != "" && audience != AudienceOwner
+}
+
 // OutsideApprovalError is what a call gets when its tool asks for approval on
-// its own in a turn that has no approvals.
+// its own in a turn that has no approvals (members or outside).
 const OutsideApprovalError = "This needs the owner's approval, and approvals aren't available in this chat. Don't retry it; say you can't do that here."
 
 // NormalizeClass: anything unclassified is destructive (fail closed).
@@ -164,7 +174,7 @@ type CollectOptions struct {
 	Sticky []string
 	// Called with the names a search just loaded.
 	OnLoad func(names []string)
-	// Who can read the chat: AudienceOwner ("" too) or AudienceOutside.
+	// Who can read the chat: AudienceOwner ("" too), AudienceMembers or AudienceOutside.
 	Audience string
 	Log      *logx.Logger
 	// Called after an untrusted tool returns (taints the turn).
@@ -400,9 +410,9 @@ func searchToolFor(out *Collected, order []string, opts CollectOptions) connecto
 }
 
 // wrapTool times the call and, for untrusted tools, taints the turn after it
-// returns (even with an error, which may carry the content). In an outside
-// turn, a call whose tool asks for approval on its own is refused: that turn
-// has no approvals.
+// returns (even with an error, which may carry the content). In a members or
+// outside turn, a call whose tool asks for approval on its own is refused:
+// that turn has no approvals.
 func wrapTool(t connectors.Tool, meta *ToolMeta, opts CollectOptions) connectors.Tool {
 	exec := t.Execute
 	if exec == nil {
@@ -412,7 +422,7 @@ func wrapTool(t connectors.Tool, meta *ToolMeta, opts CollectOptions) connectors
 		if opts.OnToolStart != nil {
 			opts.OnToolStart(call.ToolCallID)
 		}
-		if opts.Audience == AudienceOutside && meta.NeedsApproval != nil && asksOnItsOwn(meta.NeedsApproval, input) {
+		if NoApprovals(opts.Audience) && meta.NeedsApproval != nil && asksOnItsOwn(meta.NeedsApproval, input) {
 			return nil, errors.New(OutsideApprovalError)
 		}
 		defer func() {

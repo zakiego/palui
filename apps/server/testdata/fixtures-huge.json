@@ -8,6 +8,12 @@
    "first": null,
    "last": null
   },
+  "agent_members": {
+   "columns": ["agent_id","member_id","created_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
   "agents": {
    "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat"],
    "count": 1,
@@ -115,6 +121,18 @@
    "count": 50,
    "first": ["fx_<mcpg#1>","token","Aleksandra Wiśniewska-Kowalczyk's agent 1","user_owner",null,null,"0000","fixture-fx_<mcpg#1>",null,null,null,null,null,1794621600000,null],
    "last": ["fx_<mcpg#2>","token","Joko Montgomery's agent 50","user_owner",null,null,"0049","fixture-fx_<mcpg#2>",null,null,null,null,null,1790388000000,null]
+  },
+  "member_accounts": {
+   "columns": ["id","member_id","channel","external_id","alt_id","display_name","created_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "members": {
+   "columns": ["id","name","created_at","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
   },
   "messages": {
    "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],

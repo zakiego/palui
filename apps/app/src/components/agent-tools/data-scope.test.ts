@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { dataOf, groupData, inSharedChats, type ToolItem } from "./shared"
+import { dataOf, groupData, inMemberChats, inSharedChats, type ToolItem } from "./shared"
 
 const tool = (name: string, data?: ToolItem["data"]): ToolItem => ({
   name: `mcp-crm__${name}`,
@@ -51,5 +51,23 @@ describe("shared chats", () => {
     expect(inSharedChats(safe, "safe", { allowAll: false, tools: { [safe.name]: "ask" } })).toBe(false)
     expect(inSharedChats(safe, "safe", { allowAll: false, tools: { [safe.name]: "deny" } })).toBe(false)
     expect(inSharedChats(safe, "safe", { allowAll: true, tools: { [safe.name]: "allow" } })).toBe(true)
+  })
+})
+
+describe("members' chats", () => {
+  const safe = { ...tool("notes", "agent"), memberSafe: true }
+  const none = { allowAll: false, tools: {} }
+
+  it("gets a tool the server marks member-safe", () => {
+    expect(inMemberChats(safe, none)).toBe(true)
+  })
+
+  it("leaves out a tool set to ask first or off", () => {
+    expect(inMemberChats(safe, { allowAll: false, tools: { [safe.name]: "ask" } })).toBe(false)
+    expect(inMemberChats(safe, { allowAll: false, tools: { [safe.name]: "deny" } })).toBe(false)
+  })
+
+  it("leaves out a tool when the server sends no memberSafe", () => {
+    expect(inMemberChats(tool("x", "agent"), none)).toBe(false)
   })
 })

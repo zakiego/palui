@@ -90,6 +90,7 @@ type meowSocket struct {
 	seq      int
 	updates  map[int]func(Update)
 	upserts  map[int]func(Upsert)
+	groups   map[int]func(string)
 	pending  []any
 	ended    bool
 	closedAt bool
@@ -126,7 +127,7 @@ func NewMeowSocket(ctx context.Context, storePath string, log *logx.Logger) (Soc
 	// Baileys' syncFullHistory: false; history blobs are never downloaded.
 	cli.ManualHistorySyncDownload = true
 	sctx, cancel := context.WithCancel(context.Background())
-	s := &meowSocket{cli: cli, container: container, sqldb: sqldb, ctx: sctx, cancel: cancel, updates: map[int]func(Update){}, upserts: map[int]func(Upsert){}}
+	s := &meowSocket{cli: cli, container: container, sqldb: sqldb, ctx: sctx, cancel: cancel, updates: map[int]func(Update){}, upserts: map[int]func(Upsert){}, groups: map[int]func(string){}}
 	s.handlerID = cli.AddEventHandler(s.handle)
 	return s, nil
 }
@@ -154,6 +155,35 @@ func (s *meowSocket) OnUpsert(fn func(Upsert)) func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		delete(s.upserts, id)
+	}
+}
+
+func (s *meowSocket) OnGroupChange(fn func(string)) func() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.seq++
+	id := s.seq
+	s.groups[id] = fn
+	return func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		delete(s.groups, id)
+	}
+}
+
+func (s *meowSocket) emitGroupChange(jid string) {
+	s.mu.Lock()
+	if s.ended {
+		s.mu.Unlock()
+		return
+	}
+	fns := make([]func(string), 0, len(s.groups))
+	for _, fn := range s.groups {
+		fns = append(fns, fn)
+	}
+	s.mu.Unlock()
+	for _, fn := range fns {
+		fn(jid)
 	}
 }
 
@@ -216,6 +246,11 @@ func (s *meowSocket) handle(evt any) {
 		}
 	case *events.Message:
 		s.emitUpsert(Upsert{Type: "notify", Messages: []*Message{fromEvent(e)}})
+	case *events.GroupInfo:
+		// Any change, not only joins and leaves: cheap and safe.
+		s.emitGroupChange(e.JID.String())
+	case *events.JoinedGroup:
+		s.emitGroupChange(e.JID.String())
 	}
 }
 
@@ -365,6 +400,35 @@ func (s *meowSocket) GroupSubject(ctx context.Context, jid string) (string, erro
 		return "", err
 	}
 	return info.Name, nil
+}
+
+// GroupParticipants is one GetGroupInfo request. A list shorter than the
+// group's participant count is an unknown list, so it's an error.
+func (s *meowSocket) GroupParticipants(ctx context.Context, jid string) ([]GroupMember, error) {
+	g, err := types.ParseJID(jid)
+	if err != nil {
+		return nil, err
+	}
+	info, err := s.cli.GetGroupInfo(ctx, g)
+	if err != nil {
+		return nil, err
+	}
+	if info.ParticipantCount > 0 && info.ParticipantCount != len(info.Participants) {
+		return nil, fmt.Errorf("group %s lists %d of %d participants", jid, len(info.Participants), info.ParticipantCount)
+	}
+	out := make([]GroupMember, 0, len(info.Participants))
+	for _, part := range info.Participants {
+		id := part.JID.ToNonAD()
+		m := GroupMember{ID: id.String()}
+		for _, other := range []types.JID{part.PhoneNumber, part.LID} {
+			if !other.IsEmpty() && other.ToNonAD() != id {
+				m.Alt = other.ToNonAD().String()
+				break
+			}
+		}
+		out = append(out, m)
+	}
+	return out, nil
 }
 
 func (s *meowSocket) PNForLID(ctx context.Context, lid string) (string, error) {

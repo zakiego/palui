@@ -101,6 +101,10 @@ type Socket interface {
 	SendPresenceUpdate(ctx context.Context, state, jid string) error
 	PresenceSubscribe(ctx context.Context, jid string) error
 	GroupSubject(ctx context.Context, jid string) (string, error)
+	// Everyone in the group, bare JIDs. ID is the participant's main JID, Alt its other form ("" when unknown).
+	GroupParticipants(ctx context.Context, jid string) ([]GroupMember, error)
+	// A group's metadata or participants changed, or this account joined one; the func detaches.
+	OnGroupChange(fn func(jid string)) (off func())
 	// "" when unknown.
 	PNForLID(ctx context.Context, lid string) (string, error)
 	LIDForPN(ctx context.Context, pn string) (string, error)
@@ -108,6 +112,9 @@ type Socket interface {
 	Logout(ctx context.Context) error
 	End()
 }
+
+// GroupMember is one participant of a group as the socket reports it.
+type GroupMember struct{ ID, Alt string }
 
 // SocketFactory creates a socket on the session store at storePath.
 type SocketFactory func(ctx context.Context, storePath string) (Socket, error)

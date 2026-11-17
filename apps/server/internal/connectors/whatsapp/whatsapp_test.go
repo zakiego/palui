@@ -973,3 +973,218 @@ func TestSessionStates(t *testing.T) {
 	testutil.Must(t, whatsapp.WipeSession(path))
 	eq(t, whatsapp.InspectSession(path), whatsapp.SessionNone)
 }
+
+func TestGroupParticipants(t *testing.T) {
+	const (
+		grp     = "120363000000000001@g.us"
+		other   = "120363000000000002@g.us"
+		selfPN  = "628980001472@s.whatsapp.net"
+		selfLID = "111222333@lid"
+		aniPN   = "6281200000001@s.whatsapp.net"
+		aniLID  = "100000000000001@lid"
+		budiPN  = "6281200000002@s.whatsapp.net"
+		budiLID = "100000000000002@lid"
+	)
+	lister := func(r *connectors.RunningConnector) connectors.GroupLister {
+		l, ok := r.Channel.(connectors.GroupLister)
+		if !ok {
+			t.Fatal("whatsapp channel is not a GroupLister")
+		}
+		return l
+	}
+	members := func(s *watest.FakeSocket) {
+		s.GroupMembers[grp] = []whatsapp.GroupMember{
+			{ID: selfLID, Alt: selfPN},
+			{ID: aniPN, Alt: aniLID},
+			{ID: budiLID}, // LID only: the phone comes from the local store
+		}
+		s.GroupMembers[other] = []whatsapp.GroupMember{{ID: selfPN}, {ID: aniPN}}
+		s.SetLID(budiLID, budiPN)
+	}
+	ctx := context.Background()
+
+	t.Run("lists without this account and pairs phone and LID", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		members(e.sock())
+		got, err := lister(r).GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, got, []connectors.Participant{{ExternalID: aniPN, AltID: aniLID}, {ExternalID: budiLID, AltID: budiPN}})
+	})
+
+	t.Run("caches for 10 minutes", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		s := e.sock()
+		members(s)
+		l := lister(r)
+		_, err := l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		e.clock.Set(e.clock.Now() + 9*60_000)
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 1)
+		e.clock.Set(e.clock.Now() + 2*60_000)
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 2)
+	})
+
+	t.Run("a group change drops only that group", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		s := e.sock()
+		members(s)
+		l := lister(r)
+		for _, g := range []string{grp, other} {
+			_, err := l.GroupParticipants(ctx, g)
+			testutil.Must(t, err)
+		}
+		s.EmitGroupChange(other)
+		_, err := l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 2)
+		s.EmitGroupChange(grp)
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 3)
+	})
+
+	t.Run("a change during the fetch keeps the stale list out", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		s := e.sock()
+		members(s)
+		l := lister(r)
+		s.DuringGroupParticipants = func(jid string) {
+			s.DuringGroupParticipants = nil
+			s.EmitGroupChange(jid)
+		}
+		if _, err := l.GroupParticipants(ctx, grp); err == nil {
+			t.Fatal("a list fetched across a group change passed")
+		}
+		_, err := l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 2)
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 2)
+	})
+
+	t.Run("a member writing during the fetch keeps it, a stranger doesn't", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		s := e.sock()
+		members(s)
+		l := lister(r)
+		write := func(id, participant string, n int) {
+			s.Message(dm(id, nil, func(k *whatsapp.Key) { k.RemoteJID, k.Participant = grp, participant }), "")
+			conntest.Until(t, func() bool { return e.ctx.InboundCount() == n })
+		}
+		s.DuringGroupParticipants = func(string) {
+			s.DuringGroupParticipants = nil
+			write("M1", aniPN, 1)
+		}
+		_, err := l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 1)
+
+		s.EmitGroupChange(grp)
+		s.DuringGroupParticipants = func(string) {
+			s.DuringGroupParticipants = nil
+			write("M2", "6281200000003@s.whatsapp.net", 2)
+		}
+		if _, err := l.GroupParticipants(ctx, grp); err == nil {
+			t.Fatal("a list that misses a sender seen during the fetch passed")
+		}
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 3)
+	})
+
+	t.Run("a canceled fetch is not cached", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		s := e.sock()
+		members(s)
+		l := lister(r)
+		cctx, cancel := context.WithCancel(ctx)
+		s.DuringGroupParticipants = func(string) {
+			s.DuringGroupParticipants = nil
+			cancel()
+		}
+		if _, err := l.GroupParticipants(cctx, grp); err == nil {
+			t.Fatal("a canceled fetch passed")
+		}
+		_, err := l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 2)
+	})
+
+	t.Run("reconnecting clears the cache", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		s := e.sock()
+		members(s)
+		l := lister(r)
+		_, err := l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		s.OpenConn("")
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 2)
+	})
+
+	t.Run("a sender outside the list drops the group", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		s := e.sock()
+		members(s)
+		l := lister(r)
+		_, err := l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		// A known participant writing keeps the entry.
+		s.Message(dm("K1", nil, func(k *whatsapp.Key) { k.RemoteJID, k.Participant = grp, aniLID }), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 1 })
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 1)
+		s.Message(dm("K2", nil, func(k *whatsapp.Key) { k.RemoteJID, k.Participant = grp, "6281200000003@s.whatsapp.net" }), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 2 })
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 2)
+	})
+
+	t.Run("errors are never cached", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		s := e.sock()
+		members(s)
+		l := lister(r)
+		s.GroupMembersErr[grp] = errors.New("rate limited")
+		if _, err := l.GroupParticipants(ctx, grp); err == nil {
+			t.Fatal("socket error passed")
+		}
+		delete(s.GroupMembersErr, grp)
+		_, err := l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 2)
+
+		// A list without this account is unknown.
+		s.GroupMembers[other] = []whatsapp.GroupMember{{ID: aniPN}}
+		if _, err := l.GroupParticipants(ctx, other); err == nil {
+			t.Fatal("list without self passed")
+		}
+		if _, err := l.GroupParticipants(ctx, other); err == nil {
+			t.Fatal("list without self passed")
+		}
+		eq(t, s.GroupMemberCalls(), 4)
+
+		// A DM jid.
+		if _, err := l.GroupParticipants(ctx, aniPN); err == nil {
+			t.Fatal("dm passed")
+		}
+		eq(t, s.GroupMemberCalls(), 4)
+
+		// Socket down: no cache, even a fresh one.
+		s.Close(500)
+		if _, err := l.GroupParticipants(ctx, grp); err == nil || err.Error() != whatsapp.ReasonNotConnected {
+			t.Fatal(err)
+		}
+		eq(t, s.GroupMemberCalls(), 4)
+	})
+}

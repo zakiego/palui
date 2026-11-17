@@ -37,7 +37,7 @@ type ResumeContext struct {
 	BatchRunID string          `json:"batchRunId,omitempty"`
 	ResumedAt  int64           `json:"resumedAt,omitempty"`
 	AgentID    string          `json:"agentId,omitempty"`
-	// "owner" or "outside". "sharedOwner" (or "guest") only on an approval asked before PLAN 19.9 step 1.
+	// "owner", "members" or "outside". "sharedOwner" (or "guest") only on an approval asked before PLAN 19.9 step 1.
 	Mode string `json:"mode,omitempty"`
 }
 

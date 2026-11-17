@@ -26,9 +26,9 @@ var limits = struct {
 	flowName, flowDescription, flowSteps, flowTriggers, flowError, agentName, agentSlug, attachmentTitle, attachmentDescription, attachmentFilename,
 	connectorLabel, connectorID, jobName, rrule, reminderText, contactName, outboundText, contactNote, hookName, model, persona, webMessage,
 	toolName, approvalArgs, toolResult, statusDetail, jobResult, instructionTitle, instructionBody, preferenceKey, preferenceValue, botUsername,
-	commandName, commandDescription, commandPrompt int
+	commandName, commandDescription, commandPrompt, memberName, memberAccounts int
 }{80, 200, 40, 8, 300, 40, 24, 200, 1000, 200, 80, 63, 80, 300, 500, 60, 2000, 200, 60, 120, 8000, 8000, 64, 300, 500, 300, 500, 80, 1000, 40, 300, 32,
-	32, 120, 4000}
+	32, 120, 4000, 60, 5}
 
 const (
 	worstLongURL    = "https://example.com/workspaces/northwind-industries-holdings/projects/q3-launch/docs/9f8e7d6c5b4a?tab=comments&filter=unresolved&sort=newest"
@@ -231,6 +231,26 @@ func worst(k *Kit) {
 	// An uploaded photo: a small gradient PNG, the shape a browser-resized photo has.
 	cs := k.Agent(Agent{Slug: "cs", Name: "CS", Persona: "Jawab pertanyaan pelanggan Vorneo.", GuestTools: "none", AvatarImage: ptr(GradientAvatar48())})
 	k.Assign(family, arisan, true)
+	// Members (PLAN 19.4), made-up people and numbers. A name at the limit
+	// mixing scripts and an emoji, in two agents, with the most accounts: a
+	// phone with a learned LID, a LID only, a 20-digit Telegram id and two
+	// more numbers.
+	worstAccounts := []MemberAccount{
+		{Channel: "whatsapp", ExternalID: "6281200000011@s.whatsapp.net", AltID: ptr("100000000000011@lid")},
+		{Channel: "whatsapp", ExternalID: "100000000000012@lid", DisplayName: ptr("Nurul 🧕🏽")},
+		{Channel: "telegram", ExternalID: "12345678901234567890"},
+		{Channel: "whatsapp", ExternalID: "6281200000013@s.whatsapp.net"},
+		{Channel: "whatsapp", ExternalID: "447700900013@s.whatsapp.net"},
+	}
+	if len(worstAccounts) > L.memberAccounts {
+		panic(fixtureErr{fmt.Errorf("%d member accounts, over the limit of %d", len(worstAccounts), L.memberAccounts)})
+	}
+	k.Member(Member{Name: within("Nurul Hidayah binti H. Abdul Gani نور الهداية 🧕🏽 Bendahara", L.memberName), Accounts: worstAccounts, Agents: []string{arisan, cs}})
+	// One letter, one account: the guest who asks in the family group below,
+	// so the people list has to leave out someone who is already a member.
+	k.Member(Member{Name: "M", Accounts: []MemberAccount{{Channel: "telegram", ExternalID: "1000000099"}}, Agents: []string{arisan}})
+	// In CS only: arisan's page offers them under members of other agents.
+	k.Member(Member{Name: "Admin Gudang", Accounts: []MemberAccount{{Channel: "whatsapp", ExternalID: "6281200000014@s.whatsapp.net"}}, Agents: []string{cs}})
 	// Agent-scoped MCP: one owned by the agent with the longest name, one by CS,
 	// and one whose owner was deleted (serves nobody).
 	k.OwnConnector("mcp-files", arisan)
