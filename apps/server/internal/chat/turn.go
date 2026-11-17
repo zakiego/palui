@@ -540,6 +540,9 @@ func resumeContextJSON(rc approvals.ResumeContext, scope, names *[]string, syste
 		o.Set("silentToken", rc.SilentToken)
 	}
 	o.Set("tainted", rc.Tainted)
+	if rc.OthersWrote {
+		o.Set("othersWrote", true)
+	}
 	o.Set("sessionId", rc.SessionID)
 	o.Set("system", system)
 	o.Set("batchRunId", rc.BatchRunID)
@@ -813,6 +816,10 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 	c.setActive(chat.ID, active)
 	var tainted atomic.Bool
 	tainted.Store(input.UntrustedInput || (rs != nil && rs.Context.Tainted) || QuotesOutsider(history, batch))
+	// The turn read what other people wrote (another agent's chats or memory):
+	// from then on no write runs on its own, "allow" included.
+	var othersWrote atomic.Bool
+	othersWrote.Store(rs != nil && rs.Context.OthersWrote)
 	timer := &toolTimer{starts: map[string]int64{}}
 	var channel connectors.ChannelHandle
 	if chat.Channel != "web" {
@@ -962,6 +969,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 						rlog.Info("turn tainted by an untrusted tool result", logx.Fields{"tool": m.Name})
 					}
 					tainted.Store(true)
+					if m.OthersWrote {
+						othersWrote.Store(true)
+					}
 				},
 				OnToolStart: func(id string) { timer.start(id, c.Clock()) },
 			})
@@ -1195,6 +1205,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					rlog.Info("turn tainted by an untrusted tool call", logx.Fields{"tool": meta.Name})
 					tainted.Store(true)
 				}
+				if meta != nil && meta.OthersWrote {
+					othersWrote.Store(true)
+				}
 				// An outside turn has no approvals. Its tools run right away, and the
 				// tool wrapper refuses a call whose tool asks on its own.
 				if outside {
@@ -1209,12 +1222,13 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					class = meta.Class
 				}
 				return tools.NeedsApproval(tools.ApprovalInput{
-					Class:      class,
-					Permission: tools.PermissionFor(&perms, call.ToolName),
-					OwnerTurn:  ownerTurn,
-					Tainted:    tainted.Load(),
-					Strict:     strict,
-					SendsFile:  len(attachments.FindRefs(call.Input)) > 0,
+					Class:       class,
+					Permission:  tools.PermissionFor(&perms, call.ToolName),
+					OwnerTurn:   ownerTurn,
+					Tainted:     tainted.Load(),
+					OthersWrote: othersWrote.Load(),
+					Strict:      strict,
+					SendsFile:   len(attachments.FindRefs(call.Input)) > 0,
 				})
 			},
 			Emit: func(p Part) {
@@ -1288,7 +1302,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		case len(requests) > 0 && status != "error" && status != "aborted":
 			rc := approvals.ResumeContext{
 				Trigger: input.Trigger, OriginTrigger: origin, JobID: jobID, ModelRole: role, Deliver: deliver,
-				SilentToken: silentToken, Tainted: tainted.Load(), SessionID: chat.SessionID,
+				SilentToken: silentToken, Tainted: tainted.Load(), OthersWrote: othersWrote.Load(), SessionID: chat.SessionID,
 				BatchRunID: batchRunID, AgentID: agent.ID, Mode: mode,
 			}
 			ctxJSON := resumeContextJSON(rc, toolScope, toolNames, system)

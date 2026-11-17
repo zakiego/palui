@@ -31,7 +31,9 @@ type ResumeContext struct {
 	Deliver     bool      `json:"deliver"`
 	SilentToken string    `json:"silentToken,omitempty"`
 	Tainted     bool      `json:"tainted"`
-	SessionID   *string   `json:"sessionId"`
+	// The turn read what other people wrote: writes ask even when allowed.
+	OthersWrote bool    `json:"othersWrote,omitempty"`
+	SessionID   *string `json:"sessionId"`
 	// The system prompt as sent, block by block (a plain string on old rows).
 	System     json.RawMessage `json:"system"`
 	BatchRunID string          `json:"batchRunId,omitempty"`
