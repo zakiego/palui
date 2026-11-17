@@ -314,3 +314,24 @@ func TestCompact(t *testing.T) {
 	h.say("/compact")
 	eq(t, lastText(t, h.DB), "Obrolannya masih pendek, belum ada yang perlu diringkas.")
 }
+
+// The summarizer is told who wrote each line: a guest's messages in a shared
+// chat must never be folded in as the owner's (report rpt_0mwkvj89vvcyovivrua:
+// a guest's name ended up as the owner's in the summary).
+func TestCompactLabelsSenders(t *testing.T) {
+	h := cmdSetup(t, []models.Step{models.Say("satu"), models.Say("dua"), models.Say("tiga"), models.Say("empat"), models.Say("lima"), models.Say("RINGKASAN")}, nil, extra{})
+	h.say("halo a", func(m *connectors.InboundMessage) { m.SenderName = "Raka" })
+	for _, x := range []string{"b", "c", "d", "e"} {
+		h.say("halo " + x)
+	}
+	// Make "halo b" a guest's message, as in a group.
+	_, err := h.DB.Exec("UPDATE messages SET from_owner = 0, sender_name = 'Dimas', sender_id = '999' WHERE text = 'halo b'")
+	testutil.Must(t, err)
+	h.say("/compact")
+	seen := h.m.PromptsSeen()
+	text := string(need(models.MarshalMessages(seen[len(seen)-1])))
+	contains(t, text, "[Owner (Raka)]: halo a")
+	contains(t, text, "[Dimas]: halo b")
+	contains(t, text, "[Palui]: satu")
+	notContains(t, text, "[Owner]: halo b")
+}

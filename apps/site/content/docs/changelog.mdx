@@ -45,6 +45,7 @@ Nothing yet.
 
 ### Fixed
 
+- In a group, an agent no longer mixes you up with someone else in the chat. Conversation summaries used to credit every message to you, so a friend's name could end up as yours and the agent would call you by it. Summaries now keep who wrote what, and the agent sees the name you use on WhatsApp or Telegram next to your messages, so it knows what to call you.
 - Agents can see WhatsApp stickers. Before, a sticker with no text never reached the agent at all. Now it arrives as an image marked as a sticker, so the agent can react to it, and an animated sticker comes through as its first frame. It follows the same rules as photos: a guest's sticker is only read when it's part of a message the agent will answer.
 - WhatsApp stickers sent to the agent are actually downloaded now. They still came through as just "[sticker]" because the download skipped them. Replying to a photo or sticker and mentioning the agent ("what does this say?") also sends that photo or sticker along, even when it was group talk the agent never read.
 - A flow whose schedule takes its times from a tool (like prayer times from an external MCP server) no longer asks for approval on every write once its version is approved. The tool only hands back times, so the scheduled time, date and item label aren't treated as outside data anymore. A list source that copies labels from the tool still asks.

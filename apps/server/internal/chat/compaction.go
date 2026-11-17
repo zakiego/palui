@@ -122,9 +122,9 @@ func CompactSession(c *EngineCtx, sessionID string, after, keep int) (CompactRes
 	for i, m := range fold {
 		who := "Palui"
 		if m.Role == "user" {
-			who = "Owner"
+			who = SenderLabel(m.FromOwner, m.SenderName, m.SenderID)
 		}
-		lines[i] = fmt.Sprintf("%s: %s", who, m.Text)
+		lines[i] = fmt.Sprintf("[%s]: %s", who, m.Text)
 	}
 	earlier := ""
 	if session.Summary != nil && *session.Summary != "" {
@@ -135,7 +135,7 @@ func CompactSession(c *EngineCtx, sessionID string, after, keep int) (CompactRes
 		return CompactResult{}, err
 	}
 	out, err := GenerateText(context.Background(), models.MeterToBudget(q, fm, c.Clock),
-		"You compress a chat between the owner and their assistant Palui into a short running summary for Palui's context. Keep facts, decisions, open tasks, names, dates and preferences. Drop small talk. Write in the conversation's language, at most 250 words. Output only the summary.",
+		"You compress a chat between the owner, anyone else in it, and their assistant Palui into a short running summary for Palui's context. Each line starts with who wrote it in brackets: [Owner] or [Owner (name)] is the owner, any other name is someone else in the chat, never the owner. Keep track of who said or asked what. Keep facts, decisions, open tasks, names, dates and preferences. Drop small talk. Write in the conversation's language, at most 250 words. Output only the summary.",
 		earlier+"New messages:\n"+strings.Join(lines, "\n"), 60*time.Second, c.RetryDelay)
 	if err != nil {
 		c.Log.Warn("compaction failed", logx.Fields{"session_id": sessionID, "error": err})

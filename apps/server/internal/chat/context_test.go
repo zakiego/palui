@@ -589,3 +589,20 @@ func TestBuildSystemInbound(t *testing.T) {
 }
 
 var _ = json.Marshal
+
+func TestSenderLabel(t *testing.T) {
+	s := func(v string) *string { return &v }
+	eq(t, chat.SenderLabel(true, nil, s("111")), "Owner")
+	eq(t, chat.SenderLabel(true, s("  Raka\n Test "), nil), "Owner (Raka Test)")
+	eq(t, chat.SenderLabel(true, s("[x]"), nil), "Owner (x)")
+	eq(t, chat.SenderLabel(true, s("owner"), nil), "Owner")
+	eq(t, chat.SenderLabel(true, s(" [] "), nil), "Owner")
+	eq(t, chat.SenderLabel(false, s("Dimas"), s("222")), "Dimas")
+	eq(t, chat.SenderLabel(false, nil, s("222")), "222")
+	eq(t, chat.SenderLabel(false, nil, nil), "Guest")
+	// A guest can't wear the owner's label, bare or with a name.
+	eq(t, chat.SenderLabel(false, s(" [Owner] "), nil), "Guest (Owner)")
+	eq(t, chat.SenderLabel(false, s("Owner (Raka)"), nil), "Guest (Owner (Raka))")
+	eq(t, chat.SenderLabel(false, s("[OWNER] Raka"), nil), "Guest (OWNER Raka)")
+	eq(t, chat.SenderLabel(false, s("Ownerku"), nil), "Ownerku")
+}

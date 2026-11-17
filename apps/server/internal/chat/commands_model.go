@@ -474,14 +474,9 @@ func CmdBtw(c *EngineCtx, chat db.Chat, msg *CommandMessage) (CommandReply, erro
 		}
 		lines := make([]string, len(history))
 		for i, m := range history {
-			who := "Guest"
-			switch {
-			case m.Role == "assistant":
+			who := SenderLabel(m.FromOwner, m.SenderName, m.SenderID)
+			if m.Role == "assistant" {
 				who = agent.Name
-			case m.FromOwner:
-				who = "Owner"
-			case m.SenderName != nil:
-				who = *m.SenderName
 			}
 			lines[i] = fmt.Sprintf("%s: %s", who, strx.Slice16(m.Text, btwMessageChars))
 		}
