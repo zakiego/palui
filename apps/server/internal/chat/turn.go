@@ -778,17 +778,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			audience = tools.AudienceOutside
 		}
 	}
-	// Palui's approval asked in a group before 19.9 step 1 ran as the owner's
-	// turn; it resumes with that tool set. A fresh shared turn never asks.
-	if shared && rs != nil && rs.Context.Mode == tools.AudienceOwner {
-		audience = tools.AudienceOwner
-	}
 	mode := audience
-	// An approval asked before 19.9 step 1 resumes under the rules it was asked with.
-	legacy := rs != nil && rs.Context.Mode == "sharedOwner"
-	if legacy {
-		mode = "sharedOwner"
-	}
 
 	chain, err := models.ResolveChain(q, c.Host, role)
 	if err != nil {
@@ -915,9 +905,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			Tainted: tainted.Load, OwnerText: ownerText,
 			Memory: &connectors.MemoryScope{Container: scope.Container, Read: scope.Read, Locked: scope.Locked},
 		}
-		outside := audience == tools.AudienceOutside && !legacy
+		outside := audience == tools.AudienceOutside
 		// Members and outside turns have nobody to ask (PLAN 19.4).
-		open := tools.NoApprovals(audience) && !legacy
+		open := tools.NoApprovals(audience)
 		noTools := input.NoTools || origin == "hook" || (outside && agent.GuestTools == "none")
 		toolScope := input.ToolScope
 		toolNames := input.ToolNames
@@ -929,11 +919,8 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		deny := tools.DeniedTools(&perms)
 		if open {
 			collectAudience = audience
-			// No approvals here: a tool the owner wants a say on isn't offered at
-			// all. A resume keeps it: its approved call was already asked for.
-			if rs == nil {
-				deny = append(deny, tools.AskTools(&perms)...)
-			}
+			// No approvals here: a tool the owner wants a say on isn't offered at all.
+			deny = append(deny, tools.AskTools(&perms)...)
 		}
 		var collected *tools.Collected
 		if noTools {
@@ -998,13 +985,23 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			}
 			var responses []models.Part
 			approvedIDs := map[string]bool{}
+			// A resume lands in a turn with no approvals only from a request asked
+			// before PLAN 19.9 step 1, or when the chat stopped being the owner's since.
+			// Nothing it approved runs there.
+			if open {
+				rlog.Warn("approval resumed in a chat with no approvals; its calls are denied", logx.Fields{"mode": rs.Context.Mode})
+			}
 			for _, a := range rs.Approvals {
+				approved := a.Status == "approved" && !open
 				reason, ok := approvalReasons[a.Status]
 				if !ok {
 					reason = "Denied by the owner"
 				}
-				responses = append(responses, models.ToolApprovalResponsePart(a.ApprovalID, a.Status == "approved", &reason))
-				if a.Status == "approved" && a.ToolCallID != nil && *a.ToolCallID != "" {
+				if open {
+					reason = tools.OutsideApprovalError
+				}
+				responses = append(responses, models.ToolApprovalResponsePart(a.ApprovalID, approved, &reason))
+				if approved && a.ToolCallID != nil && *a.ToolCallID != "" {
 					approvedIDs[*a.ToolCallID] = true
 				}
 			}
@@ -1110,11 +1107,10 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		if err != nil {
 			return err
 		}
-		// Jobs and hooks: every write needs approval. So does a shared-chat
-		// approval asked before 19.9 step 1; a fresh shared turn has no approvals.
-		strict := unattended(origin) || origin == "hook" || legacy
+		// Jobs and hooks: every write needs approval.
+		strict := unattended(origin) || origin == "hook"
 		// The owner's own message: the agent's tool permissions may skip the prompt here, nowhere else.
-		ownerTurn := origin == "message" && (mode == tools.AudienceOwner || legacy)
+		ownerTurn := origin == "message" && mode == tools.AudienceOwner
 		typing(true)
 		c.Bus.Publish(TurnEvent{Type: "turn-start", ChatID: chat.ID, RunID: runID})
 		clock := NewStepClock(c.Monotonic())
@@ -1310,8 +1306,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				DeliverReply(c, chat, runID, text)
 			}
 			// A shared chat never sees the prompt: it goes to the owner's DM (PLAN 19.4).
-			// Since 19.9 step 1 only a legacy sharedOwner resume asks from a shared
-			// chat; step 5 removes this routing.
+			// Since 19.9 step 1 a shared chat never asks; step 5 removes this routing.
 			askChat := chat
 			if shared {
 				if dm, ok := ownerChatFor(c, chat.Channel); ok {

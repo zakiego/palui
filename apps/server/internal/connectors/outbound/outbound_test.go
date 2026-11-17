@@ -97,8 +97,8 @@ func TestOnlyTurnsTheOwnerStartedInHisOwnChatGetTheSendTools(t *testing.T) {
 		func(x *connectors.TurnInfo) { x.Origin = "schedule" },
 		func(x *connectors.TurnInfo) { x.Origin = "hook" },
 		func(x *connectors.TurnInfo) { x.Origin = "reminder" },
-		func(x *connectors.TurnInfo) { x.Mode = "guest" },
-		func(x *connectors.TurnInfo) { x.Mode = "sharedOwner" },
+		func(x *connectors.TurnInfo) { x.Mode = "outside" },
+		func(x *connectors.TurnInfo) { x.Mode = "members" },
 		func(x *connectors.TurnInfo) { x.Origin = "" },
 	}
 	for i, m := range muts {
@@ -390,7 +390,7 @@ func TestAddContactOnlyExistsInTurnsTheOwnerStarted(t *testing.T) {
 		func(x *connectors.TurnInfo) { x.Origin, x.Trigger = "flow", "flow" },
 		func(x *connectors.TurnInfo) { x.Origin = "hook" },
 		func(x *connectors.TurnInfo) { x.Origin = "schedule" },
-		func(x *connectors.TurnInfo) { x.Mode = "guest" },
+		func(x *connectors.TurnInfo) { x.Mode = "outside" },
 	} {
 		if _, ok := setup(t, m, false).tools(t).Get("add_contact"); ok {
 			t.Fatal("offered")
