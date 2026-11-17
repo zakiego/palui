@@ -39,6 +39,13 @@ type fakeOpts struct {
 	profileDown  bool
 	// What /v1/containers lists; nil is default and zaki.
 	containers func() []string
+	// How long /v1/containers takes to answer.
+	containersDelay time.Duration
+	// Tool results: a tool named here answers with this text, as an error when errors[tool].
+	results map[string]string
+	errors  map[string]bool
+	// The runtime's health and container timeout; 0 is recall.Runtime's 5 s.
+	timeoutMs int64
 }
 
 type fake struct {
@@ -71,6 +78,16 @@ func (f *fake) paths(filter func(seen) bool) []string {
 	return out
 }
 
+// waitOrDone waits d, and says whether the request was dropped meanwhile.
+func waitOrDone(r *http.Request, d time.Duration) bool {
+	select {
+	case <-time.After(d):
+		return false
+	case <-r.Context().Done():
+		return true
+	}
+}
+
 func deletes(s seen) bool { return s.Method == "DELETE" }
 
 func fakeRecall(t *testing.T, o fakeOpts) *fake {
@@ -84,6 +101,11 @@ func fakeRecall(t *testing.T, o fakeOpts) *fake {
 			}
 			f.toolArgs = append(f.toolArgs, rec)
 			f.mu.Unlock()
+			if text, ok := o.results[tool]; ok {
+				r := conntest.TextResult(text)
+				r.IsError = o.errors[tool]
+				return r
+			}
 			return conntest.TextResult(tool + " ok")
 		}
 	}
@@ -119,6 +141,8 @@ func fakeRecall(t *testing.T, o fakeOpts) *fake {
 			return send(w, 401, map[string]any{"error": map[string]any{"type": "unauthorized", "message": "missing or invalid API key"}})
 		}
 		switch {
+		case r.URL.Path == "/v1/containers" && o.containersDelay > 0 && waitOrDone(r, o.containersDelay):
+			return true
 		case r.URL.Path == "/v1/containers" && o.containers != nil:
 			list := []any{}
 			for _, c := range o.containers() {

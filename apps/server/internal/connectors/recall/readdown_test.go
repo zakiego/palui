@@ -2,9 +2,11 @@ package recall_test
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/chats"
@@ -63,7 +65,11 @@ func memSetup(t *testing.T, o fakeOpts) memEnv {
 		shopGroup:  ensure(chats.EnsureInput{Channel: "whatsapp", ExternalID: "120000000000000003@g.us", Title: "Shop orders", Kind: "group", AgentID: &shop.ID}, downNow-4),
 	}
 	ctx := conntest.NewCtx(t, d, "recall", cfg(t, f.base, ""), map[string]string{"apiKey": KEY})
-	running, err := recall.Runtime.Start(ctx.Context)
+	rt := recall.Runtime
+	if o.timeoutMs > 0 {
+		rt = recall.New(recall.Options{TimeoutMs: o.timeoutMs})
+	}
+	running, err := rt.Start(ctx.Context)
 	testutil.Must(t, err)
 	t.Cleanup(func() { running.Stop(context.Background()) })
 	e.running = running
@@ -127,7 +133,7 @@ func TestSearchAgentMemoryReadsTheAgentsOwnAndPerChatContainers(t *testing.T) {
 	e := memSetup(t, fakeOpts{containers: func() []string { return []string{"owner-mem", "agent-club", dmMem, groupMem, "agent-shop"} }})
 	groupMem = agents.ChatContainer("agent-club", e.clubGroup.ID)
 	dmMem = agents.ChatContainer("agent-club", e.clubDM.ID)
-	res := exec(t, e.tools(t), "search_agent_memory", `{"agent":"club","query":"next book","limit":5}`)
+	res := exec(t, e.tools(t), "search_agent_memory", `{"agent":"club","query":"next book","limit":6}`)
 	if !res.B("ok") || res.S("agent.slug") != "club" || res.Len("results") != 3 {
 		t.Fatal(res)
 	}
@@ -141,10 +147,11 @@ func TestSearchAgentMemoryReadsTheAgentsOwnAndPerChatContainers(t *testing.T) {
 	if !res.Has("results.0.result") || res.Has("results.0.error") {
 		t.Fatal(res.JSON("results.0"))
 	}
+	// limit is a total: 6 across 3 containers is 2 each.
 	want := []string{
-		`[{"container":"agent-club","limit":5,"query":"next book","tool":"search_memories"}]`,
-		`[{"container":"` + groupMem + `","limit":5,"query":"next book","tool":"search_memories"}]`,
-		`[{"container":"` + dmMem + `","limit":5,"query":"next book","tool":"search_memories"}]`,
+		`[{"container":"agent-club","limit":2,"query":"next book","tool":"search_memories"}]`,
+		`[{"container":"` + groupMem + `","limit":2,"query":"next book","tool":"search_memories"}]`,
+		`[{"container":"` + dmMem + `","limit":2,"query":"next book","tool":"search_memories"}]`,
 	}
 	sort.Strings(want)
 	if got := sortedArgs(e.f); got != strings.Join(want, ",") {
@@ -224,5 +231,80 @@ func TestListAgentMemoryPassesTheCursorOnlyForOneContainer(t *testing.T) {
 	}
 	if got := argsJSON(e.f.Args()); got != `[{"container":"`+groupMem+`","cursor":"c1","limit":20,"tool":"list_memories"}]` {
 		t.Fatal(got)
+	}
+}
+
+func TestAgentMemoryLimitIsATotalWithADefaultWhenSeveralContainersAreRead(t *testing.T) {
+	var groupMem, dmMem string
+	e := memSetup(t, fakeOpts{containers: func() []string { return []string{"agent-club", dmMem, groupMem} }})
+	groupMem = agents.ChatContainer("agent-club", e.clubGroup.ID)
+	dmMem = agents.ChatContainer("agent-club", e.clubDM.ID)
+	exec(t, e.tools(t), "list_agent_memory", `{"agent":"club"}`)
+	exec(t, e.tools(t), "search_agent_memory", `{"agent":"club","query":"x"}`)
+	exec(t, e.tools(t), "list_agent_memory", `{"agent":"club","chat":"`+e.clubDM.ID+`"}`)
+	got := map[string][]any{}
+	for _, a := range e.f.Args() {
+		got[a["tool"].(string)] = append(got[a["tool"].(string)], a["limit"])
+	}
+	// list: 50 over 3 is 17 each, search: 20 over 3 is 7, one container: recall's default.
+	if fmt.Sprint(got["list_memories"]) != "[17 17 17 <nil>]" || fmt.Sprint(got["search_memories"]) != "[7 7 7]" {
+		t.Fatal(got)
+	}
+}
+
+func TestAgentMemoryUnwrapsRecallsResultAndReportsItsErrors(t *testing.T) {
+	e := memSetup(t, fakeOpts{
+		results: map[string]string{"search_memories": `{"results":[{"id":"m1","memory":"Next book: Laut Bercerita"}]}`, "list_memories": "recall is busy"},
+		errors:  map[string]bool{"list_memories": true},
+	})
+	res := exec(t, e.tools(t), "search_agent_memory", `{"agent":"shop","query":"x"}`)
+	if res.S("results.0.result.results.0.memory") != "Next book: Laut Bercerita" {
+		t.Fatal(res)
+	}
+	res = exec(t, e.tools(t), "list_agent_memory", `{"agent":"shop"}`)
+	if res.S("results.0.error") != "recall is busy" || res.Has("results.0.result") {
+		t.Fatal(res)
+	}
+}
+
+func TestSearchAgentMemorySaysHowManyOlderChatsItLeftOut(t *testing.T) {
+	e := memSetup(t, fakeOpts{})
+	for i := range recall.AgentMemoryChats + 2 {
+		_, err := chats.Ensure(e.d, chats.EnsureInput{Channel: "telegram", ExternalID: fmt.Sprintf("70000010%d", i), Title: "Member", AgentID: &e.club.ID}, downNow)
+		testutil.Must(t, err)
+	}
+	res := exec(t, e.tools(t), "search_agent_memory", `{"agent":"club","query":"x"}`)
+	// 2 chats from setup plus 12: the 10 most recent are read.
+	if res.N("chatsNotSearched") != 4 || !strings.Contains(res.S("hint"), "Pass chat") {
+		t.Fatal(res)
+	}
+	if r := exec(t, e.tools(t), "search_agent_memory", `{"agent":"shop","query":"x"}`); r.Has("chatsNotSearched") {
+		t.Fatal(r)
+	}
+}
+
+func TestAgentMemoryNamesTheOtherAgentsWhenTheSlugIsWrong(t *testing.T) {
+	e := memSetup(t, fakeOpts{})
+	r := exec(t, e.tools(t), "search_agent_memory", `{"agent":"nobody","query":"x"}`)
+	if !strings.Contains(r.S("error"), "The other agents are: club, shop.") {
+		t.Fatal(r)
+	}
+	for _, name := range []string{"search_agent_memory", "list_agent_memory"} {
+		pt, _ := e.tools(t).Get(name)
+		if strings.Contains(string(pt.Tool.InputSchema), "chats__") || strings.Contains(pt.Tool.Description, "chats__") {
+			t.Fatal(name, "names a chats tool")
+		}
+	}
+}
+
+func TestAgentMemoryReadsEveryContainerWhenRecallsListStalls(t *testing.T) {
+	e := memSetup(t, fakeOpts{containersDelay: 10 * time.Second, timeoutMs: 100})
+	start := time.Now()
+	res := exec(t, e.tools(t), "search_agent_memory", `{"agent":"club","query":"x"}`)
+	if time.Since(start) > 3*time.Second {
+		t.Fatal("waited for the stalled container list")
+	}
+	if res.Len("results") != 3 {
+		t.Fatal(res)
 	}
 }

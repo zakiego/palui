@@ -569,7 +569,7 @@ func New(opts Options) *connectors.Runtime {
 							return nil, err
 						}
 						if down {
-							more := ReadDownTools(c.DB, api, aiTools)
+							more := ReadDownTools(c.DB, api, aiTools, timeout)
 							for _, k := range more.Keys() {
 								pt, _ := more.Get(k)
 								set.Set(k, pt)
