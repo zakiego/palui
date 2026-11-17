@@ -240,6 +240,10 @@ type wa struct {
 	// Group participant lists (PLAN 19.4), dropped on any group change, on
 	// reconnect and when a sender outside the list writes.
 	groupMembers map[string]membersEntry
+	// groupGen counts the drops per group and groupEpoch the full clears, also
+	// when nothing was cached, so a fetch that overlapped one isn't stored.
+	groupGen   map[string]uint64
+	groupEpoch uint64
 
 	queue chan delivery
 	quit  chan struct{}
@@ -290,6 +294,7 @@ func start(c connectors.Context, o Options) (*connectors.RunningConnector, error
 		thinking:        map[string]*thinking{},
 		groupTitles:     map[string]titleEntry{},
 		groupMembers:    map[string]membersEntry{},
+		groupGen:        map[string]uint64{},
 		queue:           make(chan delivery, 256),
 		quit:            make(chan struct{}),
 	}
@@ -494,6 +499,7 @@ func (w *wa) onUpdate(s Socket, u Update) {
 	case "open":
 		// Changes made while offline may never be reported.
 		w.groupMembers = map[string]membersEntry{}
+		w.groupEpoch++
 		w.attempt = 0
 		w.clearPairingLocked()
 		w.live.Connection = "open"
@@ -619,7 +625,7 @@ func (w *wa) connect() {
 	})
 	offGroup := s.OnGroupChange(func(jid string) {
 		w.mu.Lock()
-		delete(w.groupMembers, jid)
+		w.dropGroupLocked(jid)
 		w.mu.Unlock()
 	})
 	w.detach = func() {
@@ -724,8 +730,9 @@ func (w *wa) deliver(s Socket, m *Message) error {
 
 	if group {
 		w.mu.Lock()
-		if e, ok := w.groupMembers[jid]; ok && !inParticipants(e.list, BareJID(sender), alt) {
-			delete(w.groupMembers, jid)
+		// No entry also drops: a fetch in flight may predate this sender.
+		if e, ok := w.groupMembers[jid]; !ok || !inParticipants(e.list, BareJID(sender), alt) {
+			w.dropGroupLocked(jid)
 		}
 		w.mu.Unlock()
 	}
@@ -844,6 +851,7 @@ func (w *wa) GroupParticipants(ctx context.Context, jid string) ([]connectors.Pa
 	now := w.o.Now()
 	w.mu.Lock()
 	hit, ok := w.groupMembers[jid]
+	gen, epoch := w.groupGen[jid], w.groupEpoch
 	w.mu.Unlock()
 	if ok && now-hit.at < groupMembersTTL {
 		return slices.Clone(hit.list), nil
@@ -892,10 +900,25 @@ func (w *wa) GroupParticipants(ctx context.Context, jid string) ([]connectors.Pa
 	if !foundSelf {
 		return nil, fmt.Errorf("this WhatsApp account is not in %s", jid)
 	}
+	if err := ctx.Err(); err != nil {
+		// The id lookups may have failed on the deadline: don't keep a list
+		// with missing alt ids.
+		return nil, err
+	}
 	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.groupGen[jid] != gen || w.groupEpoch != epoch {
+		return nil, fmt.Errorf("%s changed while its participants were fetched", jid)
+	}
 	w.groupMembers[jid] = membersEntry{list: list, at: w.o.Now()}
-	w.mu.Unlock()
 	return slices.Clone(list), nil
+}
+
+// dropGroupLocked forgets a group's participants and fails any fetch of them
+// already in flight. Callers hold w.mu.
+func (w *wa) dropGroupLocked(jid string) {
+	delete(w.groupMembers, jid)
+	w.groupGen[jid]++
 }
 
 func (w *wa) openSocket() Socket {

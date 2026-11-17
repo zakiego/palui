@@ -1007,6 +1007,44 @@ func TestGroupParticipants(t *testing.T) {
 		eq(t, s.GroupMemberCalls(), 3)
 	})
 
+	t.Run("a change during the fetch keeps the stale list out", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		s := e.sock()
+		members(s)
+		l := lister(r)
+		s.DuringGroupParticipants = func(jid string) {
+			s.DuringGroupParticipants = nil
+			s.EmitGroupChange(jid)
+		}
+		if _, err := l.GroupParticipants(ctx, grp); err == nil {
+			t.Fatal("a list fetched across a group change passed")
+		}
+		_, err := l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 2)
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 2)
+	})
+
+	t.Run("a canceled fetch is not cached", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		s := e.sock()
+		members(s)
+		l := lister(r)
+		cctx, cancel := context.WithCancel(ctx)
+		s.DuringGroupParticipants = func(string) {
+			s.DuringGroupParticipants = nil
+			cancel()
+		}
+		if _, err := l.GroupParticipants(cctx, grp); err == nil {
+			t.Fatal("a canceled fetch passed")
+		}
+		_, err := l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 2)
+	})
+
 	t.Run("reconnecting clears the cache", func(t *testing.T) {
 		e, r := openRunning(t, opts{})
 		s := e.sock()

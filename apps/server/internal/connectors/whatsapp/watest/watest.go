@@ -56,6 +56,9 @@ type FakeSocket struct {
 	// neither is an error.
 	GroupMembers    map[string][]whatsapp.GroupMember
 	GroupMembersErr map[string]error
+	// DuringGroupParticipants, when set, runs inside GroupParticipants after
+	// the list is read, as if an event landed while the request was in flight.
+	DuringGroupParticipants func(jid string)
 }
 
 // New is new FakeSocket({ registered }).
@@ -213,16 +216,24 @@ func (f *FakeSocket) GroupSubject(_ context.Context, jid string) (string, error)
 }
 
 func (f *FakeSocket) GroupParticipants(_ context.Context, jid string) ([]whatsapp.GroupMember, error) {
+	list, during, err := f.groupParticipants(jid)
+	if during != nil {
+		during(jid)
+	}
+	return list, err
+}
+
+func (f *FakeSocket) groupParticipants(jid string) ([]whatsapp.GroupMember, func(string), error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.groupCalls++
 	if err, ok := f.GroupMembersErr[jid]; ok {
-		return nil, err
+		return nil, f.DuringGroupParticipants, err
 	}
 	if list, ok := f.GroupMembers[jid]; ok {
-		return append([]whatsapp.GroupMember(nil), list...), nil
+		return append([]whatsapp.GroupMember(nil), list...), f.DuringGroupParticipants, nil
 	}
-	return nil, fmt.Errorf("no participants for %s", jid)
+	return nil, f.DuringGroupParticipants, fmt.Errorf("no participants for %s", jid)
 }
 
 // GroupMemberCalls is how many times GroupParticipants was called.
