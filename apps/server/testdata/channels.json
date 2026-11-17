@@ -11935,7 +11935,7 @@
    "downloads": []
   },
   {
-   "name": "sticker dropped",
+   "name": "sticker that isn't a webp",
    "msg": {
     "key": {
      "remoteJid": "628123456789@s.whatsapp.net",
@@ -11949,8 +11949,23 @@
     "pushName": "Zaki"
    },
    "type": "notify",
-   "inbound": [],
-   "downloads": []
+   "inbound": [
+    {
+     "channel": "whatsapp",
+     "connectorId": "whatsapp",
+     "chatExternalId": "628123456789@s.whatsapp.net",
+     "chatKind": "dm",
+     "senderExternalId": "628123456789@s.whatsapp.net",
+     "text": "[sticker, could not be read]",
+     "at": 1700000000000,
+     "senderName": "Zaki",
+     "chatTitle": "Zaki",
+     "channelMsgId": "ST1"
+    }
+   ],
+   "downloads": [
+    "ST1"
+   ]
   },
   {
    "name": "stranger image",

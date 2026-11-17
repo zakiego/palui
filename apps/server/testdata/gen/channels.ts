@@ -460,7 +460,7 @@ const WA_STEPS: WaStep[] = [
   { name: "image over 16 MB when read", msg: dm("BIGIMG", { imageMessage: {} }) },
   { name: "video is caption only", msg: dm("VID1", { videoMessage: { caption: "klip", mimetype: "video/mp4" } }) },
   { name: "video without caption dropped", msg: dm("VID2", { videoMessage: { mimetype: "video/mp4" } }) },
-  { name: "sticker dropped", msg: dm("ST1", { stickerMessage: {} }) },
+  { name: "sticker that isn't a webp", msg: dm("ST1", { stickerMessage: {} }) },
   { name: "stranger image", msg: dm("IMG2", { imageMessage: { caption: "spam" } }, { remoteJid: "629999@s.whatsapp.net" }) },
   { name: "stranger image without caption dropped", msg: dm("IMG5", { imageMessage: {} }, { remoteJid: "629999@s.whatsapp.net" }) },
   { name: "owner by LID image", msg: dm("IMG6", { imageMessage: { caption: "lid" } }, { remoteJid: OWNER_LID, remoteJidAlt: OWNER_JID }) },

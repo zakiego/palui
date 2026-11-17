@@ -252,9 +252,15 @@ type MediaInfo struct {
 	Bytes       int64
 	Filename    string
 	DurationSec *float64
+	// Sticker: an image sent as a sticker (WebP). Animated ones reach the
+	// model as their first frame; Lottie ones can't be drawn at all.
+	Sticker  bool
+	Animated bool
+	Lottie   bool
 }
 
-// MediaOf: image, audio (voice notes too) or document; nil for anything else.
+// MediaOf: image (stickers too), audio (voice notes too) or document; nil for
+// anything else.
 func MediaOf(c *waE2E.Message) *MediaInfo {
 	if c == nil {
 		return nil
@@ -283,6 +289,9 @@ func MediaOf(c *waE2E.Message) *MediaInfo {
 		return info
 	case c.DocumentMessage != nil:
 		return &MediaInfo{Kind: "document", MimeType: mime(c.DocumentMessage.Mimetype, "application/octet-stream"), Bytes: length(c.DocumentMessage.FileLength), Filename: c.DocumentMessage.GetFileName()}
+	case c.StickerMessage != nil:
+		st := c.StickerMessage
+		return &MediaInfo{Kind: "image", MimeType: mime(st.Mimetype, "image/webp"), Bytes: length(st.FileLength), Sticker: true, Animated: st.GetIsAnimated(), Lottie: st.GetIsLottie()}
 	}
 	return nil
 }

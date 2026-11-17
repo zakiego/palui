@@ -11,6 +11,7 @@ require (
 	github.com/rivo/uniseg v0.4.7
 	github.com/teambition/rrule-go v1.8.2
 	go.mau.fi/whatsmeow v0.0.0-20261113220833-ecc39170bc14
+	golang.org/x/image v0.48.0
 	golang.org/x/net v0.62.0
 	golang.org/x/text v0.44.0
 	google.golang.org/protobuf v1.36.12
@@ -53,7 +54,7 @@ require (
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	modernc.org/libc v1.80.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

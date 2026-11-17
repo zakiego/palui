@@ -33,6 +33,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/logx"
 	"github.com/zakiego/palui/apps/server/internal/owner"
+	"github.com/zakiego/palui/apps/server/internal/sticker"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 )
 
@@ -787,6 +788,20 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		msg.Quoted = &connectors.InboundQuote{From: QuoteAuthor(q.Participant, self, []string{sender, alt}, !group), Text: q.Text, Media: q.Media}
 	}
 
+	// A sticker has no caption, so its label is the text. It says "sticker"
+	// so the model reacts to it as one, not as a photo someone shared.
+	label := ""
+	if info != nil && info.Sticker {
+		label = "[sticker]"
+		if info.Animated {
+			label = "[animated sticker, first frame]"
+		}
+		if info.Lottie {
+			// Lottie stickers are vector animations; there's no image to send.
+			label = "[animated sticker, can't be shown]"
+			info = nil
+		}
+	}
 	note := ""
 	if info != nil {
 		wanted := false
@@ -816,6 +831,22 @@ func (w *wa) deliver(s Socket, m *Message) error {
 				note = fmt.Sprintf("[%s could not be downloaded]", info.Kind)
 			case len(data) > max:
 				note = overLimitNote(info, max)
+			case info.Sticker:
+				// WebP, often animated: send a PNG (the first frame) so any
+				// vision model can read it.
+				animated := sticker.IsAnimated(data)
+				img, err := sticker.ToPNG(data)
+				if err != nil {
+					w.log.Warn("whatsapp sticker could not be converted", map[string]any{"err": err.Error()})
+					label = "[sticker, could not be read]"
+					break
+				}
+				if animated {
+					label = "[animated sticker, first frame]"
+				}
+				stub.MimeType = "image/png"
+				stub.Data = base64.StdEncoding.EncodeToString(img)
+				msg.Media = []connectors.InboundMedia{stub}
 			default:
 				stub.Data = base64.StdEncoding.EncodeToString(data)
 				msg.Media = []connectors.InboundMedia{stub}
@@ -823,7 +854,7 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		}
 	}
 	var parts []string
-	for _, p := range []string{text, note} {
+	for _, p := range []string{label, text, note} {
 		if p != "" {
 			parts = append(parts, p)
 		}

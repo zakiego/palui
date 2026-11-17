@@ -624,6 +624,63 @@ func TestInbound(t *testing.T) {
 		in := e.ctx.Inbound()[0]
 		eq(t, []any{in.Text, len(in.Media)}, []any{"[image could not be downloaded]", 0})
 	})
+	// A sticker never reached the model at all (rpt_0mwkukqo7spxy2l0i2y).
+	t.Run("sends stickers to the model as png images", func(t *testing.T) {
+		still, err := os.ReadFile("../../sticker/testdata/still-lossless.webp")
+		testutil.Must(t, err)
+		animated, err := os.ReadFile("../../sticker/testdata/animated-lossless.webp")
+		testutil.Must(t, err)
+		e, _ := openRunning(t, opts{})
+		e.sock().Media = func(m *whatsapp.Message) ([]byte, error) {
+			switch m.Key.ID {
+			case "ST1":
+				return still, nil
+			case "ST2":
+				return animated, nil
+			}
+			return []byte("not a webp"), nil
+		}
+		isPNG := func(m connectors.InboundMedia) bool {
+			b, err := base64.StdEncoding.DecodeString(m.Data)
+			return err == nil && m.Kind == "image" && m.MimeType == "image/png" && strings.HasPrefix(string(b), "\x89PNG")
+		}
+		sticker := func(id string, s *waE2E.StickerMessage, edit func(*whatsapp.Key)) *whatsapp.Message {
+			if s.Mimetype == nil {
+				s.Mimetype = proto.String("image/webp")
+			}
+			return dm(id, &waE2E.Message{StickerMessage: s}, edit)
+		}
+
+		e.sock().Message(sticker("ST1", &waE2E.StickerMessage{}, nil), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 1 })
+		in := e.ctx.Inbound()[0]
+		eq(t, []any{in.Text, len(in.Media), isPNG(in.Media[0])}, []any{"[sticker]", 1, true})
+
+		// Animated, even when WhatsApp leaves out isAnimated.
+		e.sock().Message(sticker("ST2", &waE2E.StickerMessage{}, nil), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 2 })
+		in = e.ctx.Inbound()[1]
+		eq(t, []any{in.Text, len(in.Media), isPNG(in.Media[0])}, []any{"[animated sticker, first frame]", 1, true})
+
+		// Bytes that aren't a WebP: the message still says a sticker came.
+		e.sock().Message(sticker("ST3", &waE2E.StickerMessage{}, nil), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 3 })
+		in = e.ctx.Inbound()[2]
+		eq(t, []any{in.Text, len(in.Media)}, []any{"[sticker, could not be read]", 0})
+
+		// Lottie: nothing to draw, nothing downloaded.
+		e.sock().Message(sticker("ST4", &waE2E.StickerMessage{IsLottie: proto.Bool(true), IsAnimated: proto.Bool(true), Mimetype: proto.String("application/was")}, nil), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 4 })
+		in = e.ctx.Inbound()[3]
+		eq(t, []any{in.Text, len(in.Media)}, []any{"[animated sticker, can't be shown]", 0})
+
+		// A stranger's sticker isn't downloaded but still reaches the inbox.
+		e.sock().Message(sticker("ST5", &waE2E.StickerMessage{}, func(k *whatsapp.Key) { k.RemoteJID = "629999@s.whatsapp.net" }), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 5 })
+		in = e.ctx.Inbound()[4]
+		eq(t, []any{in.Text, in.Media}, []any{"[sticker]", []connectors.InboundMedia{{Kind: "image", MimeType: "image/webp"}}})
+		eq(t, e.sock().Downloads(), []string{"ST1", "ST2", "ST3"})
+	})
 	t.Run("does not download documents over 1 MB", func(t *testing.T) {
 		e, _ := openRunning(t, opts{})
 		e.sock().Message(dm("DOC1", &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{FileName: proto.String("big.pdf"), FileLength: proto.Uint64(5 * 1024 * 1024), Mimetype: proto.String("application/pdf")}}, nil), "")
