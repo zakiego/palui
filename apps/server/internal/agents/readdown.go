@@ -14,7 +14,8 @@ import (
 
 // CanReadDown says whether a turn gets the read-down tools: the default agent,
 // answering the owner (mode "" or owner) in the owner's own DM or the web
-// chat, on the owner's message or one of the owner's scheduled jobs. Hooks,
+// chat, on the owner's message or one of the owner's scheduled jobs, in a
+// chat the default agent still answers in. Hooks,
 // flows, reminders, shared chats, other agents and anything unknown get
 // nothing (fail closed).
 func CanReadDown(q db.Q, turn connectors.TurnInfo, now int64) (bool, error) {
@@ -45,17 +46,20 @@ func CanReadDown(q db.Q, turn connectors.TurnInfo, now int64) (bool, error) {
 	if err != nil || shared {
 		return false, err
 	}
-	var agent db.Agent
+	// The chat must still be Palui's: an approval resumed after /agent moved
+	// the chat to another agent carries Palui's id but answers in that chat.
+	chatAgent, err := ForChat(q, chat.AgentID, now)
+	if err != nil || !chatAgent.IsDefault {
+		return false, err
+	}
 	if turn.AgentID != "" {
 		a, ok, err := Get(q, turn.AgentID)
 		if err != nil || !ok {
 			return false, err
 		}
-		agent = a
-	} else if agent, err = ForChat(q, chat.AgentID, now); err != nil {
-		return false, err
+		return a.IsDefault, nil
 	}
-	return agent.IsDefault, nil
+	return true, nil
 }
 
 // Others is every agent but the default one, oldest first: the agents Palui

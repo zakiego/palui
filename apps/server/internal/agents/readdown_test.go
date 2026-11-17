@@ -82,6 +82,22 @@ func TestCanReadDownOnlyForPaluiInTheOwnersOwnChats(t *testing.T) {
 	}
 }
 
+func TestCanReadDownIsFalseOnceTheOwnersChatMovedToAnotherAgent(t *testing.T) {
+	e := readDownSetup(t)
+	// /agent club in the owner's DM while Palui's approval waits: the resume
+	// still carries Palui's id.
+	_, err := e.d.Exec("UPDATE chats SET agent_id = ? WHERE id = ?", e.club.ID, e.ownerDM.ID)
+	testutil.Must(t, err)
+	for _, agentID := range []string{e.palui.ID, ""} {
+		turn := connectors.TurnInfo{ChatID: e.ownerDM.ID, Channel: "whatsapp", Trigger: "approval", Origin: "message", Mode: "owner", AgentID: agentID}
+		got, err := agents.CanReadDown(e.d, turn, 1)
+		testutil.Must(t, err)
+		if got {
+			t.Fatalf("agent %q: read down in a chat club answers in", agentID)
+		}
+	}
+}
+
 func TestOthersAndOtherLeaveOutTheDefaultAgent(t *testing.T) {
 	e := readDownSetup(t)
 	shop := create(t, e.d, agents.Input{Slug: "shop", Name: s("Shop"), Persona: s("p")})
