@@ -95,16 +95,73 @@ func TestRuntimeExposesFetchPageAsAnUntrustedReadTool(t *testing.T) {
 	testutil.Must(t, err)
 	set, err := running.Tools(context.Background(), connectors.TurnInfo{RunID: "r", ChatID: "c", Channel: "web", Trigger: "message", TZ: "Asia/Makassar"})
 	testutil.Must(t, err)
-	if strings.Join(set.Keys(), ",") != "fetch_page" {
+	if strings.Join(set.Keys(), ",") != "fetch_page,search_web" {
 		t.Fatal(set.Keys())
 	}
-	pt, _ := set.Get("fetch_page")
-	if pt.Class != "read" || !pt.Untrusted {
-		t.Fatalf("%+v", pt)
+	for _, name := range set.Keys() {
+		// Both stay guest-safe: a group agent's guests get these and nothing else.
+		pt, _ := set.Get(name)
+		if pt.Class != "read" || !pt.Untrusted || !pt.GuestSafe || pt.Data != connectors.DataNone {
+			t.Fatalf("%s: %+v", name, pt)
+		}
 	}
 	res, err := webfetch.Runtime.Test(c)
 	testutil.Must(t, err)
 	if !res.OK {
 		t.Fatal(res)
+	}
+}
+
+const ddgPage = `<!doctype html><html><body><div id="links">
+<div class="result results_links result--ad"><h2><a class="result__a" href="https://ads.example.com/buy">Beli sawit murah</a></h2><a class="result__snippet">Iklan</a></div>
+<div class="result results_links results_links_deep web-result"><h2 class="result__title"><a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.go.id%2Fid%2Fstatistics%2Dtable%2F2%2Fproduksi.html&amp;rut=abc">Produksi Tanaman <b>Perkebunan</b> menurut Kecamatan</a></h2>
+<a class="result__snippet" href="//duckduckgo.com/l/?uddg=x">Produksi tanaman perkebunan  menurut kecamatan dan jenis tanaman.</a></div>
+<div class="result results_links web-result"><h2><a class="result__a" href="https://example.org/direct">Direct link</a></h2></div>
+<div class="result results_links web-result"><h2><a class="result__a" href="javascript:alert(1)">Bad scheme</a></h2></div>
+</div></body></html>`
+
+func TestParseSearchResultsSkipsAdsAndUnwrapsRedirects(t *testing.T) {
+	got := webfetch.ParseSearchResults(ddgPage)
+	want := []webfetch.SearchResult{
+		{Title: "Produksi Tanaman Perkebunan menurut Kecamatan", URL: "https://example.go.id/id/statistics-table/2/produksi.html", Snippet: "Produksi tanaman perkebunan menurut kecamatan dan jenis tanaman."},
+		{Title: "Direct link", URL: "https://example.org/direct"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("%+v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("%d: %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestSearchWebQueriesDuckDuckGoAndReturnsResults(t *testing.T) {
+	var asked string
+	fetcher := func(_ context.Context, u string, opts safenet.Options) (*safenet.Response, error) {
+		asked = u
+		return response(ddgPage, "text/html", 0, false), nil
+	}
+	out := conntest.Of(webfetch.SearchWeb(context.Background(), "produksi sawit tanah laut", fetcher))
+	if asked != "https://html.duckduckgo.com/html/?q=produksi+sawit+tanah+laut" {
+		t.Fatal(asked)
+	}
+	if !out.B("ok") || out.S("query") != "produksi sawit tanah laut" || !strings.Contains(out.String(), `"url":"https://example.go.id/id/statistics-table/2/produksi.html"`) || strings.Contains(out.String(), "ads.example.com") {
+		t.Fatal(out)
+	}
+}
+
+func TestSearchWebTellsAnEmptySearchFromABlockedOne(t *testing.T) {
+	none := conntest.Of(webfetch.SearchWeb(context.Background(), "zzqx", fake(response(`<html><body><div class="no-results">No results.</div></body></html>`, "text/html", 0, false), nil)))
+	if none.String() != `{"ok":true,"query":"zzqx","results":[]}` {
+		t.Fatal(none)
+	}
+	blocked := conntest.Of(webfetch.SearchWeb(context.Background(), "zzqx", fake(response(`<html><body><form id="challenge-form"></form></body></html>`, "text/html", 0, false), nil)))
+	if blocked.B("ok") || !strings.Contains(blocked.S("error"), "without results") {
+		t.Fatal(blocked)
+	}
+	down := conntest.Of(webfetch.SearchWeb(context.Background(), "zzqx", fake(response("busy", "text/html", 503, false), nil)))
+	if down.String() != `{"ok":false,"query":"zzqx","error":"The search engine answered 503"}` {
+		t.Fatal(down)
 	}
 }
