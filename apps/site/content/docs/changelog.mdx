@@ -21,7 +21,11 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - MCP servers get a "Holds no private data" switch on an agent's Tools tab, for a server that keeps nothing about you, like prayer times. Once it's on, that server's tools that aren't destructive reach groups and other people's DMs and run there without asking. On a global server it applies to every agent. Changing the server's URL turns it off again.
 - Agents can have members. On an agent's page, add the people you trust with it (a name plus their WhatsApp number or Telegram id, picked from people who already wrote or typed in). A DM with a member, or a WhatsApp group where everyone is you or a member, also gets that agent's own tools: its MCP servers, notes, contacts and memory, with no approval prompts and never anything destructive. A group with anyone else in it stays as before, and so does every Telegram group, because a bot can't see who's in one. A member of one agent is a stranger to the others, and Palui has no members. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 
+- Ask Palui about your other agents. In your own DM or the web chat, Palui can list the chats your other agents answer in, read them (who wrote each message, paged 30 at a time), and search or list those agents' memory, so "what did the book club group say today?" just works. Anyone in those chats can write something for Palui to read, so after reading them every write asks you first, even a tool you set to allow, and the next turns ask too while what Palui read is in the conversation. No other agent can read Palui's chats or your memory, and groups, webhooks and flows never get these tools.
+
 ### Changed
+
+- A tool result stays untrusted on the next turns. Palui shows past tool results to the model again, so in a turn whose history holds a web page, an `external` MCP result or another chat it read, writes now ask you first. Before, only the turn that read it did. Auto-save still keeps those later turns.
 
 - A group no longer sees your list of agents. When you mention the bot in a WhatsApp group that has no agent yet, or type `/agent` in any group or someone else's DM, the chat only hears that no agent is set up, and the `/agent <name>` choices go to your own DM. `/usage` in a group only shows that group's agent.
 

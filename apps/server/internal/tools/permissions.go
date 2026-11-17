@@ -117,6 +117,8 @@ type ApprovalInput struct {
 	// The owner started this turn and is there to see it.
 	OwnerTurn bool
 	Tainted   bool
+	// The turn read what other people wrote (another agent's chats or memory).
+	OthersWrote bool
 	// Jobs, flows and hooks: every write asks.
 	Strict bool
 	// The call carries a saved file (a palui:attachment ref).
@@ -130,6 +132,11 @@ func NeedsApproval(i ApprovalInput) bool {
 	}
 	// A turn that read something untrusted never sends a saved file on its own.
 	if i.SendsFile && i.Tainted {
+		return true
+	}
+	// Anyone in another agent's chat can plant text for the owner's agent to
+	// read, so after that no write runs on its own, "allow" included.
+	if i.OthersWrote && (i.Class == "write" || i.Class == "destructive") {
 		return true
 	}
 	if i.Permission == "allow" && i.OwnerTurn {

@@ -42,6 +42,8 @@ type ToolMeta struct {
 	Tool        string `json:"tool"`
 	Class       string `json:"class"`
 	Untrusted   bool   `json:"untrusted"`
+	// Results hold what other people wrote (PaluiTool.OthersWrote).
+	OthersWrote bool   `json:"-"`
 	Title       string `json:"title,omitempty"`
 	// Connector label, for search and the capability list.
 	Label         string                             `json:"label,omitempty"`
@@ -243,7 +245,7 @@ func Collect(ctx context.Context, running []connectors.RunningEntry, opts Collec
 			if contains(opts.Deny, name) {
 				continue
 			}
-			meta := &ToolMeta{Name: name, ConnectorID: e.ID, Tool: toolName, Class: cls, Untrusted: pt.Untrusted || e.Row.Trust == "external", Title: pt.Title, Label: e.Row.Label, GuestSafe: pt.GuestSafe, Data: pt.Data, Scope: connectors.ResolveData(pt.Data, e.Row), NeedsApproval: pt.NeedsApproval, Preview: pt.Preview}
+			meta := &ToolMeta{Name: name, ConnectorID: e.ID, Tool: toolName, Class: cls, Untrusted: pt.Untrusted || pt.OthersWrote || e.Row.Trust == "external", OthersWrote: pt.OthersWrote, Title: pt.Title, Label: e.Row.Label, GuestSafe: pt.GuestSafe, Data: pt.Data, Scope: connectors.ResolveData(pt.Data, e.Row), NeedsApproval: pt.NeedsApproval, Preview: pt.Preview}
 			out.Tools.Set(name, wrapTool(pt.Tool, meta, opts))
 			out.Meta[name] = meta
 			order = append(order, name)

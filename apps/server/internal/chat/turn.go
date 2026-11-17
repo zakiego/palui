@@ -507,6 +507,33 @@ func FinishResumedRun(q db.Q, runID string) error {
 	return err
 }
 
+// taintFromReplay marks the turn replay-tainted when the history it replays
+// holds the result of an untrusted call: that content is in front of the
+// model again, so approvals treat the turn as tainted. It doesn't touch the
+// run's own taint (runs.tainted, TurnResult.Tainted, the auto-save skip),
+// which keeps meaning "this run read something untrusted". A call to a tool
+// this turn doesn't have counts as untrusted (fail closed), and as other
+// people's words only when its name is a read-down tool. Calls that never ran
+// carry nothing.
+func taintFromReplay(calls []ToolCallRow, meta map[string]*tools.ToolMeta, tainted, othersWrote *atomic.Bool, log *logx.Logger) {
+	for _, pc := range calls {
+		if pc.Status != "ok" && pc.Status != "error" {
+			continue
+		}
+		m := meta[pc.Tool]
+		if m != nil && !m.Untrusted {
+			continue
+		}
+		if !tainted.Load() {
+			log.Info("turn replay-tainted by an untrusted call in its history", logx.Fields{"tool": pc.Tool})
+		}
+		tainted.Store(true)
+		if (m == nil && agents.IsReadDownTool(pc.Tool)) || (m != nil && m.OthersWrote) {
+			othersWrote.Store(true)
+		}
+	}
+}
+
 // resumeContextJSON writes the ResumeContext in the TS key order.
 func resumeContextJSON(rc approvals.ResumeContext, scope, names *[]string, system []models.Message) *jsonx.Object {
 	o := jsonx.NewMap[any]()
@@ -531,6 +558,12 @@ func resumeContextJSON(rc approvals.ResumeContext, scope, names *[]string, syste
 		o.Set("silentToken", rc.SilentToken)
 	}
 	o.Set("tainted", rc.Tainted)
+	if rc.OthersWrote {
+		o.Set("othersWrote", true)
+	}
+	if rc.ReplayTainted {
+		o.Set("replayTainted", true)
+	}
 	o.Set("sessionId", rc.SessionID)
 	o.Set("system", system)
 	o.Set("batchRunId", rc.BatchRunID)
@@ -808,6 +841,15 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 	c.setActive(chat.ID, active)
 	var tainted atomic.Bool
 	tainted.Store(input.UntrustedInput || (rs != nil && rs.Context.Tainted) || QuotesOutsider(history, batch))
+	// The turn read what other people wrote (another agent's chats or memory):
+	// from then on no write runs on its own, "allow" included.
+	var othersWrote atomic.Bool
+	othersWrote.Store(rs != nil && rs.Context.OthersWrote)
+	// The history replays an untrusted result: approvals see a tainted turn,
+	// the run's own taint stays as is.
+	var replayTainted atomic.Bool
+	replayTainted.Store(rs != nil && rs.Context.ReplayTainted)
+	approvalTainted := func() bool { return tainted.Load() || replayTainted.Load() }
 	timer := &toolTimer{starts: map[string]int64{}}
 	channel := channelOf(c, chat)
 	typing := func(on bool) {
@@ -890,7 +932,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		turnInfo := connectors.TurnInfo{
 			RunID: runID, ChatID: chat.ID, Channel: chat.Channel, Trigger: input.Trigger, TZ: all.Timezone, Now: startedAt,
 			JobID: jobID, BatchRunID: batchRunID, AgentID: agent.ID, Origin: origin, Mode: mode,
-			Tainted: tainted.Load, OwnerText: ownerText,
+			Tainted: approvalTainted, OwnerText: ownerText,
 			Memory: &connectors.MemoryScope{Container: scope.Container, Read: scope.Read, Locked: scope.Locked},
 		}
 		outside := audience == tools.AudienceOutside
@@ -947,6 +989,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 						rlog.Info("turn tainted by an untrusted tool result", logx.Fields{"tool": m.Name})
 					}
 					tainted.Store(true)
+					if m.OthersWrote {
+						othersWrote.Store(true)
+					}
 				},
 				OnToolStart: func(id string) { timer.start(id, c.Clock()) },
 			})
@@ -1078,6 +1123,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					}
 					pastCalls = kept
 				}
+				taintFromReplay(pastCalls, collected.Meta, &replayTainted, &othersWrote, rlog)
 			}
 			var base []models.Message
 			if isMessage {
@@ -1189,6 +1235,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					rlog.Info("turn tainted by an untrusted tool call", logx.Fields{"tool": meta.Name})
 					tainted.Store(true)
 				}
+				if meta != nil && meta.OthersWrote {
+					othersWrote.Store(true)
+				}
 				// A members or outside turn has no approvals. Its tools run right
 				// away, and the tool wrapper refuses a call whose tool asks on its own.
 				if open {
@@ -1203,12 +1252,13 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					class = meta.Class
 				}
 				return tools.NeedsApproval(tools.ApprovalInput{
-					Class:      class,
-					Permission: tools.PermissionFor(&perms, call.ToolName),
-					OwnerTurn:  ownerTurn,
-					Tainted:    tainted.Load(),
-					Strict:     strict,
-					SendsFile:  len(attachments.FindRefs(call.Input)) > 0,
+					Class:       class,
+					Permission:  tools.PermissionFor(&perms, call.ToolName),
+					OwnerTurn:   ownerTurn,
+					Tainted:     approvalTainted(),
+					OthersWrote: othersWrote.Load(),
+					Strict:      strict,
+					SendsFile:   len(attachments.FindRefs(call.Input)) > 0,
 				})
 			},
 			Emit: func(p Part) {
@@ -1282,7 +1332,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		case len(requests) > 0 && status != "error" && status != "aborted":
 			rc := approvals.ResumeContext{
 				Trigger: input.Trigger, OriginTrigger: origin, JobID: jobID, ModelRole: role, Deliver: deliver,
-				SilentToken: silentToken, Tainted: tainted.Load(), SessionID: chat.SessionID,
+				SilentToken: silentToken, Tainted: tainted.Load(), OthersWrote: othersWrote.Load(), ReplayTainted: replayTainted.Load(), SessionID: chat.SessionID,
 				BatchRunID: batchRunID, AgentID: agent.ID, Mode: mode,
 			}
 			ctxJSON := resumeContextJSON(rc, toolScope, toolNames, system)

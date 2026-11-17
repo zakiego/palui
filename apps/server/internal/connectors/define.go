@@ -174,7 +174,11 @@ type PaluiTool struct {
 	Class string
 	// Results taint the turn (web fetch, hooks, external MCP).
 	Untrusted bool
-	Title     string
+	// Results hold what other people wrote for the owner's agent to read
+	// (another agent's chats and memory). Implies Untrusted, and a write or
+	// destructive call after it asks even when the owner set that tool to allow.
+	OthersWrote bool
+	Title       string
 	// May run in a turn started by someone other than the owner.
 	GuestSafe bool
 	// Whose data the tool reads or writes: DataChat, DataAgent, DataShared or

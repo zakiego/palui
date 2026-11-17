@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/kit"
 	mcpconn "github.com/zakiego/palui/apps/server/internal/connectors/mcp"
@@ -51,6 +52,7 @@ var Manifest = connectors.Manifest{
 	RemoveWarning: "This removes the recall key from Palui. Your memories stay in recall.",
 	Docs: &connectors.Docs{Notes: []string{
 		"Tools: add_memory (write), search_memories, ask_memory, get_profile, list_memories (read), forget_memory and forget_document (destructive).",
+		"In your own DM or the web chat, Palui also gets search_agent_memory and list_agent_memory (read) to read other agents' memory. They never read yours. After reading, every write asks you first, even a tool you set to allow.",
 		"Auto-save uses source_id <session>:<range>, so saving the same slice twice is a no-op.",
 	}},
 	SecretFields: kit.SecretNames(SecretZod),
@@ -556,6 +558,23 @@ func New(opts Options) *connectors.Runtime {
 							title = def.Name
 						}
 						set.Set(def.Name, connectors.PaluiTool{Data: connectors.DataAgent, Tool: withContainer(t, cls, &scope), Class: cls, Title: title})
+					}
+					if c.DB != nil {
+						now := turn.Now
+						if now == 0 {
+							now = time.Now().UnixMilli()
+						}
+						down, err := agents.CanReadDown(c.DB, turn, now)
+						if err != nil {
+							return nil, err
+						}
+						if down {
+							more := ReadDownTools(c.DB, api, aiTools, timeout)
+							for _, k := range more.Keys() {
+								pt, _ := more.Get(k)
+								set.Set(k, pt)
+							}
+						}
 					}
 					mu.Lock()
 					had := mcpError != ""

@@ -70,6 +70,11 @@ func TestAllowSkipsThePromptOnlyInAnOwnerTurn(t *testing.T) {
 		{tools.ApprovalInput{Class: "write", Permission: "allow", OwnerTurn: true, SendsFile: true, Tainted: true}, true},
 		{tools.ApprovalInput{Class: "read", OwnerTurn: true, SendsFile: true}, false},
 		{tools.ApprovalInput{Class: "write", Permission: "allow", OwnerTurn: true, SendsFile: true}, false},
+		// after reading what other people wrote, a write asks even when allowed.
+		{tools.ApprovalInput{Class: "write", Permission: "allow", OwnerTurn: true, Tainted: true, OthersWrote: true}, true},
+		{tools.ApprovalInput{Class: "destructive", Permission: "allow", OwnerTurn: true, Tainted: true, OthersWrote: true}, true},
+		{tools.ApprovalInput{Class: "read", Permission: "allow", OwnerTurn: true, Tainted: true, OthersWrote: true}, false},
+		{tools.ApprovalInput{Class: "read", OwnerTurn: true, Tainted: true, OthersWrote: true}, false},
 	}
 	for i, c := range cases {
 		if got := tools.NeedsApproval(c.in); got != c.want {
