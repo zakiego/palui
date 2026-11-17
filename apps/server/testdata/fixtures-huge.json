@@ -50,6 +50,12 @@
    "first": null,
    "last": null
   },
+  "custom_commands": {
+   "columns": ["id","agent_id","name","description","prompt","attach_report","enabled","created_at","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
   "events": {
    "columns": ["id","at","level","connector_id","kind","message","data"],
    "count": 12180,

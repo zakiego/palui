@@ -15,6 +15,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/approvals"
 	"github.com/zakiego/palui/apps/server/internal/chats"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
+	"github.com/zakiego/palui/apps/server/internal/customcmd"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/members"
 	"github.com/zakiego/palui/apps/server/internal/owner"
@@ -42,6 +43,9 @@ type Route struct {
 	// hook.
 	Hook *StoredHook
 	Text string
+	// custom: the owner's command from the dashboard, and the text typed after it.
+	Custom     *db.CustomCommand
+	CustomArgs string
 }
 
 // ChatScope is chatScope: an agent's own Telegram bot keeps its chats apart
@@ -75,6 +79,18 @@ type SenderVerdict struct {
 	// Context: a group message nobody addressed to the agent, in a chat set
 	// up with one. It's stored as context for later turns and never answered.
 	Context bool
+}
+
+// MediaWanted: whether a channel should download this message's media. Only
+// a message that will be answered shows its media to the model: the sender
+// check drops strangers, and group talk kept as context loses its bytes.
+// Same side effect as SenderCheck, which Inbound runs right after anyway.
+func MediaWanted(q db.Q, msg connectors.InboundMessage, now int64) (bool, error) {
+	v, err := SenderCheck(q, msg, now)
+	if err != nil {
+		return false, err
+	}
+	return v.OK && !v.Context, nil
 }
 
 // SenderCheck is senderCheck: checks that need only the inbound message and
@@ -181,6 +197,30 @@ func ParseCommand(text string) (ParsedCommand, bool) {
 		return ParsedCommand{}, false
 	}
 	return ParsedCommand{Name: name, Args: append([]string{}, fields[1:]...)}, true
+}
+
+// matchCustom: a custom command for the chat's agent (PLAN 8.3), with a
+// Telegram @bot suffix and in any case. args keeps the rest of the text as
+// typed, newlines included.
+func matchCustom(q db.Q, chat db.Chat, text string, now int64) (db.CustomCommand, string, bool, error) {
+	t := strx.Trim(text)
+	if !strings.HasPrefix(t, "/") {
+		return db.CustomCommand{}, "", false, nil
+	}
+	head := spaceSplit.Split(t, 2)[0]
+	name := customcmd.NormalizeName(botSuffix.ReplaceAllString(strings.ToLower(head), ""))
+	if !customcmd.NameRe.MatchString(name) {
+		return db.CustomCommand{}, "", false, nil
+	}
+	agent, err := agents.ForChat(q, chat.AgentID, now)
+	if err != nil {
+		return db.CustomCommand{}, "", false, err
+	}
+	cmd, ok, err := customcmd.Find(q, agent.ID, name)
+	if err != nil || !ok {
+		return db.CustomCommand{}, "", false, err
+	}
+	return cmd, strx.Trim(t[len(head):]), true, nil
 }
 
 var (
@@ -378,6 +418,15 @@ func RouteMessage(i RouteInput) (Route, error) {
 		}
 		if took {
 			return Route{Kind: "handled"}, nil
+		}
+	}
+	if hasText {
+		cmd, args, ok, err := matchCustom(i.DB, i.Chat, i.Text, i.Now)
+		if err != nil {
+			return Route{}, err
+		}
+		if ok {
+			return Route{Kind: "custom", Custom: &cmd, CustomArgs: args}, nil
 		}
 	}
 	if i.ReminderActions != nil && hasText {

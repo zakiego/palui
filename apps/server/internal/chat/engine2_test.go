@@ -572,3 +572,26 @@ func TestUnattendedTurns(t *testing.T) {
 
 var _ = json.Marshal
 var _ = strings.Contains
+
+// Transcription costs money per note, so a guest's voice note isn't transcribed.
+func TestPrepareMediaGuestVoice(t *testing.T) {
+	d := testutil.DB(t)
+	calls := 0
+	running := []connectors.RunningEntry{{ID: "voice", Handle: &connectors.RunningConnector{Transcribe: func(context.Context, connectors.InboundMedia) (string, error) {
+		calls++
+		return "halo", nil
+	}}}}
+	audio := []connectors.InboundMedia{{Kind: "audio", MimeType: "audio/ogg", Data: base64.StdEncoding.EncodeToString([]byte("x"))}}
+	_, guest, err := chat.WriteInbound(d, tgMsg("", func(m *connectors.InboundMessage) { m.Media = audio }), 1, false)
+	testutil.Must(t, err)
+	row := need(chat.PrepareMedia(context.Background(), d, guest, running, nil))
+	eq(t, row.Text, "[voice] (pesan suara dari tamu, gak ditranskrip)")
+	eq(t, calls, 0)
+	contains(t, string(row.Content), `"note":"guest, not transcribed"`)
+
+	_, own, err := chat.WriteInbound(d, tgMsg("", func(m *connectors.InboundMessage) { m.Media = audio }), 2, true)
+	testutil.Must(t, err)
+	row = need(chat.PrepareMedia(context.Background(), d, own, running, nil))
+	eq(t, row.Text, "[voice] halo")
+	eq(t, calls, 1)
+}

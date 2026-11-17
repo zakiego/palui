@@ -581,8 +581,48 @@ func TestInbound(t *testing.T) {
 
 		e.sock().Message(dm("IMG2", &waE2E.Message{ImageMessage: &waE2E.ImageMessage{Caption: proto.String("spam")}}, func(k *whatsapp.Key) { k.RemoteJID = "629999@s.whatsapp.net" }), "")
 		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 3 })
-		eq(t, len(e.ctx.Inbound()[2].Media), 0)
+		eq(t, e.ctx.Inbound()[2].Media, []connectors.InboundMedia{{Kind: "image", MimeType: "image/jpeg"}})
 		eq(t, e.sock().Downloads(), []string{"IMG1", "VN1"})
+	})
+	// A guest's photo in a group set up for guests never reached the model, and
+	// one without a caption vanished (rpt_0mwkrtff0z3w0ld5vfp).
+	t.Run("downloads a guest's media when the message will be answered", func(t *testing.T) {
+		e, _ := openRunning(t, opts{})
+		var asked []connectors.InboundMessage
+		e.ctx.Services.WantsMedia = func(m connectors.InboundMessage) bool {
+			asked = append(asked, m)
+			return m.Addressed
+		}
+		group := func(id string, mention bool) *whatsapp.Message {
+			img := &waE2E.ImageMessage{Mimetype: proto.String("image/jpeg")}
+			if mention {
+				img.Caption = proto.String("@bot lihat")
+				img.ContextInfo = &waE2E.ContextInfo{MentionedJID: []string{"628980001472@s.whatsapp.net"}}
+			}
+			return dm(id, &waE2E.Message{ImageMessage: img}, func(k *whatsapp.Key) {
+				k.RemoteJID, k.Participant = "120363@g.us", "62811@s.whatsapp.net"
+			})
+		}
+		e.sock().Message(group("GIMG1", true), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 1 })
+		in := e.ctx.Inbound()[0]
+		eq(t, []any{in.Text, in.Addressed, in.Media}, []any{"@bot lihat", true, []connectors.InboundMedia{{Kind: "image", MimeType: "image/jpeg", Data: base64.StdEncoding.EncodeToString([]byte("media:GIMG1"))}}})
+		eq(t, []any{asked[0].ChatKind, asked[0].SenderExternalID, asked[0].Text}, []any{"group", "62811@s.whatsapp.net", "@bot lihat"})
+
+		// Group talk: not downloaded, but the photo still reaches the inbox.
+		e.sock().Message(group("GIMG2", false), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 2 })
+		in = e.ctx.Inbound()[1]
+		eq(t, []any{in.Text, in.Media}, []any{"", []connectors.InboundMedia{{Kind: "image", MimeType: "image/jpeg"}}})
+		eq(t, e.sock().Downloads(), []string{"GIMG1"})
+	})
+	t.Run("says so when a wanted photo can't be downloaded", func(t *testing.T) {
+		e, _ := openRunning(t, opts{})
+		e.sock().Media = func(*whatsapp.Message) ([]byte, error) { return nil, errors.New("410 gone") }
+		e.sock().Message(dm("IMG9", &waE2E.Message{ImageMessage: &waE2E.ImageMessage{Mimetype: proto.String("image/jpeg")}}, nil), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 1 })
+		in := e.ctx.Inbound()[0]
+		eq(t, []any{in.Text, len(in.Media)}, []any{"[image could not be downloaded]", 0})
 	})
 	t.Run("does not download documents over 1 MB", func(t *testing.T) {
 		e, _ := openRunning(t, opts{})

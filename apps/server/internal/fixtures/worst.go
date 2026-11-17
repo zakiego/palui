@@ -26,8 +26,9 @@ var limits = struct {
 	flowName, flowDescription, flowSteps, flowTriggers, flowError, agentName, agentSlug, attachmentTitle, attachmentDescription, attachmentFilename,
 	connectorLabel, connectorID, jobName, rrule, reminderText, contactName, outboundText, contactNote, hookName, model, persona, webMessage,
 	toolName, approvalArgs, toolResult, statusDetail, jobResult, instructionTitle, instructionBody, preferenceKey, preferenceValue, botUsername,
-	memberName, memberAccounts int
-}{80, 200, 40, 8, 300, 40, 24, 200, 1000, 200, 80, 63, 80, 300, 500, 60, 2000, 200, 60, 120, 8000, 8000, 64, 300, 500, 300, 500, 80, 1000, 40, 300, 32, 60, 5}
+	commandName, commandDescription, commandPrompt, memberName, memberAccounts int
+}{80, 200, 40, 8, 300, 40, 24, 200, 1000, 200, 80, 63, 80, 300, 500, 60, 2000, 200, 60, 120, 8000, 8000, 64, 300, 500, 300, 500, 80, 1000, 40, 300, 32,
+	32, 120, 4000, 60, 5}
 
 const (
 	worstLongURL    = "https://example.com/workspaces/northwind-industries-holdings/projects/q3-launch/docs/9f8e7d6c5b4a?tab=comments&filter=unresolved&sort=newest"
@@ -263,6 +264,18 @@ func worst(k *Kit) {
 		CreatedAt: ptr(now - 20*D),
 	})
 	k.Instruction(Instruction{AgentID: &arisan, Title: "Haul", Body: "Haul tahun ini hari Ahad.", Enabled: ptr(false), CreatedAt: ptr(now - 3*D)})
+	// Custom commands: every limit at once on one agent's command, a global one
+	// with the same name, and a one-letter one with no description that's off.
+	k.CustomCommand(CustomCommand{
+		AgentID:      &arisan,
+		Name:         within("rekap-setoran-arisan-bani-abdurr", L.commandName),
+		Description:  within(fill("Rekap setoran arisan bulan ini, urut dari yang paling lama belum bayar, lalu kirim ke grup keluarga. ", L.commandDescription), L.commandDescription),
+		Prompt:       fill("Buat rekap setoran arisan dari https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_arisan_bani_abdurrahman/edit#gid=0 untuk {{args}}. ", L.commandPrompt),
+		AttachReport: true,
+		CreatedAt:    ptr(now - 10*D),
+	})
+	k.CustomCommand(CustomCommand{Name: "rekap-setoran-arisan-bani-abdurr", Description: "Rekap untuk agent lain", Prompt: "Rekap setoran.", CreatedAt: ptr(now - 9*D)})
+	k.CustomCommand(CustomCommand{Name: "x", Prompt: "خلاصة اليوم 🌴", Enabled: ptr(false), CreatedAt: ptr(now - D)})
 	k.Message(family, "user", "@palui_bot siapa yang belum bayar arisan bulan ini?", now-40_000, MsgExtra{FromOwner: ptr(false), SenderName: ptr(ptr("Muhammad Fadhlurrahman Al-Banjari bin H. Abdurrahman Siddiq")), SenderID: ptr("1000000099")})
 	k.Message(family, "user", "؟", now-30_000, MsgExtra{FromOwner: ptr(false), SenderName: ptr[*string](nil), SenderID: ptr("1000000100")})
 

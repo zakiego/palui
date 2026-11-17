@@ -379,6 +379,11 @@ type Services struct {
 	ClaimOwner func(ctx context.Context, in ClaimInput) (bool, error)
 	// Whether this sender is the owner (also learns the WhatsApp LID).
 	IsOwner func(channel, externalID, altID string) bool
+	// Whether the media of this message is worth downloading: true when it
+	// will be answered (the owner, or a guest in a chat set up for guests).
+	// Dropped messages and group talk kept as context never show their media.
+	// Optional; without it only the owner's media is downloaded.
+	WantsMedia func(msg InboundMessage) bool
 	// Reconcile now instead of on the next tick. Optional.
 	Reconcile func()
 	// Call a read-only tool of another running connector, server-side. Optional.
