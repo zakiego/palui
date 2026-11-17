@@ -76,4 +76,43 @@ func TestReadDown(t *testing.T) {
 			t.Fatal(jsonx.Stringify(p.Context))
 		}
 	})
+
+	t.Run("the next turn replays the read, so it starts tainted and a write asks even with allow-all", func(t *testing.T) {
+		h, notes := readDownWorld(t,
+			models.CallTool("chats__read_agent_chat", objOf("chat", "chat_club"), "r1"),
+			models.Say("Grup buku lagi bahas jadwal."),
+			models.CallTool("notes__add", objOf("text", "planted"), "n1"),
+		)
+		allowAll(t, h.DB, "", nil)
+
+		h.sendIdle("apa kata grup buku hari ini?")
+		eq(t, count(t, h.DB, "pending_approvals"), 0)
+		h.sendIdle("oke makasih")
+		eq(t, len(notes.get()), 0)
+		eq(t, allApprovals(t, h.DB, "")[0].Tool, "notes__add")
+		eq(t, count(t, h.DB, "runs WHERE tainted = 1"), 2)
+	})
+
+	t.Run("an ordinary untrusted call in the history taints the next turn", func(t *testing.T) {
+		notes := &executedLog{}
+		fetch := connectors.PaluiTool{Class: "read", Untrusted: true, Tool: conntest.FnTool("get", func(*jsonx.Object) (any, error) { return "page text", nil })}
+		h := basic(t, []models.Step{
+			models.CallTool("web__get", objOf(), "w1"),
+			models.Say("Ini isinya."),
+			models.CallTool("notes__add", objOf("text", "a"), "n1"),
+			models.CallTool("notes__add", objOf("text", "b"), "n2"),
+		}, extra{
+			registry: map[string]*connectors.Runtime{
+				"web":   toolsRT("web", tools("get", fetch)),
+				"notes": toolsRT("notes", tools("add", connectors.PaluiTool{Class: "write", Tool: conntest.FnTool("add", func(in *jsonx.Object) (any, error) { notes.add(str(in, "text")); return nil, nil })})),
+			},
+			rows: []chattest.Row{{"web", "tools"}, {"notes", "tools"}},
+		})
+
+		h.sendIdle("baca halaman ini")
+		h.sendIdle("catat ya")
+		eq(t, len(notes.get()), 0)
+		eq(t, allApprovals(t, h.DB, "")[0].Tool, "notes__add")
+		eq(t, count(t, h.DB, "runs WHERE tainted = 1"), 2)
+	})
 }

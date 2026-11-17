@@ -516,6 +516,29 @@ func FinishResumedRun(q db.Q, runID string) error {
 	return err
 }
 
+// taintFromReplay starts the turn tainted when the history it replays holds
+// the result of an untrusted call: that content is in front of the model
+// again. A call to a tool this turn doesn't have counts as untrusted and as
+// other people's words (fail closed). Calls that never ran carry nothing.
+func taintFromReplay(calls []ToolCallRow, meta map[string]*tools.ToolMeta, tainted, othersWrote *atomic.Bool, log *logx.Logger) {
+	for _, pc := range calls {
+		if pc.Status != "ok" && pc.Status != "error" {
+			continue
+		}
+		m := meta[pc.Tool]
+		if m != nil && !m.Untrusted {
+			continue
+		}
+		if !tainted.Load() {
+			log.Info("turn tainted by an untrusted call in its history", logx.Fields{"tool": pc.Tool})
+		}
+		tainted.Store(true)
+		if m == nil || m.OthersWrote {
+			othersWrote.Store(true)
+		}
+	}
+}
+
 // resumeContextJSON writes the ResumeContext in the TS key order.
 func resumeContextJSON(rc approvals.ResumeContext, scope, names *[]string, system []models.Message) *jsonx.Object {
 	o := jsonx.NewMap[any]()
@@ -1093,6 +1116,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					}
 					pastCalls = kept
 				}
+				taintFromReplay(pastCalls, collected.Meta, &tainted, &othersWrote, rlog)
 			}
 			var base []models.Message
 			if isMessage {
