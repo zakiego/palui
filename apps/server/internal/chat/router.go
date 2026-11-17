@@ -16,6 +16,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/chats"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/db"
+	"github.com/zakiego/palui/apps/server/internal/members"
 	"github.com/zakiego/palui/apps/server/internal/owner"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 )
@@ -106,6 +107,11 @@ func SenderCheck(q db.Q, msg connectors.InboundMessage, now int64) (SenderVerdic
 			return SenderVerdict{Reason: "Group message not addressed to the agent.", Quiet: true}, nil
 		}
 		return SenderVerdict{OK: true, FromOwner: true}, nil
+	}
+	// A member's account learns its other WhatsApp id; nothing else here
+	// changes for members: commands and buttons stay the owner's (PLAN 19.3).
+	if err := members.Learn(q, members.Sender{Channel: msg.Channel, ExternalID: msg.SenderExternalID, AltID: msg.SenderAltID}); err != nil {
+		return SenderVerdict{}, err
 	}
 	if !found {
 		agentID, err := ScopeAgentID(q, scope)

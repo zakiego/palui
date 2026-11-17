@@ -272,22 +272,22 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 			sticky = s.LoadedTools.V
 		}
 	}
-	// A shared chat gets what a fresh outside turn there gets (same rules as ExecuteTurn).
-	shared, err := agents.IsSharedChat(q, chat)
+	// A shared chat gets what a fresh turn there gets (same rules as ExecuteTurn).
+	audience, err := Audience(c, chat, agent)
 	if err != nil {
 		return "", err
 	}
-	if shared && agent.GuestTools == "none" {
+	if audience == tools.AudienceOutside && agent.GuestTools == "none" {
 		return "Gak ada tool buat " + agent.Name + " di chat ini: tool buat orang lain dimatiin.", nil
 	}
 	perms := agent.ToolPermissions.V
 	turn := connectors.TurnInfo{ChatID: chat.ID, Channel: chat.Channel, Trigger: "message", TZ: all.Timezone, Now: now, AgentID: agent.ID}
-	audience := ""
 	deny := tools.DeniedTools(&perms)
-	if shared {
-		turn.Mode = tools.AudienceOutside
-		audience = tools.AudienceOutside
+	if tools.NoApprovals(audience) {
+		turn.Mode = audience
 		deny = append(deny, tools.AskTools(&perms)...)
+	} else {
+		audience = ""
 	}
 	collected := tools.Collect(context.Background(), c.Host.Running(), tools.CollectOptions{
 		Turn:              turn,
@@ -353,7 +353,7 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 		}
 		lines = append(lines, fmt.Sprintf("• %s (%d): %s", id, len(own), strings.Join(counts, ", ")))
 	}
-	if shared {
+	if audience != "" {
 		lines = append(lines, "", "Detail: /tools <id>. Di chat ini tool jalan tanpa minta izin, jadi yang perlu izin gak ditawarin.")
 	} else if perms.AllowAll {
 		lines = append(lines, "", "Detail: /tools <id>. Semua tool jalan tanpa minta izin di chat kamu, kecuali yang diatur minta izin.")
