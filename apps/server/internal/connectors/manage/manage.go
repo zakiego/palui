@@ -16,6 +16,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/registry"
 	"github.com/zakiego/palui/apps/server/internal/db"
+	"github.com/zakiego/palui/apps/server/internal/events"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/zod"
 )
@@ -223,7 +224,25 @@ func SaveDraft(q db.Q, in DraftInput, masterKey string, now int64) (db.Connector
 			up.AgentID = in.AgentID
 		}
 	}
-	return connectors.Upsert(q, up, masterKey, now)
+	row, err := connectors.Upsert(q, up, masterKey, now)
+	if err != nil {
+		return row, err
+	}
+	// A draft can set or clear the no-private-data mark too (a changed URL
+	// clears it): leave the same trail setConnectorDataFn does.
+	if m.ID == "mcp" {
+		before := found && connectors.NoPrivateData(existing)
+		if after := connectors.NoPrivateData(row); after != before {
+			ev := events.Input{ConnectorID: &row.ID, Kind: "mcp.data", Message: "No longer marked as holding no private data"}
+			if after {
+				ev.Level, ev.Message = "warn", "Marked as holding no private data: shared chats can use its tools"
+			}
+			if _, err := events.Log(q, ev, now); err != nil {
+				return row, err
+			}
+		}
+	}
+	return row, nil
 }
 
 // urlChanged: the draft sends a url and it isn't the stored one. sent is the

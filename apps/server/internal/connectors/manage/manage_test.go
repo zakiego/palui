@@ -183,6 +183,12 @@ func TestSaveDraftClearsTheNoPrivateDataMarkOnANewURL(t *testing.T) {
 	if u, _ := row.Config.Get("url"); u != "https://other.example.com/mcp" {
 		t.Fatal(row.Config)
 	}
+	// The clear leaves a trail, like setConnectorDataFn.
+	var n int
+	testutil.Must(t, d.QueryRow("SELECT count(*) FROM events WHERE kind = 'mcp.data' AND connector_id = 'mcp-x' AND at = 4000").Scan(&n))
+	if n != 1 {
+		t.Fatalf("mcp.data events at the clear: %d", n)
+	}
 
 	// An emptied url clears it too.
 	mark()
