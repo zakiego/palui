@@ -74,6 +74,55 @@ func ScanIdentity(s Scanner) (Identity, error) {
 	return r, err
 }
 
+// --- members, member_accounts, agent_members (PLAN 19.4) ---------------------------
+
+type Member struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
+const MemberCols = "id, name, created_at, updated_at"
+
+func ScanMember(s Scanner) (Member, error) {
+	var r Member
+	err := s.Scan(&r.ID, &r.Name, &r.CreatedAt, &r.UpdatedAt)
+	return r, err
+}
+
+type MemberAccount struct {
+	ID          string  `json:"id"`
+	MemberID    string  `json:"memberId"`
+	Channel     string  `json:"channel"`
+	ExternalID  string  `json:"externalId"`
+	AltID       *string `json:"altId"`
+	DisplayName *string `json:"displayName"`
+	CreatedAt   int64   `json:"createdAt"`
+}
+
+const MemberAccountCols = "id, member_id, channel, external_id, alt_id, display_name, created_at"
+
+func ScanMemberAccount(s Scanner) (MemberAccount, error) {
+	var r MemberAccount
+	err := s.Scan(&r.ID, &r.MemberID, &r.Channel, &r.ExternalID, &r.AltID, &r.DisplayName, &r.CreatedAt)
+	return r, err
+}
+
+type AgentMember struct {
+	AgentID   string `json:"agentId"`
+	MemberID  string `json:"memberId"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+const AgentMemberCols = "agent_id, member_id, created_at"
+
+func ScanAgentMember(s Scanner) (AgentMember, error) {
+	var r AgentMember
+	err := s.Scan(&r.AgentID, &r.MemberID, &r.CreatedAt)
+	return r, err
+}
+
 // --- chats, sessions, messages ---------------------------------------------------
 
 type Chat struct {
@@ -173,7 +222,7 @@ type Approval struct {
 	ID          string        `json:"id"`
 	RunID       string        `json:"runId"`
 	ChatID      string        `json:"chatId"`
-	AskChatID   *string       `json:"askChatId"`
+	AskChatID   *string       `json:"askChatId"` // old rows only: nothing writes it since PLAN 19.9 step 5
 	ApprovalID  string        `json:"approvalId"`
 	ToolCallID  *string       `json:"toolCallId"`
 	Tool        string        `json:"tool"`
@@ -339,6 +388,30 @@ func ScanHook(s Scanner) (Hook, error) {
 	return h, err
 }
 
+// --- custom_commands --------------------------------------------------------------
+
+// CustomCommand is a custom_commands row. Name has no leading slash. AgentID
+// nil means every agent; an agent's own command beats a global one.
+type CustomCommand struct {
+	ID           string  `json:"id"`
+	AgentID      *string `json:"agentId"`
+	Name         string  `json:"name"`
+	Description  string  `json:"description"`
+	Prompt       string  `json:"prompt"`
+	AttachReport bool    `json:"attachReport"`
+	Enabled      bool    `json:"enabled"`
+	CreatedAt    int64   `json:"createdAt"`
+	UpdatedAt    int64   `json:"updatedAt"`
+}
+
+const CustomCommandCols = "id, agent_id, name, description, prompt, attach_report, enabled, created_at, updated_at"
+
+func ScanCustomCommand(s Scanner) (CustomCommand, error) {
+	var r CustomCommand
+	err := s.Scan(&r.ID, &r.AgentID, &r.Name, &r.Description, &r.Prompt, &r.AttachReport, &r.Enabled, &r.CreatedAt, &r.UpdatedAt)
+	return r, err
+}
+
 // --- instructions, preferences -----------------------------------------------------
 
 type Instruction struct {
@@ -381,6 +454,8 @@ type ToolPermissions struct {
 	Tools    *jsonx.Map[string] `json:"tools"`
 }
 
+// Agent: the table still has owner_powers (PLAN 19.9 step 5). Nothing reads
+// or writes it, and a later release drops the column with a table rebuild.
 type Agent struct {
 	ID                   string                    `json:"id"`
 	Slug                 string                    `json:"slug"`
@@ -390,7 +465,6 @@ type Agent struct {
 	RecallContainer      *string                   `json:"recallContainer"`
 	RecallReadContainers NullJSON[[]string]        `json:"recallReadContainers"`
 	RecallPerChat        bool                      `json:"recallPerChat"`
-	OwnerPowers          string                    `json:"ownerPowers"`
 	GuestTools           string                    `json:"guestTools"`
 	DailyTokenCap        int64                     `json:"dailyTokenCap"`
 	ToolPermissions      NullJSON[ToolPermissions] `json:"toolPermissions"`
@@ -402,11 +476,11 @@ type Agent struct {
 	UpdatedAt            int64                     `json:"updatedAt"`
 }
 
-const AgentCols = "id, slug, name, persona, is_default, recall_container, recall_read_containers, recall_per_chat, owner_powers, guest_tools, daily_token_cap, tool_permissions, telegram_connector_id, avatar_image, avatar_icon, avatar_color, created_at, updated_at"
+const AgentCols = "id, slug, name, persona, is_default, recall_container, recall_read_containers, recall_per_chat, guest_tools, daily_token_cap, tool_permissions, telegram_connector_id, avatar_image, avatar_icon, avatar_color, created_at, updated_at"
 
 func ScanAgent(s Scanner) (Agent, error) {
 	var a Agent
-	err := s.Scan(&a.ID, &a.Slug, &a.Name, &a.Persona, &a.IsDefault, &a.RecallContainer, &a.RecallReadContainers, &a.RecallPerChat, &a.OwnerPowers, &a.GuestTools, &a.DailyTokenCap, &a.ToolPermissions, &a.TelegramConnectorID, &a.AvatarImage, &a.AvatarIcon, &a.AvatarColor, &a.CreatedAt, &a.UpdatedAt)
+	err := s.Scan(&a.ID, &a.Slug, &a.Name, &a.Persona, &a.IsDefault, &a.RecallContainer, &a.RecallReadContainers, &a.RecallPerChat, &a.GuestTools, &a.DailyTokenCap, &a.ToolPermissions, &a.TelegramConnectorID, &a.AvatarImage, &a.AvatarIcon, &a.AvatarColor, &a.CreatedAt, &a.UpdatedAt)
 	return a, err
 }
 

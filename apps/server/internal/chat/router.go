@@ -15,7 +15,9 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/approvals"
 	"github.com/zakiego/palui/apps/server/internal/chats"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
+	"github.com/zakiego/palui/apps/server/internal/customcmd"
 	"github.com/zakiego/palui/apps/server/internal/db"
+	"github.com/zakiego/palui/apps/server/internal/members"
 	"github.com/zakiego/palui/apps/server/internal/owner"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 )
@@ -41,6 +43,9 @@ type Route struct {
 	// hook.
 	Hook *StoredHook
 	Text string
+	// custom: the owner's command from the dashboard, and the text typed after it.
+	Custom     *db.CustomCommand
+	CustomArgs string
 }
 
 // ChatScope is chatScope: an agent's own Telegram bot keeps its chats apart
@@ -76,6 +81,18 @@ type SenderVerdict struct {
 	Context bool
 }
 
+// MediaWanted: whether a channel should download this message's media. Only
+// a message that will be answered shows its media to the model: the sender
+// check drops strangers, and group talk kept as context loses its bytes.
+// Same side effect as SenderCheck, which Inbound runs right after anyway.
+func MediaWanted(q db.Q, msg connectors.InboundMessage, now int64) (bool, error) {
+	v, err := SenderCheck(q, msg, now)
+	if err != nil {
+		return false, err
+	}
+	return v.OK && !v.Context, nil
+}
+
 // SenderCheck is senderCheck: checks that need only the inbound message and
 // the chat row, if any (PLAN 19.2). A stranger's message in a chat we've never
 // seen creates the chat row (not allowed), so the owner can set it up.
@@ -106,6 +123,11 @@ func SenderCheck(q db.Q, msg connectors.InboundMessage, now int64) (SenderVerdic
 			return SenderVerdict{Reason: "Group message not addressed to the agent.", Quiet: true}, nil
 		}
 		return SenderVerdict{OK: true, FromOwner: true}, nil
+	}
+	// A member's account learns its other WhatsApp id; nothing else here
+	// changes for members: commands and buttons stay the owner's (PLAN 19.3).
+	if err := members.Learn(q, members.Sender{Channel: msg.Channel, ExternalID: msg.SenderExternalID, AltID: msg.SenderAltID}); err != nil {
+		return SenderVerdict{}, err
 	}
 	if !found {
 		agentID, err := ScopeAgentID(q, scope)
@@ -177,6 +199,30 @@ func ParseCommand(text string) (ParsedCommand, bool) {
 	return ParsedCommand{Name: name, Args: append([]string{}, fields[1:]...)}, true
 }
 
+// matchCustom: a custom command for the chat's agent (PLAN 8.3), with a
+// Telegram @bot suffix and in any case. args keeps the rest of the text as
+// typed, newlines included.
+func matchCustom(q db.Q, chat db.Chat, text string, now int64) (db.CustomCommand, string, bool, error) {
+	t := strx.Trim(text)
+	if !strings.HasPrefix(t, "/") {
+		return db.CustomCommand{}, "", false, nil
+	}
+	head := spaceSplit.Split(t, 2)[0]
+	name := customcmd.NormalizeName(botSuffix.ReplaceAllString(strings.ToLower(head), ""))
+	if !customcmd.NameRe.MatchString(name) {
+		return db.CustomCommand{}, "", false, nil
+	}
+	agent, err := agents.ForChat(q, chat.AgentID, now)
+	if err != nil {
+		return db.CustomCommand{}, "", false, err
+	}
+	cmd, ok, err := customcmd.Find(q, agent.ID, name)
+	if err != nil || !ok {
+		return db.CustomCommand{}, "", false, err
+	}
+	return cmd, strx.Trim(t[len(head):]), true, nil
+}
+
 var (
 	yesWords  = map[string]bool{"ya": true, "y": true, "iya": true, "yes": true}
 	noWords   = map[string]bool{"batal": true, "no": true, "tidak": true, "nggak": true, "gak": true}
@@ -196,7 +242,8 @@ func ParseYesNo(text string) (yes bool, ok bool) {
 }
 
 // quotedApproval: the approval whose prompt this message quotes, by the
-// prompt's channel id or through the outbox row that sent it.
+// prompt's channel id or through the outbox row that sent it. ask_chat_id is
+// set on old rows only (asked in the owner's DM before PLAN 19.9 step 5).
 func quotedApproval(q db.Q, chatID, channelMsgID string) (string, error) {
 	var id string
 	err := q.QueryRow("SELECT id FROM pending_approvals WHERE (ask_chat_id = ? OR (ask_chat_id IS NULL AND chat_id = ?)) AND prompt_msg_id = ?", chatID, chatID, channelMsgID).Scan(&id)
@@ -371,6 +418,15 @@ func RouteMessage(i RouteInput) (Route, error) {
 		}
 		if took {
 			return Route{Kind: "handled"}, nil
+		}
+	}
+	if hasText {
+		cmd, args, ok, err := matchCustom(i.DB, i.Chat, i.Text, i.Now)
+		if err != nil {
+			return Route{}, err
+		}
+		if ok {
+			return Route{Kind: "custom", Custom: &cmd, CustomArgs: args}, nil
 		}
 	}
 	if i.ReminderActions != nil && hasText {

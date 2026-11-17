@@ -17,6 +17,7 @@ var want = map[string]string{
 	"getAgentsPage": "GET", "getAgentPage": "GET", "getAgentToolsFn": "GET", "getAgentMemoryFn": "GET",
 	"saveAgentFn": "POST", "deleteAgentFn": "POST", "setAgentToolPermissionsFn": "POST", "setChatAgentFn": "POST",
 	"setChatReplyModeFn": "POST", "setChatAckFn": "POST", "setChatAllowedFn": "POST", "setChatDeployNoticeFn": "POST",
+	"getAgentMembersFn": "GET", "saveMemberFn": "POST", "setAgentMemberFn": "POST",
 	// attachments.ts
 	"getAttachments": "GET", "deleteAttachmentFn": "POST", "getAttachmentShares": "GET",
 	"createAttachmentShareFn": "POST", "revokeAttachmentShareFn": "POST",
@@ -25,7 +26,7 @@ var want = map[string]string{
 	// connectors.ts
 	"getConnectorsPage": "GET", "getConnectorDetail": "GET", "pauseConnectorFn": "POST", "resumeConnectorFn": "POST",
 	"removeConnectorFn": "POST", "saveConnectorDraft": "POST", "connectConnectorFn": "POST", "testConnectorFn": "POST",
-	"connectorActionFn": "POST", "setWhatsAppOwnerFn": "POST", "setConnectorOwnerFn": "POST",
+	"connectorActionFn": "POST", "setWhatsAppOwnerFn": "POST", "setConnectorOwnerFn": "POST", "setConnectorDataFn": "POST",
 	// dev-fixtures.ts
 	"getFixtureState": "GET", "setFixture": "POST",
 	// flows.ts
@@ -37,6 +38,8 @@ var want = map[string]string{
 	// notes.ts
 	"getNotes": "GET", "saveInstructionFn": "POST", "setInstructionEnabledFn": "POST", "deleteInstructionFn": "POST",
 	"setPreferenceFn": "POST", "deletePreferenceFn": "POST",
+	// commands.ts
+	"getCommandsPage": "GET", "saveCommandFn": "POST", "setCommandEnabledFn": "POST", "deleteCommandFn": "POST",
 	// mcp-access.ts
 	"getMcpAccess": "GET", "createMcpToken": "POST", "revokeMcpAccess": "POST", "getOAuthRequest": "GET", "decideOAuthRequest": "POST",
 	// outbound.ts
@@ -53,8 +56,8 @@ var want = map[string]string{
 var public = map[string]bool{"getSession": true, "getInvite": true, "acceptInvite": true}
 
 func TestEveryServerFunctionIsRegistered(t *testing.T) {
-	if len(want) != 83 {
-		t.Fatalf("the list has %d names, want 83", len(want))
+	if len(want) != 91 {
+		t.Fatalf("the list has %d names, want 91", len(want))
 	}
 	got := map[string]httpapi.Handler{}
 	for _, h := range httpapi.Handlers() {

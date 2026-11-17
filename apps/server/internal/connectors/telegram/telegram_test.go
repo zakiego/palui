@@ -370,7 +370,18 @@ func TestInbound(t *testing.T) {
 		eq(t, len(e.fetched), 0)
 		in := e.ctx.Inbound()[0]
 		eq(t, []string{in.SenderExternalID, in.Text}, []string{"77", "spam"})
-		eq(t, len(in.Media), 0)
+		eq(t, in.Media, []connectors.InboundMedia{{Kind: "image", MimeType: "image/jpeg"}})
+	})
+	// A guest's photo in a chat set up for guests never reached the model
+	// (rpt_0mwkrtff0z3w0ld5vfp).
+	t.Run("downloads a guest's media when the message will be answered", func(t *testing.T) {
+		e := setup(t)
+		e.claimed(t)
+		e.ctx.Services.WantsMedia = func(m connectors.InboundMessage) bool { return m.SenderExternalID == "77" }
+		e.fake.FeedJSON(messageUpdate(`{"photo":[{"file_id":"g1","file_unique_id":"g","width":1,"height":1}]}`, strangerJSON))
+		in := e.ctx.Inbound()[0]
+		eq(t, []any{in.Text, len(in.Media), len(e.fetched)}, []any{"", 1, 1})
+		eq(t, in.Media[0].Data != "", true)
 	})
 	t.Run("a failed download is logged and the text still goes", func(t *testing.T) {
 		e := setup(t)
@@ -378,7 +389,7 @@ func TestInbound(t *testing.T) {
 		e.claimed(t)
 		e.fake.FeedJSON(messageUpdate(`{"caption":"lihat","photo":[{"file_id":"x","file_unique_id":"x","width":1,"height":1}]}`, ""))
 		in := e.ctx.Inbound()[0]
-		eq(t, in.Text, "lihat")
+		eq(t, in.Text, "lihat\n[image could not be downloaded]")
 		eq(t, len(in.Media), 0)
 	})
 	t.Run("turns button presses into callbacks and answers them", func(t *testing.T) {

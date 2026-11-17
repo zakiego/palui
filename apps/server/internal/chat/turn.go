@@ -98,6 +98,9 @@ type EngineCtx struct {
 	TurnTimeoutMs int64
 	// RetryDelay is the model retry's first wait (2 s); tests shorten it.
 	RetryDelay time.Duration
+	// GroupLookupTimeout overrides the wait on a group's participant list
+	// (GroupLookupTimeout, 3 s); tests shorten it.
+	GroupLookupTimeout time.Duration
 	// Monotonic is performance.now() in ms.
 	Monotonic func() float64
 	// ResumeRun queues the resume of a run whose requests are all decided.
@@ -410,9 +413,9 @@ func sendToOwner(c *EngineCtx, from db.Chat, text string) {
 	}
 }
 
-// SendApprovalPrompt is sendApprovalPrompt. from is the shared chat the
-// request came from, when the prompt is asked elsewhere.
-func SendApprovalPrompt(c *EngineCtx, chat db.Chat, row db.Approval, title string, from *db.Chat) {
+// SendApprovalPrompt is sendApprovalPrompt. The prompt is asked in the chat
+// the request came from, which is always the owner's (PLAN 19.4).
+func SendApprovalPrompt(c *EngineCtx, chat db.Chat, row db.Approval, title string) {
 	name := title
 	if name == "" {
 		name = strings.Replace(row.Tool, "__", " › ", 1)
@@ -421,23 +424,11 @@ func SendApprovalPrompt(c *EngineCtx, chat db.Chat, row db.Approval, title strin
 	if row.ToolClass == "destructive" {
 		kind = "aksi destruktif"
 	}
-	where := ""
-	if from != nil {
-		place := "chat"
-		if from.Kind == "group" {
-			place = "grup"
-		}
-		label := from.ExternalID
-		if t := strx.Trim(from.Title); t != "" {
-			label = "\"" + strx.Slice16(t, 60) + "\""
-		}
-		where = fmt.Sprintf(" di %s %s", place, label)
-	}
 	preview := ""
 	if row.ArgsPreview != nil {
 		preview = *row.ArgsPreview
 	}
-	text := fmt.Sprintf("Boleh aku jalanin %s%s? (%s)\n%s\n\nBalas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.", name, where, kind, preview)
+	text := fmt.Sprintf("Boleh aku jalanin %s? (%s)\n%s\n\nBalas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.", name, kind, preview)
 	c.send(chat, text, "approval:"+row.ID, SendExtra{Actions: []db.OutboxAction{{ID: "approve:" + row.ID, Label: "Ya"}, {ID: "deny:" + row.ID, Label: "Batal"}}})
 	c.Bus.Publish(TurnEvent{Type: "approval", ChatID: chat.ID, RunID: row.RunID, ApprovalID: row.ID, Tool: row.Tool, Class: row.ToolClass, ArgsPreview: preview})
 }
@@ -790,21 +781,25 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		}
 	}
 	// Who can read the chat decides the tools, not who sent the message (PLAN 19.4).
-	audience := tools.AudienceOwner
-	if shared {
-		audience = tools.AudienceOutside
+	audience, err := Audience(c, chat, agent)
+	if err != nil {
+		return TurnResult{}, err
 	}
-	// Palui's approval asked in a group before 19.9 step 1 ran as the owner's
-	// turn; it resumes with that tool set. A fresh shared turn never asks.
-	if shared && rs != nil && rs.Context.Mode == tools.AudienceOwner {
-		audience = tools.AudienceOwner
+	if audience == tools.AudienceMembers {
+		sessionID := ""
+		if session != nil {
+			sessionID = session.ID
+		}
+		outsider, err := HistoryHasOutsider(q, chat, agent.ID, sessionID, history)
+		if err != nil {
+			return TurnResult{}, err
+		}
+		if outsider {
+			tlog.Info("members chat counted as outside", logx.Fields{"reason": "history holds a message from someone who is not a member"})
+			audience = tools.AudienceOutside
+		}
 	}
 	mode := audience
-	// An approval asked before 19.9 step 1 resumes under the rules it was asked with.
-	legacy := rs != nil && rs.Context.Mode == "sharedOwner"
-	if legacy {
-		mode = "sharedOwner"
-	}
 
 	chain, err := models.ResolveChain(q, c.Host, role)
 	if err != nil {
@@ -856,16 +851,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 	replayTainted.Store(rs != nil && rs.Context.ReplayTainted)
 	approvalTainted := func() bool { return tainted.Load() || replayTainted.Load() }
 	timer := &toolTimer{starts: map[string]int64{}}
-	var channel connectors.ChannelHandle
-	if chat.Channel != "web" {
-		if chat.ConnectorID != "" {
-			if e, ok := c.Host.Get(chat.ConnectorID); ok && e.Handle != nil {
-				channel = e.Handle.Channel
-			}
-		} else {
-			channel = c.Host.ChannelFor(chat.Channel)
-		}
-	}
+	channel := channelOf(c, chat)
 	typing := func(on bool) {
 		t, ok := channel.(connectors.Typer)
 		if !ok {
@@ -949,7 +935,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			Tainted: approvalTainted, OwnerText: ownerText,
 			Memory: &connectors.MemoryScope{Container: scope.Container, Read: scope.Read, Locked: scope.Locked},
 		}
-		outside := audience == tools.AudienceOutside && !legacy
+		outside := audience == tools.AudienceOutside
+		// Members and outside turns have nobody to ask (PLAN 19.4).
+		open := tools.NoApprovals(audience)
 		noTools := input.NoTools || origin == "hook" || (outside && agent.GuestTools == "none")
 		toolScope := input.ToolScope
 		toolNames := input.ToolNames
@@ -959,13 +947,10 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		perms := agent.ToolPermissions.V
 		collectAudience := ""
 		deny := tools.DeniedTools(&perms)
-		if outside {
-			collectAudience = tools.AudienceOutside
-			// No approvals here: a tool the owner wants a say on isn't offered at
-			// all. A resume keeps it: its approved call was already asked for.
-			if rs == nil {
-				deny = append(deny, tools.AskTools(&perms)...)
-			}
+		if open {
+			collectAudience = audience
+			// No approvals here: a tool the owner wants a say on isn't offered at all.
+			deny = append(deny, tools.AskTools(&perms)...)
 		}
 		var collected *tools.Collected
 		if noTools {
@@ -1033,13 +1018,23 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			}
 			var responses []models.Part
 			approvedIDs := map[string]bool{}
+			// A resume lands in a turn with no approvals only from a request asked
+			// before PLAN 19.9 step 1, or when the chat stopped being the owner's since.
+			// Nothing it approved runs there.
+			if open {
+				rlog.Warn("approval resumed in a chat with no approvals; its calls are denied", logx.Fields{"mode": rs.Context.Mode})
+			}
 			for _, a := range rs.Approvals {
+				approved := a.Status == "approved" && !open
 				reason, ok := approvalReasons[a.Status]
 				if !ok {
 					reason = "Denied by the owner"
 				}
-				responses = append(responses, models.ToolApprovalResponsePart(a.ApprovalID, a.Status == "approved", &reason))
-				if a.Status == "approved" && a.ToolCallID != nil && *a.ToolCallID != "" {
+				if open {
+					reason = tools.OutsideApprovalError
+				}
+				responses = append(responses, models.ToolApprovalResponsePart(a.ApprovalID, approved, &reason))
+				if approved && a.ToolCallID != nil && *a.ToolCallID != "" {
 					approvedIDs[*a.ToolCallID] = true
 				}
 			}
@@ -1062,7 +1057,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			}
 			var sharedInfo *SharedInfo
 			if shared {
-				sharedInfo = &SharedInfo{Kind: chat.Kind, Guest: outside}
+				sharedInfo = &SharedInfo{Kind: chat.Kind, Guest: open, Members: audience == tools.AudienceMembers}
 			}
 			dashboard := ""
 			if origin == "message" {
@@ -1117,7 +1112,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				if pastCalls, err = LoadToolCalls(q, history); err != nil {
 					return err
 				}
-				if outside {
+				if open {
 					// A tool this turn doesn't have (one an older turn ran) isn't
 					// replayed by name and result.
 					kept := pastCalls[:0]
@@ -1146,11 +1141,10 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		if err != nil {
 			return err
 		}
-		// Jobs and hooks: every write needs approval. So does a shared-chat
-		// approval asked before 19.9 step 1; a fresh shared turn has no approvals.
-		strict := unattended(origin) || origin == "hook" || legacy
+		// Jobs and hooks: every write needs approval.
+		strict := unattended(origin) || origin == "hook"
 		// The owner's own message: the agent's tool permissions may skip the prompt here, nowhere else.
-		ownerTurn := origin == "message" && (mode == tools.AudienceOwner || legacy)
+		ownerTurn := origin == "message" && mode == tools.AudienceOwner
 		typing(true)
 		c.Bus.Publish(TurnEvent{Type: "turn-start", ChatID: chat.ID, RunID: runID})
 		clock := NewStepClock(c.Monotonic())
@@ -1244,9 +1238,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				if meta != nil && meta.OthersWrote {
 					othersWrote.Store(true)
 				}
-				// An outside turn has no approvals. Its tools run right away, and the
-				// tool wrapper refuses a call whose tool asks on its own.
-				if outside {
+				// A members or outside turn has no approvals. Its tools run right
+				// away, and the tool wrapper refuses a call whose tool asks on its own.
+				if open {
 					return false
 				}
 				// A tool's own rule asks first, and no per-agent "allow" skips it.
@@ -1349,19 +1343,6 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			if text != "" && deliver && !silent {
 				DeliverReply(c, chat, runID, text)
 			}
-			// A shared chat never sees the prompt: it goes to the owner's DM (PLAN 19.4).
-			// Since 19.9 step 1 only a legacy sharedOwner resume asks from a shared
-			// chat; step 5 removes this routing.
-			askChat := chat
-			if shared {
-				if dm, ok := ownerChatFor(c, chat.Channel); ok {
-					askChat = dm
-				}
-			}
-			var askChatID *string
-			if askChat.ID != chat.ID {
-				askChatID = &askChat.ID
-			}
 			for _, r := range requests {
 				meta := collected.Meta[r.toolName]
 				supersede(r.toolName, r.inputJSON)
@@ -1373,7 +1354,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					return approvals.Preview(labeled, 300)
 				})
 				row, err := approvals.Create(q, approvals.CreateInput{
-					RunID: runID, ChatID: chat.ID, AskChatID: askChatID, ApprovalID: r.approvalID, ToolCallID: r.toolCallID,
+					RunID: runID, ChatID: chat.ID, ApprovalID: r.approvalID, ToolCallID: r.toolCallID,
 					Tool: r.toolName, ToolClass: classOf(r.toolName), ArgsPreview: preview, Messages: db.RawJSON(stored), ContextJSON: ctxJSON,
 				}, c.Clock(), c.ApprovalTTLMs)
 				if err != nil {
@@ -1383,11 +1364,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				if meta != nil {
 					title = meta.Title
 				}
-				var from *db.Chat
-				if askChat.ID != chat.ID {
-					from = &chat
-				}
-				SendApprovalPrompt(c, askChat, row, title, from)
+				SendApprovalPrompt(c, chat, row, title)
 			}
 			status = "awaiting_approval"
 		case status == "ok":

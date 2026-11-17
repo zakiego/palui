@@ -611,12 +611,23 @@ func (b *bot) download(fileID string) []byte {
 	return data
 }
 
-func (b *bot) mediaOf(msg *Message, isOwner bool) ([]connectors.InboundMedia, string) {
-	// Strangers are dropped by the router anyway; don't spend bandwidth on them.
-	if !isOwner {
-		return nil, ""
+// hasMedia: the message carries a photo, voice note or document.
+func hasMedia(msg *Message) bool {
+	return len(msg.Photo) > 0 || msg.Voice != nil || msg.Document != nil
+}
+
+// mediaOf downloads the media only when wanted (see Services.WantsMedia).
+// Otherwise it returns the media without bytes, so a photo with no caption
+// still reaches the inbox (group context shows it as a placeholder).
+func (b *bot) mediaOf(msg *Message, wanted bool) ([]connectors.InboundMedia, string) {
+	failed := func(kind string) ([]connectors.InboundMedia, string) {
+		return nil, fmt.Sprintf("[%s could not be downloaded]", kind)
 	}
 	if len(msg.Photo) > 0 {
+		stub := connectors.InboundMedia{Kind: "image", MimeType: "image/jpeg"}
+		if !wanted {
+			return []connectors.InboundMedia{stub}, ""
+		}
 		largest := msg.Photo[0]
 		for _, p := range msg.Photo[1:] {
 			if p.Width*p.Height > largest.Width*largest.Height {
@@ -625,27 +636,41 @@ func (b *bot) mediaOf(msg *Message, isOwner bool) ([]connectors.InboundMedia, st
 		}
 		data := b.download(largest.FileID)
 		if data == nil {
-			return nil, ""
+			return failed("image")
 		}
-		return []connectors.InboundMedia{{Kind: "image", MimeType: "image/jpeg", Data: base64.StdEncoding.EncodeToString(data)}}, ""
+		stub.Data = base64.StdEncoding.EncodeToString(data)
+		return []connectors.InboundMedia{stub}, ""
 	}
 	if msg.Voice != nil {
-		data := b.download(msg.Voice.FileID)
-		if data == nil {
-			return nil, ""
-		}
 		mime := "audio/ogg"
 		if msg.Voice.MimeType != nil {
 			mime = *msg.Voice.MimeType
 		}
 		d := msg.Voice.Duration
-		return []connectors.InboundMedia{{Kind: "audio", MimeType: mime, Data: base64.StdEncoding.EncodeToString(data), DurationSec: &d}}, ""
+		stub := connectors.InboundMedia{Kind: "audio", MimeType: mime, DurationSec: &d}
+		if !wanted {
+			return []connectors.InboundMedia{stub}, ""
+		}
+		data := b.download(msg.Voice.FileID)
+		if data == nil {
+			return failed("audio")
+		}
+		stub.Data = base64.StdEncoding.EncodeToString(data)
+		return []connectors.InboundMedia{stub}, ""
 	}
 	if msg.Document != nil {
 		doc := msg.Document
 		name := "document"
 		if doc.FileName != nil {
 			name = *doc.FileName
+		}
+		mime := "application/octet-stream"
+		if doc.MimeType != nil {
+			mime = *doc.MimeType
+		}
+		stub := connectors.InboundMedia{Kind: "document", MimeType: mime, Filename: name}
+		if !wanted {
+			return []connectors.InboundMedia{stub}, ""
 		}
 		size := 0.0
 		if doc.FileSize != nil {
@@ -657,16 +682,13 @@ func (b *bot) mediaOf(msg *Message, isOwner bool) ([]connectors.InboundMedia, st
 		}
 		data := b.download(doc.FileID)
 		if data == nil {
-			return nil, ""
+			return failed("document")
 		}
 		if len(data) > DocumentMaxBytes {
 			return nil, fmt.Sprintf("[document %s is over the 1 MB limit and was not read]", name)
 		}
-		mime := "application/octet-stream"
-		if doc.MimeType != nil {
-			mime = *doc.MimeType
-		}
-		return []connectors.InboundMedia{{Kind: "document", MimeType: mime, Data: base64.StdEncoding.EncodeToString(data), Filename: name}}, ""
+		stub.Data = base64.StdEncoding.EncodeToString(data)
+		return []connectors.InboundMedia{stub}, ""
 	}
 	return nil, ""
 }
@@ -749,16 +771,7 @@ func (b *bot) onMessage(msg *Message) error {
 		}
 	}
 
-	isOwner := b.c.Services.IsOwner("telegram", strconv.FormatInt(from.ID, 10), "")
-	media, note := b.mediaOf(msg, isOwner)
-	var parts []string
-	for _, p := range []string{text, note} {
-		if p != "" {
-			parts = append(parts, p)
-		}
-	}
-	body := strings.Join(parts, "\n")
-	if body == "" && len(media) == 0 {
+	if text == "" && !hasMedia(msg) {
 		b.log.Debug("telegram message without supported content dropped", map[string]any{"chat_id": msg.Chat.ID})
 		return nil
 	}
@@ -771,7 +784,7 @@ func (b *bot) onMessage(msg *Message) error {
 		SenderExternalID: strconv.FormatInt(from.ID, 10),
 		SenderName:       displayName(*from),
 		ChannelMsgID:     strconv.FormatInt(msg.MessageID, 10),
-		Text:             body,
+		Text:             text,
 		At:               msg.Date * 1000,
 	}
 	if msg.Chat.Type == "private" {
@@ -786,8 +799,20 @@ func (b *bot) onMessage(msg *Message) error {
 	if in.ChatKind == "group" {
 		in.Addressed = b.addressed(msg)
 	}
-	if len(media) > 0 {
-		in.Media = media
+	if hasMedia(msg) {
+		wanted := false
+		if b.c.Services.WantsMedia != nil {
+			wanted = b.c.Services.WantsMedia(in)
+		} else {
+			wanted = b.c.Services.IsOwner("telegram", in.SenderExternalID, "")
+		}
+		media, note := b.mediaOf(msg, wanted)
+		if note != "" {
+			in.Text = strings.TrimPrefix(in.Text+"\n"+note, "\n")
+		}
+		if len(media) > 0 {
+			in.Media = media
+		}
 	}
 	return b.c.Services.Inbound(b.c.Ctx, in)
 }

@@ -5,17 +5,18 @@
 // they do on Notes and Chats. Memory and Tools ask the runtime when opened.
 import * as React from "react"
 import { createFileRoute, Link, useBlocker, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon, AtSignIcon, BrainIcon, CircleAlertIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
+import { ArrowLeftIcon, AtSignIcon, BrainIcon, CircleAlertIcon, ContactIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
 import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
 import { z } from "zod"
 import { toast } from "sonner"
 
 import { AgentAvatar } from "@/components/agent-avatar"
+import { AgentMembers } from "@/components/agent-members"
 import { AvatarPicker } from "@/components/agents/avatar-picker"
 import { AppError } from "@/components/app-error"
 import { ConnectorStatusBadge } from "@/components/connector-status"
 import { ToolsByScope } from "@/components/agent-tools/by-scope"
-import { groupTools, inSharedChats, type Permission } from "@/components/agent-tools/shared"
+import { groupTools, inMemberChats, inSharedChats, type Permission } from "@/components/agent-tools/shared"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
@@ -48,7 +49,7 @@ import { StatusText } from "@/components/ui/status-text"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useLiveRefresh } from "@/hooks/use-live-events"
-import { setConnectorOwnerFn } from "@/lib/api/connectors"
+import { setConnectorDataFn, setConnectorOwnerFn } from "@/lib/api/connectors"
 import { deleteAgentFn, getAgentMemoryFn, getAgentPage, getAgentToolsFn, saveAgentFn, setAgentToolPermissionsFn, setChatAllowedFn, setChatDeployNoticeFn, setChatReplyModeFn } from "@/lib/api/agents"
 import { ago, errorMessage } from "@/lib/format"
 import { useT } from "@/lib/i18n"
@@ -85,7 +86,6 @@ const CHANNEL = {
 type Form = {
   name: string
   persona: string
-  ownerPowers: "off" | "approve"
   guestTools: "none" | "safe"
   cap: string
   container: string
@@ -103,7 +103,6 @@ function formFor(a: Agent): Form {
   return {
     name: a.name,
     persona: a.persona,
-    ownerPowers: a.ownerPowers,
     guestTools: a.guestTools,
     cap: String(a.dailyTokenCap),
     container: a.recallContainer ?? "",
@@ -206,7 +205,6 @@ function AgentSettings({ data }: { data: Loaded }) {
           id: agent.id,
           name: clean.name,
           persona: clean.persona,
-          ownerPowers: clean.ownerPowers,
           guestTools: clean.guestTools,
           dailyTokenCap: cap,
           recallContainer: clean.container || null,
@@ -336,6 +334,12 @@ function AgentSettings({ data }: { data: Loaded }) {
                     </FieldDescription>
                   </Field>
                 </FieldGroup>
+              </Section>
+            )}
+
+            {!isDefault && (
+              <Section id="members" title={t("agents.members")} description={t("agents.membersBody")}>
+                <AgentMembers agent={agent} />
               </Section>
             )}
 
@@ -665,23 +669,32 @@ function ChatRow({ chat }: { chat: AgentChat }) {
 }
 
 // Loads a tab's data when the tab opens. Memory and Tools ask the runtime, so
-// they never hold up the page.
+// they never hold up the page. `refresh` loads again behind the data on
+// screen; only the newest request lands, and a failed one keeps the old data.
 function useTabData<T>(load: () => Promise<T>, key: string) {
   const [state, setState] = React.useState<{ data?: T; error?: string }>({})
+  const latest = React.useRef(0)
+  const loadRef = React.useRef(load)
+  loadRef.current = load
   React.useEffect(() => {
-    let live = true
+    const req = ++latest.current
     setState({})
-    load().then(
-      (data) => live && setState({ data }),
-      (err: unknown) => live && setState({ error: errorMessage(err) }),
+    loadRef.current().then(
+      (data) => req === latest.current && setState({ data }),
+      (err: unknown) => req === latest.current && setState({ error: errorMessage(err) }),
     )
     return () => {
-      live = false
+      latest.current++
     }
-    // `load` is a new closure every render; `key` says when it changed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
-  return state
+  const refresh = React.useCallback(() => {
+    const req = ++latest.current
+    loadRef.current().then(
+      (data) => req === latest.current && setState({ data }),
+      () => {},
+    )
+  }, [])
+  return { ...state, refresh }
 }
 
 function LoadError({ message }: { message: string }) {
@@ -779,7 +792,7 @@ function MemoryStats({ agent }: { agent: Agent }) {
 function ToolsTab({ agent }: { agent: Agent }) {
   const t = useT()
   const [query, setQuery] = React.useState("")
-  const { data, error } = useTabData(() => getAgentToolsFn({ data: { id: agent.id } }), agent.id)
+  const { data, error, refresh } = useTabData(() => getAgentToolsFn({ data: { id: agent.id } }), agent.id)
   // Owners changed here, on top of what the tab loaded. A changed server
   // moves to the other part of the list.
   const [owners, setOwners] = React.useState<Record<string, string | null>>({})
@@ -796,7 +809,25 @@ function ToolsTab({ agent }: { agent: Agent }) {
     } catch (err) {
       setOwners((o) => ({ ...o, [connectorId]: before }))
       toast.error(errorMessage(err))
+      return
     }
+    // Who gets each tool depends on the owner, and only the server knows.
+    refresh()
+  }
+  // The owner's "holds no private data" marks, on top of what the tab loaded.
+  const [marks, setMarks] = React.useState<Record<string, boolean>>({})
+  const noPrivate = (id: string) => (id in marks ? marks[id]! : (data?.noPrivateData ?? []).includes(id))
+  const setNoPrivate = async (connectorId: string, on: boolean) => {
+    const before = noPrivate(connectorId)
+    setMarks((m) => ({ ...m, [connectorId]: on }))
+    try {
+      await setConnectorDataFn({ data: { id: connectorId, noPrivateData: on } })
+    } catch (err) {
+      setMarks((m) => ({ ...m, [connectorId]: before }))
+      toast.error(errorMessage(err))
+      return
+    }
+    refresh()
   }
   // Tool permissions save at once, like the scope. Rolled back when the save fails.
   const router = useRouter()
@@ -829,6 +860,9 @@ function ToolsTab({ agent }: { agent: Agent }) {
   // everyone there, never asking first.
   const sharedCount = tools?.filter((x) => inSharedChats(x, agent.guestTools, permissions)).length ?? null
   const sharedRule = agent.guestTools === "none" ? t("agents.tools.none") : sharedCount === null ? t("agents.tools.sharedRuleLoading") : t("agents.tools.sharedRule", { n: sharedCount.toLocaleString() })
+  // A DM with a member, or a WhatsApp group of only you and members.
+  const memberCount = tools?.filter((x) => inMemberChats(x, permissions)).length ?? null
+  const membersRule = memberCount === null ? t("agents.tools.membersRuleLoading") : t("agents.tools.membersRule", { n: memberCount.toLocaleString() })
 
   return (
     <>
@@ -842,6 +876,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
 
       <ItemGroup className="gap-1">
         <Rule icon={<UserIcon />} label={t("agents.tools.you")} value={youRule} />
+        {!agent.isDefault && <Rule icon={<ContactIcon />} label={t("agents.tools.members")} value={membersRule} />}
         <Rule icon={<UsersIcon />} label={t("agents.tools.shared")} value={sharedRule} />
       </ItemGroup>
 
@@ -885,7 +920,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
       )}
       {tools && tools.length > 0 && groups.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">{t("agents.tools.searchEmpty")}</p>}
       {data && tools && groups.length > 0 && (
-        <ToolsByScope agent={agent} data={data} tools={tools} groups={groups} query={query} ownerOf={ownerOf} setScope={(id, scope) => void setScope(id, scope)} permissions={permissions} setPermission={setPermission} />
+        <ToolsByScope agent={agent} data={data} tools={tools} groups={groups} query={query} ownerOf={ownerOf} setScope={(id, scope) => void setScope(id, scope)} noPrivate={noPrivate} setNoPrivate={(id, on) => void setNoPrivate(id, on)} permissions={permissions} setPermission={setPermission} />
       )}
     </>
   )

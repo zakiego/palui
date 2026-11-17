@@ -207,4 +207,66 @@ func TestResolveData(t *testing.T) {
 			t.Errorf("ResolveData(%q, %v) = %q, want %q", c.declared, c.row.AgentID, got, c.want)
 		}
 	}
+
+	// The owner's mark on an MCP server: only the boolean true counts.
+	marked := func(typ string, agentID *string, v any, set bool) db.Connector {
+		cfg := jsonx.NewMap[any]()
+		if set {
+			cfg.Set(connectors.NoPrivateDataKey, v)
+		}
+		return db.Connector{ID: "m", Type: typ, AgentID: agentID, Config: cfg}
+	}
+	markCases := []struct {
+		name     string
+		declared string
+		row      db.Connector
+		want     string
+	}{
+		{"global true", "", marked("mcp", nil, true, true), connectors.DataNone},
+		{"owned true", "", marked("mcp", &owner, true, true), connectors.DataNone},
+		{"string", "", marked("mcp", nil, "true", true), connectors.DataShared},
+		{"number", "", marked("mcp", &owner, float64(1), true), connectors.DataAgent},
+		{"false", "", marked("mcp", nil, false, true), connectors.DataShared},
+		{"missing", "", marked("mcp", &owner, nil, false), connectors.DataAgent},
+		{"not mcp", "", marked("gcal", nil, true, true), connectors.DataShared},
+		{"nil config", "", db.Connector{ID: "m", Type: "mcp"}, connectors.DataShared},
+		{"declared shared stands", connectors.DataShared, marked("mcp", nil, true, true), connectors.DataShared},
+		{"declared agent stands", connectors.DataAgent, marked("mcp", nil, true, true), connectors.DataAgent},
+	}
+	for _, c := range markCases {
+		if got := connectors.ResolveData(c.declared, c.row); got != c.want {
+			t.Errorf("%s: ResolveData = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestSetNoPrivateData(t *testing.T) {
+	d := testutil.DB(t)
+	cfg := jsonx.NewMap[any]()
+	cfg.Set("url", "https://prayer.example.com/mcp")
+	row, err := connectors.Upsert(d, connectors.UpsertInput{ID: "mcp-x", Manifest: connectors.RowManifest{ID: "mcp", Kind: "tools", Name: "Prayer"}, Config: cfg}, KEY, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	on, ok, err := connectors.SetNoPrivateData(d, "mcp-x", true, 2)
+	if err != nil || !ok || !connectors.NoPrivateData(on) || on.ConfigHash != row.ConfigHash || on.UpdatedAt != 2 {
+		t.Fatal(on, ok, err)
+	}
+	if u, _ := on.Config.Get("url"); u != "https://prayer.example.com/mcp" {
+		t.Fatal(on.Config)
+	}
+	stored, _, _ := connectors.Get(d, "mcp-x")
+	if !connectors.NoPrivateData(stored) {
+		t.Fatal(stored.Config)
+	}
+	off, ok, err := connectors.SetNoPrivateData(d, "mcp-x", false, 3)
+	if err != nil || !ok || connectors.NoPrivateData(off) || off.ConfigHash != row.ConfigHash {
+		t.Fatal(off, ok, err)
+	}
+	if _, has := off.Config.Get(connectors.NoPrivateDataKey); has {
+		t.Fatal(off.Config)
+	}
+	if _, ok, err := connectors.SetNoPrivateData(d, "mcp-gone", true, 4); ok || err != nil {
+		t.Fatal(ok, err)
+	}
 }

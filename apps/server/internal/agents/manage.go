@@ -228,7 +228,6 @@ type Input struct {
 	Slug                 string
 	Name                 *string
 	Persona              *string
-	OwnerPowers          *string
 	GuestTools           *string
 	DailyTokenCap        *int64
 	RecallContainer      *string
@@ -277,9 +276,6 @@ func checkFields(q db.Q, i Input, selfID string, isDefault bool) error {
 		if strx.Len16(*i.Persona) > MaxPersona {
 			return errf("Persona is at most %d characters.", MaxPersona)
 		}
-	}
-	if i.OwnerPowers != nil && *i.OwnerPowers != "off" && *i.OwnerPowers != "approve" {
-		return errf("Owner powers must be off or approve.")
 	}
 	if i.GuestTools != nil && *i.GuestTools != "none" && *i.GuestTools != "safe" {
 		return errf("Guest tools must be none or safe.")
@@ -400,10 +396,7 @@ func Create(q db.Q, in Input, now int64) (db.Agent, error) {
 	if len(all) >= MaxAgents {
 		return db.Agent{}, errf("At most %d agents.", MaxAgents)
 	}
-	ownerPowers, guestTools := "off", "safe"
-	if f.OwnerPowers != nil {
-		ownerPowers = *f.OwnerPowers
-	}
+	guestTools := "safe"
 	if f.GuestTools != nil {
 		guestTools = *f.GuestTools
 	}
@@ -412,8 +405,8 @@ func Create(q db.Q, in Input, now int64) (db.Agent, error) {
 		cap = *f.DailyTokenCap
 	}
 	perChat := f.RecallPerChat != nil && *f.RecallPerChat
-	return db.ScanAgent(q.WQueryRow("INSERT INTO agents (id, slug, name, persona, owner_powers, guest_tools, daily_token_cap, recall_container, recall_read_containers, recall_per_chat, telegram_connector_id, avatar_image, avatar_icon, avatar_color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.AgentCols,
-		secret.NewID("agt"), slug, name, persona, ownerPowers, guestTools, cap, orNull(f.RecallContainer), listValue(f.RecallReadContainers), db.Bool(perChat), orNull(f.TelegramConnectorID), orNull(f.AvatarImage), orNull(f.AvatarIcon), orNull(f.AvatarColor), now, now))
+	return db.ScanAgent(q.WQueryRow("INSERT INTO agents (id, slug, name, persona, guest_tools, daily_token_cap, recall_container, recall_read_containers, recall_per_chat, telegram_connector_id, avatar_image, avatar_icon, avatar_color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.AgentCols,
+		secret.NewID("agt"), slug, name, persona, guestTools, cap, orNull(f.RecallContainer), listValue(f.RecallReadContainers), db.Bool(perChat), orNull(f.TelegramConnectorID), orNull(f.AvatarImage), orNull(f.AvatarIcon), orNull(f.AvatarColor), now, now))
 }
 
 // Update is updateAgent (Slug is ignored).
@@ -435,7 +428,7 @@ func Update(q db.Q, id string, patch Input, now int64) (db.Agent, error) {
 	f.RecallReadContainers = readListPtr(patch.RecallReadContainers)
 	// The default agent never runs in shared chats: no shared-chat rules or bot of its own.
 	if row.IsDefault {
-		f.OwnerPowers, f.GuestTools, f.TelegramConnectorID = nil, nil, nil
+		f.GuestTools, f.TelegramConnectorID = nil, nil
 	}
 	if err := checkFields(q, f, id, row.IsDefault); err != nil {
 		return db.Agent{}, err
@@ -451,9 +444,6 @@ func Update(q db.Q, id string, patch Input, now int64) (db.Agent, error) {
 	}
 	if f.Persona != nil {
 		set("persona", *f.Persona)
-	}
-	if f.OwnerPowers != nil {
-		set("owner_powers", *f.OwnerPowers)
 	}
 	if f.GuestTools != nil {
 		set("guest_tools", *f.GuestTools)
@@ -539,7 +529,8 @@ func SetToolPermissions(q db.Q, id string, patch PermissionsPatch, now int64) (d
 
 // Delete is deleteAgent: its chats go back to the default agent, connectors it
 // owned pause (keeping the dead owner, so they serve nobody), its instructions
-// go, its contacts are removed and nothing waiting is sent on its behalf.
+// go, its contacts are removed, nothing waiting is sent on its behalf, and
+// members who were only in this agent are deleted.
 func Delete(q db.Q, id string, now int64) (bool, error) {
 	row, ok, err := Get(q, id)
 	if err != nil || !ok {
@@ -557,6 +548,11 @@ func Delete(q db.Q, id string, now int64) (bool, error) {
 			{"UPDATE connectors SET enabled = 0 WHERE agent_id = ?", []any{id}},
 			{"DELETE FROM instructions WHERE agent_id = ?", []any{id}},
 			{"UPDATE contacts SET removed_at = ? WHERE agent_id = ? AND removed_at IS NULL", []any{now, id}},
+			// Members who were only in this agent go with it (PLAN 19.4). The
+			// first two read agent_members before the third clears it.
+			{"DELETE FROM member_accounts WHERE member_id IN (SELECT member_id FROM agent_members WHERE agent_id = ?) AND member_id NOT IN (SELECT member_id FROM agent_members WHERE agent_id != ?)", []any{id, id}},
+			{"DELETE FROM members WHERE id IN (SELECT member_id FROM agent_members WHERE agent_id = ?) AND id NOT IN (SELECT member_id FROM agent_members WHERE agent_id != ?)", []any{id, id}},
+			{"DELETE FROM agent_members WHERE agent_id = ?", []any{id}},
 		}
 		for _, s := range stmts {
 			if _, err := tx.Exec(s.sql, s.args...); err != nil {

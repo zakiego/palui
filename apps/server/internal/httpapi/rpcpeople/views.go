@@ -22,7 +22,6 @@ type agentViewT struct {
 	Name                 string             `json:"name"`
 	Persona              string             `json:"persona"`
 	IsDefault            bool               `json:"isDefault"`
-	OwnerPowers          string             `json:"ownerPowers"`
 	GuestTools           string             `json:"guestTools"`
 	DailyTokenCap        int64              `json:"dailyTokenCap"`
 	ToolPermissions      db.ToolPermissions `json:"toolPermissions"`
@@ -57,7 +56,7 @@ func agentView(q db.Q, a db.Agent, chatCount int, now int64) (agentViewT, error)
 		return agentViewT{}, err
 	}
 	return agentViewT{
-		ID: a.ID, Slug: a.Slug, Name: a.Name, Persona: a.Persona, IsDefault: a.IsDefault, OwnerPowers: a.OwnerPowers, GuestTools: a.GuestTools,
+		ID: a.ID, Slug: a.Slug, Name: a.Name, Persona: a.Persona, IsDefault: a.IsDefault, GuestTools: a.GuestTools,
 		DailyTokenCap: a.DailyTokenCap, ToolPermissions: permissionsOf(a), RecallContainer: a.RecallContainer, RecallReadContainers: agents.ReadContainers(a),
 		RecallPerChat: a.RecallPerChat, Container: agents.Container(a, ""), TelegramConnectorID: a.TelegramConnectorID,
 		AvatarImage: a.AvatarImage, AvatarIcon: a.AvatarIcon, AvatarColor: a.AvatarColor,
@@ -108,6 +107,9 @@ type agentToolsT struct {
 	Error  *string             `json:"error"`
 	Used   *jsonx.Map[int64]   `json:"used"`
 	Scopes *jsonx.Map[*string] `json:"scopes"`
+	// MCP servers the owner marked as holding no private data. Left out when
+	// none are, so older replies keep their bytes.
+	NoPrivateData []string `json:"noPrivateData,omitempty"`
 }
 
 // agentTools is the Tools tab: what the runtime would offer the agent now
@@ -149,6 +151,9 @@ func agentTools(c *httpapi.Call, a db.Agent, now int64) (agentToolsT, error) {
 	for _, conn := range list {
 		if conn.Kind == "tools" {
 			out.Scopes.Set(conn.ID, conn.AgentID)
+		}
+		if connectors.NoPrivateData(conn) {
+			out.NoPrivateData = append(out.NoPrivateData, conn.ID)
 		}
 	}
 	return out, nil

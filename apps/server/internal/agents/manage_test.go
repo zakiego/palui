@@ -11,6 +11,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/chats"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
+	"github.com/zakiego/palui/apps/server/internal/members"
 	"github.com/zakiego/palui/apps/server/internal/notes"
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/testutil"
@@ -196,8 +197,8 @@ func TestAvatar(t *testing.T) {
 func TestPaluiHasNoSharedChatRules(t *testing.T) {
 	d := testutil.DB(t)
 	palui := def(t, d)
-	r := update(t, d, palui.ID, agents.Input{OwnerPowers: s("approve"), GuestTools: s("none"), TelegramConnectorID: s("tgbot-x"), Name: s("Palui 2")})
-	if r.OwnerPowers != "off" || r.GuestTools != "safe" || r.TelegramConnectorID != nil || r.Name != "Palui 2" {
+	r := update(t, d, palui.ID, agents.Input{GuestTools: s("none"), TelegramConnectorID: s("tgbot-x"), Name: s("Palui 2")})
+	if r.GuestTools != "safe" || r.TelegramConnectorID != nil || r.Name != "Palui 2" {
 		t.Fatalf("%+v", r)
 	}
 	if _, err := agents.Delete(d, palui.ID, 3); !isAgentErr(err) {
@@ -263,6 +264,35 @@ func TestAssignAndDelete(t *testing.T) {
 	testutil.Must(t, err)
 	if len(list) != 0 {
 		t.Fatal(list)
+	}
+}
+
+// Deleting an agent removes its member links and deletes the members who were
+// only there; a member also in another agent stays.
+func TestDeleteRemovesItsMembers(t *testing.T) {
+	d := testutil.DB(t)
+	chef := create(t, d, agents.Input{Slug: "chef", Name: s("Chef"), Persona: s("p")})
+	cs := create(t, d, agents.Input{Slug: "cs", Name: s("CS"), Persona: s("p")})
+	only, err := members.Create(d, "Only", []members.AccountInput{{Channel: "whatsapp", Address: "0812 0000 0001"}}, 1)
+	testutil.Must(t, err)
+	both, err := members.Create(d, "Both", []members.AccountInput{{Channel: "telegram", Address: "4242"}}, 1)
+	testutil.Must(t, err)
+	testutil.Must(t, members.Link(d, chef.ID, only.ID, 1))
+	testutil.Must(t, members.Link(d, chef.ID, both.ID, 1))
+	testutil.Must(t, members.Link(d, cs.ID, both.ID, 1))
+	ok, err := agents.Delete(d, chef.ID, 2)
+	if !ok || err != nil {
+		t.Fatal(err)
+	}
+	all, err := members.All(d)
+	testutil.Must(t, err)
+	if len(all) != 1 || all[0].ID != both.ID || len(all[0].Accounts) != 1 || len(all[0].AgentIDs) != 1 || all[0].AgentIDs[0] != cs.ID {
+		t.Fatalf("%+v", all)
+	}
+	var n int
+	testutil.Must(t, d.QueryRow("SELECT count(*) FROM member_accounts WHERE member_id = ?", only.ID).Scan(&n))
+	if n != 0 {
+		t.Fatal(n)
 	}
 }
 

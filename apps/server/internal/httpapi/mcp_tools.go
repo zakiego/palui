@@ -33,6 +33,7 @@ var MCPExcluded = map[string]string{
 	"revokeMcpAccess":    "a token can't manage MCP access",
 	"getOAuthRequest":    "OAuth consent is the owner's, in the browser",
 	"decideOAuthRequest": "OAuth consent is the owner's, in the browser",
+	"setConnectorDataFn": "decides what strangers in a shared chat can reach; the owner's call, in the dashboard",
 }
 
 // MCPTools is the catalog, grouped as the dashboard is.
@@ -53,11 +54,14 @@ func MCPTools() []MCPTool {
 		{Name: "create_webhook", RPC: "createHookFn", Title: "Create webhook", Description: "Create an inbound webhook that posts into a chat. mode forward sends the text as is; summarize runs a tool-less turn. Returns the URL and signing secret once."},
 
 		// Agents
-		{Name: "list_agents", RPC: "getAgentsPage", Title: "List agents", Description: "Every agent with its id, slug, name, persona summary, powers and the chats it serves."},
-		{Name: "get_agent", RPC: "getAgentPage", Title: "Get agent", Description: "One agent in full, by slug (from list_agents): persona, owner powers, guest tools, token cap, recall settings, chats."},
+		{Name: "list_agents", RPC: "getAgentsPage", Title: "List agents", Description: "Every agent with its id, slug, name, persona summary, guest tools setting and the chats it serves."},
+		{Name: "get_agent", RPC: "getAgentPage", Title: "Get agent", Description: "One agent in full, by slug (from list_agents): persona, guest tools, token cap, recall settings, chats."},
 		{Name: "get_agent_tools", RPC: "getAgentToolsFn", Title: "Get agent tools", Description: "The tools an agent can call and each one's permission (allow, ask, deny). id is the agent id."},
 		{Name: "get_agent_memory", RPC: "getAgentMemoryFn", Title: "Get agent memory", Description: "What an agent remembers in its recall memory. id is the agent id."},
-		{Name: "save_agent", RPC: "saveAgentFn", Title: "Create or update agent", Description: "Create an agent, or update one when id is given. Only the fields sent change. persona is the system prompt; ownerPowers off or approve; guestTools none or safe."},
+		{Name: "save_agent", RPC: "saveAgentFn", Title: "Create or update agent", Description: "Create an agent, or update one when id is given. Only the fields sent change. persona is the system prompt; guestTools none or safe."},
+		{Name: "list_agent_members", RPC: "getAgentMembersFn", Title: "List agent members", Description: "The people an AI agent is shared with (members), each with their WhatsApp or Telegram accounts and every agent they're in. Also lists members of other agents and people who wrote in a chat but aren't members yet. id is the agent id."},
+		{Name: "save_member", RPC: "saveMemberFn", Title: "Create or update member", Description: "Add a member to an agent (no id) or rename one and replace their accounts (id from list_agent_members). accounts is 1 to 5 of channel whatsapp or telegram with an address: a phone number, a WhatsApp JID, or a numeric Telegram user id. The owner's own account and accounts another member holds are refused."},
+		{Name: "set_agent_member", RPC: "setAgentMemberFn", Title: "Add or remove agent member", Description: "Add an existing member to an agent (on true) or take them out (on false). Taking a member out of their last agent deletes them. The default agent has no members.", Destructive: true, Idempotent: true},
 		{Name: "delete_agent", RPC: "deleteAgentFn", Title: "Delete agent", Description: "Delete an agent. Its chats go back to the default agent. The default agent can't be deleted.", Destructive: true},
 		{Name: "set_agent_tool_permissions", RPC: "setAgentToolPermissionsFn", Title: "Set agent tool permissions", Description: "Set allowAll, or per-tool allow, ask or deny (null clears one) for an agent. Tool names come from get_agent_tools.", Idempotent: true},
 
@@ -91,6 +95,12 @@ func MCPTools() []MCPTool {
 		{Name: "delete_instruction", RPC: "deleteInstructionFn", Title: "Delete instruction", Description: "Delete a standing instruction.", Destructive: true},
 		{Name: "set_preference", RPC: "setPreferenceFn", Title: "Set preference", Description: "Set a preference (key and value) the agent keeps in mind.", Idempotent: true},
 		{Name: "delete_preference", RPC: "deletePreferenceFn", Title: "Delete preference", Description: "Delete a preference by key.", Destructive: true},
+
+		// Custom chat commands
+		{Name: "list_commands", RPC: "getCommandsPage", Title: "List custom commands", Description: "The owner's custom chat commands (a saved prompt under a /name, for every agent or one agent), the agents, and the built-in names they can't use."},
+		{Name: "save_command", RPC: "saveCommandFn", Title: "Save custom command", Description: "Create a custom chat command, or update one when id is given. agentId null is every agent. {{args}} in prompt is the text typed after the command. attachReport adds a /report debug snapshot (private chats only)."},
+		{Name: "set_command_enabled", RPC: "setCommandEnabledFn", Title: "Enable or disable custom command", Description: "Turn a custom chat command on or off.", Idempotent: true},
+		{Name: "delete_command", RPC: "deleteCommandFn", Title: "Delete custom command", Description: "Delete a custom chat command.", Destructive: true},
 
 		// Jobs, flows, reminders
 		{Name: "list_jobs", RPC: "getJobs", Title: "List jobs", Description: "Scheduled jobs (including the daily briefing and heartbeat) with their schedule, chat, next run and last result."},

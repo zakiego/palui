@@ -6,6 +6,10 @@
    "columns": ["id","account_id","provider_id","user_id","access_token","refresh_token","id_token","access_token_expires_at","refresh_token_expires_at","scope","password","created_at","updated_at"],
    "rows": []
   },
+  "agent_members": {
+   "columns": ["agent_id","member_id","created_at"],
+   "rows": []
+  },
   "agents": {
    "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat"],
    "rows": [
@@ -67,7 +71,7 @@
     ["notes","notes","skill","Instructions & preferences",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
     ["settings","settings","skill","Settings",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
     ["remote-mcp","remote-mcp","skill","Remote MCP setup",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
-    ["mcp-jadwal-sholat","mcp","tools","jadwal-sholat",1,"on",null,"external","{\"url\":\"https://sholat.zakiego.com/mcp\",\"authMode\":\"none\",\"addedFromChat\":true}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
+    ["mcp-jadwal-sholat","mcp","tools","jadwal-sholat",1,"on",null,"external","{\"url\":\"https://sholat.zakiego.com/mcp\",\"authMode\":\"none\",\"addedFromChat\":true,\"noPrivateData\":true}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
     ["attachments","attachments","skill","Attachments",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
     ["voice","voice","skill","Voice notes",0,"not_set_up",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null]
    ]
@@ -77,6 +81,13 @@
    "rows": [
     ["<con#1>","<agt#1>","Zaki","whatsapp","6282200001001","<chat#22>","allow","Adik",1794621600000,1794621600000,null],
     ["<con#2>","<agt#1>","Ibu","whatsapp","6281111111111","<chat#23>","ask",null,1794621600000,1794621600000,null]
+   ]
+  },
+  "custom_commands": {
+   "columns": ["id","agent_id","name","description","prompt","attach_report","enabled","created_at","updated_at"],
+   "rows": [
+    ["<cmd#1>",null,"report-fix","Debug report, lalu T3 Code yang perbaiki","Start a T3 Code thread in the palui project to find and fix the problem in the debug report below. Owner's note: {{args}}\n\nPut the whole report in the task. Reply with the thread link only.",1,1,1794614400000,1794614400000],
+    ["<cmd#2>",null,"pagi","","Kasih ringkasan pagi: cuaca Banjarmasin, agenda hari ini, lalu pengingat.",0,0,1794618000000,1794618000000]
    ]
   },
   "events": {
@@ -220,6 +231,14 @@
   },
   "mcp_grants": {
    "columns": ["id","kind","name","user_id","client_id","scope","token_hint","access_hash","access_expires_at","refresh_hash","refresh_expires_at","prev_refresh_hash","rotated_at","created_at","last_used_at"],
+   "rows": []
+  },
+  "member_accounts": {
+   "columns": ["id","member_id","channel","external_id","alt_id","display_name","created_at"],
+   "rows": []
+  },
+  "members": {
+   "columns": ["id","name","created_at","updated_at"],
    "rows": []
   },
   "messages": {

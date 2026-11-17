@@ -8975,7 +8975,14 @@
      "channelMsgId": "519",
      "text": "lihat @palui_test_bot",
      "at": 1700000000000,
-     "addressed": true
+     "addressed": true,
+     "media": [
+      {
+       "kind": "image",
+       "mimeType": "image/jpeg",
+       "data": ""
+      }
+     ]
     }
    ],
    "calls": [],
@@ -9502,14 +9509,21 @@
      "senderName": "Orang",
      "channelMsgId": "529",
      "text": "spam",
-     "at": 1700000000000
+     "at": 1700000000000,
+     "media": [
+      {
+       "kind": "image",
+       "mimeType": "image/jpeg",
+       "data": ""
+      }
+     ]
     }
    ],
    "calls": [],
    "fetched": []
   },
   {
-   "name": "stranger photo without caption",
+   "name": "stranger photo without caption reaches the router without its bytes",
    "update": {
     "update_id": 29,
     "message": {
@@ -9535,7 +9549,27 @@
      ]
     }
    },
-   "inbound": [],
+   "inbound": [
+    {
+     "channel": "telegram",
+     "connectorId": "telegram",
+     "chatExternalId": "77",
+     "chatKind": "dm",
+     "chatTitle": "Orang",
+     "senderExternalId": "77",
+     "senderName": "Orang",
+     "channelMsgId": "530",
+     "text": "",
+     "at": 1700000000000,
+     "media": [
+      {
+       "kind": "image",
+       "mimeType": "image/jpeg",
+       "data": ""
+      }
+     ]
+    }
+   ],
    "calls": [],
    "fetched": []
   },
@@ -10376,7 +10410,14 @@
      "at": 1700000000000,
      "senderName": "Zaki",
      "addressed": true,
-     "channelMsgId": "G7"
+     "channelMsgId": "G7",
+     "media": [
+      {
+       "kind": "image",
+       "mimeType": "image/jpeg",
+       "data": ""
+      }
+     ]
     }
    ],
    "downloads": []
@@ -11939,13 +11980,20 @@
      "at": 1700000000000,
      "senderName": "Zaki",
      "chatTitle": "Zaki",
-     "channelMsgId": "IMG2"
+     "channelMsgId": "IMG2",
+     "media": [
+      {
+       "kind": "image",
+       "mimeType": "image/jpeg",
+       "data": ""
+      }
+     ]
     }
    ],
    "downloads": []
   },
   {
-   "name": "stranger image without caption dropped",
+   "name": "stranger image without caption reaches the router without its bytes",
    "msg": {
     "key": {
      "remoteJid": "629999@s.whatsapp.net",
@@ -11959,7 +12007,27 @@
     "pushName": "Zaki"
    },
    "type": "notify",
-   "inbound": [],
+   "inbound": [
+    {
+     "channel": "whatsapp",
+     "connectorId": "whatsapp",
+     "chatExternalId": "629999@s.whatsapp.net",
+     "chatKind": "dm",
+     "senderExternalId": "629999@s.whatsapp.net",
+     "text": "",
+     "at": 1700000000000,
+     "senderName": "Zaki",
+     "chatTitle": "Zaki",
+     "channelMsgId": "IMG5",
+     "media": [
+      {
+       "kind": "image",
+       "mimeType": "image/jpeg",
+       "data": ""
+      }
+     ]
+    }
+   ],
    "downloads": []
   },
   {

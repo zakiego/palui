@@ -47,7 +47,6 @@ func agentFields(extra ...zod.Field) *zod.ObjectS {
 	fields := []zod.Field{
 		zod.F("name", zod.String().Trim().Min(1).Max(agents.MaxAgentName)),
 		zod.F("persona", zod.String().Trim().Min(1).Max(agents.MaxPersona)),
-		zod.F("ownerPowers", zod.Enum("off", "approve")),
 		zod.F("guestTools", zod.Enum("none", "safe")),
 		zod.F("dailyTokenCap", zod.Int().Min(0).Max(100_000_000)),
 		zod.F("recallContainer", zod.Nullable(zod.String().Trim().Max(64))),
@@ -66,7 +65,6 @@ type agentInput struct {
 	Slug                 *string  `json:"slug"`
 	Name                 string   `json:"name"`
 	Persona              string   `json:"persona"`
-	OwnerPowers          string   `json:"ownerPowers"`
 	GuestTools           string   `json:"guestTools"`
 	DailyTokenCap        int64    `json:"dailyTokenCap"`
 	RecallContainer      *string  `json:"recallContainer"`
@@ -299,7 +297,7 @@ func init() {
 			}
 			list := in.RecallReadContainers
 			fields := agents.Input{
-				Name: &in.Name, Persona: &in.Persona, OwnerPowers: &in.OwnerPowers, GuestTools: &in.GuestTools, DailyTokenCap: &in.DailyTokenCap,
+				Name: &in.Name, Persona: &in.Persona, GuestTools: &in.GuestTools, DailyTokenCap: &in.DailyTokenCap,
 				RecallContainer: nullable(in.RecallContainer), RecallReadContainers: &list, RecallPerChat: &in.RecallPerChat,
 				TelegramConnectorID: nullable(in.TelegramConnectorID), AvatarImage: nullable(in.AvatarImage), AvatarIcon: nullable(in.AvatarIcon), AvatarColor: nullable(in.AvatarColor),
 			}

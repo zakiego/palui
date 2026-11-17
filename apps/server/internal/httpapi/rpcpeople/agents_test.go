@@ -7,6 +7,7 @@ import (
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/chats"
+	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/httpapi/apitest"
 	"github.com/zakiego/palui/apps/server/internal/httpapi/rpcpeople"
@@ -151,6 +152,22 @@ func TestAgentToolsCountsThisAgentsSuccessfulCallsFromTheLast7Days(t *testing.T)
 	}
 }
 
+func TestAgentToolsListsTheServersMarkedAsHoldingNoPrivateData(t *testing.T) {
+	e, token := agentsEnv(t)
+	chef := createAgent(t, e.DB, plainAgent("chef", "Chef"))
+	cfg := jsonx.NewMap[any]()
+	cfg.Set("url", "https://prayer.example.com/mcp")
+	testutil.SeedConnector(t, e.DB, "mcp-prayer", "tools", testutil.SeedOptions{Type: "mcp", Config: cfg}, agentsNow)
+	testutil.SeedConnector(t, e.DB, "mcp-notes", "tools", testutil.SeedOptions{Type: "mcp", Config: cfg.Clone()}, agentsNow)
+	_, _, err := connectors.SetNoPrivateData(e.DB, "mcp-prayer", true, agentsNow)
+	testutil.Must(t, err)
+	useFake(t, nil)
+	_, body := call(t, e, token, "getAgentToolsFn", `{"id":"`+chef.ID+`"}`)
+	if body != `{"tools":[],"error":null,"used":{},"scopes":{"mcp-notes":null,"mcp-prayer":null},"noPrivateData":["mcp-prayer"]}` {
+		t.Fatal(body)
+	}
+}
+
 func TestAgentToolsStillShowsUsageWhenTheRuntimeIsDown(t *testing.T) {
 	e, token := agentsEnv(t)
 	chef := createAgent(t, e.DB, plainAgent("chef", "Chef"))
@@ -174,5 +191,33 @@ func TestClip(t *testing.T) {
 	}
 	if got := rpcpeople.Clip("ab\U0001F469\U0001F3FD‍\U0001F4BBcd", 4); got != "ab" {
 		t.Fatal(got)
+	}
+}
+
+// An old dashboard tab or AI agent may still send ownerPowers (PLAN 19.9
+// step 5): the key is dropped, the save works and the column keeps its default.
+func TestSaveAgentIgnoresOwnerPowers(t *testing.T) {
+	e, token := agentsEnv(t)
+	body := `{"name":"Chef","persona":"p","ownerPowers":"approve","guestTools":"safe","dailyTokenCap":0,"recallContainer":null,"recallReadContainers":[],"recallPerChat":false,"telegramConnectorId":null,"avatarImage":null,"avatarIcon":null,"avatarColor":null,"slug":"chef"}`
+	status, saved := call(t, e, token, "saveAgentFn", body)
+	if status != 200 || strings.Contains(saved, "ownerPowers") {
+		t.Fatal(status, saved)
+	}
+	page := mustOK(t, e, token, "getAgentPage", `{"slug":"chef"}`)
+	if b, _ := jsonx.Marshal(page); strings.Contains(string(b), "ownerPowers") {
+		t.Fatal(string(b))
+	}
+	var id, powers string
+	testutil.Must(t, e.DB.QueryRow("SELECT id, owner_powers FROM agents WHERE slug = 'chef'").Scan(&id, &powers))
+	if powers != "off" {
+		t.Fatal(powers)
+	}
+	update := strings.Replace(body, `"slug":"chef"`, `"id":"`+id+`"`, 1)
+	if status, out := call(t, e, token, "saveAgentFn", update); status != 200 {
+		t.Fatal(status, out)
+	}
+	testutil.Must(t, e.DB.QueryRow("SELECT owner_powers FROM agents WHERE id = ?", id).Scan(&powers))
+	if powers != "off" {
+		t.Fatal(powers)
 	}
 }

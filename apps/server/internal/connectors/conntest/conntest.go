@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/db"
@@ -33,6 +34,12 @@ type FakeChannel struct {
 	Up          bool
 	TypingCalls []bool
 	SendFn      func(ctx context.Context, to string, payload db.OutboxPayload) (connectors.SendResult, error)
+	// Participants and ParticipantsErr answer GroupParticipants on Lister();
+	// ParticipantsDelay holds the answer back (the context still wins).
+	Participants      map[string][]connectors.Participant
+	ParticipantsErr   error
+	ParticipantsDelay time.Duration
+	participantCalls  int
 }
 
 func NewFakeChannel(channel string) *FakeChannel { return &FakeChannel{channel: channel, Up: true} }
@@ -65,6 +72,43 @@ func (c *FakeChannel) Reachable() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.Up
+}
+
+// ListingChannel is a FakeChannel that is also a connectors.GroupLister.
+type ListingChannel struct{ *FakeChannel }
+
+// Lister wraps the channel so it can list group participants. A plain
+// FakeChannel is not a GroupLister.
+func (c *FakeChannel) Lister() *ListingChannel { return &ListingChannel{c} }
+
+func (c *ListingChannel) GroupParticipants(ctx context.Context, chat string) ([]connectors.Participant, error) {
+	c.mu.Lock()
+	c.participantCalls++
+	delay, err := c.ParticipantsDelay, c.ParticipantsErr
+	list, ok := c.Participants[chat]
+	list = append([]connectors.Participant(nil), list...)
+	c.mu.Unlock()
+	if delay > 0 {
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("no participants for %s", chat)
+	}
+	return list, nil
+}
+
+// ParticipantCalls is how many times GroupParticipants was called.
+func (c *FakeChannel) ParticipantCalls() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.participantCalls
 }
 
 // SetFailNext makes the next n sends fail.

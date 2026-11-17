@@ -25,8 +25,10 @@ import (
 var limits = struct {
 	flowName, flowDescription, flowSteps, flowTriggers, flowError, agentName, agentSlug, attachmentTitle, attachmentDescription, attachmentFilename,
 	connectorLabel, connectorID, jobName, rrule, reminderText, contactName, outboundText, contactNote, hookName, model, persona, webMessage,
-	toolName, approvalArgs, toolResult, statusDetail, jobResult, instructionTitle, instructionBody, preferenceKey, preferenceValue, botUsername int
-}{80, 200, 40, 8, 300, 40, 24, 200, 1000, 200, 80, 63, 80, 300, 500, 60, 2000, 200, 60, 120, 8000, 8000, 64, 300, 500, 300, 500, 80, 1000, 40, 300, 32}
+	toolName, approvalArgs, toolResult, statusDetail, jobResult, instructionTitle, instructionBody, preferenceKey, preferenceValue, botUsername,
+	commandName, commandDescription, commandPrompt, memberName, memberAccounts int
+}{80, 200, 40, 8, 300, 40, 24, 200, 1000, 200, 80, 63, 80, 300, 500, 60, 2000, 200, 60, 120, 8000, 8000, 64, 300, 500, 300, 500, 80, 1000, 40, 300, 32,
+	32, 120, 4000, 60, 5}
 
 const (
 	worstLongURL    = "https://example.com/workspaces/northwind-industries-holdings/projects/q3-launch/docs/9f8e7d6c5b4a?tab=comments&filter=unresolved&sort=newest"
@@ -140,10 +142,10 @@ func worst(k *Kit) {
 		Config: obj("url", worstLongURL),
 	})
 	k.Connector("mcp-j", "mcp", ConnectorOpts{Label: ptr("J"), Status: "on", Config: obj("url", "https://j.example.com/mcp")})
-	k.Connector("mcp-files", "mcp", ConnectorOpts{Label: ptr("خادم الملفات المشتركة"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://files.example.com/mcp")})
+	k.Connector("mcp-files", "mcp", ConnectorOpts{Label: ptr("خادم الملفات المشتركة"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://files.example.com/mcp", "noPrivateData", true)})
 	k.Connector("mcp-fox", "mcp", ConnectorOpts{Label: ptr("🦊"), Status: "paused", Config: obj("url", "https://fox.example.com/mcp")})
 	// A label with no break opportunity: someone pasted the host as the name.
-	k.Connector("mcp-host", "mcp", ConnectorOpts{Label: ptr(within("mcp.internal.northwind-industries-holdings.example.com/v2/sse", L.connectorLabel)), Status: "on", Config: obj("url", "https://mcp.internal.northwind-industries-holdings.example.com/v2/sse")})
+	k.Connector("mcp-host", "mcp", ConnectorOpts{Label: ptr(within("mcp.internal.northwind-industries-holdings.example.com/v2/sse", L.connectorLabel)), Status: "on", Config: obj("url", "https://mcp.internal.northwind-industries-holdings.example.com/v2/sse", "noPrivateData", true)})
 	k.Connector("mcp-rnd", "mcp", ConnectorOpts{Label: ptr(`<b>R&D</b> **beta** &amp; "quotes"`), Status: "on", Config: obj("url", "https://rnd.example.com/mcp")})
 	k.Connector("mcp-de", "mcp", ConnectorOpts{Label: ptr("Benachrichtigungseinstellungen"), Status: "connecting", Config: obj("url", "https://de.example.com/mcp")})
 	k.Connector("mcp-notion", "mcp", ConnectorOpts{Label: ptr("Notion"), Status: "on", Config: obj("url", "https://notion.example.com/mcp")})
@@ -213,7 +215,6 @@ func worst(k *Kit) {
 		Slug:        within("koordinator-arisan-haul-", L.agentSlug),
 		Name:        within("Koordinator Arisan & Haul Bani Abdurrahm", L.agentName),
 		Persona:     fill("Kamu koordinator arisan keluarga. Catat siapa yang sudah bayar, ingatkan jadwal haul, dan jawab sopan dalam bahasa Banjar kalau ditanya pakai bahasa Banjar. ", L.persona),
-		OwnerPowers: "approve",
 		AvatarIcon:  ptr("chef-hat"),
 		AvatarColor: ptr("violet"),
 		// Allow-all on, one tool of every other kind, so the Tools tab shows each select value and both group counts.
@@ -229,6 +230,26 @@ func worst(k *Kit) {
 	// An uploaded photo: a small gradient PNG, the shape a browser-resized photo has.
 	cs := k.Agent(Agent{Slug: "cs", Name: "CS", Persona: "Jawab pertanyaan pelanggan Vorneo.", GuestTools: "none", AvatarImage: ptr(GradientAvatar48())})
 	k.Assign(family, arisan, true)
+	// Members (PLAN 19.4), made-up people and numbers. A name at the limit
+	// mixing scripts and an emoji, in two agents, with the most accounts: a
+	// phone with a learned LID, a LID only, a 20-digit Telegram id and two
+	// more numbers.
+	worstAccounts := []MemberAccount{
+		{Channel: "whatsapp", ExternalID: "6281200000011@s.whatsapp.net", AltID: ptr("100000000000011@lid")},
+		{Channel: "whatsapp", ExternalID: "100000000000012@lid", DisplayName: ptr("Nurul 🧕🏽")},
+		{Channel: "telegram", ExternalID: "12345678901234567890"},
+		{Channel: "whatsapp", ExternalID: "6281200000013@s.whatsapp.net"},
+		{Channel: "whatsapp", ExternalID: "447700900013@s.whatsapp.net"},
+	}
+	if len(worstAccounts) > L.memberAccounts {
+		panic(fixtureErr{fmt.Errorf("%d member accounts, over the limit of %d", len(worstAccounts), L.memberAccounts)})
+	}
+	k.Member(Member{Name: within("Nurul Hidayah binti H. Abdul Gani نور الهداية 🧕🏽 Bendahara", L.memberName), Accounts: worstAccounts, Agents: []string{arisan, cs}})
+	// One letter, one account: the guest who asks in the family group below,
+	// so the people list has to leave out someone who is already a member.
+	k.Member(Member{Name: "M", Accounts: []MemberAccount{{Channel: "telegram", ExternalID: "1000000099"}}, Agents: []string{arisan}})
+	// In CS only: arisan's page offers them under members of other agents.
+	k.Member(Member{Name: "Admin Gudang", Accounts: []MemberAccount{{Channel: "whatsapp", ExternalID: "6281200000014@s.whatsapp.net"}}, Agents: []string{cs}})
 	// Agent-scoped MCP: one owned by the agent with the longest name, one by CS,
 	// and one whose owner was deleted (serves nobody).
 	k.OwnConnector("mcp-files", arisan)
@@ -243,6 +264,18 @@ func worst(k *Kit) {
 		CreatedAt: ptr(now - 20*D),
 	})
 	k.Instruction(Instruction{AgentID: &arisan, Title: "Haul", Body: "Haul tahun ini hari Ahad.", Enabled: ptr(false), CreatedAt: ptr(now - 3*D)})
+	// Custom commands: every limit at once on one agent's command, a global one
+	// with the same name, and a one-letter one with no description that's off.
+	k.CustomCommand(CustomCommand{
+		AgentID:      &arisan,
+		Name:         within("rekap-setoran-arisan-bani-abdurr", L.commandName),
+		Description:  within(fill("Rekap setoran arisan bulan ini, urut dari yang paling lama belum bayar, lalu kirim ke grup keluarga. ", L.commandDescription), L.commandDescription),
+		Prompt:       fill("Buat rekap setoran arisan dari https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_arisan_bani_abdurrahman/edit#gid=0 untuk {{args}}. ", L.commandPrompt),
+		AttachReport: true,
+		CreatedAt:    ptr(now - 10*D),
+	})
+	k.CustomCommand(CustomCommand{Name: "rekap-setoran-arisan-bani-abdurr", Description: "Rekap untuk agent lain", Prompt: "Rekap setoran.", CreatedAt: ptr(now - 9*D)})
+	k.CustomCommand(CustomCommand{Name: "x", Prompt: "خلاصة اليوم 🌴", Enabled: ptr(false), CreatedAt: ptr(now - D)})
 	k.Message(family, "user", "@palui_bot siapa yang belum bayar arisan bulan ini?", now-40_000, MsgExtra{FromOwner: ptr(false), SenderName: ptr(ptr("Muhammad Fadhlurrahman Al-Banjari bin H. Abdurrahman Siddiq")), SenderID: ptr("1000000099")})
 	k.Message(family, "user", "؟", now-30_000, MsgExtra{FromOwner: ptr(false), SenderName: ptr[*string](nil), SenderID: ptr("1000000100")})
 

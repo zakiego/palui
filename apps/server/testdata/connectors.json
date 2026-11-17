@@ -412,7 +412,8 @@
     "authMode",
     "headerName",
     "toolPrefs",
-    "addedFromChat"
+    "addedFromChat",
+    "noPrivateData"
    ],
    "configDefaults": {
     "ok": false,

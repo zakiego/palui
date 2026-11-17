@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,6 +44,7 @@ const (
 	ExpiresHint       = "expires in about 2 min"
 	recentMax         = 200
 	groupTitleTTL     = 3600_000
+	groupMembersTTL   = 10 * 60_000
 	defaultLeadMs     = 1500
 	defaultRefreshMs  = 8000
 	defaultTypingMax  = 10 * 60_000
@@ -203,6 +205,13 @@ type titleEntry struct {
 	at    int64
 }
 
+type membersEntry struct {
+	list []connectors.Participant
+	at   int64
+}
+
+var _ connectors.GroupLister = (*wa)(nil)
+
 type wa struct {
 	c         connectors.Context
 	o         Options
@@ -228,6 +237,16 @@ type wa struct {
 	lastInbound map[string]Key
 	thinking    map[string]*thinking
 	groupTitles map[string]titleEntry
+	// Group participant lists (PLAN 19.4), dropped on any group change, on
+	// reconnect and when a sender outside the list writes.
+	groupMembers map[string]membersEntry
+	// groupGen counts the drops per group and groupEpoch the full clears, also
+	// when nothing was cached, so a fetch that overlapped one isn't stored.
+	groupGen   map[string]uint64
+	groupEpoch uint64
+	// groupSeen holds who wrote in a group that had no cached list, so a
+	// fetch in flight can check them against what it got back.
+	groupSeen map[string][]seenSender
 
 	queue chan delivery
 	quit  chan struct{}
@@ -277,6 +296,9 @@ func start(c connectors.Context, o Options) (*connectors.RunningConnector, error
 		lastInbound:     map[string]Key{},
 		thinking:        map[string]*thinking{},
 		groupTitles:     map[string]titleEntry{},
+		groupMembers:    map[string]membersEntry{},
+		groupGen:        map[string]uint64{},
+		groupSeen:       map[string][]seenSender{},
 		queue:           make(chan delivery, 256),
 		quit:            make(chan struct{}),
 	}
@@ -479,6 +501,9 @@ func (w *wa) onUpdate(s Socket, u Update) {
 	}
 	switch u.Connection {
 	case "open":
+		// Changes made while offline may never be reported.
+		w.groupMembers = map[string]membersEntry{}
+		w.groupEpoch++
 		w.attempt = 0
 		w.clearPairingLocked()
 		w.live.Connection = "open"
@@ -602,9 +627,15 @@ func (w *wa) connect() {
 			}
 		}
 	})
+	offGroup := s.OnGroupChange(func(jid string) {
+		w.mu.Lock()
+		w.dropGroupLocked(jid)
+		w.mu.Unlock()
+	})
 	w.detach = func() {
 		offUpdate()
 		offUpsert()
+		offGroup()
 	}
 	w.mu.Unlock()
 	s.Open()
@@ -701,49 +732,30 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		}
 	}
 
+	if group {
+		w.mu.Lock()
+		if e, ok := w.groupMembers[jid]; ok {
+			if !inParticipants(e.list, BareJID(sender), alt) {
+				w.dropGroupLocked(jid)
+			}
+		} else {
+			// No list yet: a fetch in flight may predate this sender, so it
+			// checks them before it stores (GroupParticipants).
+			seen := append(w.groupSeen[jid], seenSender{id: BareJID(sender), alt: alt, at: w.o.Now()})
+			if len(seen) > maxGroupSeen {
+				w.dropGroupLocked(jid)
+				seen = nil
+			}
+			w.groupSeen[jid] = seen
+		}
+		w.mu.Unlock()
+	}
+
 	text := TextOf(content)
 	info := MediaOf(content)
-	var media []connectors.InboundMedia
-	note := ""
-	if info != nil {
-		isOwner := w.c.Services.IsOwner("whatsapp", BareJID(sender), alt)
-		max := MediaMaxBytes
-		if info.Kind == "document" {
-			max = DocumentMaxBytes
-		}
-		switch {
-		case !isOwner:
-			// Strangers are dropped by the router; don't download their files.
-		case info.Bytes > int64(max):
-			note = overLimitNote(info, max)
-		default:
-			data, err := s.Download(w.ctx(), m)
-			switch {
-			case err != nil:
-				w.log.Warn("whatsapp media download failed", map[string]any{"err": err.Error()})
-			case len(data) > max:
-				note = overLimitNote(info, max)
-			default:
-				media = append(media, connectors.InboundMedia{Kind: info.Kind, MimeType: info.MimeType, Data: base64.StdEncoding.EncodeToString(data), Filename: info.Filename, DurationSec: info.DurationSec})
-			}
-		}
-	}
-
-	var parts []string
-	for _, p := range []string{text, note} {
-		if p != "" {
-			parts = append(parts, p)
-		}
-	}
-	body := strings.Join(parts, "\n")
-	if body == "" && len(media) == 0 {
+	if text == "" && info == nil {
 		return nil
 	}
-
-	w.mu.Lock()
-	w.remember(m)
-	w.lastInbound[jid] = key
-	w.mu.Unlock()
 
 	msg := connectors.InboundMessage{
 		Channel:          "whatsapp",
@@ -751,7 +763,7 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		ChatExternalID:   jid,
 		ChatKind:         "dm",
 		SenderExternalID: BareJID(sender),
-		Text:             body,
+		Text:             text,
 		At:               TimestampMs(m.Timestamp, w.o.Now()),
 	}
 	if alt != "" && alt != BareJID(sender) {
@@ -774,9 +786,54 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		msg.ReplyToChannelMsgID = q.ID
 		msg.Quoted = &connectors.InboundQuote{From: QuoteAuthor(q.Participant, self, []string{sender, alt}, !group), Text: q.Text, Media: q.Media}
 	}
-	if len(media) > 0 {
-		msg.Media = media
+
+	note := ""
+	if info != nil {
+		wanted := false
+		if w.c.Services.WantsMedia != nil {
+			wanted = w.c.Services.WantsMedia(msg)
+		} else {
+			wanted = w.c.Services.IsOwner("whatsapp", BareJID(sender), alt)
+		}
+		max := MediaMaxBytes
+		if info.Kind == "document" {
+			max = DocumentMaxBytes
+		}
+		// Without the bytes the row still says what was sent, so a photo
+		// with no caption isn't lost (group context shows it as a placeholder).
+		stub := connectors.InboundMedia{Kind: info.Kind, MimeType: info.MimeType, Filename: info.Filename, DurationSec: info.DurationSec}
+		switch {
+		case !wanted:
+			// Dropped by the router or kept as context: don't download it.
+			msg.Media = []connectors.InboundMedia{stub}
+		case info.Bytes > int64(max):
+			note = overLimitNote(info, max)
+		default:
+			data, err := s.Download(w.ctx(), m)
+			switch {
+			case err != nil:
+				w.log.Warn("whatsapp media download failed", map[string]any{"err": err.Error()})
+				note = fmt.Sprintf("[%s could not be downloaded]", info.Kind)
+			case len(data) > max:
+				note = overLimitNote(info, max)
+			default:
+				stub.Data = base64.StdEncoding.EncodeToString(data)
+				msg.Media = []connectors.InboundMedia{stub}
+			}
+		}
 	}
+	var parts []string
+	for _, p := range []string{text, note} {
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	msg.Text = strings.Join(parts, "\n")
+
+	w.mu.Lock()
+	w.remember(m)
+	w.lastInbound[jid] = key
+	w.mu.Unlock()
 	return w.c.Services.Inbound(w.ctx(), msg)
 }
 
@@ -788,6 +845,119 @@ func (w *wa) Reachable() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return !w.stopped && w.live.Connection == "open"
+}
+
+func inParticipants(list []connectors.Participant, ids ...string) bool {
+	for _, p := range list {
+		for _, id := range ids {
+			if id != "" && (p.ExternalID == id || p.AltID == id) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// GroupParticipants is who is in a group right now, without this account
+// (connectors.GroupLister). The list is cached for 10 minutes and never served
+// while disconnected, since change events can't arrive then.
+func (w *wa) GroupParticipants(ctx context.Context, jid string) ([]connectors.Participant, error) {
+	if !IsGroupChat(jid) {
+		return nil, fmt.Errorf("%s is not a group", jid)
+	}
+	s := w.openSocket()
+	if s == nil {
+		return nil, errors.New(ReasonNotConnected)
+	}
+	now := w.o.Now()
+	w.mu.Lock()
+	hit, ok := w.groupMembers[jid]
+	gen, epoch := w.groupGen[jid], w.groupEpoch
+	w.mu.Unlock()
+	if ok && now-hit.at < groupMembersTTL {
+		return slices.Clone(hit.list), nil
+	}
+	got, err := s.GroupParticipants(ctx, jid)
+	if err != nil {
+		return nil, err
+	}
+	user := s.User()
+	if user == nil {
+		return nil, errors.New("this WhatsApp account is not known yet")
+	}
+	self := map[string]bool{}
+	for _, id := range []string{user.ID, user.LID} {
+		if id != "" {
+			self[BareJID(id)] = true
+		}
+	}
+	list := make([]connectors.Participant, 0, len(got))
+	foundSelf := false
+	for _, m := range got {
+		id, alt := BareJID(m.ID), ""
+		if m.Alt != "" {
+			alt = BareJID(m.Alt)
+		} else {
+			var found string
+			var err error
+			if IsLID(id) {
+				found, err = s.PNForLID(ctx, id)
+			} else {
+				found, err = s.LIDForPN(ctx, id)
+			}
+			if err == nil && found != "" {
+				alt = BareJID(found)
+			}
+		}
+		if alt == id {
+			alt = ""
+		}
+		if self[id] || (alt != "" && self[alt]) {
+			foundSelf = true
+			continue
+		}
+		list = append(list, connectors.Participant{ExternalID: id, AltID: alt})
+	}
+	if !foundSelf {
+		return nil, fmt.Errorf("this WhatsApp account is not in %s", jid)
+	}
+	if err := ctx.Err(); err != nil {
+		// The id lookups may have failed on the deadline: don't keep a list
+		// with missing alt ids.
+		return nil, err
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.groupGen[jid] != gen || w.groupEpoch != epoch {
+		return nil, fmt.Errorf("%s changed while its participants were fetched", jid)
+	}
+	seen := w.groupSeen[jid]
+	delete(w.groupSeen, jid)
+	for _, x := range seen {
+		// Someone the list doesn't hold wrote while it was fetched: it may
+		// predate their joining.
+		if x.at >= now && !inParticipants(list, x.id, x.alt) {
+			return nil, fmt.Errorf("%s has a sender the fetched list doesn't hold", jid)
+		}
+	}
+	w.groupMembers[jid] = membersEntry{list: list, at: w.o.Now()}
+	return slices.Clone(list), nil
+}
+
+// seenSender is one sender in a group with no cached participant list.
+type seenSender struct {
+	id, alt string
+	at      int64
+}
+
+// maxGroupSeen bounds groupSeen per group; past it the group is dropped.
+const maxGroupSeen = 64
+
+// dropGroupLocked forgets a group's participants and fails any fetch of them
+// already in flight. Callers hold w.mu.
+func (w *wa) dropGroupLocked(jid string) {
+	delete(w.groupMembers, jid)
+	w.groupGen[jid]++
 }
 
 func (w *wa) openSocket() Socket {

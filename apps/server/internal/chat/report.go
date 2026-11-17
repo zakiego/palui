@@ -47,6 +47,11 @@ var reportRowID = regexp.MustCompile(`\b(?:chat|run|msg|webmsg|out|rtn|rto|flw|f
 
 var reportCommand = regexp.MustCompile(`(?i)^/report(@[^` + strx.SpaceClass + `]+)?([` + strx.SpaceClass + `]|$)`)
 
+func reportingCommand(m db.Message) bool {
+	c := ParseContent(m.Content)
+	return c.Command != nil && c.Command.ReportID != ""
+}
+
 // clip: one line, cut by UTF-16 unit (a cut never leaves half an emoji).
 func clip(s string, n int) string {
 	flat := strx.Trim(spaceRun.ReplaceAllString(s, " "))
@@ -238,8 +243,14 @@ func fit(head []string, sections []*reportSection, limit int) string {
 
 // CreateReport is createReport: builds the snapshot and stores it.
 func CreateReport(c *EngineCtx, chat db.Chat, note string, now int64) (db.Report, error) {
+	return createReport(c, chat, note, "", now)
+}
+
+// createReport leaves the message skipID out of the snapshot (the custom
+// command asking for it).
+func createReport(c *EngineCtx, chat db.Chat, note, skipID string, now int64) (db.Report, error) {
 	id := secret.NewID("rpt")
-	text, err := ReportText(c, chat, id, note, now)
+	text, err := reportText(c, chat, id, note, skipID, now)
 	if err != nil {
 		return db.Report{}, err
 	}
@@ -301,6 +312,10 @@ func joinDataDir(dir string) string {
 
 // ReportText is reportText.
 func ReportText(c *EngineCtx, chat db.Chat, id, note string, now int64) (string, error) {
+	return reportText(c, chat, id, note, "", now)
+}
+
+func reportText(c *EngineCtx, chat db.Chat, id, note, skipID string, now int64) (string, error) {
 	q := c.DB
 	tz, err := settings.Timezone(q)
 	if err != nil {
@@ -358,6 +373,10 @@ func ReportText(c *EngineCtx, chat db.Chat, id, note string, now int64) (string,
 	var recent []db.Message
 	for _, m := range fetched {
 		if m.Role == "user" && m.FromOwner && reportCommand.MatchString(strx.Trim(m.Text)) {
+			continue
+		}
+		// So are earlier custom commands that attached a report.
+		if m.ID == skipID || (m.Role == "user" && m.FromOwner && reportingCommand(m)) {
 			continue
 		}
 		if len(recent) < reportMessages {
@@ -638,6 +657,7 @@ func ReportText(c *EngineCtx, chat db.Chat, id, note string, now int64) (string,
 		reminders = append(reminders, r)
 	}
 	remRows.Close()
+	// ask_chat_id: old rows only, asked in the owner's DM before PLAN 19.9 step 5.
 	aprows, err := q.Query("SELECT "+db.ApprovalCols+" FROM pending_approvals WHERE status = 'pending' AND (chat_id = ? OR ask_chat_id = ?) ORDER BY created_at ASC", chat.ID, chat.ID)
 	openApprovals, err := db.All(aprows, err, db.ScanApproval)
 	if err != nil {

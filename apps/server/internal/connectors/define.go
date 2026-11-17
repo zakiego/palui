@@ -128,7 +128,7 @@ type TurnInfo struct {
 	FlowID     string
 	// What started the turn, kept across approval resumes.
 	Origin string
-	// owner or outside. sharedOwner only on an approval asked before PLAN 19.9 step 1.
+	// owner, members or outside: who can read the chat (PLAN 19.4).
 	Mode string
 	// Whether untrusted content reached the turn so far; read when the tool runs.
 	Tainted func() bool
@@ -182,8 +182,9 @@ type PaluiTool struct {
 	// May run in a turn started by someone other than the owner.
 	GuestSafe bool
 	// Whose data the tool reads or writes: DataChat, DataAgent, DataShared or
-	// DataNone. "" follows the connector; ResolveData works out the scope the
-	// server acts on.
+	// DataNone. "" follows the connector, or is DataNone on an MCP server the
+	// owner marked as holding no private data; ResolveData works out the scope
+	// the server acts on.
 	Data string
 	// Flow write tools: "version" (default) or "every_run".
 	FlowApproval string
@@ -201,7 +202,8 @@ const (
 	DataAgent = "agent"
 	// Every agent with the tool sees the same data (settings, the calendar).
 	DataShared = "shared"
-	// Keeps nothing (web fetch).
+	// Keeps nothing (web fetch, or an MCP server the owner marked as holding
+	// no private data).
 	DataNone = "none"
 )
 
@@ -263,8 +265,9 @@ type TypingOptions struct {
 	Reaction *string
 }
 
-// ChannelHandle is a running channel (outbox.Channel). Typing and
-// AnswerCallback are optional (Typer, CallbackAnswerer).
+// ChannelHandle is a running channel (outbox.Channel). Typing,
+// AnswerCallback and GroupParticipants are optional (Typer, CallbackAnswerer,
+// GroupLister).
 type ChannelHandle = outbox.Channel
 
 type Typer interface {
@@ -273,6 +276,17 @@ type Typer interface {
 
 type CallbackAnswerer interface {
 	AnswerCallback(ctx context.Context, callbackID, text string) error
+}
+
+// Participant is one account in a group chat. AltID is its other form on
+// WhatsApp (LID or phone JID), "" when unknown.
+type Participant struct{ ExternalID, AltID string }
+
+// GroupLister is a channel that can say who is in a group chat right now,
+// without the channel's own account. Any error means the list is unknown,
+// and the caller treats the chat as having outsiders.
+type GroupLister interface {
+	GroupParticipants(ctx context.Context, chatExternalID string) ([]Participant, error)
 }
 
 type RecallOptions struct {
@@ -369,6 +383,11 @@ type Services struct {
 	ClaimOwner func(ctx context.Context, in ClaimInput) (bool, error)
 	// Whether this sender is the owner (also learns the WhatsApp LID).
 	IsOwner func(channel, externalID, altID string) bool
+	// Whether the media of this message is worth downloading: true when it
+	// will be answered (the owner, or a guest in a chat set up for guests).
+	// Dropped messages and group talk kept as context never show their media.
+	// Optional; without it only the owner's media is downloaded.
+	WantsMedia func(msg InboundMessage) bool
 	// Reconcile now instead of on the next tick. Optional.
 	Reconcile func()
 	// Call a read-only tool of another running connector, server-side. Optional.

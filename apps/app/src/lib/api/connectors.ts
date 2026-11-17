@@ -66,3 +66,5 @@ export const testConnectorFn = withInput<{ id: string }, { ok: true; detail: str
 export const connectorActionFn = withInput<{ id: string; name: string; input?: { [key: string]: unknown } }, JsonObject>("connectorActionFn", "POST")
 export const setWhatsAppOwnerFn = withInput<{ phone: string }, { jid: string }>("setWhatsAppOwnerFn", "POST")
 export const setConnectorOwnerFn = withInput<{ id: string; agentId: string | null }, Ok>("setConnectorOwnerFn", "POST")
+// Mark an MCP server as holding no private data (PLAN 19.4), or clear the mark.
+export const setConnectorDataFn = withInput<{ id: string; noPrivateData: boolean }, Ok>("setConnectorDataFn", "POST")

@@ -6,6 +6,10 @@
    "columns": ["id","account_id","provider_id","user_id","access_token","refresh_token","id_token","access_token_expires_at","refresh_token_expires_at","scope","password","created_at","updated_at"],
    "rows": []
   },
+  "agent_members": {
+   "columns": ["agent_id","member_id","created_at"],
+   "rows": []
+  },
   "agents": {
    "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat"],
    "rows": [
@@ -34,6 +38,10 @@
   },
   "contacts": {
    "columns": ["id","agent_id","name","channel","address","chat_id","policy","note","created_at","updated_at","removed_at"],
+   "rows": []
+  },
+  "custom_commands": {
+   "columns": ["id","agent_id","name","description","prompt","attach_report","enabled","created_at","updated_at"],
    "rows": []
   },
   "events": {
@@ -98,6 +106,14 @@
    "rows": [
     ["fx_<mcpg#1>","token","Claude Code","user_owner",null,null,"x7Qe","fixture-fx_<mcpg#1>",null,null,null,null,null,1794614400000,1794621000000]
    ]
+  },
+  "member_accounts": {
+   "columns": ["id","member_id","channel","external_id","alt_id","display_name","created_at"],
+   "rows": []
+  },
+  "members": {
+   "columns": ["id","name","created_at","updated_at"],
+   "rows": []
   },
   "messages": {
    "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],

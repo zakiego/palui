@@ -389,3 +389,18 @@ func TestPersonalTokens(t *testing.T) {
 		t.Fatalf("revoke twice: %d", code)
 	}
 }
+
+// A tool that can delete something is marked destructive, so a client that
+// confirms only destructive tools asks first.
+func TestMCPToolsThatDeleteAreDestructive(t *testing.T) {
+	want := map[string]bool{"delete_agent": true, "remove_contact": true, "set_agent_member": true}
+	for _, tool := range httpapi.MCPTools() {
+		if want[tool.Name] && !tool.Destructive {
+			t.Errorf("%s can delete but isn't destructive", tool.Name)
+		}
+		delete(want, tool.Name)
+	}
+	for name := range want {
+		t.Errorf("%s isn't an MCP tool", name)
+	}
+}

@@ -19,6 +19,9 @@ export const mcpConfig = z.object({
   // Set when Palui added the server from chat (the remote-mcp skill). Such a
   // server only ever talks to public addresses, checked on every request.
   addedFromChat: z.boolean().optional(),
+  // Set by the owner on the agent's Tools tab: the server keeps nothing about
+  // anyone, so its tools resolve to data "none" (PLAN 19.4).
+  noPrivateData: z.boolean().optional(),
 })
 
 export default defineManifest({

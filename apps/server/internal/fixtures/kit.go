@@ -228,7 +228,6 @@ func (k *Kit) Chat(channel, externalID, title string, o ChatOpts) db.Chat {
 // form limits.
 type Agent struct {
 	Slug, Name, Persona  string
-	OwnerPowers          string
 	GuestTools           string
 	DailyTokenCap        *int64
 	ToolPermissions      any
@@ -245,9 +244,6 @@ type Agent struct {
 func (k *Kit) Agent(v Agent) string {
 	id := secret.NewID("agt")
 	cols := []col{{"id", id}, {"slug", v.Slug}, {"name", v.Name}, {"persona", v.Persona}}
-	if v.OwnerPowers != "" {
-		cols = append(cols, col{"owner_powers", v.OwnerPowers})
-	}
 	if v.GuestTools != "" {
 		cols = append(cols, col{"guest_tools", v.GuestTools})
 	}
@@ -274,6 +270,34 @@ func (k *Kit) Agent(v Agent) string {
 	if v.TokensToday != 0 {
 		tz := must(settings.Timezone(k.Q))
 		must(budget.AddUsage(k.Q, budget.AgentKey(id, k.Now, tz), v.TokensToday, k.Now))
+	}
+	return id
+}
+
+// Member is a person the owner shares agents with (PLAN 19.4). Agents are
+// agent ids, linked in order.
+type Member struct {
+	Name     string
+	Accounts []MemberAccount
+	Agents   []string
+}
+
+type MemberAccount struct {
+	Channel, ExternalID string
+	AltID, DisplayName  *string
+}
+
+// Member writes raw rows into members, member_accounts and agent_members, so
+// values can sit at the limits.
+func (k *Kit) Member(v Member) string {
+	id := secret.NewID("mem")
+	k.insert("members", col{"id", id}, col{"name", v.Name}, col{"created_at", k.Now}, col{"updated_at", k.Now})
+	for _, a := range v.Accounts {
+		k.insert("member_accounts", col{"id", secret.NewID("mac")}, col{"member_id", id}, col{"channel", a.Channel}, col{"external_id", a.ExternalID},
+			col{"alt_id", nullable(a.AltID)}, col{"display_name", nullable(a.DisplayName)}, col{"created_at", k.Now})
+	}
+	for _, agentID := range v.Agents {
+		k.insert("agent_members", col{"agent_id", agentID}, col{"member_id", id}, col{"created_at", k.Now})
 	}
 	return id
 }
@@ -693,6 +717,31 @@ func (k *Kit) Instruction(v Instruction) {
 	}
 	k.insert("instructions", col{"id", secret.NewID("ins")}, col{"title", v.Title}, col{"body", v.Body}, col{"enabled", db.Bool(enabled)},
 		col{"agent_id", nullable(v.AgentID)}, col{"created_at", at}, col{"updated_at", at})
+}
+
+// CustomCommand is a custom_commands row. Name has no slash; AgentID nil is
+// every agent.
+type CustomCommand struct {
+	Name         string
+	Description  string
+	Prompt       string
+	AttachReport bool
+	Enabled      *bool
+	AgentID      *string
+	CreatedAt    *int64
+}
+
+func (k *Kit) CustomCommand(v CustomCommand) {
+	at := k.Now
+	if v.CreatedAt != nil {
+		at = *v.CreatedAt
+	}
+	enabled := true
+	if v.Enabled != nil {
+		enabled = *v.Enabled
+	}
+	k.insert("custom_commands", col{"id", secret.NewID("cmd")}, col{"agent_id", nullable(v.AgentID)}, col{"name", v.Name}, col{"description", v.Description},
+		col{"prompt", v.Prompt}, col{"attach_report", db.Bool(v.AttachReport)}, col{"enabled", db.Bool(enabled)}, col{"created_at", at}, col{"updated_at", at})
 }
 
 // Preference is a raw insert: fixtures may use values the service would

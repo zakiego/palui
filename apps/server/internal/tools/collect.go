@@ -27,6 +27,7 @@ const (
 	SearchTool = "palui" + ToolSep + "search_tools"
 	// Who can read the chat a turn runs in (PLAN 19.4). "" counts as owner.
 	AudienceOwner   = "owner"
+	AudienceMembers = "members"
 	AudienceOutside = "outside"
 	// Matches loaded per search call.
 	SearchLimit = 5
@@ -126,21 +127,30 @@ func Namespaced(connectorID, tool string) string {
 }
 
 // InAudience says whether a tool with this resolved data scope and class may
-// be in a turn for this audience. The owner gets everything. An outside turn
-// gets tools whose data stays in that chat or that keep nothing, never a
-// destructive one. Any other audience gets nothing (fail closed).
+// be in a turn for this audience. The owner gets everything. A members turn
+// also gets the agent's own data, an outside turn only tools whose data stays
+// in that chat or that keep nothing; neither ever gets a destructive one or
+// shared data. Any other audience or scope gets nothing (fail closed).
 func InAudience(audience, scope, class string) bool {
 	switch audience {
 	case "", AudienceOwner:
 		return true
+	case AudienceMembers:
+		return (scope == connectors.DataNone || scope == connectors.DataChat || scope == connectors.DataAgent) && class != "destructive"
 	case AudienceOutside:
 		return (scope == connectors.DataChat || scope == connectors.DataNone) && class != "destructive"
 	}
 	return false
 }
 
+// NoApprovals says a turn for this audience has nobody to ask: every audience
+// but the owner's. An unknown audience has no tools anyway and must never ask.
+func NoApprovals(audience string) bool {
+	return audience != "" && audience != AudienceOwner
+}
+
 // OutsideApprovalError is what a call gets when its tool asks for approval on
-// its own in a turn that has no approvals.
+// its own in a turn that has no approvals (members or outside).
 const OutsideApprovalError = "This needs the owner's approval, and approvals aren't available in this chat. Don't retry it; say you can't do that here."
 
 // NormalizeClass: anything unclassified is destructive (fail closed).
@@ -166,7 +176,7 @@ type CollectOptions struct {
 	Sticky []string
 	// Called with the names a search just loaded.
 	OnLoad func(names []string)
-	// Who can read the chat: AudienceOwner ("" too) or AudienceOutside.
+	// Who can read the chat: AudienceOwner ("" too), AudienceMembers or AudienceOutside.
 	Audience string
 	Log      *logx.Logger
 	// Called after an untrusted tool returns (taints the turn).
@@ -291,6 +301,15 @@ const SearchToolDescription = "Find and load tools that are not loaded yet. Sear
 
 const SearchToolSchema = `{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"query":{"description":"Keywords, e.g. 'jadwal sholat' or 'prayer times'","type":"string","maxLength":200},"names":{"description":"Exact tool names to load","maxItems":5,"type":"array","items":{"type":"string","maxLength":100}},"for":{"description":"\"flow\" when picking a tool for a flow step: destructive tools are left out, since flows never run them.","type":"string","enum":["turn","flow"]}},"additionalProperties":false}`
 
+// SharedSearchToolSchema is the search tool in a members or outside turn: no
+// "for", since flows and destructive tools never reach that turn.
+const SharedSearchToolSchema = `{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"query":{"description":"Keywords, e.g. 'jadwal sholat' or 'prayer times'","type":"string","maxLength":200},"names":{"description":"Exact tool names to load","maxItems":5,"type":"array","items":{"type":"string","maxLength":100}}},"additionalProperties":false}`
+
+const (
+	searchNoMatch       = "No enabled tool matches. Try other words, or tell the owner this isn't available."
+	sharedSearchNoMatch = "Nothing here matches. Try other words, or say you can't do that here."
+)
+
 type searchInput struct {
 	Query *string  `json:"query"`
 	Names []string `json:"names"`
@@ -321,12 +340,27 @@ var SearchToolZod = zod.Object(
 	zod.F("for", zod.Enum("turn", "flow").Optional().Describe(`"flow" when picking a tool for a flow step: destructive tools are left out, since flows never run them.`)),
 )
 
+// SharedSearchToolZod is SharedSearchToolSchema's zod form (a test keeps the two
+// equal).
+var SharedSearchToolZod = zod.Object(
+	zod.F("query", zod.String().Max(200).Optional().Describe("Keywords, e.g. 'jadwal sholat' or 'prayer times'")),
+	zod.F("names", zod.Array(zod.String().Max(100)).Max(SearchLimit).Optional().Describe("Exact tool names to load")),
+)
+
 func searchToolFor(out *Collected, order []string, opts CollectOptions) connectors.Tool {
+	// A members or outside turn has no flows and no destructive tools, so its
+	// search tool doesn't name them, and its no-match note doesn't send the
+	// reader to the owner.
+	shared := NoApprovals(opts.Audience)
+	schema, schemaZod, noMatch := SearchToolSchema, SearchToolZod, searchNoMatch
+	if shared {
+		schema, schemaZod, noMatch = SharedSearchToolSchema, SharedSearchToolZod, sharedSearchNoMatch
+	}
 	return connectors.Tool{
 		Description: SearchToolDescription,
-		InputSchema: json.RawMessage(SearchToolSchema),
+		InputSchema: json.RawMessage(schema),
 		Parse: func(v any) (any, error) {
-			parsed, err := zod.Parse(SearchToolZod, v)
+			parsed, err := zod.Parse(schemaZod, v)
 			if err != nil {
 				return nil, &zod.TypeValidationError{Value: v, Cause: err}
 			}
@@ -340,7 +374,7 @@ func searchToolFor(out *Collected, order []string, opts CollectOptions) connecto
 			var docs []SearchDoc
 			for _, n := range order {
 				m := out.Meta[n]
-				if in.For == "flow" && m.Class == "destructive" {
+				if !shared && in.For == "flow" && m.Class == "destructive" {
 					continue
 				}
 				label := m.Label
@@ -384,7 +418,7 @@ func searchToolFor(out *Collected, order []string, opts CollectOptions) connecto
 				opts.Log.Info("tool search loaded tools", logx.Fields{"query": query, "tools": fresh})
 			}
 			if len(picked) == 0 {
-				return SearchResult{Loaded: []LoadedTool{}, Note: "No enabled tool matches. Try other words, or tell the owner this isn't available."}, nil
+				return SearchResult{Loaded: []LoadedTool{}, Note: noMatch}, nil
 			}
 			loaded := make([]LoadedTool, 0, len(picked))
 			for _, n := range picked {
@@ -402,9 +436,9 @@ func searchToolFor(out *Collected, order []string, opts CollectOptions) connecto
 }
 
 // wrapTool times the call and, for untrusted tools, taints the turn after it
-// returns (even with an error, which may carry the content). In an outside
-// turn, a call whose tool asks for approval on its own is refused: that turn
-// has no approvals.
+// returns (even with an error, which may carry the content). In a members or
+// outside turn, a call whose tool asks for approval on its own is refused:
+// that turn has no approvals.
 func wrapTool(t connectors.Tool, meta *ToolMeta, opts CollectOptions) connectors.Tool {
 	exec := t.Execute
 	if exec == nil {
@@ -414,7 +448,7 @@ func wrapTool(t connectors.Tool, meta *ToolMeta, opts CollectOptions) connectors
 		if opts.OnToolStart != nil {
 			opts.OnToolStart(call.ToolCallID)
 		}
-		if opts.Audience == AudienceOutside && meta.NeedsApproval != nil && asksOnItsOwn(meta.NeedsApproval, input) {
+		if NoApprovals(opts.Audience) && meta.NeedsApproval != nil && asksOnItsOwn(meta.NeedsApproval, input) {
 			return nil, errors.New(OutsideApprovalError)
 		}
 		defer func() {

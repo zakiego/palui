@@ -174,9 +174,85 @@ func TestCollectFilters(t *testing.T) {
 	if got := strings.Join(tools.Collect(ctx, aud, o).Names(), ","); got != "alpha__read,alpha__wipe,alpha__odd,alpha__note,sc__none,sc__chat,sc__agent,sc__plain,sc__wipe,crmx__plain" {
 		t.Fatal(got)
 	}
-	o.Audience = "members"
+	// A members turn also gets the agent's own data, still never destructive
+	// or shared.
+	o.Audience = tools.AudienceMembers
+	if got := strings.Join(tools.Collect(ctx, aud, o).Names(), ","); got != "sc__none,sc__chat,sc__agent,crmx__plain" {
+		t.Fatal(got)
+	}
+	// An audience nobody knows gets nothing.
+	o.Audience = "strangers"
 	if c := tools.Collect(ctx, aud, o); len(c.Names()) != 0 || len(c.ConnectorIDs) != 0 {
 		t.Fatal(c.Names())
+	}
+}
+
+func TestInAudienceTable(t *testing.T) {
+	scopes := []string{connectors.DataNone, connectors.DataChat, connectors.DataAgent, connectors.DataShared, "weird", ""}
+	classes := []string{"read", "write", "destructive"}
+	for _, aud := range []string{"", tools.AudienceOwner, tools.AudienceMembers, tools.AudienceOutside, "strangers"} {
+		for _, scope := range scopes {
+			for _, class := range classes {
+				var want bool
+				switch aud {
+				case "", tools.AudienceOwner:
+					want = true
+				case tools.AudienceMembers:
+					want = (scope == connectors.DataNone || scope == connectors.DataChat || scope == connectors.DataAgent) && class != "destructive"
+				case tools.AudienceOutside:
+					want = (scope == connectors.DataNone || scope == connectors.DataChat) && class != "destructive"
+				}
+				if got := tools.InAudience(aud, scope, class); got != want {
+					t.Fatalf("%q %q %q: %v", aud, scope, class, got)
+				}
+			}
+		}
+	}
+	if !tools.InAudience(tools.AudienceMembers, connectors.DataAgent, "read") || tools.InAudience(tools.AudienceMembers, connectors.DataShared, "read") {
+		t.Fatal("members")
+	}
+	for aud, want := range map[string]bool{"": false, tools.AudienceOwner: false, tools.AudienceMembers: true, tools.AudienceOutside: true, "strangers": true} {
+		if tools.NoApprovals(aud) != want {
+			t.Fatal(aud)
+		}
+	}
+}
+
+func TestMembersTurnGetsAgentDataOnly(t *testing.T) {
+	ctx := context.Background()
+	fn := conntest.FnTool("x", nil)
+	e := entry("mix", "tools", "Mix", "own", nil)
+	e.Handle.Tools = func(context.Context, connectors.TurnInfo) (*connectors.ToolSet, error) {
+		return conntest.Tools(
+			"a", connectors.PaluiTool{Class: "read", Data: connectors.DataNone, Tool: connectors.Tool{Description: "no data", InputSchema: fn.InputSchema, Execute: fn.Execute}},
+			"b", connectors.PaluiTool{Class: "write", Data: connectors.DataChat, Tool: connectors.Tool{Description: "chat thing", InputSchema: fn.InputSchema, Execute: fn.Execute}},
+			"c", connectors.PaluiTool{Class: "read", Data: connectors.DataAgent, Tool: connectors.Tool{Description: "agent ledger", InputSchema: fn.InputSchema, Execute: fn.Execute}},
+			"d", connectors.PaluiTool{Class: "destructive", Data: connectors.DataAgent, Tool: connectors.Tool{Description: "agent wipe", InputSchema: fn.InputSchema, Execute: fn.Execute}},
+			"secret", connectors.PaluiTool{Class: "read", Data: connectors.DataShared, Tool: connectors.Tool{Description: "private owner balance", InputSchema: fn.InputSchema, Execute: fn.Execute}},
+		), nil
+	}
+	o := opts(2, nil)
+	o.Audience = tools.AudienceMembers
+	c := tools.Collect(ctx, []connectors.RunningEntry{e}, o)
+	if got := strings.Join(c.Names(), ","); got != "mix__a,mix__b,mix__c,palui__search_tools" {
+		t.Fatal(got)
+	}
+	for _, n := range []string{"mix__d", "mix__secret"} {
+		if c.Meta[n] != nil || strings.Contains(strings.Join(c.Active(), ","), n) || strings.Contains(strings.Join(c.Deferred, ","), n) {
+			t.Fatal(n, c.Active(), c.Deferred)
+		}
+	}
+	search, _ := c.Tools.Get(tools.SearchTool)
+	for _, in := range []string{`{"names":["mix__secret","mix__d"]}`, `{"names":["secret"]}`, `{"query":"private owner balance"}`, `{"query":"agent wipe"}`} {
+		out, err := search.Execute(ctx, json.RawMessage(in), connectors.ToolCallInfo{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, l := range out.(tools.SearchResult).Loaded {
+			if l.Name == "mix__secret" || l.Name == "mix__d" {
+				t.Fatal(in, l.Name)
+			}
+		}
 	}
 }
 
@@ -239,10 +315,13 @@ func TestOutsideTurnRefusesAToolThatAsksOnItsOwn(t *testing.T) {
 	if _, err := run(tools.AudienceOutside); err == nil || err.Error() != tools.OutsideApprovalError || ran != 0 {
 		t.Fatal(err, ran)
 	}
+	if _, err := run(tools.AudienceMembers); err == nil || err.Error() != tools.OutsideApprovalError || ran != 0 {
+		t.Fatal(err, ran)
+	}
 	if out, err := run(""); err != nil || out != "done" || ran != 1 {
 		t.Fatal(out, err, ran)
 	}
-	if strings.Join(started, ",") != "c-outside,c-" {
+	if strings.Join(started, ",") != "c-outside,c-members,c-" {
 		t.Fatal(started)
 	}
 }
@@ -275,6 +354,34 @@ func TestCollectResolvesDataScope(t *testing.T) {
 	// The declared value stays as it was for the catalog.
 	if c.Meta["own__plain"].Data != "" || c.Meta["glob__chat"].Data != connectors.DataChat {
 		t.Fatal(c.Meta["own__plain"], c.Meta["glob__chat"])
+	}
+}
+
+// An MCP server the owner marked as holding no private data reaches outside and
+// members turns with its non-destructive tools; its destructive ones never do.
+func TestCollectMarkedMCPReachesSharedTurns(t *testing.T) {
+	ctx := context.Background()
+	e := entry("mcp-prayer", "tools", "Prayer times", "external", []def{{name: "times", class: "read"}, {name: "wipe", class: "destructive"}})
+	e.Row.Type = "mcp"
+	e.Row.Config = jsonx.NewMap[any]()
+	e.Row.Config.Set(connectors.NoPrivateDataKey, true)
+	for _, aud := range []string{tools.AudienceOutside, tools.AudienceMembers} {
+		o := opts(64, nil)
+		o.Audience = aud
+		c := tools.Collect(ctx, []connectors.RunningEntry{e}, o)
+		if m := c.Meta["mcp-prayer__times"]; m == nil || m.Scope != connectors.DataNone {
+			t.Fatal(aud, m)
+		}
+		if c.Meta["mcp-prayer__wipe"] != nil {
+			t.Fatal(aud, "destructive tool offered")
+		}
+	}
+	// Unmarked, the same global server stays with the owner.
+	e.Row.Config = jsonx.NewMap[any]()
+	o := opts(64, nil)
+	o.Audience = tools.AudienceOutside
+	if c := tools.Collect(ctx, []connectors.RunningEntry{e}, o); c.Meta["mcp-prayer__times"] != nil {
+		t.Fatal("unmarked server reached an outside turn")
 	}
 }
 
@@ -516,6 +623,13 @@ func TestCatalogAgentScopedConnector(t *testing.T) {
 	if names("agt_sales") != "crm__deals:,crm__notes:chat,web__fetch:none" || names("agt_other") != "web__fetch:none" {
 		t.Fatal(names("agt_sales"), names("agt_other"))
 	}
+	// An agent-scoped read tool is for members, not for outsiders.
+	for _, c := range tools.Catalog(ctx, sup.Running(), tools.CatalogOptions{AgentID: "agt_sales", ChatID: "chat_x", Channel: "web", TZ: "Asia/Makassar", Now: testutil.NOW}) {
+		want := map[string][2]bool{"crm__deals": {false, true}, "crm__notes": {true, true}, "web__fetch": {true, true}}[c.Name]
+		if c.GuestSafe != want[0] || c.MemberSafe != want[1] {
+			t.Fatalf("%+v", c)
+		}
+	}
 	_, _, err = connectors.SetOwner(d, "crm", nil, 3)
 	testutil.Must(t, err)
 	if names("agt_other") != "crm__deals:,crm__notes:chat,web__fetch:none" {
@@ -582,5 +696,63 @@ func TestConnectorToolCaller(t *testing.T) {
 func TestSearchToolZodGivesSearchToolSchema(t *testing.T) {
 	if got := string(zod.JSONSchemaBytes(tools.SearchToolZod)); got != tools.SearchToolSchema {
 		t.Fatalf("\n got  %s\n want %s", got, tools.SearchToolSchema)
+	}
+}
+
+func TestSharedSearchToolZodGivesSharedSearchToolSchema(t *testing.T) {
+	if got := string(zod.JSONSchemaBytes(tools.SharedSearchToolZod)); got != tools.SharedSearchToolSchema {
+		t.Fatalf("\n got  %s\n want %s", got, tools.SharedSearchToolSchema)
+	}
+}
+
+// Over the budget, a members or outside turn gets a search tool that names no
+// flows and no destructive tools, and a no-match note that doesn't point at
+// the owner. The owner's turn keeps the full one.
+func TestSharedSearchTool(t *testing.T) {
+	ctx := context.Background()
+	chatScoped := func() []connectors.RunningEntry {
+		e := entry("rem", "tools", "Reminders", "own", nil)
+		e.Handle.Tools = func(context.Context, connectors.TurnInfo) (*connectors.ToolSet, error) {
+			fn := conntest.FnTool("x", nil)
+			read := connectors.PaluiTool{Class: "read", Data: connectors.DataChat, Tool: fn}
+			return conntest.Tools("list", read, "show", read, "count", read, "next", read, "snooze", read), nil
+		}
+		return []connectors.RunningEntry{e}
+	}
+	for _, aud := range []string{tools.AudienceOutside, tools.AudienceMembers} {
+		o := opts(3, nil)
+		o.Audience = aud
+		c := tools.Collect(ctx, chatScoped(), o)
+		st, ok := c.Tools.Get(tools.SearchTool)
+		if !ok {
+			t.Fatal(aud, "no search tool")
+		}
+		schema := string(st.InputSchema)
+		if schema != tools.SharedSearchToolSchema {
+			t.Fatal(aud, schema)
+		}
+		for _, w := range []string{`"for"`, "flow", "destructive"} {
+			if strings.Contains(schema, w) {
+				t.Fatal(aud, w)
+			}
+		}
+		out, err := st.Execute(ctx, json.RawMessage(`{"query":"zzzz"}`), connectors.ToolCallInfo{ToolCallID: "c1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		note := out.(tools.SearchResult).Note
+		if strings.Contains(note, "owner") || note != "Nothing here matches. Try other words, or say you can't do that here." {
+			t.Fatal(aud, note)
+		}
+	}
+	o := opts(3, nil)
+	c := tools.Collect(ctx, chatScoped(), o)
+	st, _ := c.Tools.Get(tools.SearchTool)
+	if string(st.InputSchema) != tools.SearchToolSchema {
+		t.Fatal(string(st.InputSchema))
+	}
+	out, _ := st.Execute(ctx, json.RawMessage(`{"query":"zzzz"}`), connectors.ToolCallInfo{ToolCallID: "c1"})
+	if out.(tools.SearchResult).Note != "No enabled tool matches. Try other words, or tell the owner this isn't available." {
+		t.Fatal(out)
 	}
 }

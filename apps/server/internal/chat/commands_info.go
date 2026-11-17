@@ -13,6 +13,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/budget"
 	"github.com/zakiego/palui/apps/server/internal/chats"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
+	"github.com/zakiego/palui/apps/server/internal/customcmd"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/tools"
@@ -55,6 +56,24 @@ func HelpText(c *EngineCtx, chat db.Chat) (string, error) {
 			for _, f := range own {
 				lines = append(lines, fmt.Sprintf("• %s: flow \"%s\"", f.Command, f.Flow))
 			}
+		}
+	}
+	agent, err := agents.ForChat(c.DB, chat.AgentID, c.Clock())
+	if err != nil {
+		return "", err
+	}
+	custom, err := customcmd.ForAgent(c.DB, agent.ID)
+	if err != nil {
+		return "", err
+	}
+	if len(custom) > 0 {
+		lines = append(lines, "", "Perintah buatanmu:")
+		for _, cmd := range custom {
+			about := cmd.Description
+			if about == "" {
+				about = "perintah dari dashboard"
+			}
+			lines = append(lines, fmt.Sprintf("• /%s: %s", cmd.Name, about))
 		}
 	}
 	lines = append(lines, "", "Persetujuan: balas `ya` atau `batal`. Quote pesannya kalau yang nunggu lebih dari satu.")
@@ -277,29 +296,44 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 		return "", err
 	}
 	var sticky []string
+	var session *db.Session
 	if chat.SessionID != nil {
 		if s, ok, err := chats.GetSession(q, *chat.SessionID); err != nil {
 			return "", err
 		} else if ok {
 			sticky = s.LoadedTools.V
+			session = &s
 		}
 	}
-	// A shared chat gets what a fresh outside turn there gets (same rules as ExecuteTurn).
-	shared, err := agents.IsSharedChat(q, chat)
+	// A shared chat gets what a fresh turn there gets (same rules as ExecuteTurn).
+	audience, err := Audience(c, chat, agent)
 	if err != nil {
 		return "", err
 	}
-	if shared && agent.GuestTools == "none" {
+	if audience == tools.AudienceMembers && session != nil {
+		history, err := LoadHistory(q, session.ID, session.SummarizedUntil)
+		if err != nil {
+			return "", err
+		}
+		outsider, err := HistoryHasOutsider(q, chat, agent.ID, session.ID, history)
+		if err != nil {
+			return "", err
+		}
+		if outsider {
+			audience = tools.AudienceOutside
+		}
+	}
+	if audience == tools.AudienceOutside && agent.GuestTools == "none" {
 		return "Gak ada tool buat " + agent.Name + " di chat ini: tool buat orang lain dimatiin.", nil
 	}
 	perms := agent.ToolPermissions.V
 	turn := connectors.TurnInfo{ChatID: chat.ID, Channel: chat.Channel, Trigger: "message", TZ: all.Timezone, Now: now, AgentID: agent.ID}
-	audience := ""
 	deny := tools.DeniedTools(&perms)
-	if shared {
-		turn.Mode = tools.AudienceOutside
-		audience = tools.AudienceOutside
+	if tools.NoApprovals(audience) {
+		turn.Mode = audience
 		deny = append(deny, tools.AskTools(&perms)...)
+	} else {
+		audience = ""
 	}
 	collected := tools.Collect(context.Background(), c.Host.Running(), tools.CollectOptions{
 		Turn:              turn,
@@ -365,7 +399,7 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 		}
 		lines = append(lines, fmt.Sprintf("• %s (%d): %s", id, len(own), strings.Join(counts, ", ")))
 	}
-	if shared {
+	if audience != "" {
 		lines = append(lines, "", "Detail: /tools <id>. Di chat ini tool jalan tanpa minta izin, jadi yang perlu izin gak ditawarin.")
 	} else if perms.AllowAll {
 		lines = append(lines, "", "Detail: /tools <id>. Semua tool jalan tanpa minta izin di chat kamu, kecuali yang diatur minta izin.")
