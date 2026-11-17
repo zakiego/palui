@@ -203,6 +203,22 @@ func TestReadAgentChatLabelsWhoWroteEachMessage(t *testing.T) {
 	}
 }
 
+func TestReadAgentChatNamesEachReplyAfterTheAgentWhoseRunWroteIt(t *testing.T) {
+	e := downSetup(t)
+	palui := e.palui
+	// The group was Palui's before the owner moved it to the club agent.
+	_, err := e.d.Exec("INSERT INTO runs (id, chat_id, agent_id, trigger, status, started_at) VALUES ('run_old', ?, ?, 'message', 'ok', ?), ('run_new', ?, ?, 'message', 'ok', ?)", e.clubGroup.ID, palui.ID, NOW-30*MIN, e.clubGroup.ID, e.club.ID, NOW-20*MIN)
+	testutil.Must(t, err)
+	old := addFrom(t, e.d, e.clubGroup, "assistant", "Palui wrote this.", NOW-29*MIN, "", false, nil)
+	recent := addFrom(t, e.d, e.clubGroup, "assistant", "Club wrote this.", NOW-19*MIN, "", false, nil)
+	_, err = e.d.Exec("UPDATE messages SET run_id = CASE id WHEN ? THEN 'run_old' ELSE 'run_new' END WHERE id IN (?, ?)", old, old, recent)
+	testutil.Must(t, err)
+	res := call(t, downTools(t, e), "read_agent_chat", `{"chat":"`+e.clubGroup.ID+`","query":"wrote this"}`)
+	if got := res.S("messages.0.name") + "," + res.S("messages.1.name"); got != palui.Name+",Book Club" {
+		t.Fatal(res)
+	}
+}
+
 func kit(t *testing.T, raw string) *jsonx.Object {
 	t.Helper()
 	o, err := jsonx.ParseObject([]byte(raw))
