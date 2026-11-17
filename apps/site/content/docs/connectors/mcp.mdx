@@ -47,6 +47,14 @@ A server never has two owners. When two agents need the same server with differe
 
 Other agents don't get an owned server's tools, don't see it in their list of what they can do, and can't call it from a flow. A flow source still reads any server, since you set those up yourself. Delete an agent and the servers it owned pause and serve nobody until you make them global or give them to another agent.
 
+## Holds no private data
+
+Groups and other people's DMs never get an MCP server's tools, because Palui can't tell what a server knows about you. When a server keeps nothing about you, like a prayer times or weather server, open it on an agent's Tools tab and turn on "Holds no private data".
+
+With the switch on, that server's tools that aren't destructive reach every chat the agent is in, groups and strangers' DMs included, and run there without asking. Destructive tools still never do, and a tool you set to "Ask first" or "Off" stays out. On a global server the switch applies to every agent that has it.
+
+Only turn it on for a server you'd let anyone in a group call. Changing the server's URL turns the switch off again, since you vouched for the old server, not the new one. The switch lives only on the Tools tab: no chat tool and no `/mcp` tool can set it.
+
 ## Pause and remove
 
 Pausing applies from the next turn. Tool calls already running finish. Removing asks first and deletes the stored token.
