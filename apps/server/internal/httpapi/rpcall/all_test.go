@@ -37,6 +37,8 @@ var want = map[string]string{
 	// notes.ts
 	"getNotes": "GET", "saveInstructionFn": "POST", "setInstructionEnabledFn": "POST", "deleteInstructionFn": "POST",
 	"setPreferenceFn": "POST", "deletePreferenceFn": "POST",
+	// commands.ts
+	"getCommandsPage": "GET", "saveCommandFn": "POST", "setCommandEnabledFn": "POST", "deleteCommandFn": "POST",
 	// mcp-access.ts
 	"getMcpAccess": "GET", "createMcpToken": "POST", "revokeMcpAccess": "POST", "getOAuthRequest": "GET", "decideOAuthRequest": "POST",
 	// outbound.ts
@@ -53,8 +55,8 @@ var want = map[string]string{
 var public = map[string]bool{"getSession": true, "getInvite": true, "acceptInvite": true}
 
 func TestEveryServerFunctionIsRegistered(t *testing.T) {
-	if len(want) != 83 {
-		t.Fatalf("the list has %d names, want 83", len(want))
+	if len(want) != 87 {
+		t.Fatalf("the list has %d names, want 87", len(want))
 	}
 	got := map[string]httpapi.Handler{}
 	for _, h := range httpapi.Handlers() {

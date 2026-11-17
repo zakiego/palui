@@ -92,6 +92,12 @@ func MCPTools() []MCPTool {
 		{Name: "set_preference", RPC: "setPreferenceFn", Title: "Set preference", Description: "Set a preference (key and value) the agent keeps in mind.", Idempotent: true},
 		{Name: "delete_preference", RPC: "deletePreferenceFn", Title: "Delete preference", Description: "Delete a preference by key.", Destructive: true},
 
+		// Custom chat commands
+		{Name: "list_commands", RPC: "getCommandsPage", Title: "List custom commands", Description: "The owner's custom chat commands (a saved prompt under a /name, for every agent or one agent), the agents, and the built-in names they can't use."},
+		{Name: "save_command", RPC: "saveCommandFn", Title: "Save custom command", Description: "Create a custom chat command, or update one when id is given. agentId null is every agent. {{args}} in prompt is the text typed after the command. attachReport adds a /report debug snapshot (private chats only)."},
+		{Name: "set_command_enabled", RPC: "setCommandEnabledFn", Title: "Enable or disable custom command", Description: "Turn a custom chat command on or off.", Idempotent: true},
+		{Name: "delete_command", RPC: "deleteCommandFn", Title: "Delete custom command", Description: "Delete a custom chat command.", Destructive: true},
+
 		// Jobs, flows, reminders
 		{Name: "list_jobs", RPC: "getJobs", Title: "List jobs", Description: "Scheduled jobs (including the daily briefing and heartbeat) with their schedule, chat, next run and last result."},
 		{Name: "get_job_preset", RPC: "getJobPreset", Title: "Get job preset", Description: "A ready-made job (dailyBriefing or heartbeat) for a chat, to pass to save_job."},
