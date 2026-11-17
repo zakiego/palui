@@ -2,7 +2,8 @@ package tools
 
 // The tools an agent can be offered right now, for the agent page (PLAN 19.7),
 // from tools/catalog.ts: the collection a turn in the owner's own chat runs,
-// with guestSafe saying whether a shared chat's turn gets it too.
+// with guestSafe saying whether a shared chat's outside turn gets it too and
+// memberSafe whether a members turn does.
 
 import (
 	"context"
@@ -27,6 +28,9 @@ type CatalogTool struct {
 	Untrusted bool `json:"untrusted"`
 	// An outside turn (a shared chat, PLAN 19.4) gets it too.
 	GuestSafe bool `json:"guestSafe"`
+	// A members turn (PLAN 19.4) gets it too. Left out when false, so rows
+	// written before members read the same.
+	MemberSafe bool `json:"memberSafe,omitempty"`
 	// Whose data it touches: chat, agent, shared or none. Left out, it follows
 	// the connector: the agent's when one agent owns it, shared otherwise.
 	Data string `json:"data,omitempty"`
@@ -59,6 +63,16 @@ func Catalog(ctx context.Context, running []connectors.RunningEntry, o CatalogOp
 		Log:               o.Log,
 		OnUntrustedResult: func(*ToolMeta) {},
 	})
+	// And for a members turn.
+	membersTurn := outsideTurn
+	membersTurn.Mode = AudienceMembers
+	members := Collect(ctx, running, CollectOptions{
+		Turn:              membersTurn,
+		MaxTools:          math.MaxInt,
+		Audience:          AudienceMembers,
+		Log:               o.Log,
+		OnUntrustedResult: func(*ToolMeta) {},
+	})
 	rows := map[string]db.Connector{}
 	for _, e := range running {
 		rows[e.ID] = e.Row
@@ -83,7 +97,7 @@ func Catalog(ctx context.Context, running []connectors.RunningEntry, o CatalogOp
 			t := m.Title
 			title = &t
 		}
-		out = append(out, CatalogTool{Name: m.Name, Tool: m.Tool, ConnectorID: m.ConnectorID, ConnectorLabel: label, ConnectorType: typ, Class: m.Class, Title: title, Untrusted: m.Untrusted, GuestSafe: outside.Meta[name] != nil, Data: m.Data})
+		out = append(out, CatalogTool{Name: m.Name, Tool: m.Tool, ConnectorID: m.ConnectorID, ConnectorLabel: label, ConnectorType: typ, Class: m.Class, Title: title, Untrusted: m.Untrusted, GuestSafe: outside.Meta[name] != nil, MemberSafe: members.Meta[name] != nil, Data: m.Data})
 	}
 	return out
 }
