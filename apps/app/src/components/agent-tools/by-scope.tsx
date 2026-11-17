@@ -266,6 +266,7 @@ function Groups({
                   <GroupMeta
                     list={list}
                     scope={scope}
+                    agent={props.agent}
                     permissions={props.permissions}
                   />
                 </span>

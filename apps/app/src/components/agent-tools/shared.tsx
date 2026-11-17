@@ -2,7 +2,7 @@
 // global-or-own select, and the open state that follows a search.
 import * as React from "react"
 import { Link } from "@tanstack/react-router"
-import { ArrowUpRightIcon, BotIcon, CircleOffIcon, ContactIcon, GlobeIcon, LockIcon, Share2Icon, UsersIcon } from "lucide-react"
+import { ArrowUpRightIcon, BotIcon, CircleOffIcon, ContactIcon, GlobeIcon, LockIcon, LockOpenIcon, Share2Icon, UserIcon, UsersIcon } from "lucide-react"
 
 import { connectorIcon } from "@/components/connector-icon"
 import { IconTile } from "@/components/icon-tile"
@@ -55,13 +55,12 @@ export function groupData(list: ToolItem[], owned: boolean): DataScope {
   return list.map((x) => dataOf(x, owned)).reduce((a, b) => (DATA_RANK[b] > DATA_RANK[a] ? b : a), "none")
 }
 
-// Whose data, in the words of the two cards above. A tool that keeps nothing
-// says nothing.
+// Whose data, in the words of the two cards above.
 export function DataScopeText({ scope }: { scope: DataScope }) {
   const t = useT()
-  if (scope === "none") return null
+  const icon = scope === "shared" ? <Share2Icon aria-hidden="true" /> : scope === "none" ? <LockOpenIcon aria-hidden="true" /> : <LockIcon aria-hidden="true" />
   return (
-    <StatusText tone="secondary" icon={scope === "shared" ? <Share2Icon aria-hidden="true" /> : <LockIcon aria-hidden="true" />}>
+    <StatusText tone="secondary" icon={icon}>
       {t(`agents.tools.data.${scope}`)}
     </StatusText>
   )
@@ -80,6 +79,54 @@ export function inSharedChats(x: ToolItem, guestTools: string, permissions: Tool
 export function inMemberChats(x: ToolItem, permissions: ToolsViewProps["permissions"]) {
   const p = permissions.tools[x.name]
   return x.memberSafe === true && p !== "ask" && p !== "deny"
+}
+
+// Who gets a tool, widest first: everyone in a shared chat, the owner and
+// members, or only the owner. Ask first and destructive tools land on the owner.
+export type Audience = "everyone" | "members" | "owner"
+
+export function audienceOf(x: ToolItem, agent: ToolsViewProps["agent"], permissions: ToolsViewProps["permissions"]): Audience | "off" {
+  if (permissions.tools[x.name] === "deny") return "off"
+  if (inSharedChats(x, agent.guestTools, permissions)) return "everyone"
+  if (!agent.isDefault && inMemberChats(x, permissions)) return "members"
+  return "owner"
+}
+
+const AUDIENCE_RANK: Record<Audience, number> = { owner: 0, members: 1, everyone: 2 }
+
+// The widest audience among the tools that aren't off, how many tools have it,
+// and whether every one of them does. null when every tool is off.
+export function groupAudience(list: ToolItem[], agent: ToolsViewProps["agent"], permissions: ToolsViewProps["permissions"]) {
+  const on = list.map((x) => audienceOf(x, agent, permissions)).filter((a): a is Audience => a !== "off")
+  if (on.length === 0) return null
+  const audience = on.reduce((a, b) => (AUDIENCE_RANK[b] > AUDIENCE_RANK[a] ? b : a))
+  const n = on.filter((a) => a === audience).length
+  return { audience, n, all: n === on.length }
+}
+
+const AUDIENCE_ICON: Record<Audience, React.ReactNode> = {
+  everyone: <UsersIcon aria-hidden="true" />,
+  members: <ContactIcon aria-hidden="true" />,
+  owner: <UserIcon aria-hidden="true" />,
+}
+
+// Who gets it, with the icons of the rule rows. `n` switches to the count
+// form, for a server where only some tools reach that far.
+export function AudienceText({ audience, n }: { audience: Audience | "off"; n?: number }) {
+  const t = useT()
+  if (audience === "off") {
+    return (
+      <StatusText tone="secondary" icon={<CircleOffIcon aria-hidden="true" />}>
+        {t("agents.perm.off")}
+      </StatusText>
+    )
+  }
+  const some = n !== undefined && audience !== "owner"
+  return (
+    <StatusText tone="secondary" icon={AUDIENCE_ICON[audience]} className={some ? "tabular-nums" : undefined}>
+      {some ? t(`agents.tools.audienceSome.${audience}`, { n: n.toLocaleString() }) : t(`agents.tools.audience.${audience}`)}
+    </StatusText>
+  )
 }
 
 export function countClass(list: ToolItem[], cls: string) {
@@ -154,8 +201,7 @@ export function ToolRow({ x, props, scope }: { x: ToolItem; props: ToolsViewProp
   const t = useT()
   const label = useLabel()
   const used = props.data.used[x.name]
-  const { agent } = props
-  const off = props.permissions.tools[x.name] === "deny"
+  const audience = audienceOf(x, props.agent, props.permissions)
   // Two fixed columns: the tool and its facts, then the permission select at
   // the same spot on every row (under the text on a narrow screen).
   return (
@@ -177,21 +223,7 @@ export function ToolRow({ x, props, scope }: { x: ToolItem; props: ToolsViewProp
               {t("agents.tools.outside")}
             </StatusText>
           )}
-          {inSharedChats(x, agent.guestTools, props.permissions) && (
-            <StatusText tone="secondary" icon={<UsersIcon aria-hidden="true" />}>
-              {t("agents.tools.guests")}
-            </StatusText>
-          )}
-          {!agent.isDefault && inMemberChats(x, props.permissions) && !inSharedChats(x, agent.guestTools, props.permissions) && (
-            <StatusText tone="secondary" icon={<ContactIcon aria-hidden="true" />}>
-              {t("agents.tools.memberTag")}
-            </StatusText>
-          )}
-          {off && (
-            <StatusText tone="secondary" icon={<CircleOffIcon aria-hidden="true" />}>
-              {t("agents.perm.off")}
-            </StatusText>
-          )}
+          <AudienceText audience={audience} />
           {used ? <span className="text-caption text-muted-foreground tabular-nums">{t("agents.tools.used", { n: used.toLocaleString() })}</span> : null}
         </span>
       </div>
@@ -221,11 +253,24 @@ export function PermissionSelect({ name, value, allowAll, onChange }: { name: st
   )
 }
 
-// How many tools a closed group holds, whose data they touch, and how many
-// are destructive.
-export function GroupMeta({ list, scope, permissions, className }: { list: ToolItem[]; scope: DataScope; permissions?: ToolsViewProps["permissions"]; className?: string }) {
+// How many tools a closed group holds, whose data they touch, who gets them,
+// and how many are destructive.
+export function GroupMeta({
+  list,
+  scope,
+  agent,
+  permissions,
+  className,
+}: {
+  list: ToolItem[]
+  scope: DataScope
+  agent?: ToolsViewProps["agent"]
+  permissions?: ToolsViewProps["permissions"]
+  className?: string
+}) {
   const t = useT()
   const count = useCount()
+  const reach = agent && permissions ? groupAudience(list, agent, permissions) : null
   const destructive = countClass(list, "destructive")
   const allowed = permissions ? list.filter((x) => permissions.tools[x.name] === "allow").length : 0
   const off = permissions ? list.filter((x) => permissions.tools[x.name] === "deny").length : 0
@@ -233,6 +278,7 @@ export function GroupMeta({ list, scope, permissions, className }: { list: ToolI
     <span className={cn("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-caption font-normal text-muted-foreground", className)}>
       <span className="tabular-nums">{count(list.length, "agents.tools.count.one", "agents.tools.count.many")}</span>
       <DataScopeText scope={scope} />
+      {reach && <AudienceText audience={reach.audience} n={reach.all ? undefined : reach.n} />}
       {destructive > 0 && (
         <StatusText tone="destructive" icon={null} className="tabular-nums">
           {t("agents.tools.destructiveCount", { n: destructive.toLocaleString() })}
