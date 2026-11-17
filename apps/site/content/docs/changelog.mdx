@@ -11,7 +11,9 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- Pick models per agent. An agent's Settings tab has a new Model section where each role (default, fast, vision) either follows the global models from Settings or gets its own failover chain. `/model` in a chat changes that agent's own chain when it has one, and the global chain otherwise. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 
 ## 0.10.0 (2026-11-18)
 

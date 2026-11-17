@@ -25,6 +25,7 @@ import { InstructionList, InstructionSheet, useInstructionSheet } from "@/compon
 import { ListCapNote } from "@/components/list-cap-note"
 import { PagePending } from "@/components/page-pending"
 import { SimpleSelect } from "@/components/simple-select"
+import { connectorOptions, ModelChain, ROLE_HELP, ROLES, stripKeys, useCatalogs, useLinkKeys, type KeyedLink, type Role } from "@/components/model-chain"
 import { AckControl } from "@/components/ack-control"
 import {
   AlertDialog,
@@ -117,6 +118,25 @@ function formFor(a: Agent): Form {
 
 const sameForm = (a: Form, b: Form) => (Object.keys(a) as (keyof Form)[]).every((k) => a[k] === b[k])
 
+// Per role: Global, or the agent's own chain. The chain is kept while Global
+// is picked, so switching back restores it; it starts as a copy of the global one.
+type ModelsForm = Record<Role, { custom: boolean; chain: KeyedLink[] }>
+
+function modelsFor(m: Loaded["models"], withKeys: ReturnType<typeof useLinkKeys>): ModelsForm {
+  const role = (r: Role) => {
+    const own = m.own[r]
+    const start = own.length > 0 ? own : m.global[r].length > 0 ? m.global[r] : m.global.default
+    return { custom: own.length > 0, chain: withKeys(start) }
+  }
+  return { default: role("default"), fast: role("fast"), vision: role("vision") }
+}
+
+const modelRolesOf = (f: ModelsForm) => ({
+  default: f.default.custom ? stripKeys(f.default.chain) : [],
+  fast: f.fast.custom ? stripKeys(f.fast.chain) : [],
+  vision: f.vision.custom ? stripKeys(f.vision.chain) : [],
+})
+
 function BackButton() {
   const t = useT()
   return (
@@ -157,7 +177,10 @@ function AgentSettings({ data }: { data: Loaded }) {
   const [form, setForm] = React.useState(saved)
   const [errors, setErrors] = React.useState<FormErrors>({})
   const [busy, setBusy] = React.useState<null | "save" | "delete">(null)
-  const dirty = !sameForm(form, saved)
+  const withKeys = useLinkKeys()
+  const [models, setModels] = React.useState(() => modelsFor(data.models, withKeys))
+  const savedModels = JSON.stringify(data.models.own)
+  const dirty = !sameForm(form, saved) || JSON.stringify(modelRolesOf(models)) !== savedModels
   const isDefault = agent.isDefault
   const instructionSheet = useInstructionSheet()
   const tab: Tab = Route.useSearch().tab ?? "settings"
@@ -190,6 +213,15 @@ function AgentSettings({ data }: { data: Loaded }) {
     if (reads.length > MAX_READS) next.reads = t("agents.err.readsMax", { n: MAX_READS })
     else if (reads.some((c) => !CONTAINER_RE.test(c))) next.reads = t("agents.err.container")
     setErrors(next)
+    const badRole = ROLES.find((r) => models[r].custom && models[r].chain.some((x) => !x.model.trim()))
+    if (badRole && Object.keys(next).length === 0) {
+      if (tab !== "settings") await navigate({ search: { tab: "settings" }, replace: true })
+      toast.error(t("settings.models.fillIn", { role: badRole }))
+      const n = models[badRole].chain.findIndex((x) => !x.model.trim()) + 1
+      const label = t("settings.models.stepModel", { role: badRole, n })
+      requestAnimationFrame(() => document.querySelector<HTMLElement>(`[aria-label="${CSS.escape(label)}"]`)?.focus())
+      return
+    }
     const first = (["name", "persona", "cap", "container", "reads"] as const).find((k) => next[k])
     if (first) {
       const target: Tab = first === "container" || first === "reads" ? "memory" : "settings"
@@ -214,6 +246,7 @@ function AgentSettings({ data }: { data: Loaded }) {
           avatarImage: clean.avatarImage,
           avatarIcon: (clean.avatarIcon || null) as SaveData["avatarIcon"],
           avatarColor: (clean.avatarColor || null) as SaveData["avatarColor"],
+          modelRoles: modelRolesOf(models),
         },
       })
       setForm(clean)
@@ -300,6 +333,10 @@ function AgentSettings({ data }: { data: Loaded }) {
                 </Field>
                 {isDefault && <p className="text-sm text-pretty text-muted-foreground">{t("agents.defaultNote")}</p>}
               </FieldGroup>
+            </Section>
+
+            <Section id="model" title={t("agents.section.model")} description={t("agents.modelBody")}>
+              <AgentModelsFields models={models} onChange={setModels} data={data.models} newKey={withKeys} />
             </Section>
 
             {!isDefault && (
@@ -527,6 +564,54 @@ function SectionTabs({ counts }: { counts: Partial<Record<Tab, number>> }) {
         </TabsTrigger>
       ))}
     </TabsList>
+  )
+}
+
+function AgentModelsFields({ models, onChange, data, newKey }: { models: ModelsForm; onChange: React.Dispatch<React.SetStateAction<ModelsForm>>; data: Loaded["models"]; newKey: ReturnType<typeof useLinkKeys> }) {
+  const t = useT()
+  const options = connectorOptions(data.connectors)
+  const catalogs = useCatalogs(
+    ROLES.filter((r) => models[r].custom).map((r) => models[r].chain),
+    new Set(options.map((o) => o.value)),
+  )
+  const set = (role: Role, patch: Partial<ModelsForm[Role]>) => onChange((m) => ({ ...m, [role]: { ...m[role], ...patch } }))
+  return (
+    <FieldGroup>
+      {options.length === 0 && (
+        <Alert>
+          <AlertTitle>{t("settings.models.none")}</AlertTitle>
+          <AlertDescription>{t("settings.models.noneBody")}</AlertDescription>
+        </Alert>
+      )}
+      {ROLES.map((role) => {
+        const global = data.global[role].length > 0 ? data.global[role] : data.global.default
+        const first = global[0]?.model
+        const { custom, chain } = models[role]
+        return (
+          <Field key={role}>
+            <FieldLabel htmlFor={`agent-model-${role}`} className="font-mono">
+              {role}
+            </FieldLabel>
+            <FieldDescription id={`agent-model-${role}-hint`}>{t(ROLE_HELP[role])}</FieldDescription>
+            <SimpleSelect
+              id={`agent-model-${role}`}
+              value={custom ? "custom" : "global"}
+              onChange={(v) => set(role, { custom: v === "custom" })}
+              options={[
+                { value: "global", label: first ? t("agents.model.global", { model: first }) : t("agents.model.globalNone") },
+                { value: "custom", label: t("agents.model.custom") },
+              ]}
+              aria-describedby={`agent-model-${role}-hint`}
+            />
+            {custom && (
+              <div className="flex flex-col gap-2 pt-1">
+                <ModelChain role={role} chain={chain} onChange={(c) => set(role, { chain: c })} options={options} catalogs={catalogs} newKey={newKey} />
+              </div>
+            )}
+          </Field>
+        )
+      })}
+    </FieldGroup>
   )
 }
 
