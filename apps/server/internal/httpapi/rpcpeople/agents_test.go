@@ -7,6 +7,7 @@ import (
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/chats"
+	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/httpapi/apitest"
 	"github.com/zakiego/palui/apps/server/internal/httpapi/rpcpeople"
@@ -147,6 +148,22 @@ func TestAgentToolsCountsThisAgentsSuccessfulCallsFromTheLast7Days(t *testing.T)
 	useFake(t, nil)
 	_, body := call(t, e, token, "getAgentToolsFn", `{"id":"`+chef.ID+`"}`)
 	if body != `{"tools":[],"error":null,"used":{"web__fetch":2},"scopes":{}}` {
+		t.Fatal(body)
+	}
+}
+
+func TestAgentToolsListsTheServersMarkedAsHoldingNoPrivateData(t *testing.T) {
+	e, token := agentsEnv(t)
+	chef := createAgent(t, e.DB, plainAgent("chef", "Chef"))
+	cfg := jsonx.NewMap[any]()
+	cfg.Set("url", "https://prayer.example.com/mcp")
+	testutil.SeedConnector(t, e.DB, "mcp-prayer", "tools", testutil.SeedOptions{Type: "mcp", Config: cfg}, agentsNow)
+	testutil.SeedConnector(t, e.DB, "mcp-notes", "tools", testutil.SeedOptions{Type: "mcp", Config: cfg.Clone()}, agentsNow)
+	_, _, err := connectors.SetNoPrivateData(e.DB, "mcp-prayer", true, agentsNow)
+	testutil.Must(t, err)
+	useFake(t, nil)
+	_, body := call(t, e, token, "getAgentToolsFn", `{"id":"`+chef.ID+`"}`)
+	if body != `{"tools":[],"error":null,"used":{},"scopes":{"mcp-notes":null,"mcp-prayer":null},"noPrivateData":["mcp-prayer"]}` {
 		t.Fatal(body)
 	}
 }

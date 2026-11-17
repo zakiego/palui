@@ -8,12 +8,12 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/httpapi/apitest"
 )
 
-// The 23 server functions of connectors.ts, settings.ts, home.ts and
+// The 24 server functions of connectors.ts, settings.ts, home.ts and
 // activity.ts, with their methods.
 var mine = map[string]string{
 	"getConnectorsPage": "GET", "getConnectorDetail": "GET", "pauseConnectorFn": "POST", "resumeConnectorFn": "POST",
 	"removeConnectorFn": "POST", "saveConnectorDraft": "POST", "connectConnectorFn": "POST", "testConnectorFn": "POST",
-	"connectorActionFn": "POST", "setWhatsAppOwnerFn": "POST", "setConnectorOwnerFn": "POST",
+	"connectorActionFn": "POST", "setWhatsAppOwnerFn": "POST", "setConnectorOwnerFn": "POST", "setConnectorDataFn": "POST",
 	"getSettingsPage": "GET", "listConnectorModels": "GET", "saveSettings": "POST", "createHookFn": "POST",
 	"getShell": "GET", "getHome": "GET", "dismissChecklist": "POST", "getStatusSummary": "GET",
 	"getEvents": "GET", "getRuns": "GET", "getRun": "GET", "getUsage": "GET",
@@ -37,7 +37,7 @@ func TestEveryFunctionIsRegisteredWithItsGuard(t *testing.T) {
 			t.Errorf("%s: guard %s, want writer", name, h.Guard)
 		}
 	}
-	if len(mine) != 23 {
+	if len(mine) != 24 {
 		t.Fatal(len(mine))
 	}
 }

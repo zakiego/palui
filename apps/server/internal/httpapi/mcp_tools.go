@@ -33,6 +33,7 @@ var MCPExcluded = map[string]string{
 	"revokeMcpAccess":    "a token can't manage MCP access",
 	"getOAuthRequest":    "OAuth consent is the owner's, in the browser",
 	"decideOAuthRequest": "OAuth consent is the owner's, in the browser",
+	"setConnectorDataFn": "decides what strangers in a shared chat can reach; the owner's call, in the dashboard",
 }
 
 // MCPTools is the catalog, grouped as the dashboard is.
