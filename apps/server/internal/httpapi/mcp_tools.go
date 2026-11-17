@@ -55,10 +55,10 @@ func MCPTools() []MCPTool {
 
 		// Agents
 		{Name: "list_agents", RPC: "getAgentsPage", Title: "List agents", Description: "Every agent with its id, slug, name, persona summary, powers and the chats it serves."},
-		{Name: "get_agent", RPC: "getAgentPage", Title: "Get agent", Description: "One agent in full, by slug (from list_agents): persona, owner powers, guest tools, token cap, recall settings, chats."},
+		{Name: "get_agent", RPC: "getAgentPage", Title: "Get agent", Description: "One agent in full, by slug (from list_agents): persona, guest tools, token cap, recall settings, chats."},
 		{Name: "get_agent_tools", RPC: "getAgentToolsFn", Title: "Get agent tools", Description: "The tools an agent can call and each one's permission (allow, ask, deny). id is the agent id."},
 		{Name: "get_agent_memory", RPC: "getAgentMemoryFn", Title: "Get agent memory", Description: "What an agent remembers in its recall memory. id is the agent id."},
-		{Name: "save_agent", RPC: "saveAgentFn", Title: "Create or update agent", Description: "Create an agent, or update one when id is given. Only the fields sent change. persona is the system prompt; ownerPowers off or approve; guestTools none or safe."},
+		{Name: "save_agent", RPC: "saveAgentFn", Title: "Create or update agent", Description: "Create an agent, or update one when id is given. Only the fields sent change. persona is the system prompt; guestTools none or safe."},
 		{Name: "list_agent_members", RPC: "getAgentMembersFn", Title: "List agent members", Description: "The people an AI agent is shared with (members), each with their WhatsApp or Telegram accounts and every agent they're in. Also lists members of other agents and people who wrote in a chat but aren't members yet. id is the agent id."},
 		{Name: "save_member", RPC: "saveMemberFn", Title: "Create or update member", Description: "Add a member to an agent (no id) or rename one and replace their accounts (id from list_agent_members). accounts is 1 to 5 of channel whatsapp or telegram with an address: a phone number, a WhatsApp JID, or a numeric Telegram user id. The owner's own account and accounts another member holds are refused."},
 		{Name: "set_agent_member", RPC: "setAgentMemberFn", Title: "Add or remove agent member", Description: "Add an existing member to an agent (on true) or take them out (on false). Taking a member out of their last agent deletes them. The default agent has no members.", Destructive: true, Idempotent: true},

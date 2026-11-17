@@ -476,10 +476,9 @@ func TestAgentsToolsAndApprovals(t *testing.T) {
 		eq(t, len(ran.get()), 0)
 	})
 
-	t.Run("owner powers is ignored: the owner's write in the group isn't offered or asked", func(t *testing.T) {
+	t.Run("the owner's write in the group isn't offered or asked", func(t *testing.T) {
 		ran := &executedLog{}
 		h := agentsWorld(t, []models.Step{models.CallTool("alpha__note", objOf(), "c1"), models.Say("dicatat")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
-		need(agents.Update(h.DB, h.chef.ID, agents.Input{OwnerPowers: sp("approve")}, 1))
 		h.owner("/agent chef")
 		h.Engine.Idle()
 		h.owner("@bot catat ini", addressed)

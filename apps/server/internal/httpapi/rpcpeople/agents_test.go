@@ -193,3 +193,31 @@ func TestClip(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+// An old dashboard tab or AI agent may still send ownerPowers (PLAN 19.9
+// step 5): the key is dropped, the save works and the column keeps its default.
+func TestSaveAgentIgnoresOwnerPowers(t *testing.T) {
+	e, token := agentsEnv(t)
+	body := `{"name":"Chef","persona":"p","ownerPowers":"approve","guestTools":"safe","dailyTokenCap":0,"recallContainer":null,"recallReadContainers":[],"recallPerChat":false,"telegramConnectorId":null,"avatarImage":null,"avatarIcon":null,"avatarColor":null,"slug":"chef"}`
+	status, saved := call(t, e, token, "saveAgentFn", body)
+	if status != 200 || strings.Contains(saved, "ownerPowers") {
+		t.Fatal(status, saved)
+	}
+	page := mustOK(t, e, token, "getAgentPage", `{"slug":"chef"}`)
+	if b, _ := jsonx.Marshal(page); strings.Contains(string(b), "ownerPowers") {
+		t.Fatal(string(b))
+	}
+	var id, powers string
+	testutil.Must(t, e.DB.QueryRow("SELECT id, owner_powers FROM agents WHERE slug = 'chef'").Scan(&id, &powers))
+	if powers != "off" {
+		t.Fatal(powers)
+	}
+	update := strings.Replace(body, `"slug":"chef"`, `"id":"`+id+`"`, 1)
+	if status, out := call(t, e, token, "saveAgentFn", update); status != 200 {
+		t.Fatal(status, out)
+	}
+	testutil.Must(t, e.DB.QueryRow("SELECT owner_powers FROM agents WHERE id = ?", id).Scan(&powers))
+	if powers != "off" {
+		t.Fatal(powers)
+	}
+}
