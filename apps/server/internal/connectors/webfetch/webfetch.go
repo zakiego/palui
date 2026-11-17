@@ -29,12 +29,12 @@ var Manifest = connectors.Manifest{
 	Kind:        "skill",
 	Name:        "Web fetch",
 	Icon:        "globe",
-	Summary:     "Read a web page you send.",
+	Summary:     "Search the web and read the pages it finds.",
 	Builtin:     true,
 	Trust:       "external",
 	Setup:       []connectors.SetupStep{},
 	PauseNote:   "While paused, Palui can't open links.",
-	Docs:        &connectors.Docs{Notes: []string{"Only http and https pages on public addresses. Local and private network addresses are refused."}},
+	Docs:        &connectors.Docs{Notes: []string{"Only http and https pages on public addresses. Local and private network addresses are refused.", "Search goes through DuckDuckGo's plain HTML results page. No key needed."}},
 	ParseConfig: kit.ParseConfig(zod.Object()),
 }
 
@@ -236,12 +236,13 @@ var Runtime = &connectors.Runtime{
 		return connectors.TestResult{OK: true, Detail: "Ready. Pages are fetched behind the SSRF guard."}, nil
 	},
 	Start: func(c connectors.Context) (*connectors.RunningConnector, error) {
-		t := FetchPageTool(nil)
+		t, search := FetchPageTool(nil), SearchWebTool(nil)
 		return &connectors.RunningConnector{
 			Stop: func(context.Context) error { return nil },
 			Tools: func(context.Context, connectors.TurnInfo) (*connectors.ToolSet, error) {
 				set := connectors.NewToolSet()
 				set.Set("fetch_page", connectors.PaluiTool{Data: connectors.DataNone, Tool: t, Class: "read", Untrusted: true, GuestSafe: true, Title: "Read a web page"})
+				set.Set("search_web", connectors.PaluiTool{Data: connectors.DataNone, Tool: search, Class: "read", Untrusted: true, GuestSafe: true, Title: "Search the web"})
 				return set, nil
 			},
 		}, nil
