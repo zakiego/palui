@@ -195,11 +195,40 @@ func cmdAgent(c *EngineCtx, chat db.Chat, args []string) (CommandReply, error) {
 		}
 		return out
 	}
+	// Everyone in a shared chat reads the reply, so the owner's agents never
+	// show up there: the list goes to the owner's DM (PLAN 19.4). A chat on an
+	// agent's own bot only ever offers that agent, which the chat already knows.
+	private := shared && chat.ConnectorID == ""
+	toOwner := func(lines []string) (string, bool) {
+		dm, ok := ownerChatFor(c, chat.Channel)
+		if !ok {
+			return "", false
+		}
+		name := chat.Title
+		if name == "" {
+			name = chat.ExternalID
+		}
+		label := "Chat"
+		if chat.Kind == "group" {
+			label = "Grup"
+		}
+		c.send(dm, strings.Join(append([]string{fmt.Sprintf("%s \"%s\" (%s):", label, name, chat.Channel)}, lines...), "\n"), "system", SendExtra{})
+		return "Pilihan agent-nya udah aku kirim ke chat pribadi kamu.", true
+	}
 	if arg == "" && !chat.Allowed {
 		// The setup prompt: the first thing the owner sees in a new group.
 		head := fmt.Sprintf("Orang lain di %s belum dijawab.", where)
 		if chat.Channel == "whatsapp" {
 			head = fmt.Sprintf("Aku belum aktif di %s.", where)
+		}
+		if private {
+			head = fmt.Sprintf("Aku belum di-setup di %s, belum ada agent yang dipilih.", where)
+			pick := append([]string{"Belum ada agent. Ketik salah satu di sana:"}, choices()...)
+			pick = append(pick, "", "Agent baru bisa dibikin di dashboard, menu Agents.")
+			if sent, ok := toOwner(pick); ok {
+				return CommandReply{Text: head + "\n" + sent}, nil
+			}
+			return CommandReply{Text: head + "\nPilih pakai /agent <nama>."}, nil
 		}
 		lines := append([]string{head + " Pilih siapa yang jawab:"}, choices()...)
 		if chat.ConnectorID == "" {
@@ -216,6 +245,16 @@ func cmdAgent(c *EngineCtx, chat db.Chat, args []string) (CommandReply, error) {
 			return CommandReply{Text: strings.Join(append([]string{fmt.Sprintf("Agent di %s: %s (lewat bot-nya sendiri)", where, current.Name)}, mode...), "\n")}, nil
 		}
 		lines := append([]string{fmt.Sprintf("Agent di %s: %s", where, current.Name)}, mode...)
+		if private {
+			pick := append([]string{fmt.Sprintf("Agent-nya sekarang %s. Buat ganti, ketik salah satu di sana:", current.Name)}, choices()...)
+			pick = append(pick, "", "Balik ke Palui: /agent off.")
+			if sent, ok := toOwner(pick); ok {
+				lines = append(lines, sent)
+			} else {
+				lines = append(lines, "Ganti pakai /agent <nama>.")
+			}
+			return CommandReply{Text: strings.Join(lines, "\n")}, nil
+		}
 		lines = append(lines, "", "Agent yang ada:")
 		lines = append(lines, choices()...)
 		lines = append(lines, "", "Balik ke Palui: /agent off.")

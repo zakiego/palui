@@ -315,6 +315,54 @@ func TestAgentsReplyMode(t *testing.T) {
 		}
 	})
 
+	t.Run("never lists the owner's agents in a group: the setup prompt and /agent send them to the owner's DM", func(t *testing.T) {
+		h := agentsWorld(t, nil, extra{})
+		h.guest("@bot halo")
+		h.owner("/agent")
+		h.Engine.Idle()
+		rows := outboxRows(t, h.DB)
+		toDm, toGroup := rows[len(rows)-2], rows[len(rows)-1]
+		eq(t, toGroup.ChatID, groupChat(t, h.DB).ID)
+		eq(t, toGroup.Payload.Text, "Aku belum di-setup di grup ini, belum ada agent yang dipilih.\nPilihan agent-nya udah aku kirim ke chat pribadi kamu.")
+		dm := found(chats.Get(h.DB, toDm.ChatID))
+		eq(t, dm.Kind+" "+dm.ExternalID, "dm 42")
+		eq(t, toDm.Payload.Text, "Grup \"Kebun\" (telegram):\nBelum ada agent. Ketik salah satu di sana:\n• /agent palui: Palui, cuma jawab kamu\n• /agent chef: Chef\n\nAgent baru bisa dibikin di dashboard, menu Agents.")
+
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.owner("/agent")
+		h.Engine.Idle()
+		rows = outboxRows(t, h.DB)
+		toDm, toGroup = rows[len(rows)-2], rows[len(rows)-1]
+		eq(t, toGroup.Payload.Text, "Agent di grup ini: Chef\nJawab kalau di-mention atau di-reply. Ganti pakai /reply.\nPilihan agent-nya udah aku kirim ke chat pribadi kamu.")
+		eq(t, toDm.ChatID, dm.ID)
+		contains(t, toDm.Payload.Text, "Agent-nya sekarang Chef.")
+		contains(t, toDm.Payload.Text, "• /agent palui: Palui, cuma jawab kamu")
+		for _, r := range outboxRows(t, h.DB) {
+			if r.ChatID == toGroup.ChatID {
+				notContains(t, r.Payload.Text, "/agent palui")
+				notContains(t, r.Payload.Text, "Agent yang ada")
+			}
+		}
+	})
+
+	t.Run("/usage in a group shows only that group's agent", func(t *testing.T) {
+		h := agentsWorld(t, []models.Step{models.Say("a"), models.Say("b")}, extra{})
+		h.sendIdle("halo")
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.guest("@bot halo")
+		h.Engine.Idle()
+		h.owner("/usage")
+		h.Engine.Idle()
+		text := lastRow(t, h.DB).Payload.Text
+		contains(t, text, "• Chef: 1 run")
+		notContains(t, text, "Palui:")
+		h.sendIdle("/usage")
+		contains(t, lastText(t, h.DB), "• Palui: 1 run")
+		contains(t, lastText(t, h.DB), "• Chef: 1 run")
+	})
+
 	t.Run("doesn't open a group that's off, whatever its reply mode", func(t *testing.T) {
 		h := agentsWorld(t, nil, extra{})
 		if r := h.guest("@bot halo"); r != nil {
