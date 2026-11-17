@@ -1,6 +1,6 @@
 // Command palui is the Palui Agent server: `palui serve` runs everything in
 // one process, and the admin commands (`owner invite`, `connectors ...`,
-// `backup`, `secrets-check`, `hook create`) work on the same database.
+// `backup`, `secrets-check`, `hook create`, `mcp ...`) work on the same database.
 package main
 
 import (
@@ -118,7 +118,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runHealthcheck(args[1:], os.Getenv, stderr)
 	case "snapshot":
 		return runSnapshot(args[1:], stdout, stderr)
-	case "owner", "connectors", "backup", "secrets-check", "hook", "help", "--help", "-h":
+	case "owner", "connectors", "backup", "secrets-check", "hook", "mcp", "help", "--help", "-h":
 		o, done := envIO(stdout, stderr)
 		defer done()
 		return runCLI(args, o)
