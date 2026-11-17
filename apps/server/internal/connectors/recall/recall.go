@@ -52,6 +52,7 @@ var Manifest = connectors.Manifest{
 	RemoveWarning: "This removes the recall key from Palui. Your memories stay in recall.",
 	Docs: &connectors.Docs{Notes: []string{
 		"Tools: add_memory (write), search_memories, ask_memory, get_profile, list_memories (read), forget_memory and forget_document (destructive).",
+		"In your own DM or the web chat, Palui also gets search_agent_memory and list_agent_memory (read) to read other agents' memory. They never read yours, and reading taints the turn.",
 		"Auto-save uses source_id <session>:<range>, so saving the same slice twice is a no-op.",
 	}},
 	SecretFields: kit.SecretNames(SecretZod),
