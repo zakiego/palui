@@ -272,12 +272,29 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 			sticky = s.LoadedTools.V
 		}
 	}
+	// A shared chat gets what a fresh outside turn there gets (same rules as ExecuteTurn).
+	shared, err := agents.IsSharedChat(q, chat)
+	if err != nil {
+		return "", err
+	}
+	if shared && agent.GuestTools == "none" {
+		return "Gak ada tool buat " + agent.Name + " di chat ini: tool buat orang lain dimatiin.", nil
+	}
 	perms := agent.ToolPermissions.V
+	turn := connectors.TurnInfo{ChatID: chat.ID, Channel: chat.Channel, Trigger: "message", TZ: all.Timezone, Now: now, AgentID: agent.ID}
+	audience := ""
+	deny := tools.DeniedTools(&perms)
+	if shared {
+		turn.Mode = tools.AudienceOutside
+		audience = tools.AudienceOutside
+		deny = append(deny, tools.AskTools(&perms)...)
+	}
 	collected := tools.Collect(context.Background(), c.Host.Running(), tools.CollectOptions{
-		Turn:              connectors.TurnInfo{ChatID: chat.ID, Channel: chat.Channel, Trigger: "message", TZ: all.Timezone, Now: now, AgentID: agent.ID},
+		Turn:              turn,
 		MaxTools:          int(all.Budgets.MaxTools),
 		Sticky:            sticky,
-		Deny:              tools.DeniedTools(&perms),
+		Deny:              deny,
+		Audience:          audience,
 		Log:               c.Log,
 		OnUntrustedResult: func(*tools.ToolMeta) {},
 	})
@@ -336,7 +353,9 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 		}
 		lines = append(lines, fmt.Sprintf("• %s (%d): %s", id, len(own), strings.Join(counts, ", ")))
 	}
-	if perms.AllowAll {
+	if shared {
+		lines = append(lines, "", "Detail: /tools <id>. Di chat ini tool jalan tanpa minta izin, jadi yang perlu izin gak ditawarin.")
+	} else if perms.AllowAll {
 		lines = append(lines, "", "Detail: /tools <id>. Semua tool jalan tanpa minta izin di chat kamu, kecuali yang diatur minta izin.")
 	} else {
 		lines = append(lines, "", "Detail: /tools <id>. Destructive selalu minta izin, write minta izin kalau turn-nya kena data dari luar.")

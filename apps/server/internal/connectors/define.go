@@ -128,7 +128,7 @@ type TurnInfo struct {
 	FlowID     string
 	// What started the turn, kept across approval resumes.
 	Origin string
-	// owner, guest or sharedOwner.
+	// owner or outside. sharedOwner only on an approval asked before PLAN 19.9 step 1.
 	Mode string
 	// Whether untrusted content reached the turn so far; read when the tool runs.
 	Tainted func() bool
@@ -178,8 +178,8 @@ type PaluiTool struct {
 	// May run in a turn started by someone other than the owner.
 	GuestSafe bool
 	// Whose data the tool reads or writes: DataChat, DataAgent, DataShared or
-	// DataNone. "" follows the connector: the agent's when the connector is
-	// owned by one agent, shared otherwise.
+	// DataNone. "" follows the connector; ResolveData works out the scope the
+	// server acts on.
 	Data string
 	// Flow write tools: "version" (default) or "every_run".
 	FlowApproval string

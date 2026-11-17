@@ -225,3 +225,51 @@ func TestSharesAFileAsAPrivateLinkByDefaultPublicOnRequestAndTurnsThemOff(t *tes
 		t.Fatalf("%+v", res)
 	}
 }
+
+func TestASharedChatGetsNoDashboardLinksFileRefsOrShareLinks(t *testing.T) {
+	e := setup(t)
+	inbound(t, e.db, e.chatID, "run_1", []media{{"kind": "image", "mimeType": "image/jpeg", "data": JPG}}, NOW, "")
+	outside := e.turn
+	outside.Mode = "outside"
+	shared := attconn.Tools(e.db, outside, opts())
+	if got := strings.Join(conntest.Classes(shared), ","); got != "save_attachment:write,list_attachments:read,get_attachment:read,delete_attachment:destructive" {
+		t.Fatal(got)
+	}
+	for _, name := range []string{"save_attachment", "list_attachments", "get_attachment"} {
+		pt, _ := shared.Get(name)
+		if strings.Contains(pt.Tool.Description, "fileRef") || strings.Contains(pt.Tool.Description, "dashboard") || strings.Contains(pt.Tool.Description, "share_attachment") {
+			t.Fatal(name, pt.Tool.Description)
+		}
+	}
+	saved := conntest.Call(t, shared, "save_attachment", `{"title":"Struk"}`)
+	id := saved.S("attachment.id")
+	if !saved.B("ok") || id == "" || saved.Has("attachment.url") || saved.Has("attachment.fileRef") || saved.Has("sendToOtherApp") {
+		t.Fatal(saved)
+	}
+	list := conntest.Call(t, shared, "list_attachments", `{}`)
+	if list.N("count") != 1 || list.Has("attachments.0.url") || list.Has("attachments.0.fileRef") || list.Has("sendToOtherApp") || strings.Contains(list.String(), "palui.test") {
+		t.Fatal(list)
+	}
+	if r := conntest.Call(t, shared, "get_attachment", `{"id":"`+id+`"}`); !r.B("ok") || strings.Contains(r.String(), "palui.test") || strings.Contains(r.String(), "fileRef") {
+		t.Fatal(r)
+	}
+
+	// The owner's own chat keeps today's shape.
+	owner := e.turn
+	owner.Mode = "owner"
+	own := attconn.Tools(e.db, owner, opts())
+	if got := strings.Join(conntest.Classes(own), ","); got != strings.Join(conntest.Classes(e.tools), ",") {
+		t.Fatal(got)
+	}
+	ol := conntest.Call(t, own, "list_attachments", `{}`)
+	if ol.S("attachments.0.url") != "https://palui.test/app/attachments?id="+id || ol.S("attachments.0.fileRef") != "palui:attachment/"+id || !strings.Contains(ol.S("sendToOtherApp"), "fileRef") {
+		t.Fatal(ol)
+	}
+	for _, name := range []string{"save_attachment", "list_attachments", "get_attachment"} {
+		a, _ := own.Get(name)
+		b, _ := e.tools.Get(name)
+		if a.Tool.Description != b.Tool.Description {
+			t.Fatal(name)
+		}
+	}
+}

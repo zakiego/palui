@@ -4,18 +4,17 @@ package chat_test
 
 import (
 	"context"
-	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
-	"github.com/zakiego/palui/apps/server/internal/attachments"
+	"github.com/zakiego/palui/apps/server/internal/approvals"
 	"github.com/zakiego/palui/apps/server/internal/chat"
 	"github.com/zakiego/palui/apps/server/internal/chat/chattest"
 	"github.com/zakiego/palui/apps/server/internal/chats"
-	"github.com/zakiego/palui/apps/server/internal/config"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/conntest"
 	"github.com/zakiego/palui/apps/server/internal/db"
@@ -24,6 +23,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/models"
 	"github.com/zakiego/palui/apps/server/internal/notes"
 	"github.com/zakiego/palui/apps/server/internal/outbox"
+	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/testutil"
 )
 
@@ -350,25 +350,70 @@ func connectorsSetOwner(q db.Q, id, agentID string) (db.Connector, error) {
 
 func agentToolRegistry(ran *executedLog) map[string]*connectors.Runtime {
 	return map[string]*connectors.Runtime{
-		"web": toolsRT("web", tools("fetch", connectors.PaluiTool{Class: "read", Untrusted: true, GuestSafe: true, Tool: conntest.FnTool("fetch", func(*jsonx.Object) (any, error) { ran.add("fetch"); return "page", nil })})),
+		"web": toolsRT("web", tools("fetch", connectors.PaluiTool{Class: "read", Untrusted: true, GuestSafe: true, Data: connectors.DataNone, Tool: conntest.FnTool("fetch", func(*jsonx.Object) (any, error) { ran.add("fetch"); return "page", nil })})),
 		"alpha": toolsRT("alpha", tools(
 			"read", connectors.PaluiTool{Class: "read", Tool: conntest.FnTool("read owner data", func(*jsonx.Object) (any, error) { ran.add("read"); return "secret", nil })},
 			"note", connectors.PaluiTool{Class: "write", Tool: conntest.FnTool("write", func(*jsonx.Object) (any, error) { ran.add("note"); return "ok", nil })},
 		)),
+		"rem": toolsRT("rem", tools(
+			"set", connectors.PaluiTool{Class: "write", Data: connectors.DataChat, Tool: conntest.FnTool("set a reminder", func(*jsonx.Object) (any, error) { ran.add("set"); return "ok", nil })},
+			"wipe", connectors.PaluiTool{Class: "destructive", Data: connectors.DataChat, Tool: conntest.FnTool("wipe reminders", func(*jsonx.Object) (any, error) { ran.add("wipe"); return "ok", nil })},
+		)),
 	}
 }
 
-var webAlphaRows = []chattest.Row{{"web", "tools"}, {"alpha", "tools"}}
+var webAlphaRows = []chattest.Row{{"web", "tools"}, {"alpha", "tools"}, {"rem", "tools"}}
+
+// legacyApproval is a pending approval asked from the group before PLAN 19.9
+// step 1: mode sharedOwner, asked in the owner's DM.
+func legacyApproval(t *testing.T, h *agentWorld) db.Approval {
+	return legacyApprovalAs(t, h, "sharedOwner", h.chef.ID, true)
+}
+
+// legacyApprovalAs builds that row for a mode and agent; askInDM sends the
+// prompt to the owner's DM (a non-default agent), else to the group (Palui).
+func legacyApprovalAs(t *testing.T, h *agentWorld, mode, agentID string, askInDM bool) db.Approval {
+	t.Helper()
+	return legacyApprovalFor(t, h, mode, agentID, "alpha__note", askInDM)
+}
+
+// legacyApprovalFor is legacyApprovalAs for a given tool.
+func legacyApprovalFor(t *testing.T, h *agentWorld, mode, agentID, tool string, askInDM bool) db.Approval {
+	t.Helper()
+	// The owner's DM, where the legacy prompt was asked.
+	h.sendIdle("/help")
+	g := groupChat(t, h.DB)
+	dm := chatWhere(t, h.DB, "external_id = '42'")
+	msgs := need(models.MarshalMessages([]models.Message{
+		models.User("[Owner]: @bot catat ini"),
+		models.AssistantParts(models.ToolCallPart("c1", tool, objOf()), models.ToolApprovalRequestPart("aprq_1", "c1")),
+	}))
+	sys := need(models.MarshalMessages([]models.Message{models.System("Kamu Chef, ahli masak.")}))
+	var ask *string
+	if askInDM {
+		ask = &dm.ID
+	}
+	return need(approvals.Create(h.DB, approvals.CreateInput{
+		RunID: "run_legacy", ChatID: g.ID, AskChatID: ask, ApprovalID: "aprq_1", ToolCallID: "c1", Tool: tool, ToolClass: "write", ArgsPreview: "{}",
+		Messages: msgs,
+		Context:  approvals.ResumeContext{Trigger: "message", OriginTrigger: "message", ModelRole: "default", Deliver: true, AgentID: agentID, Mode: mode, System: sys},
+	}, h.Clock.Now(), 0))
+}
 
 func TestAgentsToolsAndApprovals(t *testing.T) {
-	t.Run("gives guests only guest-safe tools", func(t *testing.T) {
+	t.Run("an outside turn gets chat and no-data tools only", func(t *testing.T) {
 		ran := &executedLog{}
-		h := agentsWorld(t, []models.Step{models.CallTool("alpha__read", objOf(), "c1"), models.CallTool("web__fetch", objOf(), "c2"), models.Say("done")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
+		h := agentsWorld(t, []models.Step{models.CallTool("alpha__read", objOf(), "c1"), models.CallTool("web__fetch", objOf(), "c2"), models.CallTool("rem__set", objOf(), "c3"), models.CallTool("rem__wipe", objOf(), "c4"), models.Say("done")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
 		h.owner("/agent chef")
 		h.Engine.Idle()
 		h.guest("@bot cek")
 		h.Engine.Idle()
-		jsonEq(t, ran.get(), `["fetch"]`)
+		jsonEq(t, ran.get(), `["fetch","set"]`)
+		eq(t, count(t, h.DB, "pending_approvals"), 0)
+		p := prompt(h.m, 0)
+		contains(t, p, "web (1 tools)")
+		contains(t, p, "rem (1 tools)")
+		notContains(t, p, "alpha")
 	})
 
 	t.Run("gives guests no tools at all with guest tools off", func(t *testing.T) {
@@ -382,7 +427,7 @@ func TestAgentsToolsAndApprovals(t *testing.T) {
 		eq(t, len(ran.get()), 0)
 	})
 
-	t.Run("owner powers on approval: a write in the group is asked in the owner's DM, and only the DM's ya counts", func(t *testing.T) {
+	t.Run("owner powers is ignored: the owner's write in the group isn't offered or asked", func(t *testing.T) {
 		ran := &executedLog{}
 		h := agentsWorld(t, []models.Step{models.CallTool("alpha__note", objOf(), "c1"), models.Say("dicatat")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
 		need(agents.Update(h.DB, h.chef.ID, agents.Input{OwnerPowers: sp("approve")}, 1))
@@ -391,67 +436,8 @@ func TestAgentsToolsAndApprovals(t *testing.T) {
 		h.owner("@bot catat ini", addressed)
 		h.Engine.Idle()
 		eq(t, len(ran.get()), 0)
-		apr := allApprovals(t, h.DB, "")[0]
-		g := groupChat(t, h.DB)
-		dm := chatWhere(t, h.DB, "external_id = '42'")
-		eq(t, apr.ChatID, g.ID)
-		eq(t, *apr.AskChatID, dm.ID)
-		var pr db.Outbox
-		for _, r := range outboxRows(t, h.DB) {
-			if r.Source == "approval:"+apr.ID {
-				pr = r
-			}
-		}
-		eq(t, pr.ChatID, dm.ID)
-		contains(t, pr.Payload.Text, `di grup "Kebun"`)
-		h.owner("ya")
-		h.Engine.Idle()
-		eq(t, len(ran.get()), 0)
-		h.sendIdle("ya")
-		jsonEq(t, ran.get(), `["note"]`)
-		reply := lastRow(t, h.DB)
-		eq(t, reply.ChatID, g.ID)
-		eq(t, reply.Payload.Text, "dicatat")
-	})
-
-	t.Run("a file sent from a group is named in the DM's approval prompt and still resolves in the group after the ya", func(t *testing.T) {
-		jpeg := []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46}
-		sent := &executedLog{}
-		var dbRef *db.DB
-		mk := need(config.MasterKey(config.Get()))
-		finance := conntest.ToolsRuntime("finance", tools(), "tools", func(h *connectors.RunningConnector) {
-			h.Tools = func(ctx context.Context, turn connectors.TurnInfo) (*connectors.ToolSet, error) {
-				return conntest.Tools("upload", connectors.PaluiTool{Class: "write", Tool: conntest.FnTool("upload a file", func(in *jsonx.Object) (any, error) {
-					v := need(attachments.ResolveRefs(dbRef, in, attachments.ResolveOptions{ChatID: turn.ChatID, MasterKey: mk}))
-					sent.add(str(v.(*jsonx.Object), "file"))
-					return "ok", nil
-				})}), nil
-			}
-		})
-		h := agentsWorld(t, []models.Step{models.CallTool("finance__upload", objOf("file", "palui:attachment/att_struk"), "c1"), models.Say("terlampir")}, extra{registry: map[string]*connectors.Runtime{"finance": finance}, rows: []chattest.Row{{"finance", "tools"}}})
-		dbRef = h.DB
-		need(agents.Update(h.DB, h.chef.ID, agents.Input{OwnerPowers: sp("approve")}, 1))
-		h.owner("/agent chef")
-		h.Engine.Idle()
-		g := groupChat(t, h.DB)
-		saved := need(attachments.Save(h.DB, attachments.SaveInput{ChatID: g.ID, Title: "Struk laundry", MimeType: "image/jpeg", Bytes: jpeg}, mk, 3))
-		_, err := h.DB.Exec("UPDATE saved_attachments SET id = 'att_struk' WHERE id = ?", saved.Row.ID)
-		testutil.Must(t, err)
-		h.owner("@bot tempel struknya", addressed)
-		h.Engine.Idle()
-		apr := allApprovals(t, h.DB, "")[0]
-		eq(t, *apr.ArgsPreview, `{"file":"[file: Struk laundry, 10 B]"}`)
-		for _, r := range outboxRows(t, h.DB) {
-			if r.Source == "approval:"+apr.ID {
-				contains(t, r.Payload.Text, "[file: Struk laundry, 10 B]")
-			}
-		}
-		eq(t, len(sent.get()), 0)
-		h.sendIdle("ya")
-		jsonEq(t, sent.get(), jsonx.Stringify([]string{"data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(jpeg)}))
-		last := lastRow(t, h.DB)
-		eq(t, last.ChatID, g.ID)
-		eq(t, last.Payload.Text, "terlampir")
+		eq(t, count(t, h.DB, "pending_approvals"), 0)
+		eq(t, count(t, h.DB, "outbox WHERE source LIKE 'approval:%'"), 0)
 	})
 
 	t.Run("after reading untrusted text, sending a saved file asks even with allow-all", func(t *testing.T) {
@@ -465,20 +451,7 @@ func TestAgentsToolsAndApprovals(t *testing.T) {
 		eq(t, allApprovals(t, h.DB, "")[0].Tool, "files__send")
 	})
 
-	t.Run("allow-all with owner powers runs the owner's write in the group without asking", func(t *testing.T) {
-		ran := &executedLog{}
-		h := agentsWorld(t, []models.Step{models.CallTool("alpha__note", objOf(), "c1"), models.Say("dicatat")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
-		need(agents.Update(h.DB, h.chef.ID, agents.Input{OwnerPowers: sp("approve")}, 1))
-		allowAll(t, h.DB, h.chef.ID, nil)
-		h.owner("/agent chef")
-		h.Engine.Idle()
-		h.owner("@bot catat ini", addressed)
-		h.Engine.Idle()
-		jsonEq(t, ran.get(), `["note"]`)
-		eq(t, count(t, h.DB, "pending_approvals"), 0)
-	})
-
-	t.Run("owner powers off: the owner in the group is a guest too", func(t *testing.T) {
+	t.Run("the owner in the group gets the outside set", func(t *testing.T) {
 		ran := &executedLog{}
 		h := agentsWorld(t, []models.Step{models.CallTool("alpha__read", objOf(), "c1"), models.Say("done")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
 		h.owner("/agent chef")
@@ -489,7 +462,7 @@ func TestAgentsToolsAndApprovals(t *testing.T) {
 		// Only names what the turn can use, so the model doesn't promise a
 		// reminder it has no tool for (report rpt_0mwkf86x0essjd5ueei).
 		p := models.PromptText(h.m.Prompts[len(h.m.Prompts)-1])
-		contains(t, p, "Enabled capabilities: web (1 tools).")
+		contains(t, p, "Enabled capabilities: rem (1 tools), web (1 tools).")
 		contains(t, p, "never suggest trying again later")
 	})
 
@@ -503,6 +476,175 @@ func TestAgentsToolsAndApprovals(t *testing.T) {
 		p := models.PromptText(h.m.Prompts[len(h.m.Prompts)-1])
 		contains(t, p, "No tools are enabled right now.")
 		notContains(t, p, "Enabled capabilities")
+	})
+
+	t.Run("a tool set to ask is left out of an outside turn", func(t *testing.T) {
+		ran := &executedLog{}
+		h := agentsWorld(t, []models.Step{models.CallTool("rem__set", objOf(), "c1"), models.Say("done")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
+		ask := "ask"
+		perms := jsonx.NewMap[*string]()
+		perms.Set("rem__set", &ask)
+		need(agents.SetToolPermissions(h.DB, h.chef.ID, agents.PermissionsPatch{Tools: perms}, 1))
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.guest("@bot ingetin")
+		h.Engine.Idle()
+		eq(t, len(ran.get()), 0)
+		eq(t, count(t, h.DB, "pending_approvals"), 0)
+		notContains(t, prompt(h.m, 0), "rem (")
+		if has(h.m.Offered[0], "rem__set") {
+			t.Fatal(h.m.Offered[0])
+		}
+	})
+
+	t.Run("a write after untrusted content runs without asking in an outside turn", func(t *testing.T) {
+		ran := &executedLog{}
+		h := agentsWorld(t, []models.Step{models.CallTool("web__fetch", objOf(), "c1"), models.CallTool("rem__set", objOf(), "c2"), models.Say("done")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.guest("@bot cek terus ingetin")
+		h.Engine.Idle()
+		jsonEq(t, ran.get(), `["fetch","set"]`)
+		eq(t, count(t, h.DB, "pending_approvals"), 0)
+		runs := allRuns(t, h.DB)
+		eq(t, runs[len(runs)-1].Tainted, true)
+	})
+
+	t.Run("a tool that asks on its own is refused in an outside turn", func(t *testing.T) {
+		ran := &executedLog{}
+		reg := agentToolRegistry(ran)
+		reg["pub"] = toolsRT("pub", tools("share", connectors.PaluiTool{Class: "write", Data: connectors.DataChat, NeedsApproval: func(json.RawMessage) bool { return true }, Tool: conntest.FnTool("share", func(*jsonx.Object) (any, error) { ran.add("share"); return "ok", nil })}))
+		h := agentsWorld(t, []models.Step{models.CallTool("pub__share", objOf(), "c1"), models.Say("gak bisa")}, extra{registry: reg, rows: append(append([]chattest.Row{}, webAlphaRows...), chattest.Row{"pub", "tools"})})
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.guest("@bot share")
+		h.Engine.Idle()
+		eq(t, len(ran.get()), 0)
+		eq(t, count(t, h.DB, "pending_approvals"), 0)
+		var tc *db.ToolCall
+		for _, c := range allToolCalls(t, h.DB) {
+			if c.Tool == "pub__share" {
+				tc = &c
+			}
+		}
+		if tc == nil || tc.Status != "error" {
+			t.Fatal(tc)
+		}
+		contains(t, prompt(h.m, -1), "approvals aren't available in this chat")
+	})
+
+	t.Run("a memory connector isn't named in an outside turn", func(t *testing.T) {
+		mem := memHandle(func(connectors.SaveInput) {}, nil, false, false)
+		reg := agentToolRegistry(&executedLog{})
+		reg["recall"] = conntest.MemoryRuntime(mem)
+		h := agentsWorld(t, []models.Step{models.Say("a"), models.Say("b")}, extra{registry: reg, rows: append(append([]chattest.Row{}, webAlphaRows...), chattest.Row{"recall", "memory"})})
+		h.sendIdle("halo")
+		contains(t, prompt(h.m, 0), "recall")
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.guest("@bot cek")
+		h.Engine.Idle()
+		p := prompt(h.m, -1)
+		contains(t, p, "Enabled capabilities: rem (1 tools), web (1 tools).")
+		notContains(t, p, "recall")
+	})
+
+	t.Run("search in an outside turn can't load the agent's tool", func(t *testing.T) {
+		ran := &executedLog{}
+		h := agentsWorld(t, []models.Step{models.CallTool("palui__search_tools", objOf("names", []string{"alpha__read"}), "c1"), models.Say("gak ada")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
+		setBudget(t, h.DB, func(b *settings.Budgets) { b.MaxTools = 1 })
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.guest("@bot baca")
+		h.Engine.Idle()
+		if !has(h.m.Offered[0], "palui__search_tools") || has(h.m.Offered[0], "alpha__read") {
+			t.Fatal(h.m.Offered[0])
+		}
+		res := need(db.ScanToolCall(h.DB.QueryRow("SELECT " + db.ToolCallCols + " FROM tool_calls WHERE tool = 'palui__search_tools'")))
+		contains(t, *res.ResultPreview, `"loaded":[]`)
+		eq(t, len(ran.get()), 0)
+	})
+
+	t.Run("Palui in a group is a shared chat: the owner gets the outside set, no approvals, no dashboard", func(t *testing.T) {
+		ran := &executedLog{}
+		h := agentsWorld(t, []models.Step{models.CallTool("alpha__note", objOf(), "c1"), models.CallTool("rem__set", objOf(), "c2"), models.Say("done")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
+		h.owner("/agent palui")
+		h.Engine.Idle()
+		h.owner("@bot catat terus ingetin", addressed)
+		h.Engine.Idle()
+		jsonEq(t, ran.get(), `["set"]`)
+		eq(t, count(t, h.DB, "pending_approvals"), 0)
+		eq(t, count(t, h.DB, "outbox WHERE source LIKE 'approval:%'"), 0)
+		p := prompt(h.m, 0)
+		contains(t, p, "This is a shared group chat")
+		notContains(t, p, "https://")
+		notContains(t, p, "alpha")
+	})
+
+	t.Run("Palui's owner approval asked in a group before the change resumes with its tool", func(t *testing.T) {
+		ran := &executedLog{}
+		h := agentsWorld(t, []models.Step{models.Say("dicatat")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
+		h.owner("/agent palui")
+		h.Engine.Idle()
+		palui := need(agents.GetDefault(h.DB, 1))
+		legacyApprovalAs(t, h, "owner", palui.ID, false)
+		h.owner("ya", addressed)
+		h.Engine.Idle()
+		jsonEq(t, ran.get(), `["note"]`)
+		reply := lastRow(t, h.DB)
+		eq(t, reply.ChatID, groupChat(t, h.DB).ID)
+		eq(t, reply.Payload.Text, "dicatat")
+	})
+
+	t.Run("a legacy sharedOwner approval resumes with its tool when the owner says ya in the DM", func(t *testing.T) {
+		ran := &executedLog{}
+		h := agentsWorld(t, []models.Step{models.Say("dicatat")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		legacyApproval(t, h)
+		h.sendIdle("ya")
+		jsonEq(t, ran.get(), `["note"]`)
+		reply := lastRow(t, h.DB)
+		eq(t, reply.ChatID, groupChat(t, h.DB).ID)
+		eq(t, reply.Payload.Text, "dicatat")
+	})
+
+	t.Run("a guest approval on a tool set to ask resumes with its tool", func(t *testing.T) {
+		ran := &executedLog{}
+		h := agentsWorld(t, []models.Step{models.Say("udah diingetin")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
+		ask := "ask"
+		perms := jsonx.NewMap[*string]()
+		perms.Set("rem__set", &ask)
+		need(agents.SetToolPermissions(h.DB, h.chef.ID, agents.PermissionsPatch{Tools: perms}, 1))
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		legacyApprovalFor(t, h, "guest", h.chef.ID, "rem__set", true)
+		h.sendIdle("ya")
+		jsonEq(t, ran.get(), `["set"]`)
+		reply := lastRow(t, h.DB)
+		eq(t, reply.ChatID, groupChat(t, h.DB).ID)
+		eq(t, reply.Payload.Text, "udah diingetin")
+	})
+
+	t.Run("a legacy sharedOwner approval that expires ends ok in the group", func(t *testing.T) {
+		ran := &executedLog{}
+		h := agentsWorld(t, []models.Step{models.Say("oke, gak jadi")}, extra{registry: agentToolRegistry(ran), rows: webAlphaRows})
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		legacyApproval(t, h)
+		h.Engine.ExpireApprovals(h.Clock.Now() + 10*60_000)
+		h.Engine.Idle()
+		eq(t, len(ran.get()), 0)
+		reply := lastRow(t, h.DB)
+		eq(t, reply.ChatID, groupChat(t, h.DB).ID)
+		eq(t, reply.Payload.Text, "oke, gak jadi")
+		runs := allRuns(t, h.DB)
+		eq(t, runs[len(runs)-1].Status, "ok")
+		for _, e := range listEvents(t, h.DB) {
+			if e.Level == "error" {
+				t.Fatal(e.Kind, e.Message)
+			}
+		}
 	})
 }
 

@@ -67,6 +67,14 @@ export function DataScopeText({ scope }: { scope: DataScope }) {
   )
 }
 
+// Whether a shared chat (a group, or someone else's DM) gets this tool: the
+// server says it may, the agent offers tools there, and the owner didn't set
+// it to ask first or off (shared chats never ask, so those stay out).
+export function inSharedChats(x: ToolItem, guestTools: string, permissions: ToolsViewProps["permissions"]) {
+  const p = permissions.tools[x.name]
+  return x.guestSafe && guestTools === "safe" && p !== "ask" && p !== "deny"
+}
+
 export function countClass(list: ToolItem[], cls: string) {
   return list.filter((x) => (CLASS_TONE[x.class] ? x.class : "destructive") === cls).length
 }
@@ -162,7 +170,7 @@ export function ToolRow({ x, props, scope }: { x: ToolItem; props: ToolsViewProp
               {t("agents.tools.outside")}
             </StatusText>
           )}
-          {x.guestSafe && !agent.isDefault && agent.guestTools === "safe" && (
+          {inSharedChats(x, agent.guestTools, props.permissions) && (
             <StatusText tone="secondary" icon={<UsersIcon aria-hidden="true" />}>
               {t("agents.tools.guests")}
             </StatusText>

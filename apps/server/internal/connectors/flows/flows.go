@@ -822,10 +822,14 @@ func RecapTool(d *db.DB, turn connectors.TurnInfo, clock func() int64) connector
 	}
 }
 
-// OfferFlowTools: the owner's own chats (never a shared chat or a guest
-// turn), and not unattended turns (jobs, hooks, flow prompt steps).
+// OfferFlowTools: the owner's own chats (never a shared chat or a turn for
+// anyone but the owner), and not unattended turns (jobs, hooks, flow prompt
+// steps).
 func OfferFlowTools(q db.Q, turn connectors.TurnInfo) (bool, error) {
 	if turn.Trigger != "message" && turn.Trigger != "approval" {
+		return false, nil
+	}
+	if turn.Mode != "" && turn.Mode != "owner" {
 		return false, nil
 	}
 	c, ok, err := chats.Get(q, turn.ChatID)

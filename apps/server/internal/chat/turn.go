@@ -229,7 +229,8 @@ func (c *EngineCtx) event(in events.Input, now int64) {
 }
 
 // capabilityList: one line per enabled skill or tool connector.
-func capabilityList(c *EngineCtx, collected *tools.Collected, agentID string) []string {
+// An outside turn names only connectors it has tools from.
+func capabilityList(c *EngineCtx, collected *tools.Collected, agentID string, outside bool) []string {
 	out := []string{}
 	active := map[string]bool{}
 	for _, n := range collected.Active() {
@@ -260,7 +261,7 @@ func capabilityList(c *EngineCtx, collected *tools.Collected, agentID string) []
 		if len(waiting) == 0 {
 			if loaded > 0 {
 				out = append(out, fmt.Sprintf("%s (%d tools)", e.Row.Label, loaded))
-			} else if e.Row.Kind == "memory" {
+			} else if e.Row.Kind == "memory" && !outside {
 				// Recall still works without tools: it runs before the turn.
 				out = append(out, e.Row.Label)
 			}
@@ -620,11 +621,10 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			return TurnResult{}, err
 		}
 	}
-	shared := false
-	if !agent.IsDefault {
-		if shared, err = agents.IsSharedChat(q, chat); err != nil {
-			return TurnResult{}, err
-		}
+	// Palui too: a group it answers in is read by everyone there (PLAN 19.4).
+	shared, err := agents.IsSharedChat(q, chat)
+	if err != nil {
+		return TurnResult{}, err
 	}
 	deliver := true
 	if rs != nil {
@@ -756,20 +756,21 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			role = "vision"
 		}
 	}
-	guestInBatch := false
-	for _, h := range history {
-		if batch[h.ID] && h.Role == "user" && !h.FromOwner {
-			guestInBatch = true
-		}
+	// Who can read the chat decides the tools, not who sent the message (PLAN 19.4).
+	audience := tools.AudienceOwner
+	if shared {
+		audience = tools.AudienceOutside
 	}
-	mode := "owner"
-	if rs != nil && rs.Context.Mode != "" {
-		mode = rs.Context.Mode
-	} else if shared {
+	// Palui's approval asked in a group before 19.9 step 1 ran as the owner's
+	// turn; it resumes with that tool set. A fresh shared turn never asks.
+	if shared && rs != nil && rs.Context.Mode == tools.AudienceOwner {
+		audience = tools.AudienceOwner
+	}
+	mode := audience
+	// An approval asked before 19.9 step 1 resumes under the rules it was asked with.
+	legacy := rs != nil && rs.Context.Mode == "sharedOwner"
+	if legacy {
 		mode = "sharedOwner"
-		if guestInBatch || agent.OwnerPowers == "off" {
-			mode = "guest"
-		}
 	}
 
 	chain, err := models.ResolveChain(q, c.Host, role)
@@ -906,14 +907,24 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			Tainted: tainted.Load, OwnerText: ownerText,
 			Memory: &connectors.MemoryScope{Container: scope.Container, Read: scope.Read, Locked: scope.Locked},
 		}
-		guest := mode == "guest"
-		noTools := input.NoTools || origin == "hook" || (guest && agent.GuestTools == "none")
+		outside := audience == tools.AudienceOutside && !legacy
+		noTools := input.NoTools || origin == "hook" || (outside && agent.GuestTools == "none")
 		toolScope := input.ToolScope
 		toolNames := input.ToolNames
 		if rs != nil {
 			toolScope, toolNames = rs.Context.ToolScope, rs.Context.ToolNames
 		}
 		perms := agent.ToolPermissions.V
+		collectAudience := ""
+		deny := tools.DeniedTools(&perms)
+		if outside {
+			collectAudience = tools.AudienceOutside
+			// No approvals here: a tool the owner wants a say on isn't offered at
+			// all. A resume keeps it: its approved call was already asked for.
+			if rs == nil {
+				deny = append(deny, tools.AskTools(&perms)...)
+			}
+		}
 		var collected *tools.Collected
 		if noTools {
 			collected = tools.Collect(ctrl, nil, tools.CollectOptions{})
@@ -935,7 +946,8 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				Scope:              scopeList,
 				Only:               onlyList,
 				ExcludeDestructive: unattended(origin),
-				Deny:               tools.DeniedTools(&perms),
+				Deny:               deny,
+				Audience:           collectAudience,
 				Sticky:             sticky,
 				OnLoad: func(names []string) {
 					if chat.SessionID != nil {
@@ -944,8 +956,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 						}
 					}
 				},
-				GuestOnly: guest,
-				Log:       rlog,
+				Log: rlog,
 				OnUntrustedResult: func(m *tools.ToolMeta) {
 					if !tainted.Load() {
 						rlog.Info("turn tainted by an untrusted tool result", logx.Fields{"tool": m.Name})
@@ -1006,7 +1017,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			}
 			var sharedInfo *SharedInfo
 			if shared {
-				sharedInfo = &SharedInfo{Kind: chat.Kind, Guest: guest}
+				sharedInfo = &SharedInfo{Kind: chat.Kind, Guest: outside}
 			}
 			dashboard := ""
 			if origin == "message" {
@@ -1034,7 +1045,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				Persona:      agent.Persona,
 				Channel:      chat.Channel,
 				Chat:         &SystemChat{ID: chat.ID, ExternalID: chat.ExternalID, Kind: chat.Kind, SessionID: chat.SessionID},
-				Capabilities: capabilityList(c, collected, agent.ID),
+				Capabilities: capabilityList(c, collected, agent.ID, outside),
 				ToolSearch:   len(collected.Deferred) > 0,
 				Notes:        notesText,
 				Trigger:      origin,
@@ -1061,6 +1072,17 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				if pastCalls, err = LoadToolCalls(q, history); err != nil {
 					return err
 				}
+				if outside {
+					// A tool this turn doesn't have (one an older turn ran) isn't
+					// replayed by name and result.
+					kept := pastCalls[:0]
+					for _, pc := range pastCalls {
+						if collected.Meta[pc.Tool] != nil {
+							kept = append(kept, pc)
+						}
+					}
+					pastCalls = kept
+				}
 			}
 			var base []models.Message
 			if isMessage {
@@ -1078,10 +1100,11 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		if err != nil {
 			return err
 		}
-		// Shared chats (PLAN 19.4): every write needs approval, like jobs.
-		strict := unattended(origin) || origin == "hook" || mode != "owner"
+		// Jobs and hooks: every write needs approval. So does a shared-chat
+		// approval asked before 19.9 step 1; a fresh shared turn has no approvals.
+		strict := unattended(origin) || origin == "hook" || legacy
 		// The owner's own message: the agent's tool permissions may skip the prompt here, nowhere else.
-		ownerTurn := origin == "message" && mode != "guest"
+		ownerTurn := origin == "message" && (mode == tools.AudienceOwner || legacy)
 		typing(true)
 		c.Bus.Publish(TurnEvent{Type: "turn-start", ChatID: chat.ID, RunID: runID})
 		clock := NewStepClock(c.Monotonic())
@@ -1171,6 +1194,11 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				if meta != nil && meta.Untrusted && !tainted.Load() {
 					rlog.Info("turn tainted by an untrusted tool call", logx.Fields{"tool": meta.Name})
 					tainted.Store(true)
+				}
+				// An outside turn has no approvals. Its tools run right away, and the
+				// tool wrapper refuses a call whose tool asks on its own.
+				if outside {
+					return false
 				}
 				// A tool's own rule asks first, and no per-agent "allow" skips it.
 				if meta != nil && meta.NeedsApproval != nil && safeNeedsApproval(meta.NeedsApproval, call.InputJSON) {
@@ -1272,6 +1300,8 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				DeliverReply(c, chat, runID, text)
 			}
 			// A shared chat never sees the prompt: it goes to the owner's DM (PLAN 19.4).
+			// Since 19.9 step 1 only a legacy sharedOwner resume asks from a shared
+			// chat; step 5 removes this routing.
 			askChat := chat
 			if shared {
 				if dm, ok := ownerChatFor(c, chat.Channel); ok {

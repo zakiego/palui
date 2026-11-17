@@ -499,6 +499,17 @@ func TestBuildSystemGuestLimits(t *testing.T) {
 	notContains(t, p, "DM")
 }
 
+func TestBuildSystemUnattendedOutsideTurnNeverAsks(t *testing.T) {
+	for _, trigger := range []string{"schedule", "flow"} {
+		base := chat.SystemInput{Persona: "P", Channel: "telegram", Trigger: trigger}
+		contains(t, chat.BuildSystem(base), "Write tools need approval and destructive tools are off.")
+		base.Shared = &chat.SharedInfo{Kind: "group", Guest: true}
+		p := chat.BuildSystem(base)
+		notContains(t, p, "need approval")
+		contains(t, p, "nobody is watching live. Destructive tools are off.")
+	}
+}
+
 // A guest asked "can you read?" and the bot guessed at what reaches it
 // (rpt_0mwkiafzueqehwsasht).
 func TestBuildSystemInbound(t *testing.T) {

@@ -23,8 +23,9 @@ Palui has one owner and assumes everything else is untrusted: other people messa
 ## What the agent may do
 
 - Tool classes fail closed. Every tool is `read`, `write` or `destructive`, and an unclassified tool is `destructive`. See [Tool classes](/docs/concepts/tool-classes).
-- Approvals. `destructive` tools always ask you first. The runtime enforces it, not the prompt. See [Approvals](/docs/concepts/approvals).
-- The taint rule. Once a turn reads untrusted content (web fetch, a webhook payload, an `external` MCP server), every `write` tool needs approval for the rest of that turn. See [The taint rule](/docs/concepts/taint-rule).
+- Approvals. In your own chats, `destructive` tools always ask you first. The runtime enforces it, not the prompt. See [Approvals](/docs/concepts/approvals).
+- The taint rule. In your own chats, once a turn reads untrusted content (web fetch, a webhook payload, an `external` MCP server), every `write` tool needs approval for the rest of that turn. See [The taint rule](/docs/concepts/taint-rule).
+- Shared chats. A group or someone else's DM only gets tools whose data stays in that chat or that keep nothing (reminders, saved files, web search, web fetch). Nothing there asks for approval and destructive tools are never offered. Accepted risk: anyone in the chat can make the agent change that chat's reminders and saved files, and nothing past it. See [Agents](/docs/concepts/agents).
 - Jobs and hooks. Scheduled jobs never get `destructive` tools, and every `write` needs approval. Webhook summaries run with zero tools.
 - Budgets. Each turn is capped at 12 steps, 120 s and about 64 tools loaded up front (more load on demand through tool search). Daily token caps and a limit of 60 runs per hour stop runaway loops.
 

@@ -336,9 +336,11 @@ Delivery is at least once. Outbox rows stuck in `sending` for more than 5 minute
 | Table | Key columns |
 |---|---|
 | `connectors` | id, type, kind, label, enabled, status, status_detail, trust, config json, secrets (encrypted), config_hash, updated_at |
-| `identities` | id, channel, external_id, alt_id (LID), display_name, role |
+| `identities` | id, channel, external_id, alt_id (LID), display_name, role (`owner` or `member`), member_id |
+| `members` | id, name, created_at (19.4) |
+| `agent_members` | agent_id, member_id (19.4) |
 | `claims` | nonce, channel, expires_at, used_at |
-| `agents` | id, slug, name, persona, is_default, recall_container, owner_powers, guest_tools, daily_token_cap, telegram_connector_id, avatar_image, avatar_icon, avatar_color |
+| `agents` | id, slug, name, persona, is_default, recall_container, guest_tools, daily_token_cap, telegram_connector_id, avatar_image, avatar_icon, avatar_color |
 | `chats` | id, channel, connector_id, external_id, title, kind, session_id, allowed, agent_id |
 | `sessions` | id, chat_id, summary, saved_to_recall_at |
 | `messages` | id, session_id, role, content json, channel_msg_id, sender_name, from_owner, status (pending/handled), created_at |
@@ -552,8 +554,8 @@ Palui stops being one persona for one person. An agent is a named persona with i
 | `slug` | Lowercase id used in `/agent <slug>` and on the Agents page (`chef`, `vorneo-cs`). Fixed after creation. |
 | `name`, `persona` | Display name and the persona text that opens the system prompt (max 8000 chars). |
 | `recall_container` | Where its memory lives. Palui (the default agent) uses the recall connector's container. Every other agent gets `agent-<slug>`. |
-| `owner_powers` | `off` or `approve`: what the owner's own messages get in this agent's shared chats (19.4). |
-| `guest_tools` | `none` or `safe`: what other people can make it use (19.4). |
+| `guest_tools` | `none` or `safe`: whether a chat with outsiders gets tools at all (19.4). |
+| members | People the owner trusts with this agent's data (`agent_members`, 19.4). Palui has none. |
 | `daily_token_cap` | Tokens per day across all its chats. 0 means only the global cap applies. |
 | `telegram_connector_id` | Optional: its own Telegram bot (19.6). |
 
@@ -577,12 +579,43 @@ The first boot after the migration creates Palui as the default agent from `sett
 - In a shared chat each user message in the history starts with `[Name]:`, and the owner's start with `[Owner]:`. The system prompt says it's a shared chat, that only `[Owner]` lines come from the owner, and that the owner's private details aren't to be shared.
 - Approval answers, reminder buttons and commands are owner only. A guest's "ya" is a normal message.
 
-### 19.4 Tools and approvals
+### 19.4 Tools by audience
 
-- Guest turn: any message in the batch is from someone other than the owner. It gets no tools (`guest_tools: none`) or only tools marked `guestSafe` in the connector contract (`guest_tools: safe`). Unmarked tools are never guest safe (fail closed). Today that's web fetch (`fetch_page`).
-- Owner turn in a shared chat: with `owner_powers: off` it's treated like a guest turn. With `approve` it gets every tool, and every write or destructive call needs approval.
-- Guest and shared-chat turns are strict: every `write` needs approval, like jobs.
-- Approval prompts from a shared chat never go to that chat. They go to the owner's DM on the same channel (the web chat when there's none), and they name the chat they came from. `pending_approvals.ask_chat_id` is where the prompt went, and only an answer from there counts.
+One rule: a turn only gets tools whose data everyone who can read the chat may see. Who can read the chat decides it, not who sent the message and not a label on the agent.
+
+People:
+
+- The owner, as today (`identities.role = 'owner'`).
+- Members: people the owner names, each with one or more channel accounts (`members`, plus `identities.role = 'member'` with `identities.member_id`). `agent_members` links a member to the agents they share. A member of one agent is an outsider to every other agent.
+- Outsiders: everyone else.
+
+Audience, worked out when the turn starts:
+
+| Audience | When |
+|---|---|
+| `owner` | The owner's DM or the web chat. |
+| `members` | A shared chat where every participant is the owner or a member of this chat's agent: a DM with a member, or a WhatsApp group whose participant list (`GetGroupInfo`, cached, refreshed on participant changes) holds nobody else. |
+| `outside` | Anything else. A participant list Palui can't read counts as `outside` (fail closed), and so does every Telegram group, since a bot can't list a group's members. |
+
+Data scope is `PaluiTool.Data` from the connector contract: `none`, `chat`, `agent` or `shared`. A tool without one follows its connector: `agent` when one agent owns the connector, `shared` when it's global. MCP servers, Google Calendar and T3 Code are `agent` or `shared` that way. The owner can mark an MCP server as `none` on the agent's Tools tab (a prayer times server holds nothing private); that's the only override, since Palui can't check what an outside server keeps.
+
+| Data scope | `owner` | `members` | `outside` |
+|---|---|---|---|
+| `none` (web search, web fetch, prayer times) | yes | yes | yes |
+| `chat` (reminders, attachments, flows in that chat) | yes | yes | yes |
+| `agent` (instructions, contacts, memory, jobs, the agent's own MCP servers) | yes | yes | no |
+| `shared` (settings, global MCP servers, the owner's accounts) | yes | no | no |
+
+`guest_tools: none` takes every tool away from `outside` turns.
+
+- A tool left out isn't in the turn at all: not in the tool list, not in "Enabled capabilities", not found by `palui__search_tools`, not named anywhere in the prompt. The reply to "how much did the owner spend?" is the same whether a finance server exists or not.
+- `members` and `outside` turns have no approvals. A tool in the turn runs right away, with no limit on what it can do inside its scope (a recurring reminder in the group is fine). Destructive tools are never in those turns, and a call whose tool asks for approval on its own (`NeedsApproval`) is refused with a note to the model. Accepted risk: anyone in the chat can make the agent change that chat's data or that agent's data, and nothing past it.
+- `owner` turns keep today's rules: destructive asks, a write after untrusted content asks, `allow`/`ask`/`deny` per tool apply.
+- Approvals only ever happen in the owner's own chats now, so a shared chat never sends a prompt to the owner's DM.
+- Attachments in a shared chat leave out the share and unshare tools, the dashboard link and file refs, so public file links are made from the owner's chats only. T3 Code's chat thread list has no scope of its own and follows the connector.
+- A group Palui answers in is a shared chat like any agent's, so the owner's own message there gets the same tools as everyone else's.
+
+Reading down: Palui can read other agents' chats and memory (new read tools on Palui only, `owner` audience). What it reads was written by other people, so it taints the turn: a write after it asks for approval. No other agent can read Palui or another agent (#110 keeps jobs, MCP servers and settings per agent).
 
 ### 19.5 Memory and budget
 
@@ -591,7 +624,7 @@ The first boot after the migration creates Palui as the default agent from `sett
 - `recall_read_containers`: up to 5 containers the agent reads and never writes (owner-curated notes like `kb-shop`). Auto-recall reads them next to its own, in parallel, labeled as reference. No agent but Palui may write or read the owner's container (the memory connector's container or Palui's override); saving one is refused.
 - Recall tools follow the turn's scope (`TurnInfo.memory`). It's locked for every agent, Palui included: read tools reach its container and read list, writes only its container, any other container is an error, `forget_memory` (up to 20 ids per call, one approval) and `forget_document` check the item's container first (`GET /v1/memories/:id`, `GET /v1/documents/:id`), and recall tools not in Palui's class list are left out (`upcoming` takes `all_containers`). Palui's tools default to the owner's container and read only its own read list on top. Flow steps, polls and tool sources carry the flow agent's scope, and a call with no scope is locked to the recall connector's container.
 - Auto-save writes owner lines as `Owner:`, guest lines as `<name> (in <chat>):` and replies as `<agent name>:`. Guest text is saved on purpose, so a group agent remembers people. That also means anyone in an allowed chat can put text into that agent's memory, never into Palui's. Turns tainted by an untrusted tool result are still skipped.
-- A guest message makes the turn strict (19.4), but it doesn't mark the run tainted, so auto-save keeps it.
+- An outsider's message doesn't mark the run tainted, so auto-save keeps it.
 - `daily_token_cap` is counted in `usage` under `agent:<id>:<day>`. When it's hit, that agent stops answering until midnight (settings zone). The chat gets one notice per agent per day, and the global cap still applies on top.
 
 ### 19.6 Channels
@@ -602,11 +635,21 @@ The first boot after the migration creates Palui as the default agent from `sett
 
 ### 19.7 Dashboard
 
-- Agents page: list with avatar, name, chats, tokens today against the cap. A sheet to create or edit: avatar, name, slug, persona, owner powers, guest tools, daily cap, recall container, Telegram bot, and a link to the agent's instructions on Notes. Palui's sheet hides the shared-chat fields.
+- Agents page: list with avatar, name, chats, tokens today against the cap. A sheet to create or edit: avatar, name, slug, persona, members, guest tools, daily cap, recall container, Telegram bot, and a link to the agent's instructions on Notes. Palui's sheet hides the shared-chat fields.
+- Members: added from the agent sheet with a name and one or more accounts, picked from people who already wrote in a chat (sender id and name) or typed in. One member can be in several agents.
+- Tools tab: each tool says which audiences get it (owner only, members, everyone in the chat), next to the data label from #110. MCP servers get a "Holds no private data" switch that sets them to `none`.
 - Avatar: an uploaded photo (cropped square and re-encoded as a 256 px WebP in the browser, stored as a data URL of at most 96 KB), else one of 24 icons on one of 9 colors, else Palui's mark for the default agent and a plain bot for the rest. Columns `avatar_image`, `avatar_icon`, `avatar_color`.
 - Chats page: each chat shows its agent and an Allowed switch, with a Select to change the agent.
 - Settings: the persona field moves to Palui on the Agents page.
 
 ### 19.8 Not in this round
 
-Per-person roles (utusan IAM), group messages kept as background context, agents talking to each other, per-chat caps, media from guests.
+Roles beyond owner and member (utusan IAM), sharing one agent's data with another agent, group messages kept as background context, agents talking to each other, per-chat caps, media from guests.
+
+### 19.9 Rollout
+
+1. Audience `owner` or `outside` only (no members yet): tools filtered by data scope, no approvals in shared chats, destructive left out, `owner_powers` ignored. This alone lets a friends' group set reminders.
+2. Members: `members`, `agent_members`, the `identities` change, WhatsApp participant lists, the `members` audience, the agent sheet.
+3. Reading down: Palui's read tools for other agents' chats and memory.
+4. Tools tab: audience labels and the "Holds no private data" switch.
+5. Drop `owner_powers` and the shared-chat approval routing (`pending_approvals.ask_chat_id` stays for old rows until they expire).

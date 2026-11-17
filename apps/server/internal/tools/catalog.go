@@ -2,7 +2,7 @@ package tools
 
 // The tools an agent can be offered right now, for the agent page (PLAN 19.7),
 // from tools/catalog.ts: the collection a turn in the owner's own chat runs,
-// with each tool's guestSafe flag saying whether guest turns get it too.
+// with guestSafe saying whether a shared chat's turn gets it too.
 
 import (
 	"context"
@@ -25,6 +25,7 @@ type CatalogTool struct {
 	Title         *string `json:"title"`
 	// Its results come from outside, so they taint the turn.
 	Untrusted bool `json:"untrusted"`
+	// An outside turn (a shared chat, PLAN 19.4) gets it too.
 	GuestSafe bool `json:"guestSafe"`
 	// Whose data it touches: chat, agent, shared or none. Left out, it follows
 	// the connector: the agent's when one agent owns it, shared otherwise.
@@ -46,6 +47,15 @@ func Catalog(ctx context.Context, running []connectors.RunningEntry, o CatalogOp
 		Turn: connectors.TurnInfo{ChatID: o.ChatID, Channel: o.Channel, Trigger: "message", TZ: o.TZ, Now: o.Now, AgentID: o.AgentID},
 		// Every tool lands in Meta, active or deferred, whatever this is.
 		MaxTools:          math.MaxInt,
+		Log:               o.Log,
+		OnUntrustedResult: func(*ToolMeta) {},
+	})
+	// The same collection for an outside turn: what a shared chat gets.
+	outsideTurn := connectors.TurnInfo{ChatID: o.ChatID, Channel: o.Channel, Trigger: "message", TZ: o.TZ, Now: o.Now, AgentID: o.AgentID, Mode: AudienceOutside}
+	outside := Collect(ctx, running, CollectOptions{
+		Turn:              outsideTurn,
+		MaxTools:          math.MaxInt,
+		Audience:          AudienceOutside,
 		Log:               o.Log,
 		OnUntrustedResult: func(*ToolMeta) {},
 	})
@@ -73,7 +83,7 @@ func Catalog(ctx context.Context, running []connectors.RunningEntry, o CatalogOp
 			t := m.Title
 			title = &t
 		}
-		out = append(out, CatalogTool{Name: m.Name, Tool: m.Tool, ConnectorID: m.ConnectorID, ConnectorLabel: label, ConnectorType: typ, Class: m.Class, Title: title, Untrusted: m.Untrusted, GuestSafe: m.GuestSafe, Data: m.Data})
+		out = append(out, CatalogTool{Name: m.Name, Tool: m.Tool, ConnectorID: m.ConnectorID, ConnectorLabel: label, ConnectorType: typ, Class: m.Class, Title: title, Untrusted: m.Untrusted, GuestSafe: outside.Meta[name] != nil, Data: m.Data})
 	}
 	return out
 }

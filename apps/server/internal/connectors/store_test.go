@@ -176,3 +176,35 @@ func TestConfigHashAndPatchConfig(t *testing.T) {
 		t.Fatal("owned")
 	}
 }
+
+func TestResolveData(t *testing.T) {
+	owner := "agt_sales"
+	empty := ""
+	global := db.Connector{ID: "g"}
+	blank := db.Connector{ID: "b", AgentID: &empty}
+	owned := db.Connector{ID: "o", AgentID: &owner}
+	cases := []struct {
+		declared string
+		row      db.Connector
+		want     string
+	}{
+		{connectors.DataChat, global, connectors.DataChat},
+		{connectors.DataChat, owned, connectors.DataChat},
+		{connectors.DataNone, global, connectors.DataNone},
+		{connectors.DataNone, owned, connectors.DataNone},
+		{connectors.DataAgent, global, connectors.DataAgent},
+		{connectors.DataAgent, owned, connectors.DataAgent},
+		{connectors.DataShared, global, connectors.DataShared},
+		{connectors.DataShared, owned, connectors.DataShared},
+		{"", global, connectors.DataShared},
+		{"", blank, connectors.DataShared},
+		{"", owned, connectors.DataAgent},
+		{"chats", global, connectors.DataShared},
+		{"None", owned, connectors.DataAgent},
+	}
+	for _, c := range cases {
+		if got := connectors.ResolveData(c.declared, c.row); got != c.want {
+			t.Errorf("ResolveData(%q, %v) = %q, want %q", c.declared, c.row.AgentID, got, c.want)
+		}
+	}
+}

@@ -19,6 +19,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/testutil"
+	"github.com/zakiego/palui/apps/server/internal/tools"
 )
 
 const (
@@ -552,5 +553,19 @@ func TestDropsWatchesForMissingThreadsAndAfter24Hours(t *testing.T) {
 	}
 	if len(f.Events) != 1 || f.Events[0].Kind != "t3code.watch_expired" {
 		t.Fatal(f.Events)
+	}
+}
+
+func TestASharedChatGetsNoT3CodeTool(t *testing.T) {
+	w := setup(t)
+	entry := connectors.RunningEntry{ID: "t3code", Row: db.Connector{ID: "t3code", Kind: "tools", Label: "T3 Code", Type: "t3code"}, Handle: w.started.Handle}
+	outside := w.turn
+	outside.Mode = "outside"
+	c := tools.Collect(context.Background(), []connectors.RunningEntry{entry}, tools.CollectOptions{Turn: outside, MaxTools: 64, Audience: tools.AudienceOutside})
+	if len(c.Names()) != 0 || len(c.ConnectorIDs) != 0 {
+		t.Fatal(c.Names())
+	}
+	if all := tools.Collect(context.Background(), []connectors.RunningEntry{entry}, tools.CollectOptions{Turn: w.turn, MaxTools: 64}); len(all.Names()) != 7 {
+		t.Fatal(all.Names())
 	}
 }

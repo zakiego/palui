@@ -9,6 +9,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -24,6 +25,9 @@ const (
 	ToolSep = "__"
 	// The tool search meta tool, namespaced under the `palui` prefix.
 	SearchTool = "palui" + ToolSep + "search_tools"
+	// Who can read the chat a turn runs in (PLAN 19.4). "" counts as owner.
+	AudienceOwner   = "owner"
+	AudienceOutside = "outside"
 	// Matches loaded per search call.
 	SearchLimit = 5
 	// Loaded tools a session keeps, most recent first.
@@ -45,6 +49,8 @@ type ToolMeta struct {
 	GuestSafe     bool                               `json:"guestSafe"`
 	// Whose data it touches, as the tool declares it ("" follows the connector).
 	Data string `json:"-"`
+	// Data resolved against the connector (connectors.ResolveData).
+	Scope string `json:"-"`
 }
 
 // Collected is CollectedTools. Active grows mid-turn when a search loads tools,
@@ -117,6 +123,24 @@ func Namespaced(connectorID, tool string) string {
 	return s
 }
 
+// InAudience says whether a tool with this resolved data scope and class may
+// be in a turn for this audience. The owner gets everything. An outside turn
+// gets tools whose data stays in that chat or that keep nothing, never a
+// destructive one. Any other audience gets nothing (fail closed).
+func InAudience(audience, scope, class string) bool {
+	switch audience {
+	case "", AudienceOwner:
+		return true
+	case AudienceOutside:
+		return (scope == connectors.DataChat || scope == connectors.DataNone) && class != "destructive"
+	}
+	return false
+}
+
+// OutsideApprovalError is what a call gets when its tool asks for approval on
+// its own in a turn that has no approvals.
+const OutsideApprovalError = "This needs the owner's approval, and approvals aren't available in this chat. Don't retry it; say you can't do that here."
+
 // NormalizeClass: anything unclassified is destructive (fail closed).
 func NormalizeClass(c string) string {
 	if c == "read" || c == "write" || c == "destructive" {
@@ -140,9 +164,9 @@ type CollectOptions struct {
 	Sticky []string
 	// Called with the names a search just loaded.
 	OnLoad func(names []string)
-	// Guest turns only get tools marked guestSafe.
-	GuestOnly bool
-	Log       *logx.Logger
+	// Who can read the chat: AudienceOwner ("" too) or AudienceOutside.
+	Audience string
+	Log      *logx.Logger
 	// Called after an untrusted tool returns (taints the turn).
 	OnUntrustedResult func(meta *ToolMeta)
 	// Called when any tool starts, for timing.
@@ -194,10 +218,12 @@ func Collect(ctx context.Context, running []connectors.RunningEntry, opts Collec
 				continue
 			}
 			cls := NormalizeClass(pt.Class)
-			if opts.ExcludeDestructive && cls == "destructive" {
+			// Before anything lands in order, so search, sticky names and the
+			// capability list never see a tool outside the audience.
+			if !InAudience(opts.Audience, connectors.ResolveData(pt.Data, e.Row), cls) {
 				continue
 			}
-			if opts.GuestOnly && !pt.GuestSafe {
+			if opts.ExcludeDestructive && cls == "destructive" {
 				continue
 			}
 			name := Namespaced(e.ID, toolName)
@@ -207,7 +233,7 @@ func Collect(ctx context.Context, running []connectors.RunningEntry, opts Collec
 			if contains(opts.Deny, name) {
 				continue
 			}
-			meta := &ToolMeta{Name: name, ConnectorID: e.ID, Tool: toolName, Class: cls, Untrusted: pt.Untrusted || e.Row.Trust == "external", Title: pt.Title, Label: e.Row.Label, GuestSafe: pt.GuestSafe, Data: pt.Data, NeedsApproval: pt.NeedsApproval, Preview: pt.Preview}
+			meta := &ToolMeta{Name: name, ConnectorID: e.ID, Tool: toolName, Class: cls, Untrusted: pt.Untrusted || e.Row.Trust == "external", Title: pt.Title, Label: e.Row.Label, GuestSafe: pt.GuestSafe, Data: pt.Data, Scope: connectors.ResolveData(pt.Data, e.Row), NeedsApproval: pt.NeedsApproval, Preview: pt.Preview}
 			out.Tools.Set(name, wrapTool(pt.Tool, meta, opts))
 			out.Meta[name] = meta
 			order = append(order, name)
@@ -374,7 +400,9 @@ func searchToolFor(out *Collected, order []string, opts CollectOptions) connecto
 }
 
 // wrapTool times the call and, for untrusted tools, taints the turn after it
-// returns (even with an error, which may carry the content).
+// returns (even with an error, which may carry the content). In an outside
+// turn, a call whose tool asks for approval on its own is refused: that turn
+// has no approvals.
 func wrapTool(t connectors.Tool, meta *ToolMeta, opts CollectOptions) connectors.Tool {
 	exec := t.Execute
 	if exec == nil {
@@ -384,6 +412,9 @@ func wrapTool(t connectors.Tool, meta *ToolMeta, opts CollectOptions) connectors
 		if opts.OnToolStart != nil {
 			opts.OnToolStart(call.ToolCallID)
 		}
+		if opts.Audience == AudienceOutside && meta.NeedsApproval != nil && asksOnItsOwn(meta.NeedsApproval, input) {
+			return nil, errors.New(OutsideApprovalError)
+		}
 		defer func() {
 			if meta.Untrusted && opts.OnUntrustedResult != nil {
 				opts.OnUntrustedResult(meta)
@@ -392,4 +423,14 @@ func wrapTool(t connectors.Tool, meta *ToolMeta, opts CollectOptions) connectors
 		return exec(ctx, input, call)
 	}
 	return t
+}
+
+// asksOnItsOwn is the tool's NeedsApproval; a panic counts as asking.
+func asksOnItsOwn(fn func(json.RawMessage) bool, input json.RawMessage) (ask bool) {
+	defer func() {
+		if recover() != nil {
+			ask = true
+		}
+	}()
+	return fn(input)
 }

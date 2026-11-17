@@ -1,7 +1,8 @@
 // Package tools ports packages/core/src/tools. M1 has permissions.ts: per-agent
 // tool permissions. The owner can let an agent run every tool without asking,
 // or pick allow / ask / deny per tool. They only loosen turns the owner
-// started. Jobs, flows, hooks and guests keep the class rules.
+// started. Jobs, flows and hooks keep the class rules. Shared chats have no
+// approvals: "ask" and "deny" tools are left out there (PLAN 19.4).
 package tools
 
 import (
@@ -93,6 +94,21 @@ func DeniedTools(p *db.ToolPermissions) []string {
 	return out
 }
 
+// AskTools are the names the owner set to "ask". An outside turn leaves them
+// out: it has no approvals, and the owner wanted a say on these.
+func AskTools(p *db.ToolPermissions) []string {
+	out := []string{}
+	if p == nil {
+		return out
+	}
+	for _, k := range p.Tools.Keys() {
+		if v, _ := p.Tools.Get(k); v == "ask" {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
 type ApprovalInput struct {
 	// "read", "write" or "destructive".
 	Class string
@@ -101,7 +117,7 @@ type ApprovalInput struct {
 	// The owner started this turn and is there to see it.
 	OwnerTurn bool
 	Tainted   bool
-	// Jobs, flows, hooks and shared chats: every write asks.
+	// Jobs, flows and hooks: every write asks.
 	Strict bool
 	// The call carries a saved file (a palui:attachment ref).
 	SendsFile bool

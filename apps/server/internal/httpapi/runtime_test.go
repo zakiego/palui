@@ -10,6 +10,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/chat"
 	"github.com/zakiego/palui/apps/server/internal/chat/chattest"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
+	"github.com/zakiego/palui/apps/server/internal/connectors/notes"
 	"github.com/zakiego/palui/apps/server/internal/connectors/reminders"
 	"github.com/zakiego/palui/apps/server/internal/connectors/web"
 	"github.com/zakiego/palui/apps/server/internal/httpapi"
@@ -24,8 +25,8 @@ import (
 
 func runtimeFor(t *testing.T, deps chat.Deps) (*httpapi.Runtime, *chattest.Harness) {
 	h := chattest.New(t, chattest.Options{
-		Registry: map[string]*connectors.Runtime{"web": web.New(chat.NewBus()), "reminders": reminders.Runtime},
-		Rows:     []chattest.Row{{"web", "channel"}, {"reminders", "skill"}},
+		Registry: map[string]*connectors.Runtime{"web": web.New(chat.NewBus()), "reminders": reminders.Runtime, "notes": notes.Runtime},
+		Rows:     []chattest.Row{{"web", "channel"}, {"reminders", "skill"}, {"notes", "skill"}},
 		Deps:     deps,
 	})
 	return &httpapi.Runtime{DB: h.DB, Engine: h.Engine, Sup: h.Sup, Bus: h.Bus, Log: nil, StartedAt: 7, Clock: h.Clock.Now}, h
@@ -87,13 +88,20 @@ func TestRuntimeRoutesApprovalsStopAndAgents(t *testing.T) {
 	testutil.Must(t, err)
 	list, err := rt.AgentTools(context.Background(), palui.ID)
 	testutil.Must(t, err)
-	ok := false
+	ok, noteSeen := false, false
 	for _, tool := range list {
-		if tool.Name == "reminders__set_reminder" && tool.Class == "write" && !tool.GuestSafe {
+		// A shared chat gets the chat's reminders, never the owner's notes.
+		if tool.Name == "reminders__set_reminder" && tool.Class == "write" && tool.GuestSafe {
 			ok = true
 		}
+		if tool.ConnectorID == "notes" {
+			noteSeen = true
+			if tool.GuestSafe {
+				t.Fatalf("%+v", tool)
+			}
+		}
 	}
-	if !ok {
+	if !ok || !noteSeen {
 		t.Fatalf("%+v", list)
 	}
 	if r := rt.Remove(context.Background(), "nope"); r.OK {

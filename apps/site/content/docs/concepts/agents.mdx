@@ -48,12 +48,15 @@ Every message records who sent it. The model sees other people's messages as `[N
 
 ## What other people can make it do
 
-Each agent has two switches for shared chats:
+A shared chat is a group, or a DM with someone who isn't you. What it gets depends on who can read the chat, not on who sent the message. It only gets tools whose data stays in that chat or that keep nothing: reminders, saved files, web search and web fetch. Your notes, contacts, memory, jobs, accounts and MCP servers never show up there, and the agent can't tell anyone they exist.
 
-- Tools for other people: none, or safe tools only. Safe tools are the ones that can't reach your accounts or data. Today that's web fetch.
-- When you write there: treat you like everyone else, or use your tools but ask you first. Approval prompts from a shared chat go to your own DM, never into the group, and only your answer there counts.
+- One switch, Tools for other people: those tools, or none.
+- No approvals there. A tool the chat gets runs right away, and destructive tools are never offered.
+- Your own message in a group gets the same set as everyone else's. That includes Palui when you pick it for a group.
+- A tool you set to "Ask first" or "Off" on the Tools tab isn't offered in shared chats at all.
+- Sharing a saved file as a public link only works from your own chats.
 
-In a shared chat every write tool needs approval, the same as a scheduled job. Commands, approval answers and reminder buttons work only for you. If someone else sends `/new` or `ya`, it's just a message to the agent.
+Commands and reminder buttons work only for you. If someone else sends `/new` or `ya`, it's just a message to the agent.
 
 Admin details stay out of shared chats. If the model is off or a budget is hit, people there get a short "can't answer right now" reply, and the details go to your DM.
 

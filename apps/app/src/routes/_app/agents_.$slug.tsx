@@ -15,7 +15,7 @@ import { AvatarPicker } from "@/components/agents/avatar-picker"
 import { AppError } from "@/components/app-error"
 import { ConnectorStatusBadge } from "@/components/connector-status"
 import { ToolsByScope } from "@/components/agent-tools/by-scope"
-import { groupTools, type Permission } from "@/components/agent-tools/shared"
+import { groupTools, inSharedChats, type Permission } from "@/components/agent-tools/shared"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
@@ -317,19 +317,13 @@ function AgentSettings({ data }: { data: Loaded }) {
                         { value: "safe", label: t("agents.guestTools.safe") },
                         { value: "none", label: t("agents.guestTools.none") },
                       ]}
+                      aria-describedby={form.guestTools === "safe" ? "agent-guests-hint" : undefined}
                     />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="agent-owner">{t("agents.field.ownerPowers")}</FieldLabel>
-                    <SimpleSelect
-                      id="agent-owner"
-                      value={form.ownerPowers}
-                      onChange={(v) => set("ownerPowers", v as Form["ownerPowers"])}
-                      options={[
-                        { value: "off", label: t("agents.ownerPowers.off") },
-                        { value: "approve", label: t("agents.ownerPowers.approve") },
-                      ]}
-                    />
+                    {form.guestTools === "safe" && (
+                      <FieldDescription id="agent-guests-hint" className="text-pretty">
+                        {t("agents.guestToolsHint")}
+                      </FieldDescription>
+                    )}
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="agent-bot">{t("agents.field.bot")}</FieldLabel>
@@ -828,16 +822,13 @@ function ToolsTab({ agent }: { agent: Agent }) {
   }
 
   const tools = data?.tools ?? null
-  const guestSafe = tools?.filter((x) => x.guestSafe).length ?? 0
-
   const groups = React.useMemo(() => groupTools(tools ?? [], query), [tools, query])
 
-  // The count shows once the runtime said how many there are.
-  const safe = tools ? t("agents.tools.safe", { n: guestSafe.toLocaleString() }) : t("agents.tools.safeOnly")
-  const others = agent.isDefault ? t("agents.tools.paluiOthers") : agent.guestTools === "none" ? t("agents.tools.none") : safe
-  // Palui answers only you in a group, as in your own chats (turn.ts: shared needs a non-default agent).
   const youRule = permissions.allowAll ? t("agents.tools.youAllowAll") : t("agents.tools.youRule")
-  const inGroups = agent.isDefault ? youRule : agent.ownerPowers === "approve" ? (permissions.allowAll ? t("agents.tools.groupsAllowAll") : t("agents.tools.groupsApprove")) : agent.guestTools === "none" ? t("agents.tools.none") : safe
+  // A group or someone else's DM, Palui's groups included: one tool set for
+  // everyone there, never asking first.
+  const sharedCount = tools?.filter((x) => inSharedChats(x, agent.guestTools, permissions)).length ?? null
+  const sharedRule = agent.guestTools === "none" ? t("agents.tools.none") : sharedCount === null ? t("agents.tools.sharedRuleLoading") : t("agents.tools.sharedRule", { n: sharedCount.toLocaleString() })
 
   return (
     <>
@@ -851,8 +842,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
 
       <ItemGroup className="gap-1">
         <Rule icon={<UserIcon />} label={t("agents.tools.you")} value={youRule} />
-        <Rule icon={<UsersIcon />} label={t("agents.tools.groups")} value={inGroups} />
-        <Rule icon={<MessagesSquareIcon />} label={t("agents.tools.others")} value={others} />
+        <Rule icon={<UsersIcon />} label={t("agents.tools.shared")} value={sharedRule} />
       </ItemGroup>
 
       {tools && tools.length > 12 && (

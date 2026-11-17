@@ -199,6 +199,21 @@ func ServesAgent(row db.Connector, agentID string) bool {
 	return row.AgentID == nil || *row.AgentID == "" || *row.AgentID == agentID
 }
 
+// ResolveData is a tool's data scope on the server. A declared chat, agent,
+// shared or none stands as is. Anything else (no scope, or an unknown string)
+// follows the connector: DataAgent when one agent owns it, DataShared when it's
+// global. Unknown never becomes chat or none (fail closed).
+func ResolveData(declared string, row db.Connector) string {
+	switch declared {
+	case DataChat, DataAgent, DataShared, DataNone:
+		return declared
+	}
+	if row.AgentID != nil && *row.AgentID != "" {
+		return DataAgent
+	}
+	return DataShared
+}
+
 func ptr(s string) *string { return &s }
 
 // Connect marks desired = on. The supervisor moves it through connecting -> on|error.

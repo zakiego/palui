@@ -77,3 +77,12 @@ func TestAllowSkipsThePromptOnlyInAnOwnerTurn(t *testing.T) {
 		}
 	}
 }
+
+func TestListsAskTools(t *testing.T) {
+	if got := tools.AskTools(perms(true, "a__x", "deny", "a__y", "ask", "a__z", "allow", "a__w", "ask")); !reflect.DeepEqual(got, []string{"a__y", "a__w"}) {
+		t.Fatal(got)
+	}
+	if got := tools.AskTools(nil); len(got) != 0 {
+		t.Fatal(got)
+	}
+}

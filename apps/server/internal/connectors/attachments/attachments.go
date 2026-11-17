@@ -71,11 +71,14 @@ func strOrNil(s *string) any {
 	return *s
 }
 
-func view(a db.AttachmentMeta, appURL string) any {
+// view is one file in a result. The dashboard link and the fileRef only go to
+// the owner's own chats: a shared chat has neither the dashboard nor another
+// app's tools.
+func view(a db.AttachmentMeta, appURL string, ownerChat bool) any {
 	return kit.O(
 		"id", a.ID, "title", a.Title, "description", a.Description, "kind", a.Kind, "mimeType", a.MimeType,
 		"filename", strOrNil(a.Filename), "size", attachments.FormatBytes(a.Size), "savedAt", kit.ISO(a.CreatedAt),
-		"url", appURL+"/app/attachments?id="+a.ID, "fileRef", attachments.Ref(a.ID),
+		"url", kit.If(ownerChat, appURL+"/app/attachments?id="+a.ID), "fileRef", kit.If(ownerChat, attachments.Ref(a.ID)),
 	)
 }
 
@@ -160,6 +163,21 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 	if appURL == nil {
 		appURL = func() string { return config.Get().AppURL }
 	}
+	// A shared chat (PLAN 19.4) gets no dashboard links, no fileRef notes and no
+	// share links: a public link made there would push the chat's file out with
+	// nobody asked. "" is the owner shape (the registry golden and tests). A
+	// sharedOwner approval asked before PLAN 19.9 step 1 resumes with the tools
+	// it was asked with.
+	ownerChat := turn.Mode == "" || turn.Mode == "owner" || turn.Mode == "sharedOwner"
+	hint := ""
+	if ownerChat {
+		hint = " " + fileRefHint
+	}
+	sendTo := func(cond bool) any { return kit.If(ownerChat && cond, sendNote) }
+	getDescription := "Get one saved file's details by id: title, description, type, size and when it was saved."
+	if ownerChat {
+		getDescription = "Get one saved file's details by id: title, description, type, size, when it was saved, and the dashboard link where the owner can open or download it after signing in. Files can't be sent back into the chat yet; to give someone the file itself, call share_attachment." + hint
+	}
 	own := func(id string) (db.AttachmentMeta, any, error) {
 		a, ok, err := attachments.Get(d, id)
 		if err != nil {
@@ -176,7 +194,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 		Data:  connectors.DataChat,
 		Class: "write",
 		Title: "Save an attachment",
-		Tool: kit.Tool("Save a file the owner sent in this chat (photo, PDF, document) so it can be found later. Only save files that are worth keeping: identity documents (KTP, SIM, passport, KK), receipts and invoices, tickets and bookings, contracts, certificates, medical or school records, or anything the owner asks you to keep. Do NOT save casual photos, memes, screenshots of chats or files that are only needed for this one answer, unless the owner asks. When unsure, ask the owner first. By default it saves from the current message. A file from an earlier message (shown as [gambar dari sebelumnya]) can still be saved with `earlier: true`, for example a receipt sent before the owner confirmed: call it without `nomor` first to see the recent files with when they were sent and their caption, then again with the right `nomor`. Never tell the owner a file is saved unless this tool returned ok. Give it a clear title and a one-sentence description of what it is (dates, numbers, names that help find it later). Tell the owner it was saved. "+fileRefHint, saveInput,
+		Tool: kit.Tool("Save a file the owner sent in this chat (photo, PDF, document) so it can be found later. Only save files that are worth keeping: identity documents (KTP, SIM, passport, KK), receipts and invoices, tickets and bookings, contracts, certificates, medical or school records, or anything the owner asks you to keep. Do NOT save casual photos, memes, screenshots of chats or files that are only needed for this one answer, unless the owner asks. When unsure, ask the owner first. By default it saves from the current message. A file from an earlier message (shown as [gambar dari sebelumnya]) can still be saved with `earlier: true`, for example a receipt sent before the owner confirmed: call it without `nomor` first to see the recent files with when they were sent and their caption, then again with the right `nomor`. Never tell the owner a file is saved unless this tool returned ok. Give it a clear title and a one-sentence description of what it is (dates, numbers, names that help find it later). Tell the owner it was saved."+hint, saveInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				nomor, hasNomor := in.Int("nomor")
 				pick := int64(1)
@@ -246,14 +264,14 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 				if saved.Deduped {
 					message = fmt.Sprintf("File ini udah pernah disimpan sebagai \"%s\".", saved.Row.Title)
 				}
-				return kit.O("ok", true, "deduped", saved.Deduped, "message", message, "attachment", view(saved.Row, appURL()), "sendToOtherApp", sendNote), nil
+				return kit.O("ok", true, "deduped", saved.Deduped, "message", message, "attachment", view(saved.Row, appURL(), ownerChat), "sendToOtherApp", sendTo(true)), nil
 			}),
 	})
 	set.Set("list_attachments", connectors.PaluiTool{
 		Data:  connectors.DataChat,
 		Class: "read",
 		Title: "List saved attachments",
-		Tool: kit.Tool("List files saved in this chat with save_attachment, newest first. Use `query` to search titles, descriptions and file names, e.g. when the owner asks where their KTP or a ticket is. "+fileRefHint, listInput,
+		Tool: kit.Tool("List files saved in this chat with save_attachment, newest first. Use `query` to search titles, descriptions and file names, e.g. when the owner asks where their KTP or a ticket is."+hint, listInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				limit := int64(20)
 				if n, ok := in.Int("limit"); ok {
@@ -265,78 +283,80 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 				}
 				list := make([]any, len(rows))
 				for i, a := range rows {
-					list[i] = view(a, appURL())
+					list[i] = view(a, appURL(), ownerChat)
 				}
-				return kit.O("ok", true, "count", len(rows), "attachments", list, "sendToOtherApp", kit.If(len(rows) > 0, sendNote)), nil
+				return kit.O("ok", true, "count", len(rows), "attachments", list, "sendToOtherApp", sendTo(len(rows) > 0)), nil
 			}),
 	})
 	set.Set("get_attachment", connectors.PaluiTool{
 		Data:  connectors.DataChat,
 		Class: "read",
 		Title: "Get a saved attachment",
-		Tool: kit.Tool("Get one saved file's details by id: title, description, type, size, when it was saved, and the dashboard link where the owner can open or download it after signing in. Files can't be sent back into the chat yet; to give someone the file itself, call share_attachment. "+fileRefHint, idInput,
+		Tool: kit.Tool(getDescription, idInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				a, refusal, err := own(in.S("id"))
 				if err != nil || refusal != nil {
 					return refusal, err
 				}
-				return kit.O("ok", true, "attachment", view(a, appURL()), "sendToOtherApp", sendNote), nil
+				return kit.O("ok", true, "attachment", view(a, appURL(), ownerChat), "sendToOtherApp", sendTo(true)), nil
 			}),
 	})
-	set.Set("share_attachment", connectors.PaluiTool{
-		Data:  connectors.DataChat,
-		Class: "write",
-		Title: "Share a saved attachment",
-		Tool: kit.Tool(`Make a temporary link that opens a saved file directly (images and PDFs show in the browser, other files download). visibility "private" (the default) only opens for the owner signed in to the dashboard. visibility "public" opens for anyone who has the link, so only use it when the owner asks to share the file with someone else, and never for identity documents unless the owner says so explicitly. Links expire after `+"`expires`"+` (default 24h, at most 7d) and the owner can turn them off on the Attachments page. Each call makes a new link; send the url as it is.`, shareInput,
-			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
-				id := in.S("id")
-				a, refusal, err := own(id)
-				if err != nil || refusal != nil {
-					return refusal, err
-				}
-				visibility := in.S("visibility")
-				if visibility == "" {
-					visibility = "private"
-				}
-				duration := in.S("expires")
-				if duration == "" {
-					duration = "24h"
-				}
-				made, ok, err := attachments.CreateShare(d, attachments.ShareInput{AttachmentID: a.ID, Visibility: visibility, Duration: duration, CreatedBy: chatID}, clock())
-				if err != nil {
-					return nil, err
-				}
-				if !ok {
-					return kit.Fail(fmt.Sprintf("No saved attachment %s.", id)), nil
-				}
-				note := "Opens only after signing in to the dashboard."
-				if visibility == "public" {
-					note = "Anyone with this link can open the file until it expires."
-				}
-				return kit.O("ok", true, "url", attachments.ShareURL(appURL(), made.Token), "visibility", visibility, "expiresAt", kit.ISO(made.Share.ExpiresAt), "note", note), nil
-			}),
-	})
-	set.Set("unshare_attachment", connectors.PaluiTool{
-		Data:  connectors.DataChat,
-		Class: "write",
-		Title: "Turn off links to an attachment",
-		Tool: kit.Tool("Turn off every live share link to a saved file, e.g. when the owner says a link shouldn't work anymore. The file itself stays saved.", idInput,
-			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
-				a, refusal, err := own(in.S("id"))
-				if err != nil || refusal != nil {
-					return refusal, err
-				}
-				n, err := attachments.RevokeShares(d, a.ID, clock())
-				if err != nil {
-					return nil, err
-				}
-				msg := fmt.Sprintf("Nggak ada tautan aktif ke \"%s\".", a.Title)
-				if n > 0 {
-					msg = fmt.Sprintf("%d tautan ke \"%s\" udah dimatikan.", n, a.Title)
-				}
-				return kit.O("ok", true, "revoked", n, "message", msg), nil
-			}),
-	})
+	if ownerChat {
+		set.Set("share_attachment", connectors.PaluiTool{
+			Data:  connectors.DataChat,
+			Class: "write",
+			Title: "Share a saved attachment",
+			Tool: kit.Tool(`Make a temporary link that opens a saved file directly (images and PDFs show in the browser, other files download). visibility "private" (the default) only opens for the owner signed in to the dashboard. visibility "public" opens for anyone who has the link, so only use it when the owner asks to share the file with someone else, and never for identity documents unless the owner says so explicitly. Links expire after `+"`expires`"+` (default 24h, at most 7d) and the owner can turn them off on the Attachments page. Each call makes a new link; send the url as it is.`, shareInput,
+				func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
+					id := in.S("id")
+					a, refusal, err := own(id)
+					if err != nil || refusal != nil {
+						return refusal, err
+					}
+					visibility := in.S("visibility")
+					if visibility == "" {
+						visibility = "private"
+					}
+					duration := in.S("expires")
+					if duration == "" {
+						duration = "24h"
+					}
+					made, ok, err := attachments.CreateShare(d, attachments.ShareInput{AttachmentID: a.ID, Visibility: visibility, Duration: duration, CreatedBy: chatID}, clock())
+					if err != nil {
+						return nil, err
+					}
+					if !ok {
+						return kit.Fail(fmt.Sprintf("No saved attachment %s.", id)), nil
+					}
+					note := "Opens only after signing in to the dashboard."
+					if visibility == "public" {
+						note = "Anyone with this link can open the file until it expires."
+					}
+					return kit.O("ok", true, "url", attachments.ShareURL(appURL(), made.Token), "visibility", visibility, "expiresAt", kit.ISO(made.Share.ExpiresAt), "note", note), nil
+				}),
+		})
+		set.Set("unshare_attachment", connectors.PaluiTool{
+			Data:  connectors.DataChat,
+			Class: "write",
+			Title: "Turn off links to an attachment",
+			Tool: kit.Tool("Turn off every live share link to a saved file, e.g. when the owner says a link shouldn't work anymore. The file itself stays saved.", idInput,
+				func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
+					a, refusal, err := own(in.S("id"))
+					if err != nil || refusal != nil {
+						return refusal, err
+					}
+					n, err := attachments.RevokeShares(d, a.ID, clock())
+					if err != nil {
+						return nil, err
+					}
+					msg := fmt.Sprintf("Nggak ada tautan aktif ke \"%s\".", a.Title)
+					if n > 0 {
+						msg = fmt.Sprintf("%d tautan ke \"%s\" udah dimatikan.", n, a.Title)
+					}
+					return kit.O("ok", true, "revoked", n, "message", msg), nil
+				}),
+		})
+	}
 	set.Set("delete_attachment", connectors.PaluiTool{
 		Data:  connectors.DataChat,
 		Class: "destructive",

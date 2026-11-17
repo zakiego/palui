@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/chat"
 	"github.com/zakiego/palui/apps/server/internal/chat/chattest"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
@@ -168,6 +169,36 @@ func TestToolsCommand(t *testing.T) {
 	eq(t, lastText(t, h.DB), "alpha (2 tool):\n• baca (read): Baca data\n• hapus (destructive)")
 	h.say("/tools beta")
 	contains(t, lastText(t, h.DB), "Gak ada tool dari `beta`")
+}
+
+func TestToolsCommandInASharedChat(t *testing.T) {
+	t.Run("lists what an outside turn gets, without the owner's connectors", func(t *testing.T) {
+		h := agentsWorld(t, nil, extra{registry: agentToolRegistry(&executedLog{}), rows: webAlphaRows})
+		ask := "ask"
+		perms := jsonx.NewMap[*string]()
+		perms.Set("web__fetch", &ask)
+		need(agents.SetToolPermissions(h.DB, h.chef.ID, agents.PermissionsPatch{Tools: perms}, 1))
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.owner("/tools")
+		h.Engine.Idle()
+		text := lastRow(t, h.DB).Payload.Text
+		contains(t, text, "Tool buat Chef di chat ini: 1")
+		contains(t, text, "• rem (1): write 1")
+		notContains(t, text, "alpha")
+		notContains(t, text, "web")
+		contains(t, text, "tool jalan tanpa minta izin")
+		notContains(t, text, "Destructive selalu minta izin")
+	})
+	t.Run("says there are none when tools for other people are off", func(t *testing.T) {
+		h := agentsWorld(t, nil, extra{registry: agentToolRegistry(&executedLog{}), rows: webAlphaRows})
+		need(agents.Update(h.DB, h.chef.ID, agents.Input{GuestTools: sp("none")}, 1))
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.owner("/tools")
+		h.Engine.Idle()
+		contains(t, lastRow(t, h.DB).Payload.Text, "Gak ada tool buat Chef di chat ini")
+	})
 }
 
 func TestModelsAndModel(t *testing.T) {

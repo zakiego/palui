@@ -756,8 +756,9 @@ func Tools(in ToolsInput) *connectors.ToolSet {
 				})
 			}),
 	})
+	// No data scope: it lists the owner's coding threads, so it follows the
+	// connector like the other T3 Code tools and stays out of shared chats.
 	set.Set("list_chat_threads", connectors.PaluiTool{
-		Data:  connectors.DataChat,
 		Class: "read", Untrusted: untrusted, Title: "List this chat's T3 Code threads",
 		Tool: kit.Tool("List the T3 Code threads started or followed up from this chat, newest first, with their thread ids and links. Only this chat's threads. "+linkNote, zod.Object(),
 			func(ctx context.Context, x kit.Input, call connectors.ToolCallInfo) (any, error) {
