@@ -1,5 +1,5 @@
 // Settings (PLAN 11.4): persona, timezone, language, model roles and failover,
-// budgets, passkeys, backup status, and inbound hooks.
+// budgets, passkeys, MCP access, backup status, and inbound hooks.
 import * as React from "react"
 import { REASONING_EFFORTS } from "@/shared/constants"
 import type { ModelChainLink } from "@/shared/constants"
@@ -11,6 +11,7 @@ import { z } from "zod"
 import { AppError } from "@/components/app-error"
 import { connectorIcon } from "@/components/connector-icon"
 import { CopyButton } from "@/components/copy-button"
+import { McpAccessCard } from "@/components/mcp-access-card"
 import { ModelPicker, type ModelCatalog } from "@/components/model-picker"
 import { PageHeader } from "@/components/page-header"
 import { PageHeaderSkeleton, PagePending, LineTabsSkeleton, SkeletonButton, SkeletonText } from "@/components/page-pending"
@@ -42,22 +43,29 @@ import { Spinner } from "@/components/ui/spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { authClient, passkeyCancelled } from "@/lib/auth-client"
 import { removePasskey } from "@/lib/api/session"
+import { getMcpAccess } from "@/lib/api/mcp"
 import { createHookFn, getSettingsPage, listConnectorModels, saveSettings } from "@/lib/api/settings"
 import { ago, errorMessage, fullDate } from "@/lib/format"
 import { useLabel, useT } from "@/lib/i18n"
 
 const TABS = ["general", "models", "limits", "security", "hooks"] as const
 
+// The settings page plus the MCP access list, fetched side by side.
+async function loadSettings() {
+  const [page, mcp] = await Promise.all([getSettingsPage(), getMcpAccess()])
+  return { ...page, mcp }
+}
+
 export const Route = createFileRoute("/_app/settings")({
   validateSearch: z.object({ tab: z.enum(TABS).optional() }),
-  loader: () => getSettingsPage(),
+  loader: loadSettings,
   head: () => ({ meta: [{ title: "Settings · Palui" }] }),
   component: SettingsPage,
   pendingComponent: SettingsSkeleton,
   errorComponent: AppError,
 })
 
-type Data = Awaited<ReturnType<typeof getSettingsPage>>
+type Data = Awaited<ReturnType<typeof loadSettings>>
 type SaveInput = Parameters<typeof saveSettings>[0]["data"]
 
 function useSave() {
@@ -124,6 +132,7 @@ function SettingsPage() {
         </TabsContent>
         <TabsContent value="security" keepMounted className="flex flex-col gap-4">
           <PasskeysCard passkeys={data.passkeys} />
+          <McpAccessCard access={data.mcp} />
           <BackupCard backup={data.backup} />
         </TabsContent>
         <TabsContent value="hooks" keepMounted>
