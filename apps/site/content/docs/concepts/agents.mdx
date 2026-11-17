@@ -62,7 +62,7 @@ What a chat gets depends on who is in it:
 | You and members of this agent (a member's DM, or a WhatsApp group of only you and members) | Tools for that chat plus this agent's own data: its MCP servers, notes, contacts and memory. No approvals, nothing destructive |
 | Anyone else | Only tools whose data stays in that chat, see below |
 
-For a WhatsApp group, everyone in it has to be you or a member. The list is checked when a turn starts. It's read again when someone joins or leaves, and at least every 10 minutes. If the list can't be read, the group counts as having outsiders. Telegram groups never count as members only, because a bot can't see who's in a group.
+For a WhatsApp group, everyone in it has to be you or a member. The list is checked when a turn starts. It's read again when someone joins or leaves, and at least every 10 minutes. If the list can't be read, the group counts as having outsiders. So does a group where someone who isn't a member wrote earlier in the conversation, even after they've left, until the conversation starts over (`/new`). Telegram groups never count as members only, because a bot can't see who's in a group.
 
 Members can read what the agent knows: its notes, contacts, memory and what was said in its other chats. They can't change its instructions, send messages to contacts, or approve anything. Commands, approvals and reminder buttons stay yours.
 
