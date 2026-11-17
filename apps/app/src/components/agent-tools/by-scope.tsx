@@ -237,12 +237,13 @@ function Groups({
           // Whose data, from every tool on the server (not only the search
           // hits). Each tool says its own only when the server mixes scopes.
           const owned = props.ownerOf(head.connectorId) !== null;
+          const noPrivate = props.noPrivate(head.connectorId);
           const all = props.tools.filter(
             (x) => x.connectorId === head.connectorId,
           );
-          const scope = groupData(all, owned);
+          const scope = groupData(all, owned, noPrivate);
           const mixed =
-            new Set(all.map((x) => dataOf(x, owned))).size > 1;
+            new Set(all.map((x) => dataOf(x, owned, noPrivate))).size > 1;
           return (
             <AccordionItem
               key={head.connectorId}
@@ -266,6 +267,7 @@ function Groups({
                   <GroupMeta
                     list={list}
                     scope={scope}
+                    agent={props.agent}
                     permissions={props.permissions}
                   />
                 </span>
@@ -278,7 +280,7 @@ function Groups({
                       key={x.name}
                       x={x}
                       props={props}
-                      scope={mixed ? dataOf(x, owned) : undefined}
+                      scope={mixed ? dataOf(x, owned, noPrivate) : undefined}
                     />
                   ))}
                 </ul>

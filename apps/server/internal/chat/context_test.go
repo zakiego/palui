@@ -517,8 +517,28 @@ func TestBuildSystemUnattendedOutsideTurnNeverAsks(t *testing.T) {
 		base.Shared = &chat.SharedInfo{Kind: "group", Guest: true}
 		p := chat.BuildSystem(base)
 		notContains(t, p, "need approval")
-		contains(t, p, "nobody is watching live. Destructive tools are off.")
+		notContains(t, p, "Destructive")
+		contains(t, p, "nobody is watching live.")
 	}
+}
+
+// A members or outside turn with tool search hears nothing about flows,
+// destructive tools or the owner's tools it can't have.
+func TestBuildSystemGuestToolSearch(t *testing.T) {
+	base := chat.SystemInput{Persona: "P", Channel: "whatsapp", Trigger: "message", Capabilities: []string{"alpha (2 tools)"}, ToolSearch: true, Shared: &chat.SharedInfo{Kind: "group", Guest: true}}
+	p := chat.BuildSystem(base)
+	contains(t, p, "palui__search_tools")
+	contains(t, p, "Never say you can't do something without searching first.")
+	contains(t, p, "In this chat you only have the tools in your tool list and the ones palui__search_tools loads, on purpose")
+	for _, s := range []string{"Never tell the owner", "Destructive", "destructive", "flow"} {
+		notContains(t, p, s)
+	}
+	// Without tool search, the guest line keeps its old form.
+	base.ToolSearch = false
+	contains(t, chat.BuildSystem(base), "In this chat you only have the tools in your tool list, on purpose")
+	// The owner's turn is unchanged.
+	base.ToolSearch, base.Shared = true, nil
+	contains(t, chat.BuildSystem(base), "Never tell the owner a tool or capability doesn't exist without searching first.")
 }
 
 // A guest asked "can you read?" and the bot guessed at what reaches it

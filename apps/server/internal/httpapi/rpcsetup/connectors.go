@@ -460,6 +460,40 @@ func setConnectorOwner(c *httpapi.Call) (any, error) {
 	return map[string]bool{"ok": true}, nil
 }
 
+// setConnectorData sets or clears the owner's "holds no private data" mark on
+// an MCP server (PLAN 19.4): its non-destructive tools then reach shared
+// chats. Owner only: the dashboard's Tools tab, never a chat tool or /mcp.
+// The runtime reads the row each turn, so no poke is needed.
+func setConnectorData(c *httpapi.Call) (any, error) {
+	id := str(c, "id")
+	on := mustGet(c.Obj(), "noPrivateData") == true
+	err := c.DB().Tx(func(tx db.Q) error {
+		row, found, err := connectors.Get(tx, id)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return httpapi.Fail("That connector doesn't exist anymore.")
+		}
+		if row.Type != "mcp" {
+			return httpapi.Fail("Only an MCP server can be marked as holding no private data.")
+		}
+		if _, _, err := connectors.SetNoPrivateData(tx, id, on, c.Now()); err != nil {
+			return err
+		}
+		in := events.Input{ConnectorID: &id, Kind: "mcp.data", Message: "No longer marked as holding no private data"}
+		if on {
+			in.Level, in.Message = "warn", "Marked as holding no private data: shared chats can use its tools"
+		}
+		_, err = events.Log(tx, in, c.Now())
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]bool{"ok": true}, nil
+}
+
 // phoneRe is /^\+?[\d\s-]{8,20}$/ with JS \s.
 var phoneRe = regexp.MustCompile(`^\+?[\d` + strx.SpaceClass + `-]{8,20}$`)
 
@@ -481,4 +515,5 @@ func init() {
 	post("connectorActionFn", zod.Object(zod.F("id", idZod()), zod.F("name", zod.String().Min(1).Max(64)), zod.F("input", zod.Record(zod.Unknown()).Optional())), connectorAction)
 	post("setWhatsAppOwnerFn", zod.Object(zod.F("phone", zod.String().Trim().Regex(phoneRe, `^\+?[\d\s-]{8,20}$`, "Use digits, like 0812 3456 7890 or +62 812 3456 7890."))), setWhatsAppOwner)
 	post("setConnectorOwnerFn", zod.Object(zod.F("id", idZod()), zod.F("agentId", zod.Nullable(zod.String().Min(1).Max(100)))), setConnectorOwner)
+	post("setConnectorDataFn", zod.Object(zod.F("id", idZod()), zod.F("noPrivateData", zod.Bool())), setConnectorData)
 }

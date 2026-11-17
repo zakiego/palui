@@ -108,6 +108,9 @@ type agentToolsT struct {
 	Error  *string             `json:"error"`
 	Used   *jsonx.Map[int64]   `json:"used"`
 	Scopes *jsonx.Map[*string] `json:"scopes"`
+	// MCP servers the owner marked as holding no private data. Left out when
+	// none are, so older replies keep their bytes.
+	NoPrivateData []string `json:"noPrivateData,omitempty"`
 }
 
 // agentTools is the Tools tab: what the runtime would offer the agent now
@@ -149,6 +152,9 @@ func agentTools(c *httpapi.Call, a db.Agent, now int64) (agentToolsT, error) {
 	for _, conn := range list {
 		if conn.Kind == "tools" {
 			out.Scopes.Set(conn.ID, conn.AgentID)
+		}
+		if connectors.NoPrivateData(conn) {
+			out.NoPrivateData = append(out.NoPrivateData, conn.ID)
 		}
 	}
 	return out, nil

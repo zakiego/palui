@@ -34,6 +34,8 @@ var ConfigZod = zod.Object(
 	zod.F("headerName", zod.String().Trim().Min(1).Max(100).Optional()),
 	zod.F("toolPrefs", zod.Default(zod.Record(ToolPrefZod), jsonx.NewMap[any]())),
 	zod.F("addedFromChat", zod.Bool().Optional()),
+	// Set by the owner on the agent's Tools tab; the runtime doesn't read it.
+	zod.F(connectors.NoPrivateDataKey, zod.Bool().Optional()),
 )
 
 var SecretZod = []zod.Field{zod.F("token", zod.String().Min(1).Optional())}

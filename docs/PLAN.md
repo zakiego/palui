@@ -253,6 +253,7 @@ Budget
 - Test lists the tools. Each tool gets its own Switch and a class (`read`, `write`, `destructive`). Unknown defaults to `destructive`. `readOnlyHint` and `destructiveHint` prefill the class.
 - A trust flag per server: `own` (my servers) or `external`. Results from `external` servers taint the turn (section 10).
 - Tools are namespaced `server__tool`.
+- `config.noPrivateData: true` is the owner's mark that the server holds no private data (section 19.4). Its tools without a declared scope resolve to `none`. Set from the agent's Tools tab (`setConnectorDataFn`); the owner's draft save and the CLI can write it too. Never from a chat tool or `/mcp`. Cleared when the URL changes. Every change logs an `mcp.data` event.
 - Presets for servers I already run (vorneo, keuangan, todomap, linear) ask only for the token.
 
 ### 5.4.1 Tools: T3 Code
@@ -610,7 +611,7 @@ Audience, worked out when the turn starts:
 
 On WhatsApp the participant list is cached for 10 minutes and dropped on a group change event, on reconnect and when a sender outside the list writes. A cache miss waits at most 3 s, then counts as `outside`.
 
-Data scope is `PaluiTool.Data` from the connector contract: `none`, `chat`, `agent` or `shared`. A tool without one follows its connector: `agent` when one agent owns the connector, `shared` when it's global. MCP servers, Google Calendar and T3 Code are `agent` or `shared` that way. The owner can mark an MCP server as `none` on the agent's Tools tab (a prayer times server holds nothing private); that's the only override, since Palui can't check what an outside server keeps.
+Data scope is `PaluiTool.Data` from the connector contract: `none`, `chat`, `agent` or `shared`. A tool without one follows its connector: `agent` when one agent owns the connector, `shared` when it's global. MCP servers, Google Calendar and T3 Code are `agent` or `shared` that way. The owner can mark an MCP server as `none` on the agent's Tools tab (a prayer times server holds nothing private); that's the only override, since Palui can't check what an outside server keeps. The mark is `config.noPrivateData` on the MCP connector, written only by the dashboard's `setConnectorDataFn` (no chat tool and no `/mcp` tool), and cleared when the server's URL changes. Any value but the boolean `true`, and any other connector type, follows the connector (fail closed). A declared scope on a tool still wins over the mark.
 
 | Data scope | `owner` | `members` | `outside` |
 |---|---|---|---|
@@ -621,7 +622,7 @@ Data scope is `PaluiTool.Data` from the connector contract: `none`, `chat`, `age
 
 `guest_tools: none` takes every tool away from `outside` turns.
 
-- A tool left out isn't in the turn at all: not in the tool list, not in "Enabled capabilities", not found by `palui__search_tools`, not named anywhere in the prompt. The reply to "how much did the owner spend?" is the same whether a finance server exists or not.
+- A tool left out isn't in the turn at all: not in the tool list, not in "Enabled capabilities", not found by `palui__search_tools`, not named anywhere in the prompt. In `members` and `outside` turns the search tool itself takes the shared form: no `for` parameter, nothing about flows or destructive tools in its schema, and a no-match note that doesn't mention the owner. The prompt there doesn't talk about approvals or destructive tools either. The reply to "how much did the owner spend?" is the same whether a finance server exists or not.
 - `members` and `outside` turns have no approvals. A tool in the turn runs right away, with no limit on what it can do inside its scope (a recurring reminder in the group is fine). Destructive tools are never in those turns, and a call whose tool asks for approval on its own (`NeedsApproval`) is refused with a note to the model. Accepted risk: anyone in the chat can make the agent change that chat's data or that agent's data, and nothing past it.
 - `owner` turns keep today's rules: destructive asks, a write after untrusted content asks, `allow`/`ask`/`deny` per tool apply.
 - Approvals only ever happen in the owner's own chats now, so a shared chat never sends a prompt to the owner's DM.
@@ -650,7 +651,7 @@ Reading down: Palui can read other agents' chats and memory (new read tools on P
 
 - Agents page: list with avatar, name, chats, tokens today against the cap. A sheet to create or edit: avatar, name, slug, persona, members, guest tools, daily cap, recall container, Telegram bot, and a link to the agent's instructions on Notes. Palui's sheet hides the shared-chat fields.
 - Members: a section on the Settings tab of the agent page that saves at once, outside the settings form. Each member has a name and one or more accounts, picked from people who already wrote in a chat (sender id and name) or from DM chats that have no stored message yet, or typed in. One member can be in several agents.
-- Tools tab: each tool says which audiences get it (owner only, members, everyone in the chat), next to the data label from #110. MCP servers get a "Holds no private data" switch that sets them to `none`.
+- Tools tab: each tool says which audiences get it, next to the data label from #110: "Everyone in the chat", "You and members" or "Only you" ("Off" for a tool set to off). A closed server row shows its widest audience. MCP servers get a "Holds no private data" switch that sets them to `none`.
 - Avatar: an uploaded photo (cropped square and re-encoded as a 256 px WebP in the browser, stored as a data URL of at most 96 KB), else one of 24 icons on one of 9 colors, else Palui's mark for the default agent and a plain bot for the rest. Columns `avatar_image`, `avatar_icon`, `avatar_color`.
 - Chats page: each chat shows its agent and an Allowed switch, with a Select to change the agent.
 - Settings: the persona field moves to Palui on the Agents page.

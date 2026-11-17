@@ -178,8 +178,9 @@ type PaluiTool struct {
 	// May run in a turn started by someone other than the owner.
 	GuestSafe bool
 	// Whose data the tool reads or writes: DataChat, DataAgent, DataShared or
-	// DataNone. "" follows the connector; ResolveData works out the scope the
-	// server acts on.
+	// DataNone. "" follows the connector, or is DataNone on an MCP server the
+	// owner marked as holding no private data; ResolveData works out the scope
+	// the server acts on.
 	Data string
 	// Flow write tools: "version" (default) or "every_run".
 	FlowApproval string
@@ -197,7 +198,8 @@ const (
 	DataAgent = "agent"
 	// Every agent with the tool sees the same data (settings, the calendar).
 	DataShared = "shared"
-	// Keeps nothing (web fetch).
+	// Keeps nothing (web fetch, or an MCP server the owner marked as holding
+	// no private data).
 	DataNone = "none"
 )
 

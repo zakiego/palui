@@ -35,7 +35,7 @@ func demo(k *Kit) {
 	k.Connector("notes", "notes", ConnectorOpts{Status: "on"})
 	k.Connector("settings", "settings", ConnectorOpts{Status: "on"})
 	k.Connector("remote-mcp", "remote-mcp", ConnectorOpts{Status: "on"})
-	k.Connector("mcp-jadwal-sholat", "mcp", ConnectorOpts{Label: ptr("jadwal-sholat"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://sholat.zakiego.com/mcp", "authMode", "none", "addedFromChat", true)})
+	k.Connector("mcp-jadwal-sholat", "mcp", ConnectorOpts{Label: ptr("jadwal-sholat"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://sholat.zakiego.com/mcp", "authMode", "none", "addedFromChat", true, "noPrivateData", true)})
 	k.Instruction(Instruction{Title: "Jadwal sholat", Body: "Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai JSON API di https://sholat.zakiego.com/api/v1 lewat web fetch.", CreatedAt: ptr(now - 3*H)})
 	k.Instruction(Instruction{Title: "Ringkasan pagi", Body: "Mulai dengan cuaca, lalu agenda, lalu pengingat hari ini.", Enabled: ptr(false), CreatedAt: ptr(now - 2*H)})
 	k.CustomCommand(CustomCommand{Name: "report-fix", Description: "Debug report, lalu T3 Code yang perbaiki", Prompt: "Start a T3 Code thread in the palui project to find and fix the problem in the debug report below. Owner's note: {{args}}\n\nPut the whole report in the task. Reply with the thread link only.", AttachReport: true, CreatedAt: ptr(now - 2*H)})
