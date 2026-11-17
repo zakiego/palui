@@ -18,6 +18,11 @@ describe("isAppPath", () => {
       "/api/connectors",
       "/api/connectors/telegram/test",
       "/health",
+      "/mcp",
+      "/mcp/",
+      "/.well-known/oauth-protected-resource",
+      "/.well-known/oauth-protected-resource/mcp",
+      "/.well-known/oauth-authorization-server",
     ]) {
       expect(isAppPath(p), p).toBe(true)
     }
@@ -49,7 +54,9 @@ describe("isAppPath", () => {
       "/health-check",
       "/healthy",
       "/v1/memories",
-      "/mcp",
+      "/mcpx",
+      "/.well-known/security.txt",
+      "/.well-known/oauth-protected-resource-x",
     ]) {
       expect(isAppPath(p), p).toBe(false)
     }

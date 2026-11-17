@@ -70,8 +70,20 @@
    "columns": ["id","name","kind","rrule","tz","local_start","prompt","chat_id","model_role","tool_scope","enabled","next_run_at","status","last_run_at","last_status","last_result","daily_token_cap","created_at","updated_at"],
    "rows": []
   },
+  "mcp_grants": {
+   "columns": ["id","kind","name","user_id","client_id","scope","token_hint","access_hash","access_expires_at","refresh_hash","refresh_expires_at","prev_refresh_hash","rotated_at","created_at","last_used_at"],
+   "rows": []
+  },
   "messages": {
    "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],
+   "rows": []
+  },
+  "oauth_clients": {
+   "columns": ["id","name","client_uri","redirect_uris","auth_method","secret_hash","created_at"],
+   "rows": []
+  },
+  "oauth_requests": {
+   "columns": ["id","client_id","redirect_uri","state","scope","code_challenge","user_id","code_hash","created_at","expires_at"],
    "rows": []
   },
   "outbound_messages": {

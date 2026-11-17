@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/zakiego/palui/apps/server/internal/attachments"
@@ -83,18 +84,31 @@ func TestSeededDatabaseUsesTheDevMasterKey(t *testing.T) {
 	}
 }
 
+// sincePort lists the migrations added after seeded.db was frozen at the Go
+// port, in order. Append each new migration here: the frozen database must
+// report exactly these as missing and take them on open.
+var sincePort = []string{"0016_mcp_access"}
+
 func TestSeededDatabaseReportsSchemaOK(t *testing.T) {
 	d, s := openCopy(t, db.OpenOptions{NoMigrate: true})
 	st, err := db.GetSchemaState(d)
 	testutil.Must(t, err)
-	if !st.OK || st.Version != s.SchemaVersion {
+	if len(sincePort) == 0 && (!st.OK || st.Version != s.SchemaVersion) {
 		t.Fatalf("%+v", st)
 	}
-	// Opening with migrations applies nothing new.
+	if len(sincePort) > 0 && (st.OK || st.Reason != "behind" || !slices.Equal(st.Missing, sincePort)) {
+		t.Fatalf("the frozen database should miss exactly %v: %+v", sincePort, st)
+	}
+	// Opening with migrations applies only the new ones, on real old rows.
 	d2, _ := openCopy(t, db.OpenOptions{})
+	st, err = db.GetSchemaState(d2)
+	testutil.Must(t, err)
+	if !st.OK {
+		t.Fatalf("after migrating: %+v", st)
+	}
 	var n int
 	testutil.Must(t, d2.QueryRow("SELECT count(*) FROM _migrations").Scan(&n))
-	if n != s.Counts["_migrations"] {
+	if n != s.Counts["_migrations"]+len(sincePort) {
 		t.Fatal(n)
 	}
 }

@@ -43,6 +43,9 @@ const usage = `usage: palui <command> [--json]
                                 --require-some also fails when there was nothing to decrypt
   hook create <name> --chat <chatId> [--mode forward|summarize|flow]
                                 create an inbound webhook and print its URL and secret once
+  mcp token <name>              create a personal token for the /mcp server and print it once
+  mcp list                      personal tokens and OAuth connections to /mcp
+  mcp revoke <id>               revoke a token or connection (it stops working at once)
   eval-reminders                the live 60-phrase reminder parse eval (makes model calls)`
 
 // notReachable replaces "The runtime isn't reachable" now that there's one process.
@@ -474,6 +477,9 @@ func runCommand(cmd, sub string, rest []string, p parsed, asJSON bool, o *cliIO)
 			o.eprintln("That secret is shown once. Send x-palui-timestamp (unix seconds) and x-palui-signature: sha256=<hex HMAC-SHA256 of '<timestamp>.<raw body>'> with it.")
 		}
 		return 0, nil
+
+	case cmd == "mcp":
+		return runMCP(sub, rest, asJSON, o)
 	}
 	sep := strings.TrimSpace(cmd + " " + sub)
 	o.eprintln("unknown command: " + sep + "\n" + usage)

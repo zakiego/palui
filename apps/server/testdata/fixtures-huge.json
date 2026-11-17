@@ -104,11 +104,29 @@
    "first": ["<job#1>","Follow up deal 1","briefing","FREQ=DAILY;BYHOUR=7;BYMINUTE=0","Asia/Makassar","2026-01-01T07:00:00","x","<chat#3>","default",null,0,1794622200000,"idle",1794621000000,"error","Selesai.",50000,1794535200000,1794621600000],
    "last": ["<job#2>","Transfer arisan 120","job","FREQ=DAILY;BYHOUR=7;BYMINUTE=0","Asia/Makassar","2026-01-01T07:00:00","x","<chat#5>","default",null,1,1794693600000,"idle",1794549600000,"ok","Selesai.",50000,1794535200119,1794621600000]
   },
+  "mcp_grants": {
+   "columns": ["id","kind","name","user_id","client_id","scope","token_hint","access_hash","access_expires_at","refresh_hash","refresh_expires_at","prev_refresh_hash","rotated_at","created_at","last_used_at"],
+   "count": 50,
+   "first": ["fx_<mcpg#1>","token","Aleksandra Wiśniewska-Kowalczyk's agent 1","user_owner",null,null,"0000","fixture-fx_<mcpg#1>",null,null,null,null,null,1794621600000,null],
+   "last": ["fx_<mcpg#2>","token","Joko Montgomery's agent 50","user_owner",null,null,"0049","fixture-fx_<mcpg#2>",null,null,null,null,null,1790388000000,null]
+  },
   "messages": {
    "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],
    "count": 3284,
    "first": ["<msg#1>","<chat#1>","<ses#1>","user","{\"text\":\"Follow up deal #1000\"}","Follow up deal #1000",null,null,null,"handled",null,null,1794501600000,null,1],
    "last": ["<msg#2>","<chat#6>","<ses#3>","user","{\"text\":\"Kirim laporan mingguan ke tim Vorneo, Kartika Pratama\"}","Kirim laporan mingguan ke tim Vorneo, Kartika Pratama",null,null,null,"handled",null,null,1791773340000,null,1]
+  },
+  "oauth_clients": {
+   "columns": ["id","name","client_uri","redirect_uris","auth_method","secret_hash","created_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "oauth_requests": {
+   "columns": ["id","client_id","redirect_uri","state","scope","code_challenge","user_id","code_hash","created_at","expires_at"],
+   "count": 0,
+   "first": null,
+   "last": null
   },
   "outbound_messages": {
    "columns": ["id","agent_id","contact_id","text","origin","origin_ref","approved_by","owner_chat_id","rrule","tz","local_start","fire_at","status","last_outbox_id","created_at","updated_at"],

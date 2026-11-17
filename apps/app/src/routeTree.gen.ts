@@ -24,6 +24,7 @@ import { Route as AppOutboundRouteImport } from './routes/_app/outbound'
 import { Route as AppRemindersRouteImport } from './routes/_app/reminders'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
+import { Route as OauthConsentRouteImport } from './routes/oauth.consent'
 import { Route as AppAgentsSlugRouteImport } from './routes/_app/agents_.$slug'
 import { Route as AppConnectorsIdRouteImport } from './routes/_app/connectors_.$id'
 import { Route as AppConnectorsNewRouteImport } from './routes/_app/connectors_.new'
@@ -104,6 +105,11 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OauthConsentRoute = OauthConsentRouteImport.update({
+  id: '/oauth/consent',
+  path: '/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppAgentsSlugRoute = AppAgentsSlugRouteImport.update({
   id: '/agents_/$slug',
   path: '/agents/$slug',
@@ -145,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/reminders': typeof AppRemindersRoute
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/oauth/consent': typeof OauthConsentRoute
   '/agents/$slug': typeof AppAgentsSlugRoute
   '/connectors/$id': typeof AppConnectorsIdRoute
   '/connectors/new': typeof AppConnectorsNewRoute
@@ -165,6 +172,7 @@ export interface FileRoutesByTo {
   '/reminders': typeof AppRemindersRoute
   '/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/oauth/consent': typeof OauthConsentRoute
   '/': typeof AppIndexRoute
   '/agents/$slug': typeof AppAgentsSlugRoute
   '/connectors/$id': typeof AppConnectorsIdRoute
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/_app/reminders': typeof AppRemindersRoute
   '/_app/settings': typeof AppSettingsRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/oauth/consent': typeof OauthConsentRoute
   '/_app/': typeof AppIndexRoute
   '/_app/agents_/$slug': typeof AppAgentsSlugRoute
   '/_app/connectors_/$id': typeof AppConnectorsIdRoute
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
     | '/reminders'
     | '/settings'
     | '/invite/$token'
+    | '/oauth/consent'
     | '/agents/$slug'
     | '/connectors/$id'
     | '/connectors/new'
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/reminders'
     | '/settings'
     | '/invite/$token'
+    | '/oauth/consent'
     | '/'
     | '/agents/$slug'
     | '/connectors/$id'
@@ -254,6 +265,7 @@ export interface FileRouteTypes {
     | '/_app/reminders'
     | '/_app/settings'
     | '/invite/$token'
+    | '/oauth/consent'
     | '/_app/'
     | '/_app/agents_/$slug'
     | '/_app/connectors_/$id'
@@ -266,6 +278,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   InviteTokenRoute: typeof InviteTokenRoute
+  OauthConsentRoute: typeof OauthConsentRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -375,6 +388,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oauth/consent': {
+      id: '/oauth/consent'
+      path: '/oauth/consent'
+      fullPath: '/oauth/consent'
+      preLoaderRoute: typeof OauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/agents_/$slug': {
       id: '/_app/agents_/$slug'
       path: '/agents/$slug'
@@ -459,6 +479,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   InviteTokenRoute: InviteTokenRoute,
+  OauthConsentRoute: OauthConsentRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

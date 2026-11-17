@@ -218,6 +218,10 @@
     ["<job#2>","Heartbeat with a name long enough to wrap onto a second line on a phone","heartbeat","FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9,10,11,12,13,14,15,16,17,18,19,20,21,22","Asia/Makassar","2026-01-01T07:00:00","NOTHING unless it matters.","<chat#2>","default",null,0,null,"idle",null,null,null,30000,1794621600000,1794621600000]
    ]
   },
+  "mcp_grants": {
+   "columns": ["id","kind","name","user_id","client_id","scope","token_hint","access_hash","access_expires_at","refresh_hash","refresh_expires_at","prev_refresh_hash","rotated_at","created_at","last_used_at"],
+   "rows": []
+  },
   "messages": {
    "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],
    "rows": [
@@ -245,6 +249,14 @@
     ["<msg#22>","<chat#20>","<ses#20>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794416400000,null,1],
     ["<msg#23>","<chat#21>","<ses#21>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794405600000,null,1]
    ]
+  },
+  "oauth_clients": {
+   "columns": ["id","name","client_uri","redirect_uris","auth_method","secret_hash","created_at"],
+   "rows": []
+  },
+  "oauth_requests": {
+   "columns": ["id","client_id","redirect_uri","state","scope","code_challenge","user_id","code_hash","created_at","expires_at"],
+   "rows": []
   },
   "outbound_messages": {
    "columns": ["id","agent_id","contact_id","text","origin","origin_ref","approved_by","owner_chat_id","rrule","tz","local_start","fire_at","status","last_outbox_id","created_at","updated_at"],

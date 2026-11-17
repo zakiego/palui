@@ -12,6 +12,7 @@ Palui has one owner and assumes everything else is untrusted: other people messa
 - The owner account comes from `docker compose exec app palui owner invite`, a single-use link valid for 15 minutes. You need shell access to the Docker host to run it.
 - The same command is the recovery path for a lost passkey.
 - App routes are `noindex`.
+- AI agents reach the MCP server at `/mcp` only with a bearer token: a personal token, or an OAuth connection you allowed while signed in. Both are listed and revocable in Settings, and stored as hashes. See [MCP access](/docs/mcp-access).
 
 ## Channel owner
 

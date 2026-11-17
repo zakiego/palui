@@ -3,12 +3,14 @@ title: REST API
 description: The HTTP endpoints Palui's app serves, including /health, inbound webhooks, auth, and the dashboard's session-authenticated API.
 ---
 
-The `app` service serves everything over HTTP: the dashboard at `/app`, the API under `/api`, and `/health`.
+The `app` service serves everything over HTTP: the dashboard at `/app`, the API under `/api`, the MCP server at `/mcp`, and `/health`.
 
 | Path | Auth | Stable in v1 |
 |---|---|---|
 | `GET /health` | None | Yes |
 | `POST /api/hooks/:slug` | HMAC signature | Yes |
+| `/mcp` | Bearer token (personal or OAuth). See [MCP access](/docs/mcp-access) | Yes |
+| `/api/oauth/*`, `/.well-known/oauth-*` | None (OAuth for `/mcp`) | Yes |
 | `/api/auth/*` | Passkeys and the dashboard session | No, internal to the dashboard |
 | Other `/api/*` routes | Dashboard session | No, internal to the dashboard |
 

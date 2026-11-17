@@ -592,3 +592,79 @@ func ScanOutboundMessage(s Scanner) (OutboundMessage, error) {
 	err := s.Scan(&o.ID, &o.AgentID, &o.ContactID, &o.Text, &o.Origin, &o.OriginRef, &o.ApprovedBy, &o.OwnerChatID, &o.RRule, &o.TZ, &o.LocalStart, &o.FireAt, &o.Status, &o.LastOutboxID, &o.CreatedAt, &o.UpdatedAt)
 	return o, err
 }
+
+// --- MCP access -----------------------------------------------------------------------
+
+// OAuthClient is an oauth_clients row: an MCP client that registered itself
+// (RFC 7591). RedirectURIs is a JSON array. AuthMethod is none,
+// client_secret_post or client_secret_basic; SecretHash is set for the last two.
+type OAuthClient struct {
+	ID           string         `json:"id"`
+	Name         string         `json:"name"`
+	ClientURI    *string        `json:"clientUri"`
+	RedirectURIs JSON[[]string] `json:"redirectUris"`
+	AuthMethod   string         `json:"authMethod"`
+	SecretHash   *string        `json:"-"`
+	CreatedAt    int64          `json:"createdAt"`
+}
+
+const OAuthClientCols = "id, name, client_uri, redirect_uris, auth_method, secret_hash, created_at"
+
+func ScanOAuthClient(s Scanner) (OAuthClient, error) {
+	var r OAuthClient
+	err := s.Scan(&r.ID, &r.Name, &r.ClientURI, &r.RedirectURIs, &r.AuthMethod, &r.SecretHash, &r.CreatedAt)
+	return r, err
+}
+
+// OAuthRequest is an oauth_requests row: one authorization request waiting
+// for the owner's consent. Once approved it carries the user and the hash of
+// the one-time code the client exchanges.
+type OAuthRequest struct {
+	ID            string  `json:"id"`
+	ClientID      string  `json:"clientId"`
+	RedirectURI   string  `json:"redirectUri"`
+	State         *string `json:"state"`
+	Scope         *string `json:"scope"`
+	CodeChallenge string  `json:"-"`
+	UserID        *string `json:"userId"`
+	CodeHash      *string `json:"-"`
+	CreatedAt     int64   `json:"createdAt"`
+	ExpiresAt     int64   `json:"expiresAt"`
+}
+
+const OAuthRequestCols = "id, client_id, redirect_uri, state, scope, code_challenge, user_id, code_hash, created_at, expires_at"
+
+func ScanOAuthRequest(s Scanner) (OAuthRequest, error) {
+	var r OAuthRequest
+	err := s.Scan(&r.ID, &r.ClientID, &r.RedirectURI, &r.State, &r.Scope, &r.CodeChallenge, &r.UserID, &r.CodeHash, &r.CreatedAt, &r.ExpiresAt)
+	return r, err
+}
+
+// MCPGrant is an mcp_grants row: one way into /mcp. Kind token is a personal
+// token (no expiry, no refresh); kind oauth is an OAuth connection whose
+// access and refresh tokens rotate in place. Only hashes are stored.
+type MCPGrant struct {
+	ID               string  `json:"id"`
+	Kind             string  `json:"kind"`
+	Name             string  `json:"name"`
+	UserID           string  `json:"userId"`
+	ClientID         *string `json:"clientId"`
+	Scope            *string `json:"scope"`
+	TokenHint        *string `json:"tokenHint"`
+	AccessHash       string  `json:"-"`
+	AccessExpiresAt  *int64  `json:"accessExpiresAt"`
+	RefreshHash      *string `json:"-"`
+	RefreshExpiresAt *int64  `json:"refreshExpiresAt"`
+	PrevRefreshHash  *string `json:"-"`
+	RotatedAt        *int64  `json:"rotatedAt"`
+	CreatedAt        int64   `json:"createdAt"`
+	LastUsedAt       *int64  `json:"lastUsedAt"`
+}
+
+const MCPGrantCols = "id, kind, name, user_id, client_id, scope, token_hint, access_hash, access_expires_at, refresh_hash, refresh_expires_at, prev_refresh_hash, rotated_at, created_at, last_used_at"
+
+func ScanMCPGrant(s Scanner) (MCPGrant, error) {
+	var r MCPGrant
+	err := s.Scan(&r.ID, &r.Kind, &r.Name, &r.UserID, &r.ClientID, &r.Scope, &r.TokenHint, &r.AccessHash, &r.AccessExpiresAt, &r.RefreshHash, &r.RefreshExpiresAt, &r.PrevRefreshHash, &r.RotatedAt, &r.CreatedAt, &r.LastUsedAt)
+	return r, err
+}

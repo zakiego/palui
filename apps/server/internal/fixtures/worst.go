@@ -525,6 +525,14 @@ func worst(k *Kit) {
 	k.Passkey(Passkey{Name: ptr("هاتف نور الهدى"), CreatedAt: ptr(now - 12*D)})
 	k.Passkey(Passkey{Name: ptr("YubiKey-5C-NFC-FIPS-serial-0123456789-office-backup-key-do-not-lose"), DeviceType: "singleDevice", BackedUp: ptr(false), CreatedAt: ptr(now + 2*H)})
 	k.Passkey(Passkey{Name: ptr("   "), CreatedAt: ptr[int64](0)})
+	// MCP access: the 60-character name cap, a 100-character client name with a
+	// long client URI, RTL, one letter, never used and used a second ago.
+	k.MCPGrant(MCPGrant{Name: "Claude Code on the office build server in rack B, slot 12 v2", Hint: ptr("Zq9_"), CreatedAt: now - 400*D})
+	k.MCPGrant(MCPGrant{Name: "J", Hint: ptr("-_-_"), CreatedAt: now - 20_000, LastUsedAt: ptr(now - 1_000)})
+	k.MCPGrant(MCPGrant{Name: "وكيل الذكاء الاصطناعي في المكتب", Hint: ptr("a1B2"), CreatedAt: now - 3*D, LastUsedAt: ptr(now - 2*H)})
+	k.MCPGrant(MCPGrant{Name: "Claude", Client: ptr("Claude"), ClientURI: ptr("https://claude.ai"), CreatedAt: now - 10*D, LastUsedAt: ptr(now - 5*MIN)})
+	k.MCPGrant(MCPGrant{Name: "Workspace Automation Assistant for the Finance and Operations Team (staging environment, do not use)", Client: ptr("Workspace Automation Assistant for the Finance and Operations Team (staging environment, do not use)"),
+		ClientURI: ptr("https://very-long-subdomain-for-an-internal-tool.automation.example.com/integrations/model-context-protocol/callback"), CreatedAt: now - 2*365*D})
 
 	// New version notice on in two chats, plus one that was removed since.
 	k.Setting("deployNoticeChats", []string{family.ID, arabic.ID, worstRemoved})
