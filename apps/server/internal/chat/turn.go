@@ -764,6 +764,16 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 	if err != nil {
 		return TurnResult{}, err
 	}
+	if audience == tools.AudienceMembers {
+		outsider, err := HistoryHasOutsider(q, chat, agent.ID, history)
+		if err != nil {
+			return TurnResult{}, err
+		}
+		if outsider {
+			tlog.Info("members chat counted as outside", logx.Fields{"reason": "history holds a message from someone who is not a member"})
+			audience = tools.AudienceOutside
+		}
+	}
 	// Palui's approval asked in a group before 19.9 step 1 ran as the owner's
 	// turn; it resumes with that tool set. A fresh shared turn never asks.
 	if shared && rs != nil && rs.Context.Mode == tools.AudienceOwner {

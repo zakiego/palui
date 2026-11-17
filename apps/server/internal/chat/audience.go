@@ -4,6 +4,7 @@ package chat
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
@@ -115,4 +116,35 @@ func Audience(c *EngineCtx, chat db.Chat, agent db.Agent) (string, error) {
 		}
 	}
 	return tools.AudienceMembers, nil
+}
+
+// HistoryHasOutsider reports whether the loaded history holds a message from
+// someone who is neither the owner nor a member of this agent, such as a
+// stranger who has since left the group. Their text would reach a members
+// turn as if a member wrote it, so the turn runs as outside until the session
+// rolls over. Hook messages are left to the taint of their own turn.
+func HistoryHasOutsider(q db.Q, chat db.Chat, agentID string, history []db.Message) (bool, error) {
+	seen := map[string]bool{}
+	for _, m := range history {
+		if m.Role != "user" || m.FromOwner || m.SenderID == nil || *m.SenderID == "" {
+			continue
+		}
+		id := *m.SenderID
+		if seen[id] || strings.HasPrefix(id, "hook:") {
+			continue
+		}
+		seen[id] = true
+		isOwner, err := owner.IsOwner(q, owner.Sender{Channel: chat.Channel, ExternalID: id})
+		if err != nil {
+			return true, err
+		}
+		if isOwner {
+			continue
+		}
+		isMember, err := members.IsMember(q, agentID, members.Sender{Channel: chat.Channel, ExternalID: id})
+		if err != nil || !isMember {
+			return true, err
+		}
+	}
+	return false, nil
 }
