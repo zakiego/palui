@@ -641,7 +641,7 @@ Reading down: Palui can read other agents' chats and memory (new read tools on P
 ### 19.7 Dashboard
 
 - Agents page: list with avatar, name, chats, tokens today against the cap. A sheet to create or edit: avatar, name, slug, persona, members, guest tools, daily cap, recall container, Telegram bot, and a link to the agent's instructions on Notes. Palui's sheet hides the shared-chat fields.
-- Members: added from the agent sheet with a name and one or more accounts, picked from people who already wrote in a chat (sender id and name) or typed in. One member can be in several agents.
+- Members: a section on the Settings tab of the agent page that saves at once, outside the settings form. Each member has a name and one or more accounts, picked from people who already wrote in a chat (sender id and name) or from DM chats that have no stored message yet, or typed in. One member can be in several agents.
 - Tools tab: each tool says which audiences get it (owner only, members, everyone in the chat), next to the data label from #110. MCP servers get a "Holds no private data" switch that sets them to `none`.
 - Avatar: an uploaded photo (cropped square and re-encoded as a 256 px WebP in the browser, stored as a data URL of at most 96 KB), else one of 24 icons on one of 9 colors, else Palui's mark for the default agent and a plain bot for the rest. Columns `avatar_image`, `avatar_icon`, `avatar_color`.
 - Chats page: each chat shows its agent and an Allowed switch, with a Select to change the agent.

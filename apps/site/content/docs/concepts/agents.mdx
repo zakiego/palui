@@ -11,7 +11,7 @@ Agents are how Palui answers people other than you. Put an agent in a group, or 
 
 Open an agent on the Agents page and pick a section:
 
-- Settings: avatar, name, persona, shared-chat rules and the daily cap.
+- Settings: avatar, name, persona, shared-chat rules, members and the daily cap.
 - Chats: every chat it answers in, with the reply mode and "Answer here" for each.
 - Instructions: what it always follows.
 - Memory: its recall container, how many memories are in it, and when it last saved one.
@@ -46,9 +46,29 @@ To have it answer every message instead, send `/reply all` in the group, or pick
 
 Every message records who sent it. The model sees other people's messages as `[Name]: ...` and yours as `[Owner]: ...`, and it's told that only `[Owner]` lines come from you.
 
+## Members
+
+Members are people you trust with one agent: a partner, a family member, a teammate. They can use that agent's own data with it, which outsiders can't.
+
+To add one, open the agent's Settings tab and use Members. Give them a name and one or more accounts: a WhatsApp number or a Telegram user id. You can pick from people who already wrote in a chat, or type the account in. The section saves at once. Palui has no members, and a member of one agent is a stranger to every other agent.
+
+Adding a member doesn't open a DM with them. Their DM still has to be allowed and given the agent on the Chats page, like any other chat.
+
+What a chat gets depends on who is in it:
+
+| Who is in the chat | What the agent can use |
+|---|---|
+| Only you | Everything, with approvals as usual |
+| You and members of this agent (a member's DM, or a WhatsApp group of only you and members) | Tools for that chat plus this agent's own data: its MCP servers, notes, contacts and memory. No approvals, nothing destructive |
+| Anyone else | Only tools whose data stays in that chat, see below |
+
+For a WhatsApp group, everyone in it has to be you or a member. The list is checked when a turn starts. It's read again when someone joins or leaves, and at least every 10 minutes. If the list can't be read, the group counts as having outsiders. Telegram groups never count as members only, because a bot can't see who's in a group.
+
+Members can read what the agent knows: its notes, contacts, memory and what was said in its other chats. They can't change its instructions, send messages to contacts, or approve anything. Commands, approvals and reminder buttons stay yours.
+
 ## What other people can make it do
 
-A shared chat is a group, or a DM with someone who isn't you. What it gets depends on who can read the chat, not on who sent the message. It only gets tools whose data stays in that chat or that keep nothing: reminders, saved files, web search and web fetch. Your notes, contacts, memory, jobs, accounts and MCP servers never show up there, and the agent can't tell anyone they exist.
+This is about chats with someone who isn't you or a member: a group with an outsider in it, or a stranger's DM. What it gets depends on who can read the chat, not on who sent the message. It only gets tools whose data stays in that chat or that keep nothing: reminders, saved files, web search and web fetch. Your notes, contacts, memory, jobs, accounts and MCP servers never show up there, and the agent can't tell anyone they exist.
 
 - One switch, Tools for other people: those tools, or none.
 - No approvals there. A tool the chat gets runs right away, and destructive tools are never offered.
