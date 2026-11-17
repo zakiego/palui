@@ -26,6 +26,9 @@ type CatalogTool struct {
 	// Its results come from outside, so they taint the turn.
 	Untrusted bool `json:"untrusted"`
 	GuestSafe bool `json:"guestSafe"`
+	// Whose data it touches: chat, agent, shared or none. Left out, it follows
+	// the connector: the agent's when one agent owns it, shared otherwise.
+	Data string `json:"data,omitempty"`
 }
 
 type CatalogOptions struct {
@@ -70,7 +73,7 @@ func Catalog(ctx context.Context, running []connectors.RunningEntry, o CatalogOp
 			t := m.Title
 			title = &t
 		}
-		out = append(out, CatalogTool{Name: m.Name, Tool: m.Tool, ConnectorID: m.ConnectorID, ConnectorLabel: label, ConnectorType: typ, Class: m.Class, Title: title, Untrusted: m.Untrusted, GuestSafe: m.GuestSafe})
+		out = append(out, CatalogTool{Name: m.Name, Tool: m.Tool, ConnectorID: m.ConnectorID, ConnectorLabel: label, ConnectorType: typ, Class: m.Class, Title: title, Untrusted: m.Untrusted, GuestSafe: m.GuestSafe, Data: m.Data})
 	}
 	return out
 }
