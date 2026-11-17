@@ -97,6 +97,20 @@ In a group, or any chat other people are in, the report goes to your own chat wi
 
 The report quotes messages from the chat, other people's included, and the chat's address on the channel (on WhatsApp that's a phone number). Known token formats are masked, but read it before you paste it into a service you don't run.
 
+### Your own commands
+
+On the dashboard's Commands page you can save a prompt under a name of your own, like `/report-fix`, for every agent or for one agent. Typing it runs a normal turn with that prompt, so the agent can use its tools. `{{args}}` in the prompt becomes whatever you type after the command.
+
+Turn on "Attach a debug report" and the agent also gets the same snapshot `/report` makes. With a prompt like this one, `/report-fix it answered twice` hands the problem straight to a coding agent:
+
+```text
+Start a T3 Code thread in the palui project to find and fix the problem in the debug report below. Owner's note: {{args}}
+
+Put the whole report in the task. Reply with the thread link only.
+```
+
+Commands with a report only run in your own chat with Palui, since the report holds your details. Built-in commands and flow commands win when a name is taken twice, and an agent's own command wins over one for every agent. `/help` lists yours at the end.
+
 ### Switching off the channel you're on
 
 `/connectors off telegram` sent from Telegram is allowed only when another channel or the dashboard is reachable. The reply tells you how to turn it back on. If nothing else is reachable, the command is refused, so you can't lock yourself out. The same rule applies to WhatsApp.

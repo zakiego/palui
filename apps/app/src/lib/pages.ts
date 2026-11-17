@@ -1,8 +1,8 @@
 // The dashboard pages (PLAN 11.4), for the sidebar, header and ⌘K.
-import { ActivityIcon, BotIcon, PaperclipIcon, BellIcon, CalendarClockIcon, HouseIcon, MessagesSquareIcon, SendIcon, NotebookPenIcon, Settings2Icon, ToggleRightIcon, WorkflowIcon, type LucideIcon } from "lucide-react"
+import { ActivityIcon, BotIcon, PaperclipIcon, BellIcon, CalendarClockIcon, HouseIcon, MessagesSquareIcon, SendIcon, NotebookPenIcon, Settings2Icon, SquareSlashIcon, ToggleRightIcon, WorkflowIcon, type LucideIcon } from "lucide-react"
 import type { Key } from "@/lib/i18n"
 
-export type Page = { to: "/" | "/chats" | "/agents" | "/reminders" | "/outbound" | "/jobs" | "/flows" | "/notes" | "/attachments" | "/connectors" | "/activity" | "/settings"; label: Key; Icon: LucideIcon; group: Key }
+export type Page = { to: "/" | "/chats" | "/agents" | "/reminders" | "/outbound" | "/jobs" | "/flows" | "/notes" | "/commands" | "/attachments" | "/connectors" | "/activity" | "/settings"; label: Key; Icon: LucideIcon; group: Key }
 
 export const PAGES: Page[] = [
   { to: "/", label: "nav.home", Icon: HouseIcon, group: "nav.group.agent" },
@@ -13,6 +13,7 @@ export const PAGES: Page[] = [
   { to: "/jobs", label: "nav.jobs", Icon: CalendarClockIcon, group: "nav.group.agent" },
   { to: "/flows", label: "nav.flows", Icon: WorkflowIcon, group: "nav.group.agent" },
   { to: "/notes", label: "nav.notes", Icon: NotebookPenIcon, group: "nav.group.agent" },
+  { to: "/commands", label: "nav.commands", Icon: SquareSlashIcon, group: "nav.group.agent" },
   { to: "/attachments", label: "nav.attachments", Icon: PaperclipIcon, group: "nav.group.agent" },
   { to: "/connectors", label: "nav.connectors", Icon: ToggleRightIcon, group: "nav.group.system" },
   { to: "/activity", label: "nav.activity", Icon: ActivityIcon, group: "nav.group.system" },

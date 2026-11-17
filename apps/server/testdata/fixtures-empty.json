@@ -30,6 +30,10 @@
    "columns": ["id","agent_id","name","channel","address","chat_id","policy","note","created_at","updated_at","removed_at"],
    "rows": []
   },
+  "custom_commands": {
+   "columns": ["id","agent_id","name","description","prompt","attach_report","enabled","created_at","updated_at"],
+   "rows": []
+  },
   "events": {
    "columns": ["id","at","level","connector_id","kind","message","data"],
    "rows": []

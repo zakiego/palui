@@ -425,6 +425,14 @@ func (e *Engine) dispatch(chat db.Chat, row db.Message) (*Route, error) {
 		if err := handled(c.DB, row.ID); err != nil {
 			return nil, err
 		}
+	case "custom":
+		ok, err := startCustom(c, chat, row, *r.Custom, r.CustomArgs)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			e.queue.PushMessage(chat.ID, row.ID)
+		}
 	case "turn":
 		e.queue.PushMessage(chat.ID, row.ID)
 	}

@@ -331,6 +331,14 @@ Automations the agent builds from chat out of triggers and steps (`apps/server/i
 
 Delivery is at least once. Outbox rows stuck in `sending` for more than 5 minutes go back to `pending`.
 
+### 8.3 Custom commands
+
+The owner saves a prompt under a `/name` on the dashboard's Commands page, either for every agent (`custom_commands.agent_id` NULL) or for one agent. In the router, built-in commands come first, then flow chat triggers, then custom commands. A custom command is owner-only and needs the chat to be set up. An agent's own command beats a global one with the same name, and a command that's off is a normal message.
+
+A match runs a normal turn. The message row keeps what was typed, and its content gets `command: { id, name, prompt, reportId }`. The model sees `prompt` in place of the typed text, now and in later turns. `{{args}}` in the saved prompt becomes the text after the command; without it, that text is appended. With `attach_report` on, Palui first makes a `/report` snapshot (stored in `reports`, leaving out the command message and earlier report commands) and appends it as a `<debug_report>` block. That only runs in a private chat, since the snapshot holds the owner's details. In a shared chat the command is answered with a pointer to `/report` instead. Names are 1 to 32 of `a-z 0-9 _ -` and never a built-in. `/help` lists the commands a chat can run.
+
+Example: `/report-fix` with the report attached and a prompt telling the agent to start a T3 Code thread in the palui project with the whole report as the task.
+
 ## 9. Data model (SQLite)
 
 | Table | Key columns |

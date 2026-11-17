@@ -13,6 +13,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/budget"
 	"github.com/zakiego/palui/apps/server/internal/chats"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
+	"github.com/zakiego/palui/apps/server/internal/customcmd"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/tools"
@@ -55,6 +56,24 @@ func HelpText(c *EngineCtx, chat db.Chat) (string, error) {
 			for _, f := range own {
 				lines = append(lines, fmt.Sprintf("• %s: flow \"%s\"", f.Command, f.Flow))
 			}
+		}
+	}
+	agent, err := agents.ForChat(c.DB, chat.AgentID, c.Clock())
+	if err != nil {
+		return "", err
+	}
+	custom, err := customcmd.ForAgent(c.DB, agent.ID)
+	if err != nil {
+		return "", err
+	}
+	if len(custom) > 0 {
+		lines = append(lines, "", "Perintah buatanmu:")
+		for _, cmd := range custom {
+			about := cmd.Description
+			if about == "" {
+				about = "perintah dari dashboard"
+			}
+			lines = append(lines, fmt.Sprintf("• /%s: %s", cmd.Name, about))
 		}
 	}
 	lines = append(lines, "", "Persetujuan: balas `ya` atau `batal`. Quote pesannya kalau yang nunggu lebih dari satu.")
