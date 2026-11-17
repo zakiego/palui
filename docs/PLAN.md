@@ -253,7 +253,7 @@ Budget
 - Test lists the tools. Each tool gets its own Switch and a class (`read`, `write`, `destructive`). Unknown defaults to `destructive`. `readOnlyHint` and `destructiveHint` prefill the class.
 - A trust flag per server: `own` (my servers) or `external`. Results from `external` servers taint the turn (section 10).
 - Tools are namespaced `server__tool`.
-- `config.noPrivateData: true` is the owner's mark that the server holds no private data (section 19.4). Its tools without a declared scope resolve to `none`. Set only from the agent's Tools tab (`setConnectorDataFn`), cleared when the URL changes.
+- `config.noPrivateData: true` is the owner's mark that the server holds no private data (section 19.4). Its tools without a declared scope resolve to `none`. Set from the agent's Tools tab (`setConnectorDataFn`); the owner's draft save and the CLI can write it too. Never from a chat tool or `/mcp`. Cleared when the URL changes. Every change logs an `mcp.data` event.
 - Presets for servers I already run (vorneo, keuangan, todomap, linear) ask only for the token.
 
 ### 5.4.1 Tools: T3 Code
