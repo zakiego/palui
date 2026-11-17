@@ -81,7 +81,7 @@ func catalogBuilders(t *testing.T, e *catalogEnv) map[string]map[string]*connect
 		"chats":       {"default": must(chatsconn.Tools(e.db, e.owner, clock))},
 		"flows":       {"owner": owner, "flow": with("recap", flowsconn.RecapTool(e.db, flowTurn, clock))},
 		"hooks":       {"default": started(hooksconn.Runtime)},
-		"jobs":        {"default": jobsconn.Tools(e.db, clock)},
+		"jobs":        {"default": jobsconn.Tools(e.db, clock, "")},
 		"notes":       {"default": must(notesconn.Tools(e.db, clock, "")), "agent": must(notesconn.Tools(e.db, clock, e.agentID))},
 		"outbound":    {"owner": must(outboundconn.Tools(e.db, e.owner, clock)), "unattended": must(outboundconn.Tools(e.db, unattended, clock))},
 		"reminders":   {"default": remindersconn.Tools(e.db, e.owner, clock)},

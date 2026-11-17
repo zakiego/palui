@@ -164,3 +164,46 @@ func TestWontRemoveAServerSetUpInTheDashboardAndNeverListsItsToken(t *testing.T)
 		t.Fatal("gone")
 	}
 }
+
+func TestAnotherAgentsServersStayItsOwn(t *testing.T) {
+	d := testutil.DB(t)
+	srv := conntest.StartMCPServer(t, conntest.MCPOptions{Register: register})
+	target, _ := url.Parse(srv.URL)
+	client := &http.Client{Transport: toLocal{target}}
+	global, _ := jsonx.ParseObject([]byte(`{"url":"https://global.example.com/mcp","addedFromChat":true}`))
+	_, err := connectors.Upsert(d, connectors.UpsertInput{ID: "mcp-global", Manifest: mcpconn.Manifest.Row(), Config: global}, KEY, 1)
+	testutil.Must(t, err)
+	friends := remotemcp.Tools(remotemcp.Deps{DB: d, MasterKey: KEY, Resolver: public, Client: client, AgentID: "agt_friends", Own: true})
+	if pt, _ := friends.Get("add_mcp_server"); pt.Data != connectors.DataAgent {
+		t.Fatal(pt.Data)
+	}
+	if pt, _ := remotemcp.Tools(remotemcp.Deps{DB: d}).Get("add_mcp_server"); pt.Data != connectors.DataShared {
+		t.Fatal(pt.Data)
+	}
+	if r := conntest.Call(t, friends, "add_mcp_server", `{"name":"kas","url":"https://sholat.example.com/mcp"}`); !r.B("ok") {
+		t.Fatal(r)
+	}
+	row, _, err := connectors.Get(d, "mcp-kas")
+	testutil.Must(t, err)
+	if row.AgentID == nil || *row.AgentID != "agt_friends" {
+		t.Fatalf("%+v", row.AgentID)
+	}
+	// The owner's agent neither lists nor removes it; the friends' agent can't
+	// remove a server every agent shares.
+	owner := remotemcp.Tools(remotemcp.Deps{DB: d, MasterKey: KEY, Resolver: public, AgentID: "agt_owner"})
+	if got := strings.Join(conntest.Call(t, owner, "list_mcp_servers", `{}`).Strs("servers", "id"), ","); got != "mcp-global" {
+		t.Fatal(got)
+	}
+	if conntest.Call(t, owner, "remove_mcp_server", `{"name":"kas"}`).B("ok") {
+		t.Fatal("owner removed the friends' server")
+	}
+	if got := strings.Join(conntest.Call(t, friends, "list_mcp_servers", `{}`).Strs("servers", "id"), ","); got != "mcp-global,mcp-kas" {
+		t.Fatal(got)
+	}
+	if conntest.Call(t, friends, "remove_mcp_server", `{"name":"global"}`).B("ok") {
+		t.Fatal("friends removed a global server")
+	}
+	if !conntest.Call(t, friends, "remove_mcp_server", `{"name":"kas"}`).B("ok") {
+		t.Fatal("remove own")
+	}
+}

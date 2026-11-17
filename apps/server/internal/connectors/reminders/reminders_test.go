@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/chats"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/conntest"
@@ -174,11 +175,11 @@ func TestJobToolsListJobsWithTheScheduleAndNextRun(t *testing.T) {
 	e := setup(t)
 	_, err := jobs.Create(e.db, jobs.DailyBriefing(e.chatID, WITA, NOW), NOW)
 	testutil.Must(t, err)
-	res := conntest.Call(t, jobsconn.Tools(e.db, func() int64 { return NOW }), "list_jobs", `{"includePaused":true}`)
+	res := conntest.Call(t, jobsconn.Tools(e.db, func() int64 { return NOW }, ""), "list_jobs", `{"includePaused":true}`)
 	if res.S("jobs.0.name") != "Briefing pagi" || res.S("jobs.0.schedule") != "Tiap hari, 07.00 WITA" || res.S("jobs.0.next") != "Besok, Rabu 11 Nov, 07.00 WITA" || !res.B("jobs.0.enabled") {
 		t.Fatalf("%s", res)
 	}
-	pt, _ := jobsconn.Tools(e.db, nil).Get("list_jobs")
+	pt, _ := jobsconn.Tools(e.db, nil, "").Get("list_jobs")
 	if pt.Class != "read" {
 		t.Fatal(pt.Class)
 	}
@@ -186,5 +187,29 @@ func TestJobToolsListJobsWithTheScheduleAndNextRun(t *testing.T) {
 	testutil.Must(t, err)
 	if !tr.OK || tr.Detail != "1 active job" {
 		t.Fatalf("%+v", tr)
+	}
+}
+
+func TestJobToolsListOnlyTheJobsInTheAgentsChats(t *testing.T) {
+	e := setup(t)
+	palui, err := agents.GetDefault(e.db, NOW)
+	testutil.Must(t, err)
+	fin, err := agents.Create(e.db, agents.Input{Slug: "finansial", Name: testutil.Ptr("Finansial"), Persona: testutil.Ptr("Catat keuangan.")}, NOW)
+	testutil.Must(t, err)
+	group, err := chats.Ensure(e.db, chats.EnsureInput{Channel: "whatsapp", ExternalID: "120363@g.us", Kind: "group", AgentID: &fin.ID}, NOW)
+	testutil.Must(t, err)
+	mine, err := jobs.Create(e.db, jobs.DailyBriefing(e.chatID, WITA, NOW), NOW)
+	testutil.Must(t, err)
+	theirs, err := jobs.Create(e.db, jobs.DailyBriefing(group.ID, WITA, NOW), NOW)
+	testutil.Must(t, err)
+	for _, c := range []struct{ agent, want string }{{palui.ID, mine.ID}, {"", mine.ID}, {fin.ID, theirs.ID}} {
+		res := conntest.Call(t, jobsconn.Tools(e.db, func() int64 { return NOW }, c.agent), "list_jobs", `{"includePaused":true}`)
+		if got := strings.Join(res.Strs("jobs", "id"), ","); got != c.want {
+			t.Fatalf("agent %q: %s, want %s", c.agent, got, c.want)
+		}
+	}
+	res := conntest.Call(t, jobsconn.Tools(e.db, func() int64 { return NOW }, "agt_gone"), "list_jobs", `{"includePaused":true}`)
+	if res.N("count") != 0 {
+		t.Fatalf("%s", res)
 	}
 }
