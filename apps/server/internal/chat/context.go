@@ -183,6 +183,9 @@ func inboundLines(i SystemInput) []string {
 		voice := "Voice notes reach you only as a note that they couldn't be transcribed, so you can't hear them."
 		if i.Inbound.Voice {
 			voice = "Voice notes reach you as a transcript, marked [voice]."
+			if i.Shared != nil {
+				voice = "The owner's voice notes reach you as a transcript, marked [voice]. Anyone else's reach you only as a note that they weren't transcribed, so ask them to type it."
+			}
 		}
 		media := "Besides text, photos sent with a message are shown to you as images, and small text files (txt, csv, json, code and the like) are inlined as [file: name]. Other files reach you by name only. " + voice
 		out = append(out, media)
