@@ -889,3 +889,35 @@ func TestAgentsOwnTelegramBot(t *testing.T) {
 	jsonEq(t, mainSent, `["dari palui"]`)
 	jsonEq(t, botSent, `["dari chef"]`)
 }
+
+// A guest's photo in a group with an agent never reached the model: channels
+// only downloaded the owner's media (rpt_0mwkrtff0z3w0ld5vfp).
+func TestAgentsGuestMedia(t *testing.T) {
+	h := agentsWorld(t, []models.Step{models.Say("ok")}, extra{})
+	wants := func(mod func(m *connectors.InboundMessage)) bool {
+		m := tgMsg("lihat", mod)
+		return h.Engine.Services.WantsMedia(m)
+	}
+	eq(t, wants(guestMsg("lihat")), false)
+	h.owner("/agent chef")
+	h.Engine.Idle()
+	eq(t, wants(guestMsg("@bot lihat")), true)
+	eq(t, wants(guestMsg("lihat", notAddressed)), false)
+	eq(t, wants(ownerInGroup(addressed)), true)
+	eq(t, wants(ownerInGroup(notAddressed)), false)
+	eq(t, wants(func(m *connectors.InboundMessage) { m.SenderExternalID, m.ChatExternalID = "99", "99" }), false)
+
+	h.guest("@bot ini apa", func(m *connectors.InboundMessage) {
+		m.Media = []connectors.InboundMedia{{Kind: "image", MimeType: "image/jpeg", Data: "QUJD"}}
+	})
+	h.Engine.Idle()
+	row := lastUserRow(t, h.DB)
+	eq(t, chat.HasImages([]db.Message{row}, map[string]bool{row.ID: true}), true)
+}
+
+func lastUserRow(t *testing.T, q db.Q) db.Message {
+	t.Helper()
+	row, err := db.ScanMessage(q.QueryRow("SELECT " + db.MessageCols + " FROM messages WHERE role = 'user' ORDER BY created_at DESC, rowid DESC LIMIT 1"))
+	testutil.Must(t, err)
+	return row
+}
