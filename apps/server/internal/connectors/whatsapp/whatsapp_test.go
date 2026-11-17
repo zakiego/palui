@@ -1027,6 +1027,38 @@ func TestGroupParticipants(t *testing.T) {
 		eq(t, s.GroupMemberCalls(), 2)
 	})
 
+	t.Run("a member writing during the fetch keeps it, a stranger doesn't", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		s := e.sock()
+		members(s)
+		l := lister(r)
+		write := func(id, participant string, n int) {
+			s.Message(dm(id, nil, func(k *whatsapp.Key) { k.RemoteJID, k.Participant = grp, participant }), "")
+			conntest.Until(t, func() bool { return e.ctx.InboundCount() == n })
+		}
+		s.DuringGroupParticipants = func(string) {
+			s.DuringGroupParticipants = nil
+			write("M1", aniPN, 1)
+		}
+		_, err := l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 1)
+
+		s.EmitGroupChange(grp)
+		s.DuringGroupParticipants = func(string) {
+			s.DuringGroupParticipants = nil
+			write("M2", "6281200000003@s.whatsapp.net", 2)
+		}
+		if _, err := l.GroupParticipants(ctx, grp); err == nil {
+			t.Fatal("a list that misses a sender seen during the fetch passed")
+		}
+		_, err = l.GroupParticipants(ctx, grp)
+		testutil.Must(t, err)
+		eq(t, s.GroupMemberCalls(), 3)
+	})
+
 	t.Run("a canceled fetch is not cached", func(t *testing.T) {
 		e, r := openRunning(t, opts{})
 		s := e.sock()

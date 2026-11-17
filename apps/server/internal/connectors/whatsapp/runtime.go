@@ -244,6 +244,9 @@ type wa struct {
 	// when nothing was cached, so a fetch that overlapped one isn't stored.
 	groupGen   map[string]uint64
 	groupEpoch uint64
+	// groupSeen holds who wrote in a group that had no cached list, so a
+	// fetch in flight can check them against what it got back.
+	groupSeen map[string][]seenSender
 
 	queue chan delivery
 	quit  chan struct{}
@@ -295,6 +298,7 @@ func start(c connectors.Context, o Options) (*connectors.RunningConnector, error
 		groupTitles:     map[string]titleEntry{},
 		groupMembers:    map[string]membersEntry{},
 		groupGen:        map[string]uint64{},
+		groupSeen:       map[string][]seenSender{},
 		queue:           make(chan delivery, 256),
 		quit:            make(chan struct{}),
 	}
@@ -730,9 +734,19 @@ func (w *wa) deliver(s Socket, m *Message) error {
 
 	if group {
 		w.mu.Lock()
-		// No entry also drops: a fetch in flight may predate this sender.
-		if e, ok := w.groupMembers[jid]; !ok || !inParticipants(e.list, BareJID(sender), alt) {
-			w.dropGroupLocked(jid)
+		if e, ok := w.groupMembers[jid]; ok {
+			if !inParticipants(e.list, BareJID(sender), alt) {
+				w.dropGroupLocked(jid)
+			}
+		} else {
+			// No list yet: a fetch in flight may predate this sender, so it
+			// checks them before it stores (GroupParticipants).
+			seen := append(w.groupSeen[jid], seenSender{id: BareJID(sender), alt: alt, at: w.o.Now()})
+			if len(seen) > maxGroupSeen {
+				w.dropGroupLocked(jid)
+				seen = nil
+			}
+			w.groupSeen[jid] = seen
 		}
 		w.mu.Unlock()
 	}
@@ -910,9 +924,27 @@ func (w *wa) GroupParticipants(ctx context.Context, jid string) ([]connectors.Pa
 	if w.groupGen[jid] != gen || w.groupEpoch != epoch {
 		return nil, fmt.Errorf("%s changed while its participants were fetched", jid)
 	}
+	seen := w.groupSeen[jid]
+	delete(w.groupSeen, jid)
+	for _, x := range seen {
+		// Someone the list doesn't hold wrote while it was fetched: it may
+		// predate their joining.
+		if x.at >= now && !inParticipants(list, x.id, x.alt) {
+			return nil, fmt.Errorf("%s has a sender the fetched list doesn't hold", jid)
+		}
+	}
 	w.groupMembers[jid] = membersEntry{list: list, at: w.o.Now()}
 	return slices.Clone(list), nil
 }
+
+// seenSender is one sender in a group with no cached participant list.
+type seenSender struct {
+	id, alt string
+	at      int64
+}
+
+// maxGroupSeen bounds groupSeen per group; past it the group is dropped.
+const maxGroupSeen = 64
 
 // dropGroupLocked forgets a group's participants and fails any fetch of them
 // already in flight. Callers hold w.mu.
