@@ -213,6 +213,35 @@ func TestAgentsAck(t *testing.T) {
 	})
 }
 
+func TestAgentsGroupContext(t *testing.T) {
+	t.Run("keeps unaddressed group talk as context and answers only the mention", func(t *testing.T) {
+		h := agentsWorld(t, []models.Step{models.Say("10 shot kebanyakan")}, extra{})
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		runs, sent := len(allRuns(t, h.DB)), count(t, h.DB, "outbox")
+		if r := h.guest("tiap hari gw habis 10 shot", notAddressed); r != nil {
+			t.Fatal(r)
+		}
+		if r := h.owner("gila lo"); r != nil {
+			t.Fatal(r)
+		}
+		h.Engine.Idle()
+		eq(t, len(allRuns(t, h.DB)), runs)
+		eq(t, count(t, h.DB, "outbox"), sent)
+		g := groupChat(t, h.DB)
+		eq(t, count(t, h.DB, "messages WHERE chat_id = '"+g.ID+"' AND status = 'context' AND run_id IS NULL"), 2)
+		h.guest("@bot kebanyakan ga?")
+		h.Engine.Idle()
+		p := prompt(h.m, -1)
+		contains(t, p, "[Budi]: tiap hari gw habis 10 shot")
+		contains(t, p, "[Owner]: gila lo")
+		contains(t, p, "[Budi]: @bot kebanyakan ga?")
+		contains(t, p, "you see every message, but you only answer when someone @mentions you")
+		eq(t, lastRow(t, h.DB).Payload.Text, "10 shot kebanyakan")
+		eq(t, len(allRuns(t, h.DB)), runs+1)
+	})
+}
+
 func TestAgentsReplyMode(t *testing.T) {
 	t.Run("answers every message after /reply all, and only mentions again after /reply mention", func(t *testing.T) {
 		h := agentsWorld(t, []models.Step{models.Say("a"), models.Say("b"), models.Say("c")}, extra{})

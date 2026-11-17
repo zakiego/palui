@@ -499,4 +499,43 @@ func TestBuildSystemGuestLimits(t *testing.T) {
 	notContains(t, p, "DM")
 }
 
+// A guest asked "can you read?" and the bot guessed at what reaches it
+// (rpt_0mwkiafzueqehwsasht).
+func TestBuildSystemInbound(t *testing.T) {
+	group := chat.SystemInput{Persona: "P", Channel: "whatsapp", Trigger: "message",
+		Chat: &chat.SystemChat{ID: "chat_g", ExternalID: "1203@g.us", Kind: "group"}, Shared: &chat.SharedInfo{Kind: "group", Guest: true}}
+	t.Run("a mention group says it sees everything and answers mentions", func(t *testing.T) {
+		in := group
+		in.ReplyMode = "mention"
+		contains(t, chat.BuildSystem(in), "you see every message, but you only answer when someone @mentions you")
+	})
+	t.Run("an all group and a direct chat don't", func(t *testing.T) {
+		in := group
+		in.ReplyMode = "all"
+		notContains(t, chat.BuildSystem(in), "@mention you")
+		dm := chat.SystemInput{Persona: "P", Channel: "whatsapp", Trigger: "message", Chat: &chat.SystemChat{ID: "chat_d", Kind: "dm"}}
+		notContains(t, chat.BuildSystem(dm), "@mention you")
+	})
+	t.Run("names the media a message can carry", func(t *testing.T) {
+		in := group
+		in.Inbound = &chat.InboundInfo{}
+		p := chat.BuildSystem(in)
+		contains(t, p, "photos sent with a message are shown to you as images")
+		contains(t, p, "small text files")
+		contains(t, p, "so you can't hear them")
+		contains(t, p, "Only the owner's photos, files and voice notes reach you")
+		in.Shared = nil
+		notContains(t, chat.BuildSystem(in), "Only the owner's photos")
+		in.Inbound = &chat.InboundInfo{Voice: true}
+		p = chat.BuildSystem(in)
+		contains(t, p, "Voice notes reach you as a transcript")
+		notContains(t, p, "can't hear them")
+	})
+	t.Run("leaves media out when no message started the turn", func(t *testing.T) {
+		in := group
+		in.Trigger = "schedule"
+		notContains(t, chat.BuildSystem(in), "photos sent with a message")
+	})
+}
+
 var _ = json.Marshal
