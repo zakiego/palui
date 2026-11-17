@@ -34,7 +34,12 @@ export type CatalogTool = {
   title: string | null
   untrusted: boolean
   guestSafe: boolean
+  // Whose data it touches: each chat's, this agent's, every agent's, or none.
+  // Left out, it follows the server: this agent's when it owns it, else shared.
+  data?: DataScope
 }
+
+export type DataScope = "chat" | "agent" | "shared" | "none"
 
 // tools is null when the runtime couldn't list them (error says why).
 export type AgentTools = { tools: CatalogTool[] | null; error: string | null; used: { [tool: string]: number }; scopes: { [connectorId: string]: string | null } }

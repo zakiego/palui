@@ -2,7 +2,7 @@
 // global-or-own select, and the open state that follows a search.
 import * as React from "react"
 import { Link } from "@tanstack/react-router"
-import { ArrowUpRightIcon, BotIcon, CircleOffIcon, GlobeIcon, UsersIcon } from "lucide-react"
+import { ArrowUpRightIcon, BotIcon, CircleOffIcon, GlobeIcon, LockIcon, Share2Icon, UsersIcon } from "lucide-react"
 
 import { connectorIcon } from "@/components/connector-icon"
 import { IconTile } from "@/components/icon-tile"
@@ -10,7 +10,7 @@ import { SimpleSelect } from "@/components/simple-select"
 import { CLASS_TONE } from "@/components/tool-trace"
 import { Button } from "@/components/ui/button"
 import { StatusText } from "@/components/ui/status-text"
-import type { getAgentToolsFn } from "@/lib/api/agents"
+import type { DataScope, getAgentToolsFn } from "@/lib/api/agents"
 import { useCount, useLabel, useT } from "@/lib/i18n"
 import { manifestFor } from "@/lib/manifests"
 import { cn } from "@/lib/utils"
@@ -41,6 +41,30 @@ export function groupTools(tools: ToolItem[], query: string) {
   const by = new Map<string, ToolItem[]>()
   for (const x of hits) (by.get(x.connectorId) ?? by.set(x.connectorId, []).get(x.connectorId)!).push(x)
   return [...by.values()]
+}
+
+// Whose data a tool touches. A tool that doesn't say follows its server: the
+// agent's when this agent owns the server, every agent's when it's global.
+export function dataOf(x: ToolItem, owned: boolean): DataScope {
+  return x.data ?? (owned ? "agent" : "shared")
+}
+
+// The widest scope in a server: one shared tool makes the whole server shared.
+const DATA_RANK: Record<DataScope, number> = { none: 0, chat: 1, agent: 2, shared: 3 }
+export function groupData(list: ToolItem[], owned: boolean): DataScope {
+  return list.map((x) => dataOf(x, owned)).reduce((a, b) => (DATA_RANK[b] > DATA_RANK[a] ? b : a), "none")
+}
+
+// Whose data, in the words of the two cards above. A tool that keeps nothing
+// says nothing.
+export function DataScopeText({ scope }: { scope: DataScope }) {
+  const t = useT()
+  if (scope === "none") return null
+  return (
+    <StatusText tone="secondary" icon={scope === "shared" ? <Share2Icon aria-hidden="true" /> : <LockIcon aria-hidden="true" />}>
+      {t(`agents.tools.data.${scope}`)}
+    </StatusText>
+  )
 }
 
 export function countClass(list: ToolItem[], cls: string) {
@@ -110,7 +134,8 @@ export function GroupActions({ head, props }: { head: ToolItem; props: ToolsView
 }
 
 // One tool, with how often it ran and what it may do.
-export function ToolRow({ x, props }: { x: ToolItem; props: ToolsViewProps }) {
+// `scope` is set when the tool's server mixes scopes, so each tool says its own.
+export function ToolRow({ x, props, scope }: { x: ToolItem; props: ToolsViewProps; scope?: DataScope }) {
   const t = useT()
   const label = useLabel()
   const used = props.data.used[x.name]
@@ -131,6 +156,7 @@ export function ToolRow({ x, props }: { x: ToolItem; props: ToolsViewProps }) {
           <StatusText tone={CLASS_TONE[x.class] ?? "destructive"} icon={null}>
             {label("tool.class", x.class)}
           </StatusText>
+          {scope && <DataScopeText scope={scope} />}
           {x.untrusted && (
             <StatusText tone="secondary" icon={<GlobeIcon aria-hidden="true" />}>
               {t("agents.tools.outside")}
@@ -175,8 +201,9 @@ export function PermissionSelect({ name, value, allowAll, onChange }: { name: st
   )
 }
 
-// How many tools a closed group holds, and how many are destructive.
-export function GroupMeta({ list, permissions, className }: { list: ToolItem[]; permissions?: ToolsViewProps["permissions"]; className?: string }) {
+// How many tools a closed group holds, whose data they touch, and how many
+// are destructive.
+export function GroupMeta({ list, scope, permissions, className }: { list: ToolItem[]; scope: DataScope; permissions?: ToolsViewProps["permissions"]; className?: string }) {
   const t = useT()
   const count = useCount()
   const destructive = countClass(list, "destructive")
@@ -185,6 +212,7 @@ export function GroupMeta({ list, permissions, className }: { list: ToolItem[]; 
   return (
     <span className={cn("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-caption font-normal text-muted-foreground", className)}>
       <span className="tabular-nums">{count(list.length, "agents.tools.count.one", "agents.tools.count.many")}</span>
+      <DataScopeText scope={scope} />
       {destructive > 0 && (
         <StatusText tone="destructive" icon={null} className="tabular-nums">
           {t("agents.tools.destructiveCount", { n: destructive.toLocaleString() })}
