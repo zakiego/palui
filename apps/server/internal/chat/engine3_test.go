@@ -462,6 +462,45 @@ func TestToolSearch(t *testing.T) {
 		notContains(t, *res.ResultPreview, "prayer_wipe")
 	})
 
+	t.Run("gives a shared group a search tool that names nothing it can't have", func(t *testing.T) {
+		ran := &executedLog{}
+		chatTool := func(desc, name string) connectors.PaluiTool {
+			return connectors.PaluiTool{Class: "read", Data: connectors.DataChat, Tool: conntest.FnTool(desc, func(*jsonx.Object) (any, error) { ran.add(name); return "ok", nil })}
+		}
+		reg := map[string]*connectors.Runtime{"rem": toolsRT("rem", tools(
+			"list", chatTool("List reminders", "list"),
+			"show", chatTool("Show a reminder", "show"),
+			"count", chatTool("Count reminders", "count"),
+			"next", chatTool("Next reminder", "next"),
+			"prayer_times", chatTool("Prayer times for this chat", "prayer_times"),
+			"wipe", connectors.PaluiTool{Class: "destructive", Data: connectors.DataChat, Tool: conntest.FnTool("Wipe reminders", ret("ok"))},
+		))}
+		h := agentsWorld(t, []models.Step{models.CallTool("palui__search_tools", objOf("query", "prayer times"), "c1"), models.CallTool("rem__prayer_times", objOf(), "c2"), models.Say("done")}, extra{registry: reg, rows: []chattest.Row{{"rem", "tools"}}})
+		setBudget(t, h.DB, func(b *settings.Budgets) { b.MaxTools = 4 })
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.guest("@bot jadwal sholat")
+		h.Engine.Idle()
+		jsonEq(t, ran.get(), `["prayer_times"]`)
+		if !has(h.m.Offered[0], "palui__search_tools") || has(h.m.Offered[0], "rem__wipe") {
+			t.Fatal(h.m.Offered[0])
+		}
+		var schema string
+		for _, tl := range h.m.Calls[0].Tools {
+			if tl.Name == "palui__search_tools" {
+				schema = string(tl.InputSchema)
+			}
+		}
+		for _, s := range []string{`"for"`, "flow", "destructive"} {
+			notContains(t, schema, s)
+		}
+		p := prompt(h.m, 0)
+		contains(t, p, "Never say you can't do something without searching first.")
+		contains(t, p, "and the ones palui__search_tools loads, on purpose")
+		notContains(t, p, "Never tell the owner")
+		notContains(t, p, "Destructive")
+	})
+
 	t.Run("loads everything up front when the tools fit", func(t *testing.T) {
 		h := basic(t, []models.Step{models.Say("ok")}, extra{registry: map[string]*connectors.Runtime{"notes": skill(), "mcp-jadwal-sholat": sholat(&executedLog{})}, rows: []chattest.Row{{"notes", "skill"}, {"mcp-jadwal-sholat", "tools"}}})
 		h.sendIdle("halo")

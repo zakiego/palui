@@ -698,3 +698,61 @@ func TestSearchToolZodGivesSearchToolSchema(t *testing.T) {
 		t.Fatalf("\n got  %s\n want %s", got, tools.SearchToolSchema)
 	}
 }
+
+func TestSharedSearchToolZodGivesSharedSearchToolSchema(t *testing.T) {
+	if got := string(zod.JSONSchemaBytes(tools.SharedSearchToolZod)); got != tools.SharedSearchToolSchema {
+		t.Fatalf("\n got  %s\n want %s", got, tools.SharedSearchToolSchema)
+	}
+}
+
+// Over the budget, a members or outside turn gets a search tool that names no
+// flows and no destructive tools, and a no-match note that doesn't point at
+// the owner. The owner's turn keeps the full one.
+func TestSharedSearchTool(t *testing.T) {
+	ctx := context.Background()
+	chatScoped := func() []connectors.RunningEntry {
+		e := entry("rem", "tools", "Reminders", "own", nil)
+		e.Handle.Tools = func(context.Context, connectors.TurnInfo) (*connectors.ToolSet, error) {
+			fn := conntest.FnTool("x", nil)
+			read := connectors.PaluiTool{Class: "read", Data: connectors.DataChat, Tool: fn}
+			return conntest.Tools("list", read, "show", read, "count", read, "next", read, "snooze", read), nil
+		}
+		return []connectors.RunningEntry{e}
+	}
+	for _, aud := range []string{tools.AudienceOutside, tools.AudienceMembers} {
+		o := opts(3, nil)
+		o.Audience = aud
+		c := tools.Collect(ctx, chatScoped(), o)
+		st, ok := c.Tools.Get(tools.SearchTool)
+		if !ok {
+			t.Fatal(aud, "no search tool")
+		}
+		schema := string(st.InputSchema)
+		if schema != tools.SharedSearchToolSchema {
+			t.Fatal(aud, schema)
+		}
+		for _, w := range []string{`"for"`, "flow", "destructive"} {
+			if strings.Contains(schema, w) {
+				t.Fatal(aud, w)
+			}
+		}
+		out, err := st.Execute(ctx, json.RawMessage(`{"query":"zzzz"}`), connectors.ToolCallInfo{ToolCallID: "c1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		note := out.(tools.SearchResult).Note
+		if strings.Contains(note, "owner") || note != "Nothing here matches. Try other words, or say you can't do that here." {
+			t.Fatal(aud, note)
+		}
+	}
+	o := opts(3, nil)
+	c := tools.Collect(ctx, chatScoped(), o)
+	st, _ := c.Tools.Get(tools.SearchTool)
+	if string(st.InputSchema) != tools.SearchToolSchema {
+		t.Fatal(string(st.InputSchema))
+	}
+	out, _ := st.Execute(ctx, json.RawMessage(`{"query":"zzzz"}`), connectors.ToolCallInfo{ToolCallID: "c1"})
+	if out.(tools.SearchResult).Note != "No enabled tool matches. Try other words, or tell the owner this isn't available." {
+		t.Fatal(out)
+	}
+}
