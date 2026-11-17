@@ -654,7 +654,7 @@ Roles beyond owner and member (utusan IAM), sharing one agent's data with anothe
 ### 19.9 Rollout
 
 1. Audience `owner` or `outside` only (no members yet): tools filtered by data scope, no approvals in shared chats, destructive left out, `owner_powers` ignored. This alone lets a friends' group set reminders.
-2. Members: `members`, `agent_members`, the `identities` change, WhatsApp participant lists, the `members` audience, the agent sheet.
+2. Members: `members`, `member_accounts`, `agent_members`, WhatsApp participant lists, the `members` audience, the agent sheet.
 3. Reading down: Palui's read tools for other agents' chats and memory.
 4. Tools tab: audience labels and the "Holds no private data" switch.
 5. Drop `owner_powers` and the shared-chat approval routing (`pending_approvals.ask_chat_id` stays for old rows until they expire).
