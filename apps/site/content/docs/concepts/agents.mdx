@@ -40,7 +40,7 @@ A new WhatsApp group stays off until you do. Until then Palui answers your menti
 
 ## Groups
 
-In a group, an agent answers when someone @mentions Palui's number (or the agent's own bot) or replies to one of its messages. Everything else is ignored and never stored. That applies to you too, except for commands.
+In a group, an agent answers when someone @mentions Palui's number (or the agent's own bot) or replies to one of its messages. That applies to you too, except for commands. Once the group has an agent, it still reads the rest of the talk and keeps it as context, so a mention like "@agent what do you think?" knows what was just said. It never answers those messages on its own. Photos, files and voice notes from guests aren't downloaded, only their text.
 
 To have it answer every message instead, send `/reply all` in the group, or pick "Every message" on the Chats page. `/reply mention` goes back. A Telegram bot only sees every message after you turn off its privacy mode in BotFather and add it to the group again.
 
