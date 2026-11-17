@@ -15,6 +15,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 - Manage Palui from your own AI agents. Palui now serves an MCP server at `/mcp` with 67 tools that do what the dashboard does: settings, agents, chats, connectors, notes, jobs, flows, reminders, outbound and attachments. Apps that only take a URL connect with OAuth and a consent page in the dashboard; agents in a terminal use a personal token from Settings → Security → MCP access, or `palui mcp token <name>` on the server. Both are listed with when they were last used and can be revoked there. Adds a migration; rolling back past this release needs the pre-deploy snapshot. The edge Worker needs a redeploy so `/mcp` and the OAuth discovery documents reach the app.
 
+### Fixed
+
+- In a group, an agent no longer tells people a tool is "not open right now" and to try again later. It used to list every connector as available even when the group couldn't use them, so it promised things like reminders it had no tool for. Now it only names what that chat can actually use and says plainly when it can't do something there.
+
 ## 0.9.1 (2026-11-17)
 
 ### Fixed

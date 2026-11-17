@@ -457,6 +457,23 @@ func TestAgentsToolsAndApprovals(t *testing.T) {
 		h.owner("@bot baca", addressed)
 		h.Engine.Idle()
 		eq(t, len(ran.get()), 0)
+		// Only names what the turn can use, so the model doesn't promise a
+		// reminder it has no tool for (report rpt_0mwkf86x0essjd5ueei).
+		p := models.PromptText(h.m.Prompts[len(h.m.Prompts)-1])
+		contains(t, p, "Enabled capabilities: web (1 tools).")
+		contains(t, p, "never suggest trying again later")
+	})
+
+	t.Run("a guest turn with no tools names no capability", func(t *testing.T) {
+		h := agentsWorld(t, []models.Step{models.Say("done")}, extra{registry: agentToolRegistry(&executedLog{}), rows: webAlphaRows})
+		need(agents.Update(h.DB, h.chef.ID, agents.Input{GuestTools: sp("none")}, 1))
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.guest("@bot cek")
+		h.Engine.Idle()
+		p := models.PromptText(h.m.Prompts[len(h.m.Prompts)-1])
+		contains(t, p, "No tools are enabled right now.")
+		notContains(t, p, "Enabled capabilities")
 	})
 }
 
