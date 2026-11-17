@@ -1,0 +1,76 @@
+---
+title: MCP access
+description: Manage Palui from your own AI agents through its MCP server at /mcp, with OAuth for apps that sign in and personal tokens for agents in a terminal.
+---
+
+Palui serves its own [MCP](https://modelcontextprotocol.io) server at `/mcp`. An AI agent connected to it can do what you can do in the dashboard: read chats, runs and settings, change agents, connectors, jobs and reminders, and send messages. It's meant for your own agents, so they can set Palui up and look after it for you.
+
+The server speaks Streamable HTTP. Every call needs a bearer token, and the dashboard's session cookie isn't accepted there.
+
+## Two ways in
+
+| Way | For | Lasts |
+|---|---|---|
+| OAuth | Apps that only take a URL, like a custom connector in a chat app | Access tokens last an hour and refresh for 30 days of use |
+| Personal token | Agents that run in a terminal and can send a header | Until you revoke it |
+
+Both show up in Settings → Security → MCP access, with when each was last used. Revoke one there and it stops working at once.
+
+### OAuth
+
+Add `https://<your domain>/mcp` as a custom connector in your AI app, and leave the client ID and secret empty. The app registers itself, then sends you to a Palui page that asks whether to connect it. You need to be signed in to the dashboard (with your passkey) to answer. Allow sends you back to the app.
+
+Under the hood Palui is its own OAuth 2.1 authorization server for `/mcp`: dynamic client registration, the authorization code grant with PKCE (S256), refresh token rotation, and token revocation. The discovery documents are at `/.well-known/oauth-protected-resource/mcp` and `/.well-known/oauth-authorization-server`.
+
+### Personal token
+
+Create one in Settings → Security → MCP access → New token, or on the Docker host:
+
+```bash
+docker compose exec app palui mcp token "agent on my laptop"
+```
+
+The token (`plt_...`) is shown once. Send it as a header:
+
+```http
+POST /mcp
+Authorization: Bearer plt_...
+```
+
+For Claude Code, the dialog gives you the full command:
+
+```bash
+claude mcp add --transport http palui https://<your domain>/mcp --header "Authorization: Bearer plt_..."
+```
+
+`palui mcp list` and `palui mcp revoke <id>` list and revoke tokens and connections from the shell.
+
+## Tools
+
+The tools are the dashboard's own actions, so they validate input and take effect the same way. Read tools are marked read-only for the client. A few are marked destructive (deleting an agent, removing a connector, revoking a share link), so a careful client asks you first.
+
+| Area | Tools |
+|---|---|
+| Overview | `get_status`, `get_home`, `list_events`, `list_runs`, `get_run`, `get_usage` |
+| Settings | `get_settings`, `update_settings`, `list_connector_models`, `create_webhook` |
+| Agents | `list_agents`, `get_agent`, `get_agent_tools`, `get_agent_memory`, `save_agent`, `delete_agent`, `set_agent_tool_permissions` |
+| Chats | `list_chats`, `get_transcript`, `set_chat_agent`, `set_chat_reply_mode`, `set_chat_allowed`, `set_chat_ack`, `set_chat_deploy_notice`, `send_web_message`, `decide_approval`, `stop_turn` |
+| Connectors | `list_connectors`, `get_connector`, `pause_connector`, `resume_connector`, `test_connector`, `remove_connector`, `run_connector_action`, `set_connector_owner`, `set_whatsapp_owner` |
+| Notes | `get_notes`, `save_instruction`, `set_instruction_enabled`, `delete_instruction`, `set_preference`, `delete_preference` |
+| Jobs and flows | `list_jobs`, `get_job_preset`, `save_job`, `set_job_enabled`, `run_job_now`, `delete_job`, `list_flows`, `get_flow` |
+| Reminders | `list_reminders`, `parse_reminder`, `create_reminder`, `cancel_reminder`, `snooze_reminder` |
+| Outbound | `get_outbound`, `set_outbound_enabled`, `save_outbound_limits`, `add_contact`, `set_contact_policy`, `remove_contact`, `cancel_outbound` |
+| Attachments | `list_attachments`, `get_attachment_shares`, `create_attachment_share`, `revoke_attachment_share`, `delete_attachment` |
+
+Some things stay in the dashboard on purpose:
+
+- Adding a connector, because that's where its secrets are typed. A token never carries a connector secret.
+- Passkeys and owner invites.
+- MCP access itself. A token can't create more tokens or approve an OAuth connection.
+
+## Security notes
+
+- Tokens are stored only as SHA-256 hashes. The dashboard shows the last four characters of a personal token.
+- A refresh token works once. Using an old one again (after a two-minute grace for retries) cuts that connection.
+- Registration is open, as OAuth for MCP expects, but a registered app can do nothing until you allow it on the consent page. Apps that never connect are removed after a day.
+- Anyone holding a token can do what you can do in the dashboard. Give each machine or agent its own token, so you can revoke one without the others.

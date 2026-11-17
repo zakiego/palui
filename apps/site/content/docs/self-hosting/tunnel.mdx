@@ -8,7 +8,7 @@ The app listens only on the Docker host's loopback interface. Nothing on the hos
 ## Edge routing
 
 <EdgeRoutingDiagram>
-  A request to your domain first hits a Cloudflare Worker. Requests for /app, /api and /health are sent through your tunnel to the app on the Docker host. Every other path is served by Cloudflare Pages, which hosts this documentation site.
+  A request to your domain first hits a Cloudflare Worker. Requests for /app, /api, /health and /mcp (with its OAuth discovery documents) are sent through your tunnel to the app on the Docker host. Every other path is served by Cloudflare Pages, which hosts this documentation site.
 </EdgeRoutingDiagram>
 
 | Path | Goes to |
@@ -16,6 +16,7 @@ The app listens only on the Docker host's loopback interface. Nothing on the hos
 | `/app` | The app (dashboard) through the tunnel |
 | `/api`, including `/api/auth` and `/api/hooks` | The app through the tunnel |
 | `/health` | The app through the tunnel |
+| `/mcp`, `/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server` | The app through the tunnel ([MCP access](/docs/mcp-access)) |
 | Everything else | Cloudflare Pages (the landing page and these docs) |
 
 The landing page and docs are indexable. The app's routes are `noindex`. On your own instance, use your own domain in place of `palui.zakiego.com`, and set `APP_URL` in `.env` to match.
