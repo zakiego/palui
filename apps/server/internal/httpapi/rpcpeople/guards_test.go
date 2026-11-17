@@ -25,6 +25,8 @@ var mine = map[string]string{
 	// notes.ts
 	"getNotes": "GET", "saveInstructionFn": "POST", "setInstructionEnabledFn": "POST", "deleteInstructionFn": "POST",
 	"setPreferenceFn": "POST", "deletePreferenceFn": "POST",
+	// commands.ts
+	"getCommandsPage": "GET", "saveCommandFn": "POST", "setCommandEnabledFn": "POST", "deleteCommandFn": "POST",
 	// attachments.ts
 	"getAttachments": "GET", "deleteAttachmentFn": "POST", "getAttachmentShares": "GET",
 	"createAttachmentShareFn": "POST", "revokeAttachmentShareFn": "POST",
@@ -40,8 +42,8 @@ func names() []string {
 }
 
 func TestEveryFunctionIsRegisteredWithItsMethodAndGuard(t *testing.T) {
-	if len(mine) != 31 {
-		t.Fatalf("%d names, want 31", len(mine))
+	if len(mine) != 35 {
+		t.Fatalf("%d names, want 35", len(mine))
 	}
 	got := map[string]httpapi.Handler{}
 	for _, h := range httpapi.Handlers() {

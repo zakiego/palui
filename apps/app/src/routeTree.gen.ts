@@ -16,6 +16,7 @@ import { Route as AppActivityRouteImport } from './routes/_app/activity'
 import { Route as AppAgentsRouteImport } from './routes/_app/agents'
 import { Route as AppAttachmentsRouteImport } from './routes/_app/attachments'
 import { Route as AppChatsRouteImport } from './routes/_app/chats'
+import { Route as AppCommandsRouteImport } from './routes/_app/commands'
 import { Route as AppConnectorsRouteImport } from './routes/_app/connectors'
 import { Route as AppFlowsRouteImport } from './routes/_app/flows'
 import { Route as AppJobsRouteImport } from './routes/_app/jobs'
@@ -63,6 +64,11 @@ const AppAttachmentsRoute = AppAttachmentsRouteImport.update({
 const AppChatsRoute = AppChatsRouteImport.update({
   id: '/chats',
   path: '/chats',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCommandsRoute = AppCommandsRouteImport.update({
+  id: '/commands',
+  path: '/commands',
   getParentRoute: () => AppRoute,
 } as any)
 const AppConnectorsRoute = AppConnectorsRouteImport.update({
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/agents': typeof AppAgentsRoute
   '/attachments': typeof AppAttachmentsRoute
   '/chats': typeof AppChatsRoute
+  '/commands': typeof AppCommandsRoute
   '/connectors': typeof AppConnectorsRoute
   '/flows': typeof AppFlowsRoute
   '/jobs': typeof AppJobsRoute
@@ -164,6 +171,7 @@ export interface FileRoutesByTo {
   '/agents': typeof AppAgentsRoute
   '/attachments': typeof AppAttachmentsRoute
   '/chats': typeof AppChatsRoute
+  '/commands': typeof AppCommandsRoute
   '/connectors': typeof AppConnectorsRoute
   '/flows': typeof AppFlowsRoute
   '/jobs': typeof AppJobsRoute
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/_app/agents': typeof AppAgentsRoute
   '/_app/attachments': typeof AppAttachmentsRoute
   '/_app/chats': typeof AppChatsRoute
+  '/_app/commands': typeof AppCommandsRoute
   '/_app/connectors': typeof AppConnectorsRoute
   '/_app/flows': typeof AppFlowsRoute
   '/_app/jobs': typeof AppJobsRoute
@@ -213,6 +222,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/attachments'
     | '/chats'
+    | '/commands'
     | '/connectors'
     | '/flows'
     | '/jobs'
@@ -234,6 +244,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/attachments'
     | '/chats'
+    | '/commands'
     | '/connectors'
     | '/flows'
     | '/jobs'
@@ -257,6 +268,7 @@ export interface FileRouteTypes {
     | '/_app/agents'
     | '/_app/attachments'
     | '/_app/chats'
+    | '/_app/commands'
     | '/_app/connectors'
     | '/_app/flows'
     | '/_app/jobs'
@@ -330,6 +342,13 @@ declare module '@tanstack/react-router' {
       path: '/chats'
       fullPath: '/chats'
       preLoaderRoute: typeof AppChatsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/commands': {
+      id: '/_app/commands'
+      path: '/commands'
+      fullPath: '/commands'
+      preLoaderRoute: typeof AppCommandsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/connectors': {
@@ -438,6 +457,7 @@ interface AppRouteChildren {
   AppAgentsRoute: typeof AppAgentsRoute
   AppAttachmentsRoute: typeof AppAttachmentsRoute
   AppChatsRoute: typeof AppChatsRoute
+  AppCommandsRoute: typeof AppCommandsRoute
   AppConnectorsRoute: typeof AppConnectorsRoute
   AppFlowsRoute: typeof AppFlowsRoute
   AppJobsRoute: typeof AppJobsRoute
@@ -458,6 +478,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAgentsRoute: AppAgentsRoute,
   AppAttachmentsRoute: AppAttachmentsRoute,
   AppChatsRoute: AppChatsRoute,
+  AppCommandsRoute: AppCommandsRoute,
   AppConnectorsRoute: AppConnectorsRoute,
   AppFlowsRoute: AppFlowsRoute,
   AppJobsRoute: AppJobsRoute,

@@ -388,6 +388,30 @@ func ScanHook(s Scanner) (Hook, error) {
 	return h, err
 }
 
+// --- custom_commands --------------------------------------------------------------
+
+// CustomCommand is a custom_commands row. Name has no leading slash. AgentID
+// nil means every agent; an agent's own command beats a global one.
+type CustomCommand struct {
+	ID           string  `json:"id"`
+	AgentID      *string `json:"agentId"`
+	Name         string  `json:"name"`
+	Description  string  `json:"description"`
+	Prompt       string  `json:"prompt"`
+	AttachReport bool    `json:"attachReport"`
+	Enabled      bool    `json:"enabled"`
+	CreatedAt    int64   `json:"createdAt"`
+	UpdatedAt    int64   `json:"updatedAt"`
+}
+
+const CustomCommandCols = "id, agent_id, name, description, prompt, attach_report, enabled, created_at, updated_at"
+
+func ScanCustomCommand(s Scanner) (CustomCommand, error) {
+	var r CustomCommand
+	err := s.Scan(&r.ID, &r.AgentID, &r.Name, &r.Description, &r.Prompt, &r.AttachReport, &r.Enabled, &r.CreatedAt, &r.UpdatedAt)
+	return r, err
+}
+
 // --- instructions, preferences -----------------------------------------------------
 
 type Instruction struct {

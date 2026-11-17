@@ -22,6 +22,7 @@ var DashboardPages = [][2]string{
 	{"/app/jobs", "Scheduled jobs"},
 	{"/app/flows", "Flows (/app/flows/<flowId> for one)"},
 	{"/app/notes", "Notes and standing instructions"},
+	{"/app/commands", "Custom chat commands: a saved prompt the owner runs by typing its /name"},
 	{"/app/attachments", "Files and photos sent in chats"},
 	{"/app/activity", "Logs (?tab=events), runs (?tab=runs) and token usage (?tab=usage)"},
 	{"/app/settings?tab=general", "Bot language, dashboard language, fallback channel"},

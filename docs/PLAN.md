@@ -331,6 +331,14 @@ Automations the agent builds from chat out of triggers and steps (`apps/server/i
 
 Delivery is at least once. Outbox rows stuck in `sending` for more than 5 minutes go back to `pending`.
 
+### 8.3 Custom commands
+
+The owner saves a prompt under a `/name` on the dashboard's Commands page, either for every agent (`custom_commands.agent_id` NULL) or for one agent. In the router, built-in commands come first, then flow chat triggers, then custom commands. A custom command is owner-only and needs the chat to be set up. An agent's own command beats a global one with the same name, and a command that's off is a normal message.
+
+A match runs a normal turn. The message row keeps what was typed, and its content gets `command: { id, name, prompt, reportId }`. The model sees `prompt` in place of the typed text, now and in later turns. `{{args}}` in the saved prompt becomes the text after the command; without it, that text is appended. With `attach_report` on, Palui first makes a `/report` snapshot (stored in `reports`, leaving out the command message and earlier report commands) and appends it as a `<debug_report>` block. That only runs in a private chat, since the snapshot holds the owner's details. In a shared chat the command is answered with a pointer to `/report` instead. Names are 1 to 32 of `a-z 0-9 _ -` and never a built-in. `/help` lists the commands a chat can run.
+
+Example: `/report-fix` with the report attached and a prompt telling the agent to start a T3 Code thread in the palui project with the whole report as the task.
+
 ## 9. Data model (SQLite)
 
 | Table | Key columns |
@@ -634,7 +642,7 @@ Reading down: Palui can read other agents' chats and memory (new read tools on P
 
 ### 19.6 Channels
 
-- WhatsApp: one number for every agent. Groups (`@g.us`) are now read. The sender is `key.participant`. A message is addressed when `contextInfo.mentionedJid` holds Palui's number or LID, or when it quotes one of Palui's messages. Media from guests isn't downloaded. The model gets a note instead.
+- WhatsApp: one number for every agent. Groups (`@g.us`) are now read. The sender is `key.participant`. A message is addressed when `contextInfo.mentionedJid` holds Palui's number or LID, or when it quotes one of Palui's messages. A message's media is downloaded only when it will be answered (`Services.WantsMedia`: the owner, or a guest in a chat set up for guests). Dropped messages and group talk kept as context reach the inbox without the bytes, so a photo with no caption still shows as a placeholder.
 - Telegram: an agent can have its own bot. The Telegram connector allows several instances (`telegram`, `telegram-<slug>`). Chats are keyed by `(channel, connector_id, external_id)`, because two bots see the same DM and group ids. Replies go out through the bot the chat came in on (`outbox.connector_id`). In groups, a message is addressed when it mentions `@<bot username>` or replies to the bot. Bots in groups need privacy mode left on.
 - The owner claim stays one per channel: claiming one bot makes that Telegram account the owner for every bot.
 
@@ -649,7 +657,7 @@ Reading down: Palui can read other agents' chats and memory (new read tools on P
 
 ### 19.8 Not in this round
 
-Roles beyond owner and member (utusan IAM), sharing one agent's data with another agent, group messages kept as background context, agents talking to each other, per-chat caps, media from guests.
+Roles beyond owner and member (utusan IAM), sharing one agent's data with another agent, group messages kept as background context, agents talking to each other, per-chat caps.
 
 ### 19.9 Rollout
 

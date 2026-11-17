@@ -248,6 +248,12 @@ func PrepareMedia(ctx context.Context, q db.Q, row db.Message, running []connect
 			continue
 		}
 		if m.Kind == "audio" {
+			if !row.FromOwner {
+				// Transcribing costs money per note, so only the owner's are.
+				texts = append(texts, "[voice] (pesan suara dari tamu, gak ditranskrip)")
+				kept = append(kept, mediaEntry("kind", "audio", "mimeType", m.MimeType, "note", "guest, not transcribed"))
+				continue
+			}
 			if transcriber == nil || data == "" {
 				texts = append(texts, "[voice] (pesan suara, tapi gak ada skill transkripsi yang nyala)")
 				kept = append(kept, mediaEntry("kind", "audio", "mimeType", m.MimeType, "note", "not transcribed"))

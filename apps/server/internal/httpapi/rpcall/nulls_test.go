@@ -96,6 +96,7 @@ func getCalls(t *testing.T, d *db.DB) []getCall {
 		{"getChats", ""}, {"getConnectorsPage", ""}, {"getFlows", ""}, {"getShell", ""}, {"getHome", ""},
 		{"getStatusSummary", ""}, {"getJobs", ""}, {"getNotes", "{}"}, {"getOutbound", ""}, {"getReminders", ""},
 		{"getSession", ""}, {"listPasskeys", ""}, {"getSettingsPage", ""}, {"getFixtureState", ""},
+		{"getCommandsPage", ""},
 	}
 	for _, slug := range col(t, d, "SELECT slug FROM agents") {
 		calls = append(calls, getCall{"getAgentPage", q(map[string]string{"slug": slug})})
