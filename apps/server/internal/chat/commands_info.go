@@ -265,17 +265,32 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 		return "", err
 	}
 	var sticky []string
+	var session *db.Session
 	if chat.SessionID != nil {
 		if s, ok, err := chats.GetSession(q, *chat.SessionID); err != nil {
 			return "", err
 		} else if ok {
 			sticky = s.LoadedTools.V
+			session = &s
 		}
 	}
 	// A shared chat gets what a fresh turn there gets (same rules as ExecuteTurn).
 	audience, err := Audience(c, chat, agent)
 	if err != nil {
 		return "", err
+	}
+	if audience == tools.AudienceMembers && session != nil {
+		history, err := LoadHistory(q, session.ID, session.SummarizedUntil)
+		if err != nil {
+			return "", err
+		}
+		outsider, err := HistoryHasOutsider(q, chat, agent.ID, history)
+		if err != nil {
+			return "", err
+		}
+		if outsider {
+			audience = tools.AudienceOutside
+		}
 	}
 	if audience == tools.AudienceOutside && agent.GuestTools == "none" {
 		return "Gak ada tool buat " + agent.Name + " di chat ini: tool buat orang lain dimatiin.", nil

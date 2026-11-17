@@ -262,4 +262,11 @@ func TestMembersGroupWithAnOutsiderInHistory(t *testing.T) {
 	if has(last, "crm__deals") {
 		t.Fatal(last)
 	}
+
+	// /tools says the same as the turn: the agent's own tools aren't there.
+	g := need(chats.Ensure(w.h.DB, chats.EnsureInput{Channel: "whatsapp", ExternalID: waGroup, Kind: "group", AgentID: &w.chef.ID}, 1))
+	text, err := chat.ToolsText(w.h.Engine.Ctx, g, nil)
+	testutil.Must(t, err)
+	notContains(t, text, "crm")
+	contains(t, text, "rem (")
 }
