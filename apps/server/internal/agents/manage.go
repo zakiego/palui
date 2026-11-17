@@ -539,7 +539,8 @@ func SetToolPermissions(q db.Q, id string, patch PermissionsPatch, now int64) (d
 
 // Delete is deleteAgent: its chats go back to the default agent, connectors it
 // owned pause (keeping the dead owner, so they serve nobody), its instructions
-// go, its contacts are removed and nothing waiting is sent on its behalf.
+// go, its contacts are removed, nothing waiting is sent on its behalf, and
+// members who were only in this agent are deleted.
 func Delete(q db.Q, id string, now int64) (bool, error) {
 	row, ok, err := Get(q, id)
 	if err != nil || !ok {
@@ -557,6 +558,11 @@ func Delete(q db.Q, id string, now int64) (bool, error) {
 			{"UPDATE connectors SET enabled = 0 WHERE agent_id = ?", []any{id}},
 			{"DELETE FROM instructions WHERE agent_id = ?", []any{id}},
 			{"UPDATE contacts SET removed_at = ? WHERE agent_id = ? AND removed_at IS NULL", []any{now, id}},
+			// Members who were only in this agent go with it (PLAN 19.4). The
+			// first two read agent_members before the third clears it.
+			{"DELETE FROM member_accounts WHERE member_id IN (SELECT member_id FROM agent_members WHERE agent_id = ?) AND member_id NOT IN (SELECT member_id FROM agent_members WHERE agent_id != ?)", []any{id, id}},
+			{"DELETE FROM members WHERE id IN (SELECT member_id FROM agent_members WHERE agent_id = ?) AND id NOT IN (SELECT member_id FROM agent_members WHERE agent_id != ?)", []any{id, id}},
+			{"DELETE FROM agent_members WHERE agent_id = ?", []any{id}},
 		}
 		for _, s := range stmts {
 			if _, err := tx.Exec(s.sql, s.args...); err != nil {
