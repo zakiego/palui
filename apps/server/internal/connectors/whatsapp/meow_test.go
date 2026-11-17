@@ -147,3 +147,21 @@ func TestMeowEventsMapToBaileysCloseCodes(t *testing.T) {
 		t.Fatal("ended socket still emits")
 	}
 }
+
+// The real socket must download every kind MediaOf hands over; a sticker once
+// fell through to "no media" (rpt_0mwkvfallcmflwkzcev).
+func TestDownloadableCoversEveryMediaKind(t *testing.T) {
+	for _, c := range []*waE2E.Message{
+		{ImageMessage: &waE2E.ImageMessage{}},
+		{StickerMessage: &waE2E.StickerMessage{}},
+		{AudioMessage: &waE2E.AudioMessage{}},
+		{DocumentMessage: &waE2E.DocumentMessage{}},
+	} {
+		if MediaOf(c) == nil || downloadable(c) == nil {
+			t.Fatalf("%v: MediaOf and downloadable disagree", c)
+		}
+	}
+	if downloadable(&waE2E.Message{Conversation: proto.String("hi")}) != nil || downloadable(nil) != nil {
+		t.Fatal("text has nothing to download")
+	}
+}

@@ -681,6 +681,66 @@ func TestInbound(t *testing.T) {
 		eq(t, []any{in.Text, in.Media}, []any{"[sticker]", []connectors.InboundMedia{{Kind: "image", MimeType: "image/webp"}}})
 		eq(t, e.sock().Downloads(), []string{"ST1", "ST2", "ST3"})
 	})
+	// A guest's sticker in a group is context, so it isn't downloaded. When
+	// the owner replies to it and asks the bot, the bot only saw "[sticker]"
+	// (rpt_0mwkvfallcmflwkzcev). The reply now fetches the quoted sticker.
+	t.Run("fetches a quoted sticker or photo when the reply is for the bot", func(t *testing.T) {
+		still, err := os.ReadFile("../../sticker/testdata/still-lossless.webp")
+		testutil.Must(t, err)
+		e, _ := openRunning(t, opts{})
+		e.ctx.Services.WantsMedia = func(m connectors.InboundMessage) bool { return m.Addressed }
+		e.sock().Media = func(m *whatsapp.Message) ([]byte, error) {
+			if m.Message.GetStickerMessage() != nil {
+				return still, nil
+			}
+			return []byte("media:" + m.Key.ID), nil
+		}
+		inGroup := func(k *whatsapp.Key) { k.RemoteJID, k.Participant = "120363@g.us", "62811@s.whatsapp.net" }
+		quoting := func(text string, mention bool, quoted *waE2E.Message) *waE2E.Message {
+			ci := &waE2E.ContextInfo{StanzaID: proto.String("GST1"), Participant: proto.String("62822@s.whatsapp.net"), QuotedMessage: quoted}
+			if mention {
+				ci.MentionedJID = []string{"628980001472@s.whatsapp.net"}
+			}
+			return &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String(text), ContextInfo: ci}}
+		}
+		stickerMsg := &waE2E.Message{StickerMessage: &waE2E.StickerMessage{Mimetype: proto.String("image/webp")}}
+
+		// Group talk: the sticker isn't downloaded.
+		e.sock().Message(dm("GST1", stickerMsg, func(k *whatsapp.Key) { k.RemoteJID, k.Participant = "120363@g.us", "62822@s.whatsapp.net" }), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 1 })
+		eq(t, e.sock().Downloads(), []string(nil))
+
+		// A reply to it that isn't for the bot doesn't fetch it either.
+		e.sock().Message(dm("GR1", quoting("wkwk", false, stickerMsg), inGroup), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 2 })
+		in := e.ctx.Inbound()[1]
+		eq(t, []any{in.Text, len(in.Media)}, []any{"wkwk", 0})
+		eq(t, e.sock().Downloads(), []string(nil))
+
+		// "@bot can you read this sticker?" as a reply: the sticker comes along.
+		e.sock().Message(dm("GR2", quoting("@bot dah bisa baca stiker blom", true, stickerMsg), inGroup), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 3 })
+		in = e.ctx.Inbound()[2]
+		eq(t, []any{in.Text, in.Quoted.Media, len(in.Media)}, []any{"@bot dah bisa baca stiker blom\n[the quoted sticker is attached]", "[sticker]", 1})
+		b, err := base64.StdEncoding.DecodeString(in.Media[0].Data)
+		testutil.Must(t, err)
+		eq(t, []any{in.Media[0].Kind, in.Media[0].MimeType, strings.HasPrefix(string(b), "\x89PNG")}, []any{"image", "image/png", true})
+		eq(t, e.sock().Downloads(), []string{"GST1"})
+
+		// A quoted photo works the same way.
+		photo := &waE2E.Message{ImageMessage: &waE2E.ImageMessage{Mimetype: proto.String("image/jpeg")}}
+		e.sock().Message(dm("GR3", quoting("@bot ini apa", true, photo), inGroup), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 4 })
+		in = e.ctx.Inbound()[3]
+		eq(t, []any{in.Text, in.Media}, []any{"@bot ini apa\n[the quoted photo is attached]", []connectors.InboundMedia{{Kind: "image", MimeType: "image/jpeg", Data: base64.StdEncoding.EncodeToString([]byte("media:GST1"))}}})
+
+		// A quoted voice note or Lottie sticker isn't fetched.
+		e.sock().Message(dm("GR4", quoting("@bot dengar", true, &waE2E.Message{AudioMessage: &waE2E.AudioMessage{PTT: proto.Bool(true)}}), inGroup), "")
+		e.sock().Message(dm("GR5", quoting("@bot ini", true, &waE2E.Message{StickerMessage: &waE2E.StickerMessage{IsLottie: proto.Bool(true)}}), inGroup), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 6 })
+		eq(t, []any{e.ctx.Inbound()[4].Text, e.ctx.Inbound()[5].Text}, []any{"@bot dengar", "@bot ini"})
+		eq(t, e.sock().Downloads(), []string{"GST1", "GST1"})
+	})
 	t.Run("does not download documents over 1 MB", func(t *testing.T) {
 		e, _ := openRunning(t, opts{})
 		e.sock().Message(dm("DOC1", &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{FileName: proto.String("big.pdf"), FileLength: proto.Uint64(5 * 1024 * 1024), Mimetype: proto.String("application/pdf")}}, nil), "")

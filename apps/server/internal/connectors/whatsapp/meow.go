@@ -455,24 +455,31 @@ func (s *meowSocket) LIDForPN(ctx context.Context, pn string) (string, error) {
 	return lid.String(), nil
 }
 
-// Download fetches the media of an image, audio or document message.
+// Download fetches the media of an image, sticker, audio or document message.
 func (s *meowSocket) Download(ctx context.Context, m *Message) ([]byte, error) {
-	c := Unwrap(m.Message)
-	if c == nil {
-		return nil, errors.New("no media")
-	}
-	var d whatsmeow.DownloadableMessage
-	switch {
-	case c.ImageMessage != nil:
-		d = c.ImageMessage
-	case c.AudioMessage != nil:
-		d = c.AudioMessage
-	case c.DocumentMessage != nil:
-		d = c.DocumentMessage
-	default:
+	d := downloadable(Unwrap(m.Message))
+	if d == nil {
 		return nil, errors.New("no media")
 	}
 	return s.cli.Download(ctx, d)
+}
+
+// downloadable: the part of a message whatsmeow can download, nil when there
+// is none. It covers every kind MediaOf hands to deliver.
+func downloadable(c *waE2E.Message) whatsmeow.DownloadableMessage {
+	switch {
+	case c == nil:
+		return nil
+	case c.ImageMessage != nil:
+		return c.ImageMessage
+	case c.StickerMessage != nil:
+		return c.StickerMessage
+	case c.AudioMessage != nil:
+		return c.AudioMessage
+	case c.DocumentMessage != nil:
+		return c.DocumentMessage
+	}
+	return nil
 }
 
 func (s *meowSocket) Logout(ctx context.Context) error { return s.cli.Logout(ctx) }

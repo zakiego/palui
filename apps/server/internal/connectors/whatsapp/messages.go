@@ -197,6 +197,9 @@ type QuoteInfo struct {
 	Participant string `json:"participant,omitempty"`
 	Text        string `json:"text"`
 	Media       string `json:"media,omitempty"`
+	// The quoted message itself. It carries the media keys, so a quoted
+	// photo or sticker can still be downloaded.
+	Message *waE2E.Message `json:"-"`
 }
 
 // QuoteOf is the message this one quotes, from whichever part carries
@@ -213,6 +216,7 @@ func QuoteOf(content *waE2E.Message) *QuoteInfo {
 			Participant: ctx.GetParticipant(),
 			Text:        strx.Trim(TextOf(quoted)),
 			Media:       MediaLabel(quoted),
+			Message:     quoted,
 		}
 	}
 	return nil

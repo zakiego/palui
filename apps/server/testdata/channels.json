@@ -10593,7 +10593,7 @@
      "chatExternalId": "628123456789@s.whatsapp.net",
      "chatKind": "dm",
      "senderExternalId": "628123456789@s.whatsapp.net",
-     "text": "maksudnya",
+     "text": "maksudnya\n[the quoted photo is attached]",
      "at": 1700000000000,
      "senderName": "Zaki",
      "chatTitle": "Zaki",
@@ -10603,10 +10603,19 @@
       "from": "sender",
       "text": "struk",
       "media": "[image]"
-     }
+     },
+     "media": [
+      {
+       "kind": "image",
+       "mimeType": "image/jpeg",
+       "data": "bWVkaWE6T1dOMQ=="
+      }
+     ]
     }
    ],
-   "downloads": []
+   "downloads": [
+    "OWN1"
+   ]
   },
   {
    "name": "quote without body",
@@ -10927,7 +10936,7 @@
      "chatExternalId": "628123456789@s.whatsapp.net",
      "chatKind": "dm",
      "senderExternalId": "628123456789@s.whatsapp.net",
-     "text": "s",
+     "text": "s\n[the quoted sticker could not be read]",
      "at": 1700000000000,
      "senderName": "Zaki",
      "chatTitle": "Zaki",
@@ -10940,7 +10949,9 @@
      }
     }
    ],
-   "downloads": []
+   "downloads": [
+    "S"
+   ]
   },
   {
    "name": "quote of a location",

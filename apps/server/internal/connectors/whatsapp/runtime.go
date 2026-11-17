@@ -35,6 +35,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/owner"
 	"github.com/zakiego/palui/apps/server/internal/sticker"
 	"github.com/zakiego/palui/apps/server/internal/strx"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 )
 
 const (
@@ -694,6 +695,69 @@ func overLimitNote(info *MediaInfo, max int) string {
 	return fmt.Sprintf("[%s%s is over the %d MB limit and was not read]", info.Kind, name, max/1024/1024)
 }
 
+// stickerLabel: the text that stands in for a sticker, "" for anything else.
+func stickerLabel(info *MediaInfo) string {
+	switch {
+	case info == nil || !info.Sticker:
+		return ""
+	case info.Lottie:
+		return "[animated sticker, can't be shown]"
+	case info.Animated:
+		return "[animated sticker, first frame]"
+	}
+	return "[sticker]"
+}
+
+// quotedPicture: the media of a quoted photo or drawable sticker, nil for
+// anything else (voice notes and documents aren't fetched from a quote).
+func quotedPicture(c *waE2E.Message) *MediaInfo {
+	info := MediaOf(c)
+	if info == nil || info.Kind != "image" || info.Lottie {
+		return nil
+	}
+	return info
+}
+
+// fetchMedia downloads a wanted photo, sticker, voice note or document. It
+// returns the media for the model (nil when it couldn't be read), the label
+// (a sticker's may change once its bytes are seen) and a note for the text.
+func (w *wa) fetchMedia(s Socket, m *Message, info *MediaInfo, label string) (*connectors.InboundMedia, string, string) {
+	max := MediaMaxBytes
+	if info.Kind == "document" {
+		max = DocumentMaxBytes
+	}
+	if info.Bytes > int64(max) {
+		return nil, label, overLimitNote(info, max)
+	}
+	data, err := s.Download(w.ctx(), m)
+	switch {
+	case err != nil:
+		w.log.Warn("whatsapp media download failed", map[string]any{"err": err.Error()})
+		return nil, label, fmt.Sprintf("[%s could not be downloaded]", info.Kind)
+	case len(data) > max:
+		return nil, label, overLimitNote(info, max)
+	}
+	media := connectors.InboundMedia{Kind: info.Kind, MimeType: info.MimeType, Filename: info.Filename, DurationSec: info.DurationSec}
+	if info.Sticker {
+		// WebP, often animated: send a PNG (the first frame) so any vision
+		// model can read it.
+		animated := sticker.IsAnimated(data)
+		img, err := sticker.ToPNG(data)
+		if err != nil {
+			w.log.Warn("whatsapp sticker could not be converted", map[string]any{"err": err.Error()})
+			return nil, "[sticker, could not be read]", ""
+		}
+		if animated {
+			label = "[animated sticker, first frame]"
+		}
+		media.MimeType = "image/png"
+		media.Data = base64.StdEncoding.EncodeToString(img)
+		return &media, label, ""
+	}
+	media.Data = base64.StdEncoding.EncodeToString(data)
+	return &media, label, ""
+}
+
 func (w *wa) deliver(s Socket, m *Message) error {
 	key := m.Key
 	jid := key.RemoteJID
@@ -790,67 +854,49 @@ func (w *wa) deliver(s Socket, m *Message) error {
 
 	// A sticker has no caption, so its label is the text. It says "sticker"
 	// so the model reacts to it as one, not as a photo someone shared.
-	label := ""
-	if info != nil && info.Sticker {
-		label = "[sticker]"
-		if info.Animated {
-			label = "[animated sticker, first frame]"
+	label := stickerLabel(info)
+	if info != nil && info.Lottie {
+		// Lottie stickers are vector animations; there's no image to send.
+		info = nil
+	}
+	wants := func() bool {
+		if w.c.Services.WantsMedia != nil {
+			return w.c.Services.WantsMedia(msg)
 		}
-		if info.Lottie {
-			// Lottie stickers are vector animations; there's no image to send.
-			label = "[animated sticker, can't be shown]"
-			info = nil
-		}
+		return w.c.Services.IsOwner("whatsapp", BareJID(sender), alt)
 	}
 	note := ""
 	if info != nil {
-		wanted := false
-		if w.c.Services.WantsMedia != nil {
-			wanted = w.c.Services.WantsMedia(msg)
-		} else {
-			wanted = w.c.Services.IsOwner("whatsapp", BareJID(sender), alt)
-		}
-		max := MediaMaxBytes
-		if info.Kind == "document" {
-			max = DocumentMaxBytes
-		}
 		// Without the bytes the row still says what was sent, so a photo
 		// with no caption isn't lost (group context shows it as a placeholder).
 		stub := connectors.InboundMedia{Kind: info.Kind, MimeType: info.MimeType, Filename: info.Filename, DurationSec: info.DurationSec}
-		switch {
-		case !wanted:
+		if !wants() {
 			// Dropped by the router or kept as context: don't download it.
 			msg.Media = []connectors.InboundMedia{stub}
-		case info.Bytes > int64(max):
-			note = overLimitNote(info, max)
-		default:
-			data, err := s.Download(w.ctx(), m)
-			switch {
-			case err != nil:
-				w.log.Warn("whatsapp media download failed", map[string]any{"err": err.Error()})
-				note = fmt.Sprintf("[%s could not be downloaded]", info.Kind)
-			case len(data) > max:
-				note = overLimitNote(info, max)
-			case info.Sticker:
-				// WebP, often animated: send a PNG (the first frame) so any
-				// vision model can read it.
-				animated := sticker.IsAnimated(data)
-				img, err := sticker.ToPNG(data)
-				if err != nil {
-					w.log.Warn("whatsapp sticker could not be converted", map[string]any{"err": err.Error()})
-					label = "[sticker, could not be read]"
-					break
-				}
-				if animated {
-					label = "[animated sticker, first frame]"
-				}
-				stub.MimeType = "image/png"
-				stub.Data = base64.StdEncoding.EncodeToString(img)
-				msg.Media = []connectors.InboundMedia{stub}
-			default:
-				stub.Data = base64.StdEncoding.EncodeToString(data)
-				msg.Media = []connectors.InboundMedia{stub}
+		} else {
+			var media *connectors.InboundMedia
+			media, label, note = w.fetchMedia(s, m, info, label)
+			if media != nil {
+				msg.Media = []connectors.InboundMedia{*media}
 			}
+		}
+	} else if q := QuoteOf(content); q != nil && quotedPicture(q.Message) != nil && wants() {
+		// A reply to a photo or sticker ("what does this say?"). The quoted
+		// one was usually group talk, so it was never downloaded; the quote
+		// still carries its media keys, so fetch it now.
+		qi := quotedPicture(q.Message)
+		qm := &Message{Key: Key{RemoteJID: jid, ID: q.ID, Participant: q.Participant}, Message: q.Message, Timestamp: m.Timestamp}
+		what := "photo"
+		if qi.Sticker {
+			what = "sticker"
+		}
+		media, _, qnote := w.fetchMedia(s, qm, qi, stickerLabel(qi))
+		if media != nil {
+			msg.Media = []connectors.InboundMedia{*media}
+			note = fmt.Sprintf("[the quoted %s is attached]", what)
+		} else {
+			note = fmt.Sprintf("[the quoted %s could not be read]", what)
+			w.log.Warn("whatsapp quoted media not read", map[string]any{"note": qnote})
 		}
 	}
 	var parts []string
