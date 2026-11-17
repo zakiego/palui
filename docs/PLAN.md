@@ -637,7 +637,7 @@ Reading down: Palui can read other agents' chats and memory (new read tools on P
 
 ### 19.6 Channels
 
-- WhatsApp: one number for every agent. Groups (`@g.us`) are now read. The sender is `key.participant`. A message is addressed when `contextInfo.mentionedJid` holds Palui's number or LID, or when it quotes one of Palui's messages. Media from guests isn't downloaded. The model gets a note instead.
+- WhatsApp: one number for every agent. Groups (`@g.us`) are now read. The sender is `key.participant`. A message is addressed when `contextInfo.mentionedJid` holds Palui's number or LID, or when it quotes one of Palui's messages. A message's media is downloaded only when it will be answered (`Services.WantsMedia`: the owner, or a guest in a chat set up for guests). Dropped messages and group talk kept as context reach the inbox without the bytes, so a photo with no caption still shows as a placeholder.
 - Telegram: an agent can have its own bot. The Telegram connector allows several instances (`telegram`, `telegram-<slug>`). Chats are keyed by `(channel, connector_id, external_id)`, because two bots see the same DM and group ids. Replies go out through the bot the chat came in on (`outbox.connector_id`). In groups, a message is addressed when it mentions `@<bot username>` or replies to the bot. Bots in groups need privacy mode left on.
 - The owner claim stays one per channel: claiming one bot makes that Telegram account the owner for every bot.
 
@@ -652,7 +652,7 @@ Reading down: Palui can read other agents' chats and memory (new read tools on P
 
 ### 19.8 Not in this round
 
-Roles beyond owner and member (utusan IAM), sharing one agent's data with another agent, group messages kept as background context, agents talking to each other, per-chat caps, media from guests.
+Roles beyond owner and member (utusan IAM), sharing one agent's data with another agent, group messages kept as background context, agents talking to each other, per-chat caps.
 
 ### 19.9 Rollout
 

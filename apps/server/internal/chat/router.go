@@ -80,6 +80,18 @@ type SenderVerdict struct {
 	Context bool
 }
 
+// MediaWanted: whether a channel should download this message's media. Only
+// a message that will be answered shows its media to the model: the sender
+// check drops strangers, and group talk kept as context loses its bytes.
+// Same side effect as SenderCheck, which Inbound runs right after anyway.
+func MediaWanted(q db.Q, msg connectors.InboundMessage, now int64) (bool, error) {
+	v, err := SenderCheck(q, msg, now)
+	if err != nil {
+		return false, err
+	}
+	return v.OK && !v.Context, nil
+}
+
 // SenderCheck is senderCheck: checks that need only the inbound message and
 // the chat row, if any (PLAN 19.2). A stranger's message in a chat we've never
 // seen creates the chat row (not allowed), so the owner can set it up.

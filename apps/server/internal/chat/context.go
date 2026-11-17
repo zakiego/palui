@@ -177,7 +177,7 @@ type InboundInfo struct {
 func inboundLines(i SystemInput) []string {
 	var out []string
 	if i.Chat != nil && i.Chat.Kind == "group" && i.ReplyMode == "mention" {
-		out = append(out, "In this group you see every message, but you only answer when someone @mentions you or replies to one of your messages. The other messages in the conversation are the group's talk, there as context: never answer them on their own, only use them to understand the newest message. You only see what was said since you joined this group.")
+		out = append(out, "In this group you see every message, but you only answer when someone @mentions you or replies to one of your messages. The other messages in the conversation are the group's talk, there as context: never answer them on their own, only use them to understand the newest message. A photo in that talk shows only as [gambar dari sebelumnya]: you see a photo when it comes with the message that mentions you or replies to you, so ask for it again that way. You only see what was said since you joined this group.")
 	}
 	if i.Inbound != nil {
 		voice := "Voice notes reach you only as a note that they couldn't be transcribed, so you can't hear them."
@@ -185,10 +185,6 @@ func inboundLines(i SystemInput) []string {
 			voice = "Voice notes reach you as a transcript, marked [voice]."
 		}
 		media := "Besides text, photos sent with a message are shown to you as images, and small text files (txt, csv, json, code and the like) are inlined as [file: name]. Other files reach you by name only. " + voice
-		if i.Shared != nil {
-			// The channels never download a guest's media (whatsapp and telegram runtime).
-			media = "Only the owner's photos, files and voice notes reach you; from anyone else you get just their text, so say you can't see what they sent. " + media
-		}
 		out = append(out, media)
 	}
 	return out
@@ -738,12 +734,8 @@ func ToModelMessages(rows []db.Message, withImages map[string]bool, calls []Tool
 			if m.Kind != "image" {
 				continue
 			}
-			if withImages[r.ID] {
-				data := ""
-				if m.Data != nil {
-					data = *m.Data
-				}
-				parts = append(parts, models.ImagePart(data, m.MimeType))
+			if withImages[r.ID] && m.Data != nil && *m.Data != "" {
+				parts = append(parts, models.ImagePart(*m.Data, m.MimeType))
 			} else {
 				parts = append(parts, models.TextPart("[gambar dari sebelumnya]"))
 			}
@@ -784,8 +776,14 @@ func QuotesOutsider(rows []db.Message, ids map[string]bool) bool {
 // HasImages is hasImages.
 func HasImages(rows []db.Message, ids map[string]bool) bool {
 	for _, r := range rows {
-		if ids[r.ID] && ParseContent(r.Content).hasImage() {
-			return true
+		if !ids[r.ID] {
+			continue
+		}
+		// An image whose bytes were never downloaded shows only as a placeholder.
+		for _, m := range ParseContent(r.Content).Media {
+			if m.Kind == "image" && m.Data != nil && *m.Data != "" {
+				return true
+			}
 		}
 	}
 	return false

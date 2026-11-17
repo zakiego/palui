@@ -703,47 +703,9 @@ func (w *wa) deliver(s Socket, m *Message) error {
 
 	text := TextOf(content)
 	info := MediaOf(content)
-	var media []connectors.InboundMedia
-	note := ""
-	if info != nil {
-		isOwner := w.c.Services.IsOwner("whatsapp", BareJID(sender), alt)
-		max := MediaMaxBytes
-		if info.Kind == "document" {
-			max = DocumentMaxBytes
-		}
-		switch {
-		case !isOwner:
-			// Strangers are dropped by the router; don't download their files.
-		case info.Bytes > int64(max):
-			note = overLimitNote(info, max)
-		default:
-			data, err := s.Download(w.ctx(), m)
-			switch {
-			case err != nil:
-				w.log.Warn("whatsapp media download failed", map[string]any{"err": err.Error()})
-			case len(data) > max:
-				note = overLimitNote(info, max)
-			default:
-				media = append(media, connectors.InboundMedia{Kind: info.Kind, MimeType: info.MimeType, Data: base64.StdEncoding.EncodeToString(data), Filename: info.Filename, DurationSec: info.DurationSec})
-			}
-		}
-	}
-
-	var parts []string
-	for _, p := range []string{text, note} {
-		if p != "" {
-			parts = append(parts, p)
-		}
-	}
-	body := strings.Join(parts, "\n")
-	if body == "" && len(media) == 0 {
+	if text == "" && info == nil {
 		return nil
 	}
-
-	w.mu.Lock()
-	w.remember(m)
-	w.lastInbound[jid] = key
-	w.mu.Unlock()
 
 	msg := connectors.InboundMessage{
 		Channel:          "whatsapp",
@@ -751,7 +713,7 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		ChatExternalID:   jid,
 		ChatKind:         "dm",
 		SenderExternalID: BareJID(sender),
-		Text:             body,
+		Text:             text,
 		At:               TimestampMs(m.Timestamp, w.o.Now()),
 	}
 	if alt != "" && alt != BareJID(sender) {
@@ -774,9 +736,54 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		msg.ReplyToChannelMsgID = q.ID
 		msg.Quoted = &connectors.InboundQuote{From: QuoteAuthor(q.Participant, self, []string{sender, alt}, !group), Text: q.Text, Media: q.Media}
 	}
-	if len(media) > 0 {
-		msg.Media = media
+
+	note := ""
+	if info != nil {
+		wanted := false
+		if w.c.Services.WantsMedia != nil {
+			wanted = w.c.Services.WantsMedia(msg)
+		} else {
+			wanted = w.c.Services.IsOwner("whatsapp", BareJID(sender), alt)
+		}
+		max := MediaMaxBytes
+		if info.Kind == "document" {
+			max = DocumentMaxBytes
+		}
+		// Without the bytes the row still says what was sent, so a photo
+		// with no caption isn't lost (group context shows it as a placeholder).
+		stub := connectors.InboundMedia{Kind: info.Kind, MimeType: info.MimeType, Filename: info.Filename, DurationSec: info.DurationSec}
+		switch {
+		case !wanted:
+			// Dropped by the router or kept as context: don't download it.
+			msg.Media = []connectors.InboundMedia{stub}
+		case info.Bytes > int64(max):
+			note = overLimitNote(info, max)
+		default:
+			data, err := s.Download(w.ctx(), m)
+			switch {
+			case err != nil:
+				w.log.Warn("whatsapp media download failed", map[string]any{"err": err.Error()})
+				note = fmt.Sprintf("[%s could not be downloaded]", info.Kind)
+			case len(data) > max:
+				note = overLimitNote(info, max)
+			default:
+				stub.Data = base64.StdEncoding.EncodeToString(data)
+				msg.Media = []connectors.InboundMedia{stub}
+			}
+		}
 	}
+	var parts []string
+	for _, p := range []string{text, note} {
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	msg.Text = strings.Join(parts, "\n")
+
+	w.mu.Lock()
+	w.remember(m)
+	w.lastInbound[jid] = key
+	w.mu.Unlock()
 	return w.c.Services.Inbound(w.ctx(), msg)
 }
 
