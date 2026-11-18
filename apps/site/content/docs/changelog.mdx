@@ -11,7 +11,9 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- Let members set the rules of a shared chat. Turn on "Can set chat rules" next to a member on an agent's page, and in a chat with only you and members they can ask the agent to add or remove a rule for that chat, like "stop talking about dates here". A chat rule only changes what the agent talks about there: it never gives tools, approvals or access, never reaches other chats, and your standing instructions still win. Rule tools are skipped in any turn with a message from someone else, or one that read outside content. You get a DM each time a member changes one, and the new Chat rules section lists every rule and change with Undo. Off by default. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
 
 ## 0.10.0 (2026-11-18)
 

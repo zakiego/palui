@@ -33,6 +33,11 @@ Limits: 20 instructions per agent of up to 1000 characters, and 50 preferences o
 | `save_preference` | `write` | Set a preference (replaces the old value). |
 | `get_preferences` | `read` | List preferences. |
 | `delete_preference` | `write` | Delete a preference. |
+| `list_chat_rules` | `read` | List the current chat's rules. |
+| `save_chat_rule` | `write` | Add a rule for the current chat. |
+| `delete_chat_rule` | `write` | Remove one of the current chat's rules. |
+
+The three chat rule tools only show up in a shared chat of only you and members, and only in a turn where every message came from you or a member you let set rules. They write that chat's rules, never instructions. See [Chat rules](/docs/concepts/agents#chat-rules).
 
 ## Safety
 
