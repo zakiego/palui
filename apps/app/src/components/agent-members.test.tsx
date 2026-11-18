@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   getAgentMembersFn: vi.fn(),
   saveMemberFn: vi.fn(),
   setAgentMemberFn: vi.fn(),
+  setMemberRulesFn: vi.fn(),
 }))
 vi.mock("@/lib/api/agents", () => api)
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
@@ -31,6 +32,7 @@ const filled: Members = {
         { id: "agt_arisan", slug: "arisan", name: "Arisan" },
         { id: "agt_cs", slug: "cs", name: "CS" },
       ],
+      canSetRules: false,
     },
   ],
   others: [],
@@ -47,6 +49,7 @@ beforeEach(() => {
   api.getAgentMembersFn.mockReset()
   api.saveMemberFn.mockReset()
   api.setAgentMemberFn.mockReset()
+  api.setMemberRulesFn.mockReset()
 })
 afterEach(cleanup)
 
@@ -162,4 +165,19 @@ test("the server's name refusal shows under the name field", async () => {
   await screen.findByText("A member's name is at most 60 characters.")
   expect(screen.getByLabelText("Name").getAttribute("aria-invalid")).toBe("true")
   expect(screen.getByLabelText("WhatsApp number").getAttribute("aria-invalid")).toBe("false")
+})
+
+test("the chat rules switch saves at once and rolls back on a refusal", async () => {
+  api.getAgentMembersFn.mockResolvedValue(filled)
+  api.setMemberRulesFn.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("nope"))
+  const user = userEvent.setup()
+  render(<AgentMembers agent={agent} />)
+  const toggle = await screen.findByRole("switch", { name: "Can set chat rules" })
+  expect(toggle.getAttribute("aria-checked")).toBe("false")
+  await user.click(toggle)
+  await waitFor(() => expect(api.setMemberRulesFn).toHaveBeenCalledWith({ data: { agentId: "agt_arisan", memberId: "mem_1", on: true } }))
+  expect(toggle.getAttribute("aria-checked")).toBe("true")
+  await user.click(toggle)
+  await waitFor(() => expect(api.setMemberRulesFn).toHaveBeenCalledTimes(2))
+  await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("true"))
 })

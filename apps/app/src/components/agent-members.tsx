@@ -26,7 +26,8 @@ import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@/componen
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { StatusText } from "@/components/ui/status-text"
-import { getAgentMembersFn, saveMemberFn, setAgentMemberFn, type AgentMembers as Members, type MemberChannel, type MemberView, type Person } from "@/lib/api/agents"
+import { Switch } from "@/components/ui/switch"
+import { getAgentMembersFn, saveMemberFn, setAgentMemberFn, setMemberRulesFn, type AgentMembers as Members, type MemberChannel, type MemberView, type Person } from "@/lib/api/agents"
 import { RpcError } from "@/lib/api/client"
 import { errorMessage } from "@/lib/format"
 import { useT } from "@/lib/i18n"
@@ -82,6 +83,20 @@ export function AgentMembers({ agent }: { agent: AgentRef }) {
     }
   }
 
+  // The owner's opt-in for chat rules, saved at once like the rest of the section.
+  const setRules = async (m: MemberView, on: boolean) => {
+    const patch = (value: boolean) =>
+      setState((st) => (st.data ? { data: { ...st.data, members: st.data.members.map((x) => (x.id === m.id ? { ...x, canSetRules: value } : x)) } } : st))
+    patch(on)
+    try {
+      await setMemberRulesFn({ data: { agentId: agent.id, memberId: m.id, on } })
+      toast.success(on ? t("agents.members.rulesOn", { name: m.name }) : t("agents.members.rulesOff", { name: m.name }))
+    } catch (err) {
+      patch(!on)
+      toast.error(errorMessage(err))
+    }
+  }
+
   const { data, error } = state
   if (error) {
     return (
@@ -123,7 +138,14 @@ export function AgentMembers({ agent }: { agent: AgentRef }) {
         <>
           <ItemGroup className="gap-3">
             {data.members.map((m) => (
-              <MemberRow key={m.id} member={m} agentId={agent.id} onEdit={() => setTarget({ kind: "edit", member: m })} onRemove={() => (isLast(m) ? setConfirm({ member: m, open: true }) : void remove(m))} />
+              <MemberRow
+                key={m.id}
+                member={m}
+                agentId={agent.id}
+                onEdit={() => setTarget({ kind: "edit", member: m })}
+                onRemove={() => (isLast(m) ? setConfirm({ member: m, open: true }) : void remove(m))}
+                onRules={(on) => void setRules(m, on)}
+              />
             ))}
           </ItemGroup>
           <Button variant="outline" size="sm" className="self-start" onClick={() => setTarget({ kind: "new" })}>
@@ -172,9 +194,22 @@ export function AgentMembers({ agent }: { agent: AgentRef }) {
   )
 }
 
-function MemberRow({ member, agentId, onEdit, onRemove }: { member: MemberView; agentId: string; onEdit: () => void; onRemove: () => void }) {
+function MemberRow({
+  member,
+  agentId,
+  onEdit,
+  onRemove,
+  onRules,
+}: {
+  member: MemberView
+  agentId: string
+  onEdit: () => void
+  onRemove: () => void
+  onRules: (on: boolean) => void
+}) {
   const t = useT()
   const elsewhere = member.agents.filter((a) => a.id !== agentId)
+  const rulesId = `member-rules-${member.id}`
   return (
     <Item variant="outline" role="listitem" className="items-start gap-x-4 gap-y-3 px-4 py-4">
       <ItemContent className="min-w-48 gap-2">
@@ -198,6 +233,17 @@ function MemberRow({ member, agentId, onEdit, onRemove }: { member: MemberView; 
             <span className="[overflow-wrap:anywhere]">{t("agents.members.alsoIn", { names: elsewhere.map((a) => a.name).join(", ") })}</span>
           </StatusText>
         )}
+        <div className="mt-1 flex items-start gap-3">
+          <Switch id={rulesId} checked={member.canSetRules} onCheckedChange={onRules} aria-describedby={`${rulesId}-hint`} />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <label htmlFor={rulesId} className="text-sm font-medium">
+              {t("agents.members.rules")}
+            </label>
+            <span id={`${rulesId}-hint`} className="text-caption text-pretty text-muted-foreground">
+              {t("agents.members.rulesHint")}
+            </span>
+          </div>
+        </div>
       </ItemContent>
       <ItemActions className="-me-2 ms-auto">
         <Button variant="ghost" size="icon-sm" aria-label={t("agents.members.edit", { name: member.name })} onClick={onEdit}>

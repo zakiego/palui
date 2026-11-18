@@ -447,3 +447,51 @@ func Learn(q db.Q, s Sender) error {
 	}
 	return nil
 }
+
+// SetRules turns on or off whether a member may add and remove chat rules
+// for this agent from a shared chat. Off by default; only the owner sets it.
+func SetRules(q db.Q, agentID, memberID string, on bool) error {
+	n, err := db.Changes(q.Exec("UPDATE agent_members SET can_set_rules = ? WHERE agent_id = ? AND member_id = ?", db.Bool(on), agentID, memberID))
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return errf("That member isn't in this agent.")
+	}
+	return nil
+}
+
+// RulesOn lists the ids of this agent's members who may set chat rules.
+func RulesOn(q db.Q, agentID string) (map[string]bool, error) {
+	rows, err := q.Query("SELECT member_id FROM agent_members WHERE agent_id = ? AND can_set_rules = 1", agentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// RuleSetter is the member behind this sender when the owner let them set
+// chat rules for this agent; ok false for anyone else. Read only.
+func RuleSetter(q db.Q, agentID string, s Sender) (db.Member, bool, error) {
+	if s.Channel == db.ChannelWeb || s.Channel == "" {
+		return db.Member{}, false, nil
+	}
+	ids := senderIDs(s)
+	if len(ids) == 0 {
+		return db.Member{}, false, nil
+	}
+	marks := strings.TrimSuffix(strings.Repeat("?, ", len(ids)), ", ")
+	args := []any{agentID, s.Channel}
+	args = append(args, ids...)
+	args = append(args, ids...)
+	return db.One(q.QueryRow("SELECT "+prefixed("m")+" FROM members m JOIN member_accounts a ON a.member_id = m.id JOIN agent_members am ON am.member_id = m.id WHERE am.agent_id = ? AND am.can_set_rules = 1 AND a.channel = ? AND (a.external_id IN ("+marks+") OR a.alt_id IN ("+marks+")) LIMIT 1", args...), db.ScanMember)
+}

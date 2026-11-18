@@ -7,12 +7,12 @@
    "rows": []
   },
   "agent_members": {
-   "columns": ["agent_id","member_id","created_at"],
+   "columns": ["agent_id","member_id","created_at","can_set_rules"],
    "rows": [
-    ["<agt#1>","<mem#1>",1794621600000],
-    ["<agt#2>","<mem#1>",1794621600000],
-    ["<agt#1>","<mem#2>",1794621600000],
-    ["<agt#2>","<mem#3>",1794621600000]
+    ["<agt#1>","<mem#1>",1794621600000,1],
+    ["<agt#2>","<mem#1>",1794621600000,0],
+    ["<agt#1>","<mem#2>",1794621600000,0],
+    ["<agt#2>","<mem#3>",1794621600000,0]
    ]
   },
   "agents": {
@@ -67,6 +67,14 @@
     ["<shr#39>","<att#1>","<token hash>","public","owner",1794705840000,null,36,1794621600000,1794619440000],
     ["<shr#40>","<att#1>","<token hash>","private","owner",1794705780000,null,37,1794621600000,1794619380000]
    ]
+  },
+  "chat_rule_changes": {
+   "columns": ["id","agent_id","chat_id","rule_id","action","title","body","member_id","author_name","by_member_id","by_name","run_id","created_at","undone_at"],
+   "rows": []
+  },
+  "chat_rules": {
+   "columns": ["id","agent_id","chat_id","title","body","member_id","author_name","created_at"],
+   "rows": []
   },
   "chats": {
    "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji","save_media","save_media_days"],

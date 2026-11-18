@@ -43,6 +43,8 @@ type memberView struct {
 	Accounts []memberAccountView `json:"accounts"`
 	// Every agent the member is in, this one included.
 	Agents []memberAgent `json:"agents"`
+	// May add and remove chat rules for this agent (members of it only).
+	CanSetRules bool `json:"canSetRules"`
 }
 
 type person struct {
@@ -124,6 +126,10 @@ func agentMembersOf(q db.Q, agentID string, now int64) (agentMembers, error) {
 	for _, a := range list {
 		names[a.ID] = memberAgent{ID: a.ID, Slug: a.Slug, Name: a.Name}
 	}
+	rulesOn, err := members.RulesOn(q, agentID)
+	if err != nil {
+		return agentMembers{}, err
+	}
 	out := agentMembers{Members: []memberView{}, Others: []memberView{}}
 	taken := map[string]bool{}
 	for _, m := range all {
@@ -141,6 +147,7 @@ func agentMembersOf(q db.Q, agentID string, now int64) (agentMembers, error) {
 			}
 		}
 		if in {
+			v.CanSetRules = rulesOn[m.ID]
 			out.Members = append(out.Members, v)
 		} else {
 			out.Others = append(out.Others, v)

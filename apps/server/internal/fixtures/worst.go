@@ -244,7 +244,7 @@ func worst(k *Kit) {
 	if len(worstAccounts) > L.memberAccounts {
 		panic(fixtureErr{fmt.Errorf("%d member accounts, over the limit of %d", len(worstAccounts), L.memberAccounts)})
 	}
-	k.Member(Member{Name: within("Nurul Hidayah binti H. Abdul Gani نور الهداية 🧕🏽 Bendahara", L.memberName), Accounts: worstAccounts, Agents: []string{arisan, cs}})
+	nurul := k.Member(Member{Name: within("Nurul Hidayah binti H. Abdul Gani نور الهداية 🧕🏽 Bendahara", L.memberName), Accounts: worstAccounts, Agents: []string{arisan, cs}})
 	// One letter, one account: the guest who asks in the family group below,
 	// so the people list has to leave out someone who is already a member.
 	k.Member(Member{Name: "M", Accounts: []MemberAccount{{Channel: "telegram", ExternalID: "1000000099"}}, Agents: []string{arisan}})
@@ -284,6 +284,8 @@ func worst(k *Kit) {
 	noTitleGroup := k.Chat("whatsapp", "120363041234567890123456@g.us", "", ChatOpts{Kind: "group", SaveMediaDays: ptr[int64](0)})
 	k.Assign(noTitleGroup, arisan, true)
 	sayAs(noTitleGroup, "**Rekap** minggu ini:\n\n1. *3 deal* masuk\n2. `bayar listrik` besok", now-59*MIN, "assistant")
+	// Nurul may set chat rules for arisan; the members list shows the switch on.
+	k.MemberRules(arisan, nurul)
 	noTitleDm := k.Chat("whatsapp", "258431789012345678@lid", "", none)
 	sayAs(noTitleDm, "", now-23*H, "assistant")
 

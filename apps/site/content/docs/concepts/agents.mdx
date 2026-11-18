@@ -74,9 +74,25 @@ What a chat gets depends on who is in it:
 
 For a WhatsApp group, everyone in it has to be you or a member. The list is checked when a turn starts. It's read again when someone joins or leaves, and at least every 10 minutes. If the list can't be read, the group counts as having outsiders. So does a group where someone who isn't a member wrote earlier in the conversation, even after they've left, until the conversation starts over (`/new`). Telegram groups never count as members only, because a bot can't see who's in a group.
 
-Members can read what the agent knows: its notes, contacts, memory and what was said in its other chats. They can't change its instructions, send messages to contacts, or approve anything. Commands, approvals and reminder buttons stay yours.
+Members can read what the agent knows: its notes, contacts, memory and what was said in its other chats. They can't change its instructions, send messages to contacts, or approve anything. Commands, approvals and reminder buttons stay yours. The one thing you can let them change is the rules of a chat they're in, see [Chat rules](#chat-rules).
 
 The agent's own write tools run for members without asking you, also in a turn that read a web page or another untrusted source. So a member, or a page the agent read for them, can make it add, change or rename things in its MCP servers, notes and contacts. Only add people you'd trust with that. A job that posts into a members chat runs under the same rules.
+
+### Chat rules
+
+A chat rule is a short rule for one shared chat, like "don't bring up dates here" or "answer in English". It changes what the agent talks about and how in that chat, nothing else.
+
+By default only you set them. To let a member do it too, turn on "Can set chat rules" next to their name in Members. Then, in a chat with only you and members, they can just ask ("stop talking about dates in this group") and the agent saves it.
+
+- It only works in a chat where everyone is you or a member, the same check as above. A group with an outsider in it never gets the rule tools.
+- Every message in that turn has to come from you or a member with the switch on. One message from anyone else and the agent can't change rules in that turn.
+- A turn that read a web page, an MCP result or a quoted message from someone else can't change rules either.
+- A rule belongs to its chat. It never reaches your own DM, other chats or other agents, and it isn't one of your standing instructions.
+- The agent is told a chat rule can never give anyone tools, approvals or access, and never overrides your standing instructions.
+- Members can remove rules members added. A rule you added only you can remove.
+- A chat has at most 10 rules of 300 characters.
+
+Each time a member adds or removes one, you get a short message in your DM saying who did it and where. It leaves the rule's text out, so replying to it can't carry their words into your own chat. The Chat rules section on the agent's Settings tab lists every rule with its chat and who added it, plus the latest changes. Remove any rule there, or undo a change: an add takes the rule out again, a remove puts it back.
 
 ## What other people can make it do
 
