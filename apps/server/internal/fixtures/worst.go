@@ -388,6 +388,17 @@ func worst(k *Kit) {
 	k.Message(web, "assistant", fill(worstParagraph+"\n\n", 12_000), next())
 	k.Message(web, "user", "مرحبا، هل يمكنك تذكيري باجتماع الغد الساعة 9؟ (Q3 report, room B-12)", next())
 	k.Message(web, "assistant", "بالتأكيد. سأذكّرك غدًا الساعة 09:00 (Asia/Riyadh) باجتماع **Q3 report** في الغرفة B-12.", next())
+	// A run that sent files with send_media: the longest file name and caption,
+	// a voice note with no caption, and a send that gave up.
+	k.Message(web, "user", "kirim gambar inhaler pakai spacer, sama jadwal imunisasinya", next())
+	mediaAt := next()
+	mediaRun := k.Run(Run{ChatID: &web.ID, Trigger: "message", Status: "ok", StartedAt: mediaAt})
+	k.SentMedia(web, mediaRun, []SentMedia{
+		{Kind: "image", MimeType: "image/png", Filename: within(fill("inhaler-dengan-spacer-untuk-anak-cara-pakai-yang-benar-", L.attachmentFilename-4), L.attachmentFilename-4) + ".png", Caption: fill(worstParagraph, 1024), Status: "sent", Size: 9_876_543, At: mediaAt},
+		{Kind: "voice", MimeType: "audio/ogg", Filename: "file.ogg", Status: "sent", Size: 48_213, At: mediaAt + 1},
+		{Kind: "document", MimeType: "application/pdf", Filename: worstDeck, Caption: "Jadwal imunisasi", Status: "failed", Size: 16_777_000, Error: ptr("Call to 'sendDocument' failed! (413: Request Entity Too Large) " + worstLongURL), At: mediaAt + 2},
+	})
+	k.Message(web, "assistant", "Udah aku kirim gambarnya ya.", next(), MsgExtra{RunID: &mediaRun})
 	k.Message(web, "user", `{"event":"deployment.succeeded","repository":"northwind-industries-holdings/platform-infrastructure","sha":"9f8e7d6c5b4a4c3d8e2f1a0b9c8d7e6f9f8e7d6c","url":"`+worstLongURL+`","actor":"`+worstEmail+`"}`, next(), MsgExtra{SenderID: ptr("hook:github-actions-deploy")})
 	k.Message(web, "user", "🦊", next())
 	var groceries []string

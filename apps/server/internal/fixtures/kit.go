@@ -549,6 +549,29 @@ func (k *Kit) Contact(chat db.Chat, v Contact, sends []Send, scheduled []Schedul
 	return id
 }
 
+// SentMedia is one file a run sent with send_media: an outbox row whose
+// payload points at media (the bytes aren't in a fixture).
+type SentMedia struct {
+	Kind, MimeType, Filename, Caption, Status string
+	Size                                      int64
+	Error                                     *string
+	At                                        int64
+}
+
+func (k *Kit) SentMedia(chat db.Chat, runID string, list []SentMedia) {
+	for _, m := range list {
+		media := obj("id", secret.NewID("med"), "kind", m.Kind, "mimeType", m.MimeType, "filename", m.Filename, "size", m.Size)
+		attempts := int64(1)
+		var sentAt any = m.At
+		if m.Status != "sent" {
+			attempts, sentAt = 6, nil
+		}
+		k.insert("outbox", col{"id", secret.NewID("out")}, col{"chat_id", chat.ID}, col{"channel", chat.Channel},
+			col{"payload", str(obj("text", m.Caption, "media", media))}, col{"status", m.Status}, col{"attempts", attempts}, col{"next_attempt_at", m.At},
+			col{"source", "media:" + runID}, col{"error", nullable(m.Error)}, col{"created_at", m.At}, col{"sent_at", sentAt})
+	}
+}
+
 // Job is kit.job's values. Nil pointers on columns with a default take it.
 type Job struct {
 	Name          string
