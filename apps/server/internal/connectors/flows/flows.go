@@ -582,7 +582,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, deps Deps) *connectors.ToolSet {
 			zod.Object(
 				zod.F("id", zod.String().Optional()),
 				zod.F("days", zod.Default(zod.Int().Min(1).Max(180), float64(7))),
-				zod.F("status", zod.Enum(runStatuses...).Optional()),
+				zod.F("status", zod.Enum(runStatuses...).Optional().Describe("waiting only lists check-ins still open; a check-in that closed (answered or missed) is in a done run, so leave status out to find it.")),
 				zod.F("limit", zod.Default(zod.Int().Min(1).Max(200), float64(30))),
 			),
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {

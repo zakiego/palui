@@ -151,6 +151,40 @@ func TestCheckinSteps(t *testing.T) {
 		tu.Must(t, err)
 		contains(t, p, fmt.Sprintf(`- %s: flow "Minum obat", item "pagi", asked Rabu 11 Nov 08.00; answers: taken, skip, later (keeps asking)`, open[0].ID), "prompt")
 	})
+	t.Run("lists a check-in that just closed, so a late answer still finds its run", func(t *testing.T) {
+		// rpt_0mwlt0ir45b0omfz9mb: the Dzuhur check-in closed missed six
+		// seconds before the owner answered, and the model saw nothing open,
+		// so it told the owner the question it had asked had no basis.
+		h := newHarness(t, harnessOptions{})
+		h.setNow(at("2026-11-11T07:00"))
+		flow := h.create(MEDICINE).Flow
+		h.run(at("2026-11-11T08:00"))
+		p, err := flows.FlowCheckinsPrompt(h.db, h.chatID, at("2026-11-11T08:01"))
+		tu.Must(t, err)
+		contains(t, p, "Don't bring one up yourself", "open rule")
+		if strings.Contains(p, "closed in the last 3 hours") {
+			t.Errorf("closed block while open: %s", p)
+		}
+		for _, s := range []string{"08:15", "08:30", "08:45", "10:00"} {
+			h.run(at("2026-11-11T" + s))
+		}
+		run := getRun(t, h.db, runsOf(t, h.db, flow.ID)[0].ID)
+		eq(t, run.Status, "done", "status")
+		p, err = flows.FlowCheckinsPrompt(h.db, h.chatID, at("2026-11-11T10:00")+6000)
+		tu.Must(t, err)
+		contains(t, p, "closed in the last 3 hours", "closed block")
+		contains(t, p, fmt.Sprintf(`- %s: flow "Minum obat", item "pagi", closed Rabu 11 Nov 10.00, missed, no answer; answers: taken, skip, later`, run.ID), "closed line")
+		if strings.Contains(p, "Open flow check-ins") {
+			t.Errorf("open block with nothing open: %s", p)
+		}
+		eq(t, answer(t, h, run.ID, "taken", "", at("2026-11-11T10:00")+6000).Reply, "Oke, jawaban diganti: Udah minum.", "late answer")
+		p, err = flows.FlowCheckinsPrompt(h.db, h.chatID, at("2026-11-11T10:05"))
+		tu.Must(t, err)
+		contains(t, p, "closed Rabu 11 Nov 10.00, answered taken;", "after the late answer")
+		p, err = flows.FlowCheckinsPrompt(h.db, h.chatID, at("2026-11-11T13:01"))
+		tu.Must(t, err)
+		eq(t, p, "", "after 3 hours")
+	})
 	t.Run("9e: deadline next is the next prayer time; the recap trigger reads the log", func(t *testing.T) {
 		fp := &fakePrayer{}
 		h := newHarness(t, harnessOptions{readSource: fp.caller(), connectors: exampleConnectors(map[string]runFn{"flows__recap": returns(`{"total":3,"text":"📊 Rekap"}`)})})
