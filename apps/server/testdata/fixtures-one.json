@@ -39,9 +39,9 @@
    "rows": []
   },
   "connectors": {
-   "columns": ["id","type","kind","label","enabled","status","status_detail","trust","config","secrets","config_hash","error_since","alerted_at","sort_order","created_at","updated_at","agent_id"],
+   "columns": ["id","type","kind","label","enabled","status","status_detail","trust","config","secrets","config_hash","error_since","alerted_at","sort_order","created_at","updated_at","agent_id","agent_ids"],
    "rows": [
-    ["telegram","telegram","channel","Telegram",1,"error","401 Unauthorized","own","{}",null,"<config hash>",1794621600000,null,0,1794621600000,1794621600000,null]
+    ["telegram","telegram","channel","Telegram",1,"error","401 Unauthorized","own","{}",null,"<config hash>",1794621600000,null,0,1794621600000,1794621600000,null,null]
    ]
   },
   "contacts": {

@@ -107,14 +107,14 @@ func TestAgentScopedConnectors(t *testing.T) {
 	chef, err := agents.Create(d, agents.Input{Slug: "chef", Name: testutil.Ptr("Chef"), Persona: testutil.Ptr("p")}, 1000)
 	testutil.Must(t, err)
 	id := chef.ID
-	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-crm", Type: "mcp", Config: config("url", "https://crm.example.com/mcp"), AgentID: &id, AgentIDSet: true}, testutil.TestKey, 1000)
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-crm", Type: "mcp", Config: config("url", "https://crm.example.com/mcp"), AgentIDs: []string{id}, AgentIDsSet: true}, testutil.TestKey, 1000)
 	testutil.Must(t, err)
 	row, _, _ := connectors.Get(d, "mcp-crm")
-	if row.AgentID == nil || *row.AgentID != chef.ID {
+	if strings.Join(row.AgentIDs, ",") != chef.ID {
 		t.Fatal("owner not saved")
 	}
 	gone := "agt_gone"
-	if _, err := manage.SaveDraft(d, manage.DraftInput{ID: "mcp-crm", Type: "mcp", AgentID: &gone, AgentIDSet: true}, testutil.TestKey, 1000); err == nil || !strings.Contains(err.Error(), "doesn't exist") {
+	if _, err := manage.SaveDraft(d, manage.DraftInput{ID: "mcp-crm", Type: "mcp", AgentIDs: []string{id, gone}, AgentIDsSet: true}, testutil.TestKey, 1000); err == nil || !strings.Contains(err.Error(), "doesn't exist") {
 		t.Fatal(err)
 	}
 	// Left out, the owner stays; null makes it global.
@@ -122,20 +122,29 @@ func TestAgentScopedConnectors(t *testing.T) {
 	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-crm", Type: "mcp", Label: &label}, testutil.TestKey, 1000)
 	testutil.Must(t, err)
 	row, _, _ = connectors.Get(d, "mcp-crm")
-	if row.AgentID == nil || *row.AgentID != chef.ID || row.Label != "CRM" {
+	if strings.Join(row.AgentIDs, ",") != chef.ID || row.Label != "CRM" {
 		t.Fatal("owner lost")
 	}
-	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-crm", Type: "mcp", AgentIDSet: true}, testutil.TestKey, 1000)
+	// Several agents, blanks and repeats dropped, in the order given.
+	sales, err := agents.Create(d, agents.Input{Slug: "sales", Name: testutil.Ptr("Sales"), Persona: testutil.Ptr("p")}, 1000)
+	testutil.Must(t, err)
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-crm", Type: "mcp", AgentIDs: []string{sales.ID, "", chef.ID, sales.ID}, AgentIDsSet: true}, testutil.TestKey, 1000)
 	testutil.Must(t, err)
 	row, _, _ = connectors.Get(d, "mcp-crm")
-	if row.AgentID != nil {
+	if strings.Join(row.AgentIDs, ",") != sales.ID+","+chef.ID || !connectors.ServesAgent(row, chef.ID) || !connectors.ServesAgent(row, sales.ID) || connectors.ServesAgent(row, "agt_other") {
+		t.Fatal(row.AgentIDs)
+	}
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-crm", Type: "mcp", AgentIDsSet: true}, testutil.TestKey, 1000)
+	testutil.Must(t, err)
+	row, _, _ = connectors.Get(d, "mcp-crm")
+	if row.AgentIDs != nil {
 		t.Fatal("not global")
 	}
 	// A channel never gets an owner.
-	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "telegram", Type: "telegram", Secrets: secrets("botToken", token), AgentID: &id, AgentIDSet: true}, testutil.TestKey, 1000)
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "telegram", Type: "telegram", Secrets: secrets("botToken", token), AgentIDs: []string{id}, AgentIDsSet: true}, testutil.TestKey, 1000)
 	testutil.Must(t, err)
 	row, _, _ = connectors.Get(d, "telegram")
-	if row.AgentID != nil {
+	if row.AgentIDs != nil {
 		t.Fatal("channel owned")
 	}
 }
@@ -224,5 +233,96 @@ func TestPauseAndResume(t *testing.T) {
 	testutil.Must(t, d.QueryRow("SELECT message FROM events WHERE kind = 'pause'").Scan(&msg))
 	if msg != "Paused from cli" {
 		t.Fatal(msg)
+	}
+}
+
+func TestDuplicateCopiesEverythingIntoAPausedDraft(t *testing.T) {
+	d := testutil.DB(t)
+	chef, err := agents.Create(d, agents.Input{Slug: "chef", Name: testutil.Ptr("Chef"), Persona: testutil.Ptr("p")}, 1000)
+	testutil.Must(t, err)
+	trust := "external"
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-crm-2", Type: "mcp", Label: testutil.Ptr("CRM"), Trust: &trust,
+		Config: config("url", "https://crm.example.com/mcp", "authMode", "bearer"), Secrets: secrets("token", "sk-crm-secret"),
+		AgentIDs: []string{chef.ID}, AgentIDsSet: true}, testutil.TestKey, 1000)
+	testutil.Must(t, err)
+	testutil.Must(t, connectors.PatchConfig(d, "mcp-crm-2", config("addedFromChat", true), 1000))
+	testutil.Must(t, manage.Connect(d, "mcp-crm-2", testutil.TestKey, 1000))
+	// mcp-crm-3 is taken, so the copy of mcp-crm-2 is mcp-crm-4.
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "mcp-crm-3", Type: "mcp"}, testutil.TestKey, 1000)
+	testutil.Must(t, err)
+
+	copied, err := manage.Duplicate(d, "mcp-crm-2", testutil.TestKey, 2000)
+	testutil.Must(t, err)
+	if copied.ID != "mcp-crm-4" || copied.Label != "CRM (copy)" || copied.Trust != "external" || copied.Status != "not_set_up" || copied.Enabled {
+		t.Fatalf("%+v", copied)
+	}
+	if strings.Join(copied.AgentIDs, ",") != chef.ID {
+		t.Fatal(copied.AgentIDs)
+	}
+	if url, _ := copied.Config.Get("url"); url != "https://crm.example.com/mcp" {
+		t.Fatal(jsonx.Stringify(copied.Config))
+	}
+	if _, ok := copied.Config.Get("addedFromChat"); ok {
+		t.Fatal("a dashboard copy can't be removed from chat")
+	}
+	s, err := connectors.Secrets(copied, testutil.TestKey)
+	testutil.Must(t, err)
+	if tok, _ := s.Get("token"); tok != "sk-crm-secret" {
+		t.Fatal(tok)
+	}
+	// Changing the copy leaves the original alone.
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: copied.ID, Type: "mcp", Secrets: secrets("token", "sk-other"), AgentIDsSet: true}, testutil.TestKey, 3000)
+	testutil.Must(t, err)
+	orig, _, _ := connectors.Get(d, "mcp-crm-2")
+	s, _ = connectors.Secrets(orig, testutil.TestKey)
+	if tok, _ := s.Get("token"); tok != "sk-crm-secret" || strings.Join(orig.AgentIDs, ",") != chef.ID {
+		t.Fatal("original changed")
+	}
+
+	// A type there's only one of can't be copied.
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "telegram", Type: "telegram", Secrets: secrets("botToken", token)}, testutil.TestKey, 1000)
+	testutil.Must(t, err)
+	if _, err := manage.Duplicate(d, "telegram", testutil.TestKey, 2000); err == nil || !strings.Contains(err.Error(), "can't be duplicated") {
+		t.Fatal(err)
+	}
+	if _, err := manage.Duplicate(d, "nope", testutil.TestKey, 2000); err == nil {
+		t.Fatal("missing connector copied")
+	}
+}
+
+func TestDeletingAnAgentLeavesItsSharedConnectorsWithTheOthers(t *testing.T) {
+	d := testutil.DB(t)
+	mk := func(slug string) string {
+		a, err := agents.Create(d, agents.Input{Slug: slug, Name: testutil.Ptr(slug), Persona: testutil.Ptr("p")}, 1000)
+		testutil.Must(t, err)
+		return a.ID
+	}
+	chef, sales := mk("chef"), mk("sales")
+	for id, ids := range map[string][]string{"mcp-solo": {chef}, "mcp-shared": {chef, sales}, "mcp-other": {sales}} {
+		_, err := manage.SaveDraft(d, manage.DraftInput{ID: id, Type: "mcp", Config: config("url", "https://"+id+".example.com/mcp"), AgentIDs: ids, AgentIDsSet: true}, testutil.TestKey, 1000)
+		testutil.Must(t, err)
+		testutil.Must(t, connectors.Connect(d, id, 1000))
+	}
+	_, err := agents.Delete(d, chef, 2000)
+	testutil.Must(t, err)
+	row := func(id string) (string, bool, string) {
+		r, _, _ := connectors.Get(d, id)
+		var first *string
+		testutil.Must(t, d.QueryRow("SELECT agent_id FROM connectors WHERE id = ?", id).Scan(&first))
+		f := ""
+		if first != nil {
+			f = *first
+		}
+		return strings.Join(r.AgentIDs, ","), r.Enabled, f
+	}
+	// Only chef used it: paused, still chef's, so it serves nobody.
+	if ids, on, first := row("mcp-solo"); ids != chef || on || first != chef {
+		t.Fatal("solo", ids, on, first)
+	}
+	if ids, on, first := row("mcp-shared"); ids != sales || !on || first != sales {
+		t.Fatal("shared", ids, on, first)
+	}
+	if ids, on, _ := row("mcp-other"); ids != sales || !on {
+		t.Fatal("other", ids, on)
 	}
 }

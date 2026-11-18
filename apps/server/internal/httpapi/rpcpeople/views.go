@@ -103,10 +103,11 @@ func telegramBots(q db.Q) ([]telegramBot, error) {
 const day = 24 * 60 * 60 * 1000
 
 type agentToolsT struct {
-	Tools  []tools.CatalogTool `json:"tools"`
-	Error  *string             `json:"error"`
-	Used   *jsonx.Map[int64]   `json:"used"`
-	Scopes *jsonx.Map[*string] `json:"scopes"`
+	Tools []tools.CatalogTool `json:"tools"`
+	Error *string             `json:"error"`
+	Used  *jsonx.Map[int64]   `json:"used"`
+	// A tool connector's agents; empty when global.
+	Scopes *jsonx.Map[[]string] `json:"scopes"`
 	// MCP servers the owner marked as holding no private data. Left out when
 	// none are, so older replies keep their bytes.
 	NoPrivateData []string `json:"noPrivateData,omitempty"`
@@ -115,7 +116,7 @@ type agentToolsT struct {
 // agentTools is the Tools tab: what the runtime would offer the agent now
 // (nil when it can't say) and its successful calls per tool over 7 days.
 func agentTools(c *httpapi.Call, a db.Agent, now int64) (agentToolsT, error) {
-	out := agentToolsT{Used: jsonx.NewMap[int64](), Scopes: jsonx.NewMap[*string]()}
+	out := agentToolsT{Used: jsonx.NewMap[int64](), Scopes: jsonx.NewMap[[]string]()}
 	if rt, err := runtimeOf(c); err != nil {
 		msg := runtimeErrorMessage(err)
 		out.Error = &msg
@@ -150,7 +151,8 @@ func agentTools(c *httpapi.Call, a db.Agent, now int64) (agentToolsT, error) {
 	}
 	for _, conn := range list {
 		if conn.Kind == "tools" {
-			out.Scopes.Set(conn.ID, conn.AgentID)
+			ids := []string{}
+			out.Scopes.Set(conn.ID, append(ids, conn.AgentIDs...))
 		}
 		if connectors.NoPrivateData(conn) {
 			out.NoPrivateData = append(out.NoPrivateData, conn.ID)

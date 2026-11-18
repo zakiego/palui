@@ -113,7 +113,7 @@ func TestCollectFilters(t *testing.T) {
 	broken.Handle.Tools = func(context.Context, connectors.TurnInfo) (*connectors.ToolSet, error) { panic("boom") }
 	owned := entry("crm", "tools", "CRM", "own", []def{{name: "deals", class: "read"}})
 	agent := "agt_sales"
-	owned.Row.AgentID = &agent
+	owned.Row.AgentIDs = []string{agent}
 	all := []connectors.RunningEntry{mixed, guest, broken, owned}
 	names := func(o tools.CollectOptions) string { return strings.Join(tools.Collect(ctx, all, o).Names(), ",") }
 	o := opts(64, nil)
@@ -158,7 +158,7 @@ func TestCollectFilters(t *testing.T) {
 		), nil
 	}
 	ownedChat := entry("crmx", "tools", "CRMX", "own", nil)
-	ownedChat.Row.AgentID = &agent
+	ownedChat.Row.AgentIDs = []string{agent}
 	ownedChat.Handle.Tools = func(context.Context, connectors.TurnInfo) (*connectors.ToolSet, error) {
 		return conntest.Tools("plain", connectors.PaluiTool{Class: "read", Tool: fn}), nil
 	}
@@ -330,7 +330,9 @@ func TestCollectResolvesDataScope(t *testing.T) {
 	ctx := context.Background()
 	scoped := func(id string, agentID *string) connectors.RunningEntry {
 		e := entry(id, "tools", id, "own", nil)
-		e.Row.AgentID = agentID
+		if agentID != nil {
+			e.Row.AgentIDs = []string{*agentID}
+		}
 		e.Handle.Tools = func(context.Context, connectors.TurnInfo) (*connectors.ToolSet, error) {
 			fn := conntest.FnTool("x", nil)
 			return conntest.Tools("plain", connectors.PaluiTool{Class: "read", Tool: fn}, "chat", connectors.PaluiTool{Class: "read", Data: connectors.DataChat, Tool: fn}, "none", connectors.PaluiTool{Class: "read", Data: connectors.DataNone, Tool: fn}, "shared", connectors.PaluiTool{Class: "read", Data: connectors.DataShared, Tool: fn}), nil
@@ -609,7 +611,7 @@ func TestCatalogAgentScopedConnector(t *testing.T) {
 		}, "", nil),
 	}, map[string]string{"web": "tools", "crm": "tools"})
 	sales := "agt_sales"
-	_, _, err := connectors.SetOwner(d, "crm", &sales, 2)
+	_, _, err := connectors.SetAgents(d, "crm", []string{sales}, 2)
 	testutil.Must(t, err)
 	names := func(agent string) string {
 		var out []string
@@ -630,7 +632,7 @@ func TestCatalogAgentScopedConnector(t *testing.T) {
 			t.Fatalf("%+v", c)
 		}
 	}
-	_, _, err = connectors.SetOwner(d, "crm", nil, 3)
+	_, _, err = connectors.SetAgents(d, "crm", nil, 3)
 	testutil.Must(t, err)
 	if names("agt_other") != "crm__deals:,crm__notes:chat,web__fetch:none" {
 		t.Fatal(names("agt_other"))

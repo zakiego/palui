@@ -231,7 +231,7 @@ func TestAssignAndDelete(t *testing.T) {
 	testutil.Must(t, err)
 	other := create(t, d, agents.Input{Slug: "cs", Name: s("CS"), Persona: s("p")})
 	for _, r := range [][]any{{"mcp-a", "A", other.ID}, {"mcp-b", "B", chef.ID}, {"mcp-c", "C", nil}} {
-		_, err := d.Exec("INSERT INTO connectors (id, type, kind, label, enabled, agent_id, created_at, updated_at) VALUES (?, 'mcp', 'tools', ?, 1, ?, 1, 1)", r[0], r[1], r[2])
+		_, err := d.Exec("INSERT INTO connectors (id, type, kind, label, enabled, agent_id, agent_ids, created_at, updated_at) VALUES (?, 'mcp', 'tools', ?, 1, ?, CASE WHEN ? IS NULL THEN NULL ELSE json_array(?) END, 1, 1)", r[0], r[1], r[2], r[2], r[2])
 		testutil.Must(t, err)
 	}
 	ok, err := agents.Delete(d, chef.ID, 5)

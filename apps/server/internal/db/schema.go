@@ -31,26 +31,31 @@ type Connector struct {
 	StatusDetail *string       `json:"statusDetail"`
 	Trust        string        `json:"trust"`
 	Config       *jsonx.Object `json:"config"`
-	AgentID      *string       `json:"agentId"`
-	Secrets      *string       `json:"secrets"`
-	ConfigHash   string        `json:"configHash"`
-	ErrorSince   *int64        `json:"errorSince"`
-	AlertedAt    *int64        `json:"alertedAt"`
-	SortOrder    int64         `json:"sortOrder"`
-	CreatedAt    int64         `json:"createdAt"`
-	UpdatedAt    int64         `json:"updatedAt"`
+	// The agents it serves; empty is every agent (only tool connectors have any).
+	AgentIDs   []string `json:"agentIds"`
+	Secrets    *string  `json:"secrets"`
+	ConfigHash string   `json:"configHash"`
+	ErrorSince *int64   `json:"errorSince"`
+	AlertedAt  *int64   `json:"alertedAt"`
+	SortOrder  int64    `json:"sortOrder"`
+	CreatedAt  int64    `json:"createdAt"`
+	UpdatedAt  int64    `json:"updatedAt"`
 }
 
-const ConnectorCols = "id, type, kind, label, enabled, status, status_detail, trust, config, agent_id, secrets, config_hash, error_since, alerted_at, sort_order, created_at, updated_at"
+// agent_ids falls back to agent_id for a row only a build before 0023 wrote
+// (fail closed: that agent, not every agent).
+const ConnectorCols = "id, type, kind, label, enabled, status, status_detail, trust, config, coalesce(agent_ids, CASE WHEN agent_id != '' THEN json_array(agent_id) END), secrets, config_hash, error_since, alerted_at, sort_order, created_at, updated_at"
 
 func ScanConnector(s Scanner) (Connector, error) {
 	var c Connector
 	var cfg JSON[*jsonx.Object]
-	err := s.Scan(&c.ID, &c.Type, &c.Kind, &c.Label, &c.Enabled, &c.Status, &c.StatusDetail, &c.Trust, &cfg, &c.AgentID, &c.Secrets, &c.ConfigHash, &c.ErrorSince, &c.AlertedAt, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt)
+	var agentIDs NullJSON[[]string]
+	err := s.Scan(&c.ID, &c.Type, &c.Kind, &c.Label, &c.Enabled, &c.Status, &c.StatusDetail, &c.Trust, &cfg, &agentIDs, &c.Secrets, &c.ConfigHash, &c.ErrorSince, &c.AlertedAt, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt)
 	c.Config = cfg.V
 	if c.Config == nil {
 		c.Config = jsonx.NewMap[any]()
 	}
+	c.AgentIDs = agentIDs.V
 	return c, err
 }
 
