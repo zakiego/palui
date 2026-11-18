@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/approvals"
 	"github.com/zakiego/palui/apps/server/internal/chats"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
@@ -372,7 +373,11 @@ func (e *Engine) Dispatch(messageID string) *Route {
 
 func (e *Engine) dispatch(chat db.Chat, row db.Message) (*Route, error) {
 	c := e.Ctx
-	row, err := PrepareMedia(context.Background(), c.DB, row, c.Host.Running(), c.Log)
+	agent, err := agents.ForChat(c.DB, chat.AgentID, c.Clock())
+	if err != nil {
+		return nil, err
+	}
+	row, err = PrepareMedia(context.Background(), c.DB, row, c.Host.Running(), agent.TranscribeVoice, c.Log)
 	if err != nil {
 		return nil, err
 	}

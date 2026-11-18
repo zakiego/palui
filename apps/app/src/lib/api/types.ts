@@ -98,6 +98,8 @@ export type AgentView = {
   recallContainer: string | null
   recallReadContainers: string[]
   recallPerChat: boolean
+  // Voice notes sent to this agent are transcribed (the Voice notes connector).
+  transcribeVoice: boolean
   container: string | null
   telegramConnectorId: string | null
   avatarImage: string | null

@@ -12,12 +12,20 @@ Voice-in is input only. Palui answers in text. Voice replies (text to speech) ar
 1. Get an API key from ElevenLabs.
 2. On the Connectors page, add Voice-in and paste the key.
 3. Press Test.
+4. Open each agent that should hear voice notes, go to Settings > Voice notes and turn on "Transcribe voice notes". It's off for every new agent.
 
 ## Settings
 
 | Field | Notes |
 |---|---|
 | ElevenLabs API key | Secret. Write-only, shown masked. |
+| Language | Optional. `id` (Indonesian) by default. Use another ISO code, or `auto` to let Scribe detect it. |
+
+## Per agent
+
+Transcription is a switch on each agent, off by default, because ElevenLabs bills every note. With it off, a voice note reaches that agent as a note saying it wasn't transcribed, and the audio isn't sent anywhere. Agents that existed before this switch, while Voice-in was already on, keep transcribing after the upgrade.
+
+Only your own voice notes are transcribed. Other people's voice notes in a shared chat never are, whatever the switch says.
 
 ## Fallback
 

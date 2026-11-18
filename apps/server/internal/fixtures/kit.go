@@ -239,6 +239,7 @@ type Agent struct {
 	RecallContainer      *string
 	RecallReadContainers []string
 	RecallPerChat        *bool
+	TranscribeVoice      *bool
 	TelegramConnectorID  *string
 	AvatarImage          *string
 	AvatarIcon           *string
@@ -265,6 +266,9 @@ func (k *Kit) Agent(v Agent) string {
 	}
 	if v.RecallPerChat != nil {
 		cols = append(cols, col{"recall_per_chat", db.Bool(*v.RecallPerChat)})
+	}
+	if v.TranscribeVoice != nil {
+		cols = append(cols, col{"transcribe_voice", db.Bool(*v.TranscribeVoice)})
 	}
 	cols = append(cols,
 		col{"telegram_connector_id", nullable(v.TelegramConnectorID)},

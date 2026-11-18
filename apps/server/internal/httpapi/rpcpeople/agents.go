@@ -52,6 +52,8 @@ func agentFields(extra ...zod.Field) *zod.ObjectS {
 		zod.F("recallContainer", zod.Nullable(zod.String().Trim().Max(64))),
 		zod.F("recallReadContainers", zod.Array(zod.String().Trim().Max(64)).Max(agents.MaxReadContainers)),
 		zod.F("recallPerChat", zod.Bool()),
+		// Left out keeps the agent's setting (a new agent starts off).
+		zod.F("transcribeVoice", zod.Optional(zod.Bool())),
 		zod.F("telegramConnectorId", zod.Nullable(zod.String().Min(1).Max(64))),
 		zod.F("avatarImage", zod.Nullable(zod.String().Max(agents.MaxAvatarImage))),
 		zod.F("avatarIcon", zod.Nullable(zod.Enum(agents.AgentIcons...))),
@@ -76,6 +78,7 @@ type agentInput struct {
 	RecallContainer      *string         `json:"recallContainer"`
 	RecallReadContainers []string        `json:"recallReadContainers"`
 	RecallPerChat        bool            `json:"recallPerChat"`
+	TranscribeVoice      *bool           `json:"transcribeVoice"`
 	TelegramConnectorID  *string         `json:"telegramConnectorId"`
 	AvatarImage          *string         `json:"avatarImage"`
 	AvatarIcon           *string         `json:"avatarIcon"`
@@ -337,6 +340,7 @@ func init() {
 			fields := agents.Input{
 				Name: &in.Name, Persona: &in.Persona, GuestTools: &in.GuestTools, DailyTokenCap: &in.DailyTokenCap,
 				RecallContainer: nullable(in.RecallContainer), RecallReadContainers: &list, RecallPerChat: &in.RecallPerChat,
+				TranscribeVoice:     in.TranscribeVoice,
 				TelegramConnectorID: nullable(in.TelegramConnectorID), AvatarImage: nullable(in.AvatarImage), AvatarIcon: nullable(in.AvatarIcon), AvatarColor: nullable(in.AvatarColor),
 				ModelRoles: in.ModelRoles,
 			}
