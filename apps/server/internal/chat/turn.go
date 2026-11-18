@@ -1155,7 +1155,13 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			}
 			var base []models.Message
 			if isMessage {
-				base = ToModelMessages(history, batch, pastCalls, shared)
+				// In a mention-mode group the batch sits among group talk, so
+				// its messages are labeled as the ones to answer.
+				var addressed map[string]bool
+				if chat.Kind == "group" && chat.ReplyMode == "mention" {
+					addressed = batch
+				}
+				base = ToModelMessages(history, batch, pastCalls, shared, addressed)
 			} else {
 				base = []models.Message{models.User(input.Prompt)}
 			}
@@ -1509,6 +1515,11 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 	fields := logx.Fields{"status": logStatus, "steps": steps, "tokens_in": usage.InputTokens, "tokens_out": usage.OutputTokens, "tokens_cached": usage.CacheReadTokens, "tokens_cache_write": usage.CacheWriteTokens, "ms": ms, "tainted": tainted.Load()}
 	if served != nil {
 		fields["connector_id"] = served.ConnectorID
+	}
+	if len(batch) > 1 {
+		// Several messages answered by one reply: the first thing to check
+		// when someone says theirs was skipped.
+		fields["batch"] = len(batch)
 	}
 	rlog.Info("turn finished", fields)
 	if interrupted {

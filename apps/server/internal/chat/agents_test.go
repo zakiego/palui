@@ -114,7 +114,7 @@ func TestAgentsWhoGetsAnswered(t *testing.T) {
 		contains(t, p, "Kamu Chef, ahli masak.")
 		notContains(t, p, "Kamu Palui")
 		contains(t, p, "This is a shared group chat")
-		contains(t, p, "[Budi]: @bot resep sop?")
+		contains(t, p, "[Budi, to you]: @bot resep sop?")
 		eq(t, lastRow(t, h.DB).Payload.Text, "halo Budi")
 		eq(t, *allRuns(t, h.DB)[0].AgentID, h.chef.ID)
 	})
@@ -162,7 +162,7 @@ func TestAgentsWhoGetsAnswered(t *testing.T) {
 		if len(h.m.Prompts) < 1 {
 			t.Fatal("no prompt")
 		}
-		contains(t, prompt(h.m, 0), "[Budi]: /new")
+		contains(t, prompt(h.m, 0), "[Budi, to you]: /new")
 	})
 
 	t.Run("/agent off goes back to Palui and guests stop being answered", func(t *testing.T) {
@@ -214,6 +214,21 @@ func TestAgentsAck(t *testing.T) {
 }
 
 func TestAgentsGroupContext(t *testing.T) {
+	t.Run("a /report pointing at a guest's message says it's someone else's", func(t *testing.T) {
+		// rpt_0mwm8tx7y3elwuzgdhl called a guest's message the owner's own.
+		h := agentsWorld(t, []models.Step{models.Say("ok")}, extra{})
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.guest("punyaku belum direspon", func(m *connectors.InboundMessage) { m.ChannelMsgID = "G1" })
+		h.Engine.Idle()
+		h.owner("/report agent terskip", func(m *connectors.InboundMessage) {
+			m.ReplyToChannelMsgID = "G1"
+			m.Quoted = &connectors.InboundQuote{From: "other", Text: "punyaku belum direspon"}
+		})
+		h.Engine.Idle()
+		saved := need(db.ScanReport(h.DB.QueryRow("SELECT " + db.ReportCols + " FROM reports")))
+		contains(t, saved.Text, "Owner replied to someone else's message with this report")
+	})
 	t.Run("keeps unaddressed group talk as context and answers only the mention", func(t *testing.T) {
 		h := agentsWorld(t, []models.Step{models.Say("10 shot kebanyakan")}, extra{})
 		h.owner("/agent chef")
@@ -235,7 +250,8 @@ func TestAgentsGroupContext(t *testing.T) {
 		p := prompt(h.m, -1)
 		contains(t, p, "[Budi]: tiap hari gw habis 10 shot")
 		contains(t, p, "[Owner]: gila lo")
-		contains(t, p, "[Budi]: @bot kebanyakan ga?")
+		contains(t, p, "[Budi, to you]: @bot kebanyakan ga?")
+		notContains(t, p, "[Budi, to you]: tiap hari")
 		contains(t, p, "you see every message, but you only answer when someone @mentions you")
 		eq(t, lastRow(t, h.DB).Payload.Text, "10 shot kebanyakan")
 		eq(t, len(allRuns(t, h.DB)), runs+1)
