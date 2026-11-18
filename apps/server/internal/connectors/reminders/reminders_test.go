@@ -61,6 +61,16 @@ func TestExposesTheFiveToolsWithClasses(t *testing.T) {
 	}
 }
 
+// The agent offered a reminder to send a group recap at midnight; a reminder
+// only posts its text (rpt_0mwma9q496dw7m60nt7).
+func TestSetReminderSaysItOnlyPostsItsText(t *testing.T) {
+	e := setup(t)
+	pt, _ := e.tools.Get("set_reminder")
+	if !strings.Contains(pt.Tool.Description, "only the reminder text is posted, as is; it doesn't run you, so a reminder can't summarize") {
+		t.Fatal(pt.Tool.Description)
+	}
+}
+
 func TestSetReminderCreatesInTheTurnsChatAndEchoesTheTime(t *testing.T) {
 	e := setup(t)
 	res := conntest.Call(t, e.tools, "set_reminder", `{"text":"bayar listrik","localDateTime":"2026-11-11T09:00"}`)

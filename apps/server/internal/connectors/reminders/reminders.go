@@ -145,7 +145,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) *connectors.T
 		Data:  connectors.DataChat,
 		Class: "write",
 		Title: "Set a reminder",
-		Tool: kit.Tool("Create a reminder in this chat. Work out the local date and time yourself from the current time in the system prompt (a date with no time means 09:00). Repeat the returned `echo` to the user so a wrong time shows right away.", setInput,
+		Tool: kit.Tool("Create a reminder in this chat. At that time only the reminder text is posted, as is; it doesn't run you, so a reminder can't summarize, look anything up or do a task then. Work out the local date and time yourself from the current time in the system prompt (a date with no time means 09:00). Repeat the returned `echo` to the user so a wrong time shows right away.", setInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				now := clock()
 				tz, err := ZoneFor(d, turn, in.S("tz"))

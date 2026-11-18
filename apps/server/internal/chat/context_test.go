@@ -573,6 +573,31 @@ func TestBuildSystemGuestLimits(t *testing.T) {
 	notContains(t, p, "DM")
 }
 
+// A group member asked for a midnight recap. The agent said the owner could
+// set one up, then offered a reminder to do the recap, which only posts fixed
+// text (rpt_0mwma9q496dw7m60nt7).
+func TestBuildSystemSharedScheduling(t *testing.T) {
+	owner := chat.SystemInput{Persona: "P", Channel: "whatsapp", Trigger: "message", Capabilities: []string{"Reminders (5 tools)"}}
+	notContains(t, chat.BuildSystem(owner), "You can't schedule yourself")
+	for _, shared := range []*chat.SharedInfo{
+		{Kind: "group", Guest: true},
+		{Kind: "group", Guest: true, Members: true},
+		{Kind: "dm", Guest: true},
+	} {
+		in := owner
+		in.Shared = shared
+		p := chat.BuildSystem(in)
+		contains(t, p, "You can't schedule yourself in this chat")
+		contains(t, p, "without promising the owner can set it up")
+		contains(t, p, "only posts its own fixed text at that time and never runs you")
+		contains(t, p, "Never offer a reminder as the way to get the task done")
+		// Still nothing about the owner's setup or where to change it.
+		for _, s := range []string{"dashboard", "DM", "flow"} {
+			notContains(t, p, s)
+		}
+	}
+}
+
 func TestBuildSystemUnattendedOutsideTurnNeverAsks(t *testing.T) {
 	for _, trigger := range []string{"schedule", "flow"} {
 		base := chat.SystemInput{Persona: "P", Channel: "telegram", Trigger: trigger}
