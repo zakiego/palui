@@ -62,6 +62,10 @@ func MCPTools() []MCPTool {
 		{Name: "list_agent_members", RPC: "getAgentMembersFn", Title: "List agent members", Description: "The people an AI agent is shared with (members), each with their WhatsApp or Telegram accounts and every agent they're in. Also lists members of other agents and people who wrote in a chat but aren't members yet. id is the agent id."},
 		{Name: "save_member", RPC: "saveMemberFn", Title: "Create or update member", Description: "Add a member to an agent (no id) or rename one and replace their accounts (id from list_agent_members). accounts is 1 to 5 of channel whatsapp or telegram with an address: a phone number, a WhatsApp JID, or a numeric Telegram user id. The owner's own account and accounts another member holds are refused."},
 		{Name: "set_agent_member", RPC: "setAgentMemberFn", Title: "Add or remove agent member", Description: "Add an existing member to an agent (on true) or take them out (on false). Taking a member out of their last agent deletes them. The default agent has no members.", Destructive: true, Idempotent: true},
+		{Name: "set_member_rules", RPC: "setMemberRulesFn", Title: "Let a member set chat rules", Description: "Let a member of an AI agent add and remove rules for the shared chats they're in (on true), or stop that (on false). Off by default. agentId is the agent id, memberId from list_agent_members.", Idempotent: true},
+		{Name: "get_chat_rules", RPC: "getChatRulesFn", Title: "Get chat rules", Description: "The rules people set from an AI agent's shared chats, each with its chat and who added it, plus the latest adds and removes. id is the agent id."},
+		{Name: "delete_chat_rule", RPC: "deleteChatRuleFn", Title: "Delete chat rule", Description: "Remove one chat rule (id from get_chat_rules). agentId is the agent id.", Destructive: true},
+		{Name: "undo_chat_rule_change", RPC: "undoChatRuleChangeFn", Title: "Undo chat rule change", Description: "Undo an add or remove from get_chat_rules changes: an add takes the rule out, a remove puts it back. agentId is the agent id, id the change id."},
 		{Name: "delete_agent", RPC: "deleteAgentFn", Title: "Delete agent", Description: "Delete an agent. Its chats go back to the default agent. The default agent can't be deleted.", Destructive: true},
 		{Name: "set_agent_tool_permissions", RPC: "setAgentToolPermissionsFn", Title: "Set agent tool permissions", Description: "Set allowAll, or per-tool allow, ask or deny (null clears one) for an agent. Tool names come from get_agent_tools.", Idempotent: true},
 
@@ -132,5 +136,7 @@ func MCPTools() []MCPTool {
 		{Name: "create_attachment_share", RPC: "createAttachmentShareFn", Title: "Share attachment", Description: "Make a share link for an attachment: public or private (owner only), for 1h, 24h or 7d."},
 		{Name: "revoke_attachment_share", RPC: "revokeAttachmentShareFn", Title: "Revoke attachment share", Description: "Stop a share link working.", Destructive: true},
 		{Name: "delete_attachment", RPC: "deleteAttachmentFn", Title: "Delete attachment", Description: "Delete a saved attachment and its share links.", Destructive: true},
+		{Name: "set_chat_save_media", RPC: "setChatSaveMediaFn", Title: "Set chat auto-save", Description: "Turn auto-saving a chat's photos and documents on or off, and pick how many days they stay (7, 30, 90, 365, or 0 to keep them). Off by default; turning it off keeps what was saved.", Idempotent: true},
+		{Name: "delete_auto_saved", RPC: "deleteAutoSavedFn", Title: "Delete auto-saved files", Description: "Delete every auto-saved file of a chat and their share links. Files saved on purpose stay.", Destructive: true},
 	}
 }

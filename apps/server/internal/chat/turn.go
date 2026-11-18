@@ -17,6 +17,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/approvals"
 	"github.com/zakiego/palui/apps/server/internal/attachments"
 	"github.com/zakiego/palui/apps/server/internal/budget"
+	"github.com/zakiego/palui/apps/server/internal/chatrules"
 	"github.com/zakiego/palui/apps/server/internal/chats"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/db"
@@ -939,11 +940,16 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			}
 		}
 		scope := agents.Scope(agent, chat.ID)
+		ruleSetter, err := RuleSetterFor(q, chat, agent, audience, origin, rs != nil, history, batch)
+		if err != nil {
+			return err
+		}
 		turnInfo := connectors.TurnInfo{
 			RunID: runID, ChatID: chat.ID, Channel: chat.Channel, Trigger: input.Trigger, TZ: all.Timezone, Now: startedAt,
 			JobID: jobID, BatchRunID: batchRunID, AgentID: agent.ID, Origin: origin, Mode: mode,
 			Tainted: approvalTainted, OwnerText: ownerText,
-			Memory: &connectors.MemoryScope{Container: scope.Container, Read: scope.Read, Locked: scope.Locked},
+			Memory:     &connectors.MemoryScope{Container: scope.Container, Read: scope.Read, Locked: scope.Locked},
+			RuleSetter: ruleSetter,
 		}
 		outside := audience == tools.AudienceOutside
 		// Members and outside turns have nobody to ask (PLAN 19.4).
@@ -1065,6 +1071,12 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			if err != nil {
 				return err
 			}
+			rulesText := ""
+			if shared {
+				if rulesText, err = chatrules.Prompt(q, agent.ID, chat.ID); err != nil {
+					return err
+				}
+			}
 			var sharedInfo *SharedInfo
 			if shared {
 				sharedInfo = &SharedInfo{Kind: chat.Kind, Guest: open, Members: audience == tools.AudienceMembers}
@@ -1098,6 +1110,8 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				Capabilities: capabilityList(c, collected, agent.ID, outside),
 				ToolSearch:   len(collected.Deferred) > 0,
 				Notes:        notesText,
+				ChatRules:    rulesText,
+				RuleSetter:   ruleSetter != nil,
 				Trigger:      origin,
 				Shared:       sharedInfo,
 				Dashboard:    dashboard,

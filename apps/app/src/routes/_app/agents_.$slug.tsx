@@ -11,6 +11,7 @@ import { z } from "zod"
 import { toast } from "sonner"
 
 import { AgentAvatar } from "@/components/agent-avatar"
+import { AgentChatRules } from "@/components/agent-chat-rules"
 import { AgentMembers } from "@/components/agent-members"
 import { AvatarPicker } from "@/components/agents/avatar-picker"
 import { AppError } from "@/components/app-error"
@@ -377,6 +378,12 @@ function AgentSettings({ data }: { data: Loaded }) {
             {!isDefault && (
               <Section id="members" title={t("agents.members")} description={t("agents.membersBody")}>
                 <AgentMembers agent={agent} />
+              </Section>
+            )}
+
+            {!isDefault && (
+              <Section id="chat-rules" title={t("agents.rules")} description={t("agents.rulesBody")}>
+                <AgentChatRules agent={agent} />
               </Section>
             )}
 

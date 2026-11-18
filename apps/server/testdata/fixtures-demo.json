@@ -7,7 +7,7 @@
    "rows": []
   },
   "agent_members": {
-   "columns": ["agent_id","member_id","created_at"],
+   "columns": ["agent_id","member_id","created_at","can_set_rules"],
    "rows": []
   },
   "agents": {
@@ -20,32 +20,40 @@
    "columns": ["id","attachment_id","token_hash","visibility","created_by","expires_at","revoked_at","open_count","last_opened_at","created_at"],
    "rows": []
   },
+  "chat_rule_changes": {
+   "columns": ["id","agent_id","chat_id","rule_id","action","title","body","member_id","author_name","by_member_id","by_name","run_id","created_at","undone_at"],
+   "rows": []
+  },
+  "chat_rules": {
+   "columns": ["id","agent_id","chat_id","title","body","member_id","author_name","created_at"],
+   "rows": []
+  },
   "chats": {
-   "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji"],
+   "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji","save_media","save_media_days"],
    "rows": [
-    ["<chat#1>","web","web","Palui (web)","dm","<ses#1>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#2>","telegram","987654321","Zaki 🌴 (Telegram DM with a rather long display name)","dm","<ses#2>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#3>","whatsapp","6281234567890@s.whatsapp.net","","dm","<ses#3>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#4>","whatsapp","demo-0","Keluarga besar 👨‍👩‍👧‍👦 Banjarmasin","dm","<ses#4>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#5>","telegram","demo-1","مجموعة العائلة","dm","<ses#5>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#6>","whatsapp","demo-2","東京出張チーム","dm","<ses#6>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#7>","telegram","demo-3","A","dm","<ses#7>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#8>","whatsapp","demo-4","Vorneo agents: Banjarbaru, Martapura, Pelaihari, Tanah Laut, Barito Kuala and Hulu Sungai","dm","<ses#8>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#9>","telegram","demo-5","🔥🔥🔥","dm","<ses#9>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#10>","whatsapp","demo-6","supercalifragilisticexpialidocious_channel_without_spaces_0123456789","dm","<ses#10>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#11>","telegram","demo-7","Keluarga besar 👨‍👩‍👧‍👦 Banjarmasin","dm","<ses#11>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#12>","whatsapp","demo-8","مجموعة العائلة","dm","<ses#12>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#13>","telegram","demo-9","東京出張チーム","dm","<ses#13>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#14>","whatsapp","demo-10","A","dm","<ses#14>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#15>","telegram","demo-11","Vorneo agents: Banjarbaru, Martapura, Pelaihari, Tanah Laut, Barito Kuala and Hulu Sungai","dm","<ses#15>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#16>","whatsapp","demo-12","🔥🔥🔥","dm","<ses#16>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#17>","telegram","demo-13","supercalifragilisticexpialidocious_channel_without_spaces_0123456789","dm","<ses#17>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#18>","whatsapp","demo-14","Keluarga besar 👨‍👩‍👧‍👦 Banjarmasin","dm","<ses#18>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#19>","telegram","demo-15","مجموعة العائلة","dm","<ses#19>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#20>","whatsapp","demo-16","東京出張チーム","dm","<ses#20>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#21>","telegram","demo-17","A","dm","<ses#21>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#22>","whatsapp","6282200001001@s.whatsapp.net","Zaki","dm","<ses#22>",0,null,1794621600000,"",null,"mention",1,"⏳"],
-    ["<chat#23>","whatsapp","6281111111111@s.whatsapp.net","Ibu","dm","<ses#23>",0,null,1794621600000,"",null,"mention",1,"⏳"]
+    ["<chat#1>","web","web","Palui (web)","dm","<ses#1>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#2>","telegram","987654321","Zaki 🌴 (Telegram DM with a rather long display name)","dm","<ses#2>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#3>","whatsapp","6281234567890@s.whatsapp.net","","dm","<ses#3>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#4>","whatsapp","demo-0","Keluarga besar 👨‍👩‍👧‍👦 Banjarmasin","dm","<ses#4>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#5>","telegram","demo-1","مجموعة العائلة","dm","<ses#5>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#6>","whatsapp","demo-2","東京出張チーム","dm","<ses#6>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#7>","telegram","demo-3","A","dm","<ses#7>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#8>","whatsapp","demo-4","Vorneo agents: Banjarbaru, Martapura, Pelaihari, Tanah Laut, Barito Kuala and Hulu Sungai","dm","<ses#8>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#9>","telegram","demo-5","🔥🔥🔥","dm","<ses#9>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#10>","whatsapp","demo-6","supercalifragilisticexpialidocious_channel_without_spaces_0123456789","dm","<ses#10>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#11>","telegram","demo-7","Keluarga besar 👨‍👩‍👧‍👦 Banjarmasin","dm","<ses#11>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#12>","whatsapp","demo-8","مجموعة العائلة","dm","<ses#12>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#13>","telegram","demo-9","東京出張チーム","dm","<ses#13>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#14>","whatsapp","demo-10","A","dm","<ses#14>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#15>","telegram","demo-11","Vorneo agents: Banjarbaru, Martapura, Pelaihari, Tanah Laut, Barito Kuala and Hulu Sungai","dm","<ses#15>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#16>","whatsapp","demo-12","🔥🔥🔥","dm","<ses#16>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#17>","telegram","demo-13","supercalifragilisticexpialidocious_channel_without_spaces_0123456789","dm","<ses#17>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#18>","whatsapp","demo-14","Keluarga besar 👨‍👩‍👧‍👦 Banjarmasin","dm","<ses#18>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#19>","telegram","demo-15","مجموعة العائلة","dm","<ses#19>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#20>","whatsapp","demo-16","東京出張チーム","dm","<ses#20>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#21>","telegram","demo-17","A","dm","<ses#21>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#22>","whatsapp","6282200001001@s.whatsapp.net","Zaki","dm","<ses#22>",0,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#23>","whatsapp","6281111111111@s.whatsapp.net","Ibu","dm","<ses#23>",0,null,1794621600000,"",null,"mention",1,"⏳",0,30]
    ]
   },
   "claims": {
@@ -384,11 +392,11 @@
    ]
   },
   "saved_attachments": {
-   "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at"],
+   "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at","origin","sender_id","sender_name","sent_at"],
    "rows": [
-    ["<att#1>","<chat#3>",null,null,"Tiket pesawat BDJ-CGK 12 Des","Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.","document","application/pdf","e-ticket-XKQ9PL.pdf",184320,"<sha256 of data>",{"bytes":184320,"sha256":"5b9035eb3f55e13a8fac419c08ab23620b264679b199b4e0dbd55a6e2233d310"},1794610800000],
-    ["<att#2>","<chat#2>",null,null,"KTP Zaki","Foto KTP, berlaku seumur hidup.","image","image/png",null,135032,"<sha256 of data>",{"bytes":135032,"sha256":"3645ad90546168ac687c954a6d1c58c6d7d0b2c1f42e22dde1cb85dd6c8b75be"},1794528000000],
-    ["<att#3>","<chat#2>",null,null,"Struk servis motor","Bengkel resmi Banjarbaru, ganti oli dan kampas rem, Rp 385.000.","document","application/pdf","struk_servis_2026-11-01.pdf",96000,"<sha256 of data>",{"bytes":96000,"sha256":"3dde18f3f56de6e3a148525d91ad33841163c40d6d0112492f350a6529fb517b"},1793844000000]
+    ["<att#1>","<chat#3>",null,null,"Tiket pesawat BDJ-CGK 12 Des","Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.","document","application/pdf","e-ticket-XKQ9PL.pdf",184320,"<sha256 of data>",{"bytes":184320,"sha256":"5b9035eb3f55e13a8fac419c08ab23620b264679b199b4e0dbd55a6e2233d310"},1794610800000,"tool",null,null,null],
+    ["<att#2>","<chat#2>",null,null,"KTP Zaki","Foto KTP, berlaku seumur hidup.","image","image/png",null,135032,"<sha256 of data>",{"bytes":135032,"sha256":"3645ad90546168ac687c954a6d1c58c6d7d0b2c1f42e22dde1cb85dd6c8b75be"},1794528000000,"tool",null,null,null],
+    ["<att#3>","<chat#2>",null,null,"Struk servis motor","Bengkel resmi Banjarbaru, ganti oli dan kampas rem, Rp 385.000.","document","application/pdf","struk_servis_2026-11-01.pdf",96000,"<sha256 of data>",{"bytes":96000,"sha256":"3dde18f3f56de6e3a148525d91ad33841163c40d6d0112492f350a6529fb517b"},1793844000000,"tool",null,null,null]
    ]
   },
   "session": {

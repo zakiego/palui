@@ -7,7 +7,7 @@
    "rows": []
   },
   "agent_members": {
-   "columns": ["agent_id","member_id","created_at"],
+   "columns": ["agent_id","member_id","created_at","can_set_rules"],
    "rows": []
   },
   "agents": {
@@ -18,8 +18,16 @@
    "columns": ["id","attachment_id","token_hash","visibility","created_by","expires_at","revoked_at","open_count","last_opened_at","created_at"],
    "rows": []
   },
+  "chat_rule_changes": {
+   "columns": ["id","agent_id","chat_id","rule_id","action","title","body","member_id","author_name","by_member_id","by_name","run_id","created_at","undone_at"],
+   "rows": []
+  },
+  "chat_rules": {
+   "columns": ["id","agent_id","chat_id","title","body","member_id","author_name","created_at"],
+   "rows": []
+  },
   "chats": {
-   "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji"],
+   "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji","save_media","save_media_days"],
    "rows": []
   },
   "claims": {
@@ -149,7 +157,7 @@
    "rows": []
   },
   "saved_attachments": {
-   "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at"],
+   "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at","origin","sender_id","sender_name","sent_at"],
    "rows": []
   },
   "session": {

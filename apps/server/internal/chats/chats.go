@@ -55,6 +55,33 @@ func SetAck(q db.Q, chatID string, patch AckPatch) (db.Chat, bool, error) {
 	return db.One(q.WQueryRow("UPDATE chats SET "+strings.Join(sets, ", ")+" WHERE id = ? RETURNING "+db.ChatCols, args...), db.ScanChat)
 }
 
+// SaveMediaPatch sets the chat's auto-save. Nil fields stay.
+type SaveMediaPatch struct {
+	On *bool
+	// Retention in days; callers check it with attachments.ValidAutoDays.
+	Days *int64
+}
+
+// SetSaveMedia turns auto-saving this chat's photos and documents on or off
+// and sets how long they stay. Files already saved are kept either way.
+func SetSaveMedia(q db.Q, chatID string, patch SaveMediaPatch) (db.Chat, bool, error) {
+	var sets []string
+	var args []any
+	if patch.On != nil {
+		sets = append(sets, "save_media = ?")
+		args = append(args, db.Bool(*patch.On))
+	}
+	if patch.Days != nil {
+		sets = append(sets, "save_media_days = ?")
+		args = append(args, *patch.Days)
+	}
+	if len(sets) == 0 {
+		return Get(q, chatID)
+	}
+	args = append(args, chatID)
+	return db.One(q.WQueryRow("UPDATE chats SET "+strings.Join(sets, ", ")+" WHERE id = ? RETURNING "+db.ChatCols, args...), db.ScanChat)
+}
+
 // EnsureInput: Allowed and AgentID only apply to a new chat.
 type EnsureInput struct {
 	Channel    string
@@ -234,7 +261,7 @@ func SearchChats(q db.Q, s Search) ([]Hit, error) {
 	return db.All(rows, err, func(s db.Scanner) (Hit, error) {
 		var h Hit
 		c := &h.Chat
-		err := s.Scan(&c.ID, &c.Channel, &c.ExternalID, &c.Title, &c.Kind, &c.SessionID, &c.ConnectorID, &c.Allowed, &c.AgentID, &c.ReplyMode, &c.Ack, &c.AckEmoji, &c.LastMessageAt, &c.CreatedAt, &h.MessageCount)
+		err := s.Scan(append(db.ChatDest(c), &h.MessageCount)...)
 		return h, err
 	})
 }

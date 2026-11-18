@@ -113,13 +113,64 @@ type AgentMember struct {
 	AgentID   string `json:"agentId"`
 	MemberID  string `json:"memberId"`
 	CreatedAt int64  `json:"createdAt"`
+	// The owner lets this member add and remove chat rules (0020).
+	CanSetRules bool `json:"canSetRules"`
 }
 
-const AgentMemberCols = "agent_id, member_id, created_at"
+const AgentMemberCols = "agent_id, member_id, created_at, can_set_rules"
 
 func ScanAgentMember(s Scanner) (AgentMember, error) {
 	var r AgentMember
-	err := s.Scan(&r.AgentID, &r.MemberID, &r.CreatedAt)
+	err := s.Scan(&r.AgentID, &r.MemberID, &r.CreatedAt, &r.CanSetRules)
+	return r, err
+}
+
+// ChatRule is a short rule for one shared chat, added from that chat by the
+// owner or a member the owner allowed (0020). MemberID nil means the owner.
+type ChatRule struct {
+	ID         string  `json:"id"`
+	AgentID    string  `json:"agentId"`
+	ChatID     string  `json:"chatId"`
+	Title      string  `json:"title"`
+	Body       string  `json:"body"`
+	MemberID   *string `json:"memberId"`
+	AuthorName string  `json:"authorName"`
+	CreatedAt  int64   `json:"createdAt"`
+}
+
+const ChatRuleCols = "id, agent_id, chat_id, title, body, member_id, author_name, created_at"
+
+func ScanChatRule(s Scanner) (ChatRule, error) {
+	var r ChatRule
+	err := s.Scan(&r.ID, &r.AgentID, &r.ChatID, &r.Title, &r.Body, &r.MemberID, &r.AuthorName, &r.CreatedAt)
+	return r, err
+}
+
+// ChatRuleChange is one add or remove of a chat rule: the rule as it was,
+// who wrote it (MemberID, AuthorName), who changed it (ByMemberID, ByName;
+// nil member means the owner) and when the owner undid it.
+type ChatRuleChange struct {
+	ID         string  `json:"id"`
+	AgentID    string  `json:"agentId"`
+	ChatID     string  `json:"chatId"`
+	RuleID     string  `json:"ruleId"`
+	Action     string  `json:"action"`
+	Title      string  `json:"title"`
+	Body       string  `json:"body"`
+	MemberID   *string `json:"memberId"`
+	AuthorName string  `json:"authorName"`
+	ByMemberID *string `json:"byMemberId"`
+	ByName     string  `json:"byName"`
+	RunID      *string `json:"runId"`
+	CreatedAt  int64   `json:"createdAt"`
+	UndoneAt   *int64  `json:"undoneAt"`
+}
+
+const ChatRuleChangeCols = "id, agent_id, chat_id, rule_id, action, title, body, member_id, author_name, by_member_id, by_name, run_id, created_at, undone_at"
+
+func ScanChatRuleChange(s Scanner) (ChatRuleChange, error) {
+	var r ChatRuleChange
+	err := s.Scan(&r.ID, &r.AgentID, &r.ChatID, &r.RuleID, &r.Action, &r.Title, &r.Body, &r.MemberID, &r.AuthorName, &r.ByMemberID, &r.ByName, &r.RunID, &r.CreatedAt, &r.UndoneAt)
 	return r, err
 }
 
@@ -140,13 +191,22 @@ type Chat struct {
 	AckEmoji      string  `json:"ackEmoji"`
 	LastMessageAt *int64  `json:"lastMessageAt"`
 	CreatedAt     int64   `json:"createdAt"`
+	// Keep every photo and document sent here in saved_attachments (off by default).
+	SaveMedia bool `json:"saveMedia"`
+	// Days an auto-saved file stays; 0 keeps it until someone deletes it.
+	SaveMediaDays int64 `json:"saveMediaDays"`
 }
 
-const ChatCols = "id, channel, external_id, title, kind, session_id, connector_id, allowed, agent_id, reply_mode, ack, ack_emoji, last_message_at, created_at"
+const ChatCols = "id, channel, external_id, title, kind, session_id, connector_id, allowed, agent_id, reply_mode, ack, ack_emoji, last_message_at, created_at, save_media, save_media_days"
+
+// ChatDest is ScanChat's scan targets, for queries that select more columns after ChatCols.
+func ChatDest(c *Chat) []any {
+	return []any{&c.ID, &c.Channel, &c.ExternalID, &c.Title, &c.Kind, &c.SessionID, &c.ConnectorID, &c.Allowed, &c.AgentID, &c.ReplyMode, &c.Ack, &c.AckEmoji, &c.LastMessageAt, &c.CreatedAt, &c.SaveMedia, &c.SaveMediaDays}
+}
 
 func ScanChat(s Scanner) (Chat, error) {
 	var c Chat
-	err := s.Scan(&c.ID, &c.Channel, &c.ExternalID, &c.Title, &c.Kind, &c.SessionID, &c.ConnectorID, &c.Allowed, &c.AgentID, &c.ReplyMode, &c.Ack, &c.AckEmoji, &c.LastMessageAt, &c.CreatedAt)
+	err := s.Scan(ChatDest(&c)...)
 	return c, err
 }
 
@@ -266,13 +326,25 @@ type AttachmentMeta struct {
 	Size        int64   `json:"size"`
 	Sha256      string  `json:"sha256"`
 	CreatedAt   int64   `json:"createdAt"`
+	// "tool" (save_attachment) or "auto" (the chat's auto-save).
+	Origin string `json:"origin"`
+	// Who sent the file and when, when known.
+	SenderID   *string `json:"senderId"`
+	SenderName *string `json:"senderName"`
+	SentAt     *int64  `json:"sentAt"`
 }
 
-const AttachmentMetaCols = "id, chat_id, message_id, run_id, title, description, kind, mime_type, filename, size, sha256, created_at"
+const AttachmentMetaCols = "id, chat_id, message_id, run_id, title, description, kind, mime_type, filename, size, sha256, created_at, origin, sender_id, sender_name, sent_at"
+
+// AttachmentMetaDest is ScanAttachmentMeta's scan targets, for queries that
+// select more columns after AttachmentMetaCols.
+func AttachmentMetaDest(a *AttachmentMeta) []any {
+	return []any{&a.ID, &a.ChatID, &a.MessageID, &a.RunID, &a.Title, &a.Description, &a.Kind, &a.MimeType, &a.Filename, &a.Size, &a.Sha256, &a.CreatedAt, &a.Origin, &a.SenderID, &a.SenderName, &a.SentAt}
+}
 
 func ScanAttachmentMeta(s Scanner) (AttachmentMeta, error) {
 	var a AttachmentMeta
-	err := s.Scan(&a.ID, &a.ChatID, &a.MessageID, &a.RunID, &a.Title, &a.Description, &a.Kind, &a.MimeType, &a.Filename, &a.Size, &a.Sha256, &a.CreatedAt)
+	err := s.Scan(AttachmentMetaDest(&a)...)
 	return a, err
 }
 

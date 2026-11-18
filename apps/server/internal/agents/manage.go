@@ -599,6 +599,8 @@ func Delete(q db.Q, id string, now int64) (bool, error) {
 			{"UPDATE chats SET agent_id = NULL WHERE agent_id = ?", []any{id}},
 			{"UPDATE connectors SET enabled = 0 WHERE agent_id = ?", []any{id}},
 			{"DELETE FROM instructions WHERE agent_id = ?", []any{id}},
+			{"DELETE FROM chat_rules WHERE agent_id = ?", []any{id}},
+			{"DELETE FROM chat_rule_changes WHERE agent_id = ?", []any{id}},
 			{"UPDATE contacts SET removed_at = ? WHERE agent_id = ? AND removed_at IS NULL", []any{now, id}},
 			// Members who were only in this agent go with it (PLAN 19.4). The
 			// first two read agent_members before the third clears it.

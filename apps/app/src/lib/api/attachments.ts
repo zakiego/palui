@@ -16,6 +16,10 @@ export type AttachmentItem = {
   mimeType: string
   size: number
   title: string
+  // "auto": kept by the chat's auto-save, with who sent it (name, else id).
+  origin: "tool" | "auto"
+  senderName: string | null
+  sentAt: number | null
 }
 
 export type AttachmentsPage = { attachments: AttachmentItem[]; timezone: string }
@@ -29,3 +33,7 @@ export const createAttachmentShareFn = withInput<{ id: string; visibility: Share
   "POST",
 )
 export const revokeAttachmentShareFn = withInput<{ shareId: string }, Ok>("revokeAttachmentShareFn", "POST")
+// A chat's auto-save: on or off, and how many days files stay (0 keeps them).
+export const setChatSaveMediaFn = withInput<{ chatId: string; on?: boolean; days?: number }, Ok>("setChatSaveMediaFn", "POST")
+// Deletes every auto-saved file of a chat; files saved on purpose stay.
+export const deleteAutoSavedFn = withInput<{ chatId: string }, { ok: true; deleted: number }>("deleteAutoSavedFn", "POST")

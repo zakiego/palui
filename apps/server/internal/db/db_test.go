@@ -44,7 +44,7 @@ func TestReportsADatabaseBehindTheCode(t *testing.T) {
 	}
 	defer d.Close()
 	st, _ := db.GetSchemaState(d)
-	if st.OK || st.Reason != "behind" || len(st.Missing) != 20 {
+	if st.OK || st.Reason != "behind" || len(st.Missing) != 22 {
 		t.Fatalf("%+v", st)
 	}
 }
@@ -57,7 +57,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	}
 	var n int
 	_ = d.QueryRow("SELECT count(*) FROM _migrations").Scan(&n)
-	if n != 20 {
+	if n != 22 {
 		t.Fatal(n)
 	}
 }

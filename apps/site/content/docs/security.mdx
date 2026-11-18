@@ -60,6 +60,8 @@ recall auto-save stores only your messages and the final replies. It never store
 
 Messages stay in the database. Compaction only removes old messages from the model's context.
 
+Saved attachments stay until you delete them. Files a chat's auto-save kept are deleted after the retention you picked for that chat (30 days by default), unless you chose to keep them.
+
 ## Model provider logs
 
 Palui sends prompts to your model provider. If that provider logs requests to disk (CLIProxyAPI can), your prompts and any recall memories in them end up there. Cap or disable those logs.
