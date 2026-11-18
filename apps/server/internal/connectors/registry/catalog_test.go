@@ -17,6 +17,7 @@ import (
 	jobsconn "github.com/zakiego/palui/apps/server/internal/connectors/jobs"
 	notesconn "github.com/zakiego/palui/apps/server/internal/connectors/notes"
 	outboundconn "github.com/zakiego/palui/apps/server/internal/connectors/outbound"
+	printerconn "github.com/zakiego/palui/apps/server/internal/connectors/printer"
 	recallconn "github.com/zakiego/palui/apps/server/internal/connectors/recall"
 	remindersconn "github.com/zakiego/palui/apps/server/internal/connectors/reminders"
 	"github.com/zakiego/palui/apps/server/internal/connectors/remotemcp"
@@ -83,6 +84,7 @@ func catalogBuilders(t *testing.T, e *catalogEnv) map[string]map[string]*connect
 		"hooks":       {"default": started(hooksconn.Runtime)},
 		"jobs":        {"default": jobsconn.Tools(e.db, clock, "")},
 		"notes":       {"default": must(notesconn.Tools(e.db, clock, "")), "agent": must(notesconn.Tools(e.db, clock, e.agentID))},
+		"printer":     {"default": printerconn.Tools(e.db, e.owner, printerconn.Config{URL: "ipp://host.docker.internal:631/printers/My_Printer"}, printerconn.Options{})},
 		"outbound":    {"owner": must(outboundconn.Tools(e.db, e.owner, clock)), "unattended": must(outboundconn.Tools(e.db, unattended, clock))},
 		"reminders":   {"default": remindersconn.Tools(e.db, e.owner, clock)},
 		"remote-mcp":  {"default": remotemcp.Tools(remotemcp.Deps{DB: e.db, MasterKey: testutil.TestKey, Clock: clock})},

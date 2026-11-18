@@ -8,6 +8,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/cliproxy"
 	"github.com/zakiego/palui/apps/server/internal/connectors/gcal"
 	"github.com/zakiego/palui/apps/server/internal/connectors/mcp"
+	"github.com/zakiego/palui/apps/server/internal/connectors/printer"
 	"github.com/zakiego/palui/apps/server/internal/connectors/recall"
 	"github.com/zakiego/palui/apps/server/internal/connectors/registry"
 	"github.com/zakiego/palui/apps/server/internal/connectors/t3code"
@@ -29,6 +30,7 @@ var configSchemas = map[string]*zod.ObjectS{
 	"mcp":        mcp.ConfigZod,
 	"gcal":       gcal.ConfigZod,
 	"t3code":     t3code.ConfigZod,
+	"printer":    printer.ConfigZod,
 	"voice":      voice.ConfigZod,
 }
 

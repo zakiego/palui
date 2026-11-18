@@ -19,6 +19,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/mcp"
 	"github.com/zakiego/palui/apps/server/internal/connectors/notes"
 	"github.com/zakiego/palui/apps/server/internal/connectors/outbound"
+	"github.com/zakiego/palui/apps/server/internal/connectors/printer"
 	"github.com/zakiego/palui/apps/server/internal/connectors/recall"
 	"github.com/zakiego/palui/apps/server/internal/connectors/reminders"
 	"github.com/zakiego/palui/apps/server/internal/connectors/remotemcp"
@@ -51,6 +52,7 @@ func Catalog() []Entry {
 		{"mcp", mcp.Runtime},
 		{"gcal", gcal.Runtime},
 		{"t3code", t3code.Runtime},
+		{"printer", printer.Runtime},
 		{"reminders", reminders.Runtime},
 		{"outbound", outbound.Runtime},
 		{"flows", flows.Runtime},

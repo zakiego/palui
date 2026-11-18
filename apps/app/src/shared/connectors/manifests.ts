@@ -10,6 +10,7 @@ import hooks from "./hooks/manifest"
 import jobs from "./jobs/manifest"
 import mcp from "./mcp/manifest"
 import outbound from "./outbound/manifest"
+import printer from "./printer/manifest"
 import notes from "./notes/manifest"
 import settings from "./settings/manifest"
 import recall from "./recall/manifest"
@@ -36,6 +37,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   mcp,
   gcal,
   t3code,
+  printer,
   reminders,
   outbound,
   flows,
