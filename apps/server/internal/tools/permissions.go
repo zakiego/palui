@@ -116,7 +116,12 @@ type ApprovalInput struct {
 	Permission string
 	// The owner started this turn and is there to see it.
 	OwnerTurn bool
-	Tainted   bool
+	// An untrusted result came back earlier in this turn.
+	Tainted bool
+	// An untrusted result is in the history replayed to this turn.
+	ReplayTainted bool
+	// The tool only records the owner's own reply in this chat (PaluiTool.OwnerReply).
+	OwnerReply bool
 	// The turn read what other people wrote (another agent's chats or memory).
 	OthersWrote bool
 	// Jobs, flows and hooks: every write asks.
@@ -130,8 +135,15 @@ func NeedsApproval(i ApprovalInput) bool {
 	if i.Permission == "ask" {
 		return true
 	}
+	tainted := i.Tainted || i.ReplayTainted
+	// Recording the owner's answer to a check-in, in the owner's own turn, is
+	// the owner's own words, not something an old web page or chat log asked
+	// for. Untrusted text from this same turn still makes it ask.
+	if i.OwnerReply && i.OwnerTurn && !i.Strict {
+		tainted = i.Tainted
+	}
 	// A turn that read something untrusted never sends a saved file on its own.
-	if i.SendsFile && i.Tainted {
+	if i.SendsFile && tainted {
 		return true
 	}
 	// Anyone in another agent's chat can plant text for the owner's agent to
@@ -145,5 +157,5 @@ func NeedsApproval(i ApprovalInput) bool {
 	if i.Class == "destructive" {
 		return true
 	}
-	return i.Class == "write" && (i.Tainted || i.Strict)
+	return i.Class == "write" && (tainted || i.Strict)
 }

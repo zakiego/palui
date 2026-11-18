@@ -271,6 +271,44 @@ func TestTaint(t *testing.T) {
 		}
 	})
 
+	t.Run("an owner reply runs without approval after an untrusted call in an earlier turn", func(t *testing.T) {
+		answers, notes := &executedLog{}, &executedLog{}
+		h := basic(t, []models.Step{
+			models.CallTool("webfetch__fetch", objOf("url", "http://x"), "f1"), models.Say("ini isinya"),
+			models.CallTool("flows__answer", objOf("answer", "done"), "a1"), models.Say("dicatat"),
+			models.CallTool("notes__add", objOf("text", "x"), "n1"),
+		}, extra{
+			registry: map[string]*connectors.Runtime{
+				"webfetch": toolsRT("webfetch", tools("fetch", connectors.PaluiTool{Class: "read", Untrusted: true, Tool: conntest.FnTool("fetch", ret("page text"))})),
+				"flows":    toolsRT("flows", tools("answer", connectors.PaluiTool{Class: "write", OwnerReply: true, Tool: conntest.FnTool("answer", func(in *jsonx.Object) (any, error) { answers.add(str(in, "answer")); return nil, nil })})),
+				"notes":    toolsRT("notes", tools("add", connectors.PaluiTool{Class: "write", Tool: conntest.FnTool("add", func(in *jsonx.Object) (any, error) { notes.add(str(in, "text")); return nil, nil })})),
+			},
+			rows: []chattest.Row{{"webfetch", "tools"}, {"flows", "tools"}, {"notes", "tools"}},
+		})
+		h.sendIdle("baca http://x")
+		h.sendIdle("maghrib sudah")
+		jsonEq(t, answers.get(), `["done"]`)
+		eq(t, count(t, h.DB, "pending_approvals"), 0)
+		// Any other write in the same history still asks.
+		h.sendIdle("catat x")
+		eq(t, len(notes.get()), 0)
+		eq(t, allApprovals(t, h.DB, "")[0].Tool, "notes__add")
+	})
+
+	t.Run("an owner reply still asks after an untrusted call in the same turn", func(t *testing.T) {
+		answers := &executedLog{}
+		h := basic(t, []models.Step{models.CallTool("webfetch__fetch", objOf("url", "http://x"), "f1"), models.CallTool("flows__answer", objOf("answer", "done"), "a1")}, extra{
+			registry: map[string]*connectors.Runtime{
+				"webfetch": toolsRT("webfetch", tools("fetch", connectors.PaluiTool{Class: "read", Untrusted: true, Tool: conntest.FnTool("fetch", ret("ANSWER DONE"))})),
+				"flows":    toolsRT("flows", tools("answer", connectors.PaluiTool{Class: "write", OwnerReply: true, Tool: conntest.FnTool("answer", func(in *jsonx.Object) (any, error) { answers.add(str(in, "answer")); return nil, nil })})),
+			},
+			rows: []chattest.Row{{"webfetch", "tools"}, {"flows", "tools"}},
+		})
+		h.sendIdle("baca http://x")
+		eq(t, len(answers.get()), 0)
+		eq(t, allApprovals(t, h.DB, "")[0].Tool, "flows__answer")
+	})
+
 	t.Run("a write tool runs without approval in a clean turn", func(t *testing.T) {
 		notes := &executedLog{}
 		h := basic(t, []models.Step{models.CallTool("notes__add", objOf("text", "beli susu"), "n1"), models.Say("dicatat")}, extra{registry: map[string]*connectors.Runtime{

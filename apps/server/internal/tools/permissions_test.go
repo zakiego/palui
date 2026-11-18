@@ -83,6 +83,38 @@ func TestAllowSkipsThePromptOnlyInAnOwnerTurn(t *testing.T) {
 	}
 }
 
+func TestAnOwnerReplyIgnoresOnlyReplayTaintInAnOwnerTurn(t *testing.T) {
+	w := tools.ApprovalInput{Class: "write", OwnerReply: true}
+	cases := []struct {
+		name string
+		in   func(tools.ApprovalInput) tools.ApprovalInput
+		want bool
+	}{
+		{"owner turn, untrusted call in history", func(i tools.ApprovalInput) tools.ApprovalInput { i.OwnerTurn, i.ReplayTainted = true, true; return i }, false},
+		{"owner turn, clean", func(i tools.ApprovalInput) tools.ApprovalInput { i.OwnerTurn = true; return i }, false},
+		{"owner turn, untrusted call in this turn", func(i tools.ApprovalInput) tools.ApprovalInput {
+			i.OwnerTurn, i.Tainted, i.ReplayTainted = true, true, true
+			return i
+		}, true},
+		{"owner turn, others wrote", func(i tools.ApprovalInput) tools.ApprovalInput {
+			i.OwnerTurn, i.ReplayTainted, i.OthersWrote = true, true, true
+			return i
+		}, true},
+		{"job, flow or hook", func(i tools.ApprovalInput) tools.ApprovalInput { i.Strict = true; return i }, true},
+		{"not an owner turn, replay tainted", func(i tools.ApprovalInput) tools.ApprovalInput { i.ReplayTainted = true; return i }, true},
+		{"set to ask", func(i tools.ApprovalInput) tools.ApprovalInput { i.OwnerTurn, i.Permission = true, "ask"; return i }, true},
+		{"any other write after replay taint", func(i tools.ApprovalInput) tools.ApprovalInput {
+			i.OwnerReply, i.OwnerTurn, i.ReplayTainted = false, true, true
+			return i
+		}, true},
+	}
+	for _, c := range cases {
+		if got := tools.NeedsApproval(c.in(w)); got != c.want {
+			t.Errorf("%s: %v", c.name, got)
+		}
+	}
+}
+
 func TestListsAskTools(t *testing.T) {
 	if got := tools.AskTools(perms(true, "a__x", "deny", "a__y", "ask", "a__z", "allow", "a__w", "ask")); !reflect.DeepEqual(got, []string{"a__y", "a__w"}) {
 		t.Fatal(got)

@@ -200,6 +200,11 @@ type PaluiTool struct {
 	FlowApproval string
 	// Ask the owner for this call even where the class rules wouldn't.
 	NeedsApproval func(input json.RawMessage) bool
+	// The write only records what the owner just said in this chat (a
+	// check-in answer). In the owner's own turn, untrusted results replayed
+	// from earlier turns don't make it ask. Untrusted results in the same
+	// turn, others' writing, jobs, flows and hooks still do.
+	OwnerReply bool
 	// The approval prompt's text for this call.
 	Preview func(input json.RawMessage) string
 }
