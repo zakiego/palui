@@ -15,7 +15,7 @@ description: Open a pull request in zakiego/palui the repo's way. Branches from 
    (cd <package> && npx tsc --noEmit && npx vitest run)               # each TS package
    ```
    For `apps/site`, typecheck is `pnpm typecheck` (it runs `next typegen` first). The root `pnpm typecheck`, `pnpm test` and `pnpm build` run every package and then the Go module, so they're the full gate. Run `pnpm build` when the change touches build config, the Dockerfile or bundling.
-4. Changelog: if the change is user-visible, `## Unreleased` in `apps/site/content/docs/changelog.mdx` has its bullet (`palui-changelog`). `pnpm release check` passes. Don't bump the version in the PR: that happens in the nightly release PR (`palui-release`).
+4. Changelog: if the change is user-visible, `## Unreleased` in `apps/site/content/docs/changelog.mdx` has its bullet (`palui-changelog`), one short sentence. `pnpm release check` passes. Don't bump the version in the PR: that happens in the nightly release PR (`palui-release`).
 5. Schema changed? The new `apps/server/internal/db/migrations/NNNN_*.sql` file is numbered after main's last one and `schema.go` matches it (`palui-schema-change`).
 6. Visible dashboard change? It passed `palui-ui-check`, and you have before and after screenshots.
 7. No em dashes in code, comments, docs or the PR. English everywhere except bot-facing copy, which is casual Indonesian.
@@ -45,6 +45,8 @@ TL;DR: <one or two sentences on what changes for the owner running Palui>
 ## Changelog
 <the Unreleased bullets this PR adds, or "None: internal only">
 ```
+
+Right after `gh pr create`, end the changelog bullet with the new PR's link (`([#N](https://github.com/zakiego/palui/pull/N))`), commit it as `docs(changelog): link the PR` and push.
 
 When the user asked for the PR, push and create it without showing a draft first, then send the link. Otherwise show the title and body and wait.
 

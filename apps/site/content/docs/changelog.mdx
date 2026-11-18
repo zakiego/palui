@@ -8,6 +8,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - While the version starts with `0.`, the v1 scope below is still being built. A minor bump (`0.2.0`) adds features or changes behavior. A patch bump (`0.1.1`) only fixes things.
 - `1.0.0` is the release where the v1 scope is done. From then on, a major bump means you have to do something when you upgrade, and the release notes say what.
 - Changes that need action from you on upgrade sit under "Breaking" in that release.
+- Each entry ends with the PR that made it. "Adds a migration" means rolling back past that release needs the pre-deploy snapshot.
 
 ## Unreleased
 
@@ -17,276 +18,273 @@ Nothing yet.
 
 ### Added
 
-- Auto-save a chat's photos and documents. Turn it on per chat on the Chats page and every photo and document sent there is kept on the Attachments page, with who sent it, when and its caption, so a group can share a file once and ask about it later. It's off by default. Pick how long files stay (7, 30, 90 or 365 days, or keep them), and delete a chat's auto-saved files in one go. Stickers and voice notes are skipped, files are capped at 10 MB each, 500 MB per chat and 2 GB in all, and saving never slows down a reply or changes what the agent may do. Two new MCP tools, `set_chat_save_media` and `delete_auto_saved`. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Let members set the rules of a shared chat. Turn on "Can set chat rules" next to a member on an agent's page, and in a chat with only you and members they can ask the agent to add or remove a rule for that chat, like "stop talking about dates here". A chat rule only changes what the agent talks about there: it never gives tools, approvals or access, never reaches other chats, and your standing instructions still win. Rule tools are skipped in any turn with a message from someone else, or one that read outside content. You get a DM each time a member changes one, and the new Chat rules section lists every rule and change with Undo. Off by default. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Pick models per agent. An agent's Settings tab has a new Model section where each role (default, fast, vision) either follows the global models from Settings or gets its own failover chain. `/model` in a chat changes that agent's own chain when it has one, and the global chain otherwise. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Agents can send photos, files, voice notes, videos and stickers on WhatsApp, Telegram and the web chat. The new `send_media` tool sends a public URL (fetched through the SSRF guard) or a file saved in that chat, so an agent asked for a picture can find one and send it instead of saying it can't. It only sends files that already exist: no image generation and no text to speech. Guests in a chat set up for them can use it too, like `save_attachment`. The Chats page lists each file sent under the agent's reply. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Agents can send a picture they find on the web. `fetch_page` now also lists up to 8 picture links on a page (its preview image first, without logos, icons and tracking pixels), and `send_media` given a page link as an image sends that page's preview image. Asked for "gambar inhaler pakai spacer", the agent can search, read a result and send its picture.
-- Give a tool connector to several agents. On an MCP server's page, "Chosen agents" lets you pick any number of agents instead of just one, and only those agents get its tools. A server shared by several agents counts as shared data, so its tools reach group chats only under the shared-chat rules. Deleting an agent takes it off the list and leaves the server with the rest. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Duplicate an MCP server. The Duplicate button on its page copies the URL, auth, token, tool picks and agents into a new paused draft, so you can change the copy and give it to another agent before connecting it. A new MCP tool, `duplicate_connector`, does the same.
-- A Printer connector. Point it at your Mac's print queue (`ipp://host.docker.internal:631/printers/<queue>`) and ask Palui in chat to print a PDF or photo you sent, one from earlier, or a saved attachment, with copies, color or gray, paper size and pages. `printer_status` shows the printer's state, problems like an empty tray, and waiting jobs. Printing is a write tool, so it asks first after untrusted content and in scheduled jobs.
-- Turn voice note transcription on per agent. An agent's Settings tab has a new Voice notes section with a "Transcribe voice notes" switch. With it on, your voice notes to that agent go through the Voice-in connector (ElevenLabs, Indonesian by default) and reach it as text. It's off for new agents, since every note costs money. Agents that already existed while Voice-in was on stay on. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- For MCP clients: `list_connectors` now returns `agentIds` (a list, empty for every agent) and `ownerNames` instead of `agentId` and `ownerName`. `set_connector_owner` takes `agentIds`, and the old `agentId` still works.
+- Auto-save a chat's photos and documents to the Attachments page. Turn it on per chat on the Chats page. Adds a migration. ([#128](https://github.com/zakiego/palui/pull/128))
+- Members can set a shared chat's rules, like topics to avoid, once you turn on "Can set chat rules". Adds a migration. ([#129](https://github.com/zakiego/palui/pull/129))
+- Pick models per agent in the new Model section of its Settings tab. Adds a migration. ([#127](https://github.com/zakiego/palui/pull/127))
+- Agents can send photos, files, voice notes, videos and stickers with the new `send_media` tool. Adds a migration. ([#132](https://github.com/zakiego/palui/pull/132))
+- Agents can send a picture they find on a web page. ([#134](https://github.com/zakiego/palui/pull/134))
+- Give an MCP server to several agents with "Chosen agents" on its page. Adds a migration. ([#133](https://github.com/zakiego/palui/pull/133))
+- Duplicate an MCP server into a paused draft with the Duplicate button. ([#133](https://github.com/zakiego/palui/pull/133))
+- A Printer connector: ask in chat to print a PDF or photo on your Mac's printer. ([#136](https://github.com/zakiego/palui/pull/136))
+- Turn voice note transcription on per agent in its Settings tab. Adds a migration. ([#135](https://github.com/zakiego/palui/pull/135))
+- For MCP clients: `list_connectors` returns `agentIds` and `ownerNames` instead of `agentId` and `ownerName`. ([#133](https://github.com/zakiego/palui/pull/133))
 
 ### Changed
 
-- The model chain editor is simpler. Each step has one search over every connector's models, so picking a model picks its connector too. Drag a step's handle (or use the arrow keys on it) to reorder, and press X to remove it.
+- The model chain editor has one search per step and drag to reorder. ([#127](https://github.com/zakiego/palui/pull/127))
 
 ### Fixed
 
-- An agent in a group no longer promises a scheduled task it can't do. Asked to send a recap of the day's chat at midnight, a group agent said only the owner could set that up in the dashboard, then offered a reminder "for the recap". A reminder only posts its own text and never runs the agent, and nothing in a shared chat runs it later. It now says it can't do that by itself, suggests asking the owner without promising anything, and offers a reminder only as a nudge to ask it again.
-- An agent in a group no longer answers only one of several people who mentioned it at once. When mentions arrive together (say, right after WhatsApp reconnects), the agent now sees which messages are addressed to it and answers each one by name, instead of answering one and treating the rest as group talk. A reply to another member's message is also no longer shown to the agent as the sender's own message, so it knows whose words it is reading.
-- Agents remember their chats again. A recall connector set up from the dashboard ran with auto-recall and auto-save off, because the setup form never stores those two switches and the server read a missing one as off. So no conversation was ever saved to recall, and an agent like a group one kept an empty memory unless it called `add_memory` itself. Both are on unless turned off, as the docs say. Conversations not saved yet go to recall the next time they compact or you send `/new`.
-- Answering a flow check-in in your own chat no longer asks "Boleh aku jalanin Record a check-in answer?" first. It used to ask whenever the conversation had read outside content earlier (a web page, another chat's log), and an unanswered prompt lost the answer after 10 minutes. It still asks when outside content was read in the same reply, and in jobs, flows and hooks.
-- An agent in a WhatsApp group with only you in it gets all its tools again. Since 0.10.0 every group counted as having outsiders unless the agent had members, so an agent like a finance one lost its own MCP server and said it had no tool to save a transaction. A group whose participants are only you now counts as your own chat, with approvals as usual. If someone else wrote there earlier in the conversation, it stays limited until `/new`.
-- A late answer to a flow check-in no longer leaves the agent confused. When you answered "udah" a few seconds after a check-in closed, the agent saw nothing open and told you its own question had no basis. It now sees check-ins that closed in the last 3 hours and records the late answer on the right run. It also knows check-ins are real after `/new`, even though they aren't in the new conversation, and stops bringing them up on its own, since the flow already sends reminders.
-- The agent no longer calls its earlier reply a mistake when you changed its setup in between. Each conversation remembers the setup of its last reply (Palui version, tools per connector, whether the chat counts as yours, persona, instructions and chat rules). When any of that changed, the next reply's context says what, once, with the update's commit subjects or a changelog link. So after you give it a missing tool, it says "tadi memang belum ada, sekarang sudah ditambahkan" instead of "ternyata tadi aku yang salah". Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Web search no longer gives up after one slow try. When DuckDuckGo hangs, `search_web` stops waiting after 7 seconds and asks once more, instead of waiting 15 seconds and telling the agent the search took too long. Usually the second try answers in about a second.
-- A `/report` sent as a reply now says which message you replied to, so the coding agent knows what went wrong even without a note. The same goes for a custom command that attaches a report.
-- A WhatsApp contact added by phone number no longer shows up twice on the Chats page once they message you. WhatsApp often sends from a hidden id instead of the number, which made a second, empty chat. Palui now keeps it as one chat, and an empty duplicate that already exists folds into the real one the next time that person writes.
+- A group agent no longer promises scheduled work it can't do. ([#144](https://github.com/zakiego/palui/pull/144))
+- A group agent answers everyone who mentioned it at once, not just one of them. ([#143](https://github.com/zakiego/palui/pull/143))
+- Agents save their chats to recall again. Auto-recall and auto-save were off by mistake. ([#141](https://github.com/zakiego/palui/pull/141))
+- Answering a flow check-in in your own chat no longer asks for approval first. ([#140](https://github.com/zakiego/palui/pull/140))
+- An agent in a WhatsApp group with only you in it gets all its tools again. ([#137](https://github.com/zakiego/palui/pull/137))
+- A check-in answered a bit late is recorded instead of confusing the agent. ([#138](https://github.com/zakiego/palui/pull/138))
+- After you change an agent's setup, it no longer calls its earlier reply a mistake. Adds a migration. ([#139](https://github.com/zakiego/palui/pull/139))
+- Web search tries again when DuckDuckGo hangs instead of giving up. ([#130](https://github.com/zakiego/palui/pull/130))
+- A `/report` sent as a reply says which message it replies to. ([#130](https://github.com/zakiego/palui/pull/130))
+- A WhatsApp contact added by number no longer shows up twice on the Chats page. ([#131](https://github.com/zakiego/palui/pull/131))
 
 ## 0.10.0 (2026-11-18)
 
 ### Added
 
-- Save your own chat commands on the dashboard. The new Commands page stores a prompt under a `/name`, for every agent or for one agent, and typing it runs a normal turn with that prompt. `{{args}}` takes the text typed after the command, and "Attach a debug report" adds the `/report` snapshot, so a command like `/report-fix` can hand a bug straight to a T3 Code thread. Your commands show up in `/help`, and four new MCP tools manage them. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Manage Palui from your own AI agents. Palui now serves an MCP server at `/mcp` with 74 tools that do what the dashboard does: settings, agents, chats, connectors, notes, jobs, flows, reminders, outbound and attachments. Apps that only take a URL connect with OAuth and a consent page in the dashboard; agents in a terminal use a personal token from Settings → Security → MCP access, or `palui mcp token <name>` on the server. Both are listed with when they were last used and can be revoked there. Adds a migration; rolling back past this release needs the pre-deploy snapshot. The edge Worker needs a redeploy so `/mcp` and the OAuth discovery documents reach the app.
-- An agent's Tools tab now says whose data each tool touches: "Data: per chat", "Data: this agent" or "Data: all agents", next to the tool count. Use it to check what an agent in a friends' group can reach. A server you switch between Only this agent and Global changes its label with it.
-- Agents can search the web. Web fetch gets a `search_web` tool that returns the top results (title, link and snippet) for a query, so an agent finds the right page before reading it instead of guessing URLs. Guests in a group can use it too, like `fetch_page`.
-- An agent's Tools tab now says who gets each tool: "Everyone in the chat", "You and members", "Only you" or "Off". A closed server row says the same for the whole server, with a count when only some of its tools reach that far.
-- MCP servers get a "Holds no private data" switch on an agent's Tools tab, for a server that keeps nothing about you, like prayer times. Once it's on, that server's tools that aren't destructive reach groups and other people's DMs and run there without asking. On a global server it applies to every agent. Changing the server's URL turns it off again.
-- Agents can have members. On an agent's page, add the people you trust with it (a name plus their WhatsApp number or Telegram id, picked from people who already wrote or typed in). A DM with a member, or a WhatsApp group where everyone is you or a member, also gets that agent's own tools: its MCP servers, notes, contacts and memory, with no approval prompts and never anything destructive. A group with anyone else in it stays as before, and so does every Telegram group, because a bot can't see who's in one. A member of one agent is a stranger to the others, and Palui has no members. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-
-- Ask Palui about your other agents. In your own DM or the web chat, Palui can list the chats your other agents answer in, read them (who wrote each message, paged 30 at a time), and search or list those agents' memory, so "what did the book club group say today?" just works. Anyone in those chats can write something for Palui to read, so after reading them every write asks you first, even a tool you set to allow, and the next turns ask too while what Palui read is in the conversation. No other agent can read Palui's chats or your memory, and groups, webhooks and flows never get these tools.
+- Save your own `/name` chat commands on the new Commands page. Adds a migration. ([#118](https://github.com/zakiego/palui/pull/118))
+- Manage Palui from your own AI agents through the MCP server at `/mcp`. Adds a migration. Redeploy the edge Worker. ([#108](https://github.com/zakiego/palui/pull/108))
+- An agent's Tools tab says whose data each tool touches. ([#110](https://github.com/zakiego/palui/pull/110))
+- Agents can search the web with `search_web`. ([#112](https://github.com/zakiego/palui/pull/112))
+- An agent's Tools tab says who gets each tool. ([#120](https://github.com/zakiego/palui/pull/120))
+- A "Holds no private data" switch lets an MCP server's tools reach groups without approvals. ([#120](https://github.com/zakiego/palui/pull/120))
+- Agents can have members, who get the agent's own tools in their DM or an all-member group. Adds a migration. ([#116](https://github.com/zakiego/palui/pull/116))
+- In your own chat, Palui can read your other agents' chats and memory. ([#117](https://github.com/zakiego/palui/pull/117))
 
 ### Changed
 
-- A tool result stays untrusted on the next turns. Palui shows past tool results to the model again, so in a turn whose history holds a web page, an `external` MCP result or another chat it read, writes now ask you first. Before, only the turn that read it did. Auto-save still keeps those later turns.
-
-- A group no longer sees your list of agents. When you mention the bot in a WhatsApp group that has no agent yet, or type `/agent` in any group or someone else's DM, the chat only hears that no agent is set up, and the `/agent <name>` choices go to your own DM. `/usage` in a group only shows that group's agent.
-
-- In a group, an agent now reads the whole conversation but still only answers when it's @mentioned or replied to. Before, it only ever saw the messages addressed to it, so "@agent what do you think?" came with no idea what was being discussed. The talk around a mention is kept as context and is never answered on its own. It also tells people plainly what it can read.
-
-- An agent now sees the photos, files and voice notes guests send it, not only yours. Before, a guest's photo in a group or DM set up with an agent reached it as text only, and a photo with no caption didn't reach it at all, so it told them it couldn't see what they sent. A photo in the group's talk around a mention still shows only as a placeholder; send it with the message that mentions the agent. When a photo can't be downloaded, the agent is told so instead of getting nothing.
-
-- Voice notes from guests aren't transcribed, so they don't add to your transcription bill. The agent gets a note that a voice note came in and asks them to type it. Your own voice notes are transcribed as before.
-
-- Agents in groups and in other people's DMs now get reminders, saved files, web search and web fetch for everyone in that chat, with no approval prompts. They never get destructive tools or anything that reaches your notes, contacts, memory, jobs, accounts or MCP servers, and can't find out those exist. Your own message in a group gets the same set, Palui's groups included, and a tool you set to "Ask first" or "Off" isn't offered there. The "When you write there" setting on the agent sheet is gone, and the Tools tab marks each tool a shared chat gets. A scheduled job that posts into a group keeps only those tools.
-
-- The agents API and the `get_agent` and `save_agent` MCP tools no longer have `ownerPowers`. It did nothing since groups stopped asking for approval. An AI agent or script that still sends it keeps working, and the value is ignored. The unused `owner_powers` column stays in the database for now; a later release drops it.
+- A tool result stays untrusted on later turns, so writes after it ask first. ([#117](https://github.com/zakiego/palui/pull/117))
+- A group no longer sees your list of agents. ([#115](https://github.com/zakiego/palui/pull/115))
+- A group agent reads the whole conversation but still only answers when mentioned. ([#119](https://github.com/zakiego/palui/pull/119))
+- Agents see the photos, files and voice notes guests send. ([#119](https://github.com/zakiego/palui/pull/119))
+- Guests' voice notes aren't transcribed, so they don't add to your bill. ([#121](https://github.com/zakiego/palui/pull/121))
+- Agents in shared chats get reminders, saved files and web tools with no approval prompts. ([#113](https://github.com/zakiego/palui/pull/113))
+- `ownerPowers` is gone from the agents API and MCP tools. It's ignored if sent. ([#122](https://github.com/zakiego/palui/pull/122))
 
 ### Fixed
 
-- In a group, an agent no longer mixes you up with someone else in the chat. Conversation summaries used to credit every message to you, so a friend's name could end up as yours and the agent would call you by it. Summaries now keep who wrote what, and the agent sees the name you use on WhatsApp or Telegram next to your messages, so it knows what to call you.
-- Agents can see WhatsApp stickers. Before, a sticker with no text never reached the agent at all. Now it arrives as an image marked as a sticker, so the agent can react to it, and an animated sticker comes through as its first frame. It follows the same rules as photos: a guest's sticker is only read when it's part of a message the agent will answer.
-- WhatsApp stickers sent to the agent are actually downloaded now. They still came through as just "[sticker]" because the download skipped them. Replying to a photo or sticker and mentioning the agent ("what does this say?") also sends that photo or sticker along, even when it was group talk the agent never read.
-- A flow whose schedule takes its times from a tool (like prayer times from an external MCP server) no longer asks for approval on every write once its version is approved. The tool only hands back times, so the scheduled time, date and item label aren't treated as outside data anymore. A list source that copies labels from the tool still asks.
-- In a group, an agent no longer tells people a tool is "not open right now" and to try again later. It used to list every connector as available even when the group couldn't use them, so it promised things like reminders it had no tool for. Now it only names what that chat can actually use and says plainly when it can't do something there.
-- In groups and other people's DMs, the tool search and the agent's instructions no longer mention flows, destructive tools or approvals, so the agent stops hinting at things that chat can't have.
-- Agents keep to their own jobs, MCP servers and connectors. `list_jobs` now lists only the jobs that post into the asking agent's chats, so an agent in a friends' group can't read your briefings. An MCP server added from a chat with any agent but the default belongs to that agent, and that agent can't remove a server every agent uses. `get_settings` lists only the connectors the agent can call.
+- A group agent no longer mixes you up with someone else in the chat. ([#126](https://github.com/zakiego/palui/pull/126))
+- Agents can see WhatsApp stickers. ([#123](https://github.com/zakiego/palui/pull/123))
+- Stickers are downloaded now, and a quoted photo or sticker reaches the agent. ([#125](https://github.com/zakiego/palui/pull/125))
+- A flow scheduled from a tool's times no longer asks for approval on every write. ([#114](https://github.com/zakiego/palui/pull/114))
+- A group agent no longer promises tools the group can't use. ([#109](https://github.com/zakiego/palui/pull/109))
+- In shared chats, the agent no longer mentions flows, destructive tools or approvals. ([#120](https://github.com/zakiego/palui/pull/120))
+- Agents only see their own jobs, MCP servers and connectors. ([#110](https://github.com/zakiego/palui/pull/110))
 
 ## 0.9.1 (2026-11-17)
 
 ### Fixed
 
-- Confirm dialogs close when you pick the action. Before, choosing Always allow for a contact on the Outbound page saved the change but left the dialog open, and the same happened in other confirm dialogs whose row stayed on the page.
+- Confirm dialogs close when you pick the action. ([#106](https://github.com/zakiego/palui/pull/106))
 
 ## 0.9.0 (2026-11-15)
 
 ### Breaking
 
-- Palui now runs as one service instead of two. The server, the channels, agent turns, the scheduler and the dashboard are a single program, so `compose.yaml` has only `app`, and the image is about 42 MB instead of 399 MB. On the same test database, idle memory went from about 153 MB for the two old containers to about 11 MB. Your database, connectors, chats and settings carry over as they are. After you upgrade: sign in to the dashboard again (old sessions end; your passkey still works, and `docker compose exec app palui owner invite` gets you in if it doesn't), and pair WhatsApp again from its connector page, since the WhatsApp session is stored in a new format under `/data/wa/`. Once WhatsApp works, you can delete the old session with `docker compose exec app rm -r /data/wa-auth`. `BETTER_AUTH_SECRET`, `RUNTIME_URL` and `CONTROL_PORT` are no longer read, so you can remove them from `.env`; keep `MASTER_KEY` and `APP_URL`. `scripts/pre-deploy.sh` removes the old `runtime` container on the first deploy. `APP_URL` should use a host name: with an IP address the server still starts, but passkeys are off and the log says why. The nightly backup now uploads WhatsApp as `wa-<timestamp>.tar.age`.
+- Palui runs as one Go service, with a 42 MB image instead of 399 MB. After you upgrade: ([#103](https://github.com/zakiego/palui/pull/103))
+  - Sign in to the dashboard again.
+  - Pair WhatsApp again, then delete the old session with `docker compose exec app rm -r /data/wa-auth`.
+  - Remove `BETTER_AUTH_SECRET`, `RUNTIME_URL` and `CONTROL_PORT` from `.env`.
+  - Use a host name in `APP_URL`, not an IP address, or passkeys stay off.
 
 ### Added
 
-- Add a contact from chat. Ask Palui to add a contact with a name and a phone number, and it shows you the name and the cleaned-up number to approve before it's saved to that agent's contacts. It always asks, even when the agent may run every tool without asking. New contacts start at Always ask, and only the Outbound page can switch one to Always allow. A number that's already saved comes back as the existing contact instead of a duplicate. Flows, webhooks and guests can't add contacts.
-- Pick the reaction per WhatsApp chat. Palui puts ⏳ on your message while it writes a reply, and now each chat can turn that off or use another emoji. Send `/ack off`, `/ack on` or `/ack 👀` in the chat, or pick it under "Reaction" on the Chats page or an agent's Chats tab. Typing still shows when it's off. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Palui can delete a saved document from recall with `forget_document`, so the full text of a note it saved stops showing up in searches. Before, it could only forget the facts taken from a document, and the text itself had to be deleted on the recall dashboard. It asks you first and only touches the agent's own container.
-- Agents can keep a separate memory per chat. On an agent's Memory tab, "Separate memory per chat" gives each chat its own recall container, so what one customer said never comes up in another customer's chat. New agents start with it on; existing ones keep their single container until you turn it on. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Shared containers on an agent's Memory tab: up to 5 recall containers it reads but never writes, like a `kb-shop` you fill with product facts. Auto-recall shows them next to the agent's own memory, labeled as reference only. Palui can use them too.
-- Activity > Usage splits tokens per agent. A new "Per agent" card next to Per model shows each agent's tokens and runs over the last 14 days. Runs from before agents count toward Palui, and runs of a deleted agent group under "Deleted agent".
+- Ask Palui to add a contact from chat. It always asks before saving. ([#100](https://github.com/zakiego/palui/pull/100))
+- Turn the ⏳ reaction off or pick another emoji per chat with `/ack`. Adds a migration. ([#97](https://github.com/zakiego/palui/pull/97))
+- Palui can delete a saved recall document with `forget_document`. ([#89](https://github.com/zakiego/palui/pull/89))
+- Agents can keep a separate memory per chat. Adds a migration. ([#85](https://github.com/zakiego/palui/pull/85))
+- Agents can read up to 5 shared recall containers, like a product knowledge base. ([#85](https://github.com/zakiego/palui/pull/85))
+- Activity > Usage splits tokens per agent. ([#87](https://github.com/zakiego/palui/pull/87))
 
 ### Fixed
 
-- Another agent can no longer pick your memory as its own or shared container when the recall connector has no container picked. Before, the check assumed your memory was called `default`, while recall actually used its own default (like `zaki`), so an agent's Memory tab accepted `zaki`. Palui now asks recall for that name, keeps it in the connector's config, and refuses it on every agent but Palui.
-- `forget_memory` and `forget_document` work again when the recall connector has no container picked. Before, a fact or document Palui had just saved answered "No memory with that id", because add and search used recall's default container while forget compared against an empty name. Palui now asks recall which container its default is and uses that one name for every recall tool. Auto-recall in that setup also reads your real memory again instead of an empty container named `undefined`, and the "can't use recall container" error names the containers the agent may use.
-- Palui can no longer read or write another agent's memory. Before, only agents other than Palui were locked to their own recall containers, so Palui could search or save into, say, `agent-finansial`. Now Palui reaches your memory plus the shared containers on its Memory tab, and nothing else. Add an agent's container to Palui's shared list if you want Palui to read it. Flow steps and tool sources now run with their flow agent's memory limits too; before, they weren't limited at all. Recall's `purge_container` and any recall tool Palui doesn't know yet are no longer offered.
-- An agent's chat history tools only reach the chats it answers in. Before, `search_chats` listed every chat and `read_chat` read any of them, so Palui in your DM could read the group another agent serves and save it to its memory. Now another agent's chat doesn't show up in a search, and reading it by id or JID returns an error with nothing from the chat. The dashboard still shows every chat.
-- An agent other than Palui can no longer read or change your memory through recall's tools. Before, its `search_memories` and `add_memory` defaulted to Palui's container and took any container the model named, so a question from you in a group could pull your private facts into that group. Its tools now reach only its own container and its shared ones, `forget_memory` checks the memory's container first, and recall tools Palui doesn't know yet (like `upcoming`, which can read every container) are left out. Agents also can't pick your container as their own or as a shared one.
-- A photo or document you sent a few messages ago can still be saved. Before, `save_attachment` only took files from the message being answered, so when the agent showed a transaction preview first and you said "ya" later, the receipt couldn't be saved or attached anymore and the agent asked you to send it again. Now it can pick a file from this chat's last 24 hours (`earlier: true`), matched by caption and time.
+- Other agents can't pick your memory as their container when recall has none picked. ([#91](https://github.com/zakiego/palui/pull/91))
+- `forget_memory` and `forget_document` work when recall has no container picked. ([#90](https://github.com/zakiego/palui/pull/90))
+- Palui can no longer read or write another agent's memory. ([#88](https://github.com/zakiego/palui/pull/88))
+- An agent's chat history tools only reach the chats it answers in. ([#86](https://github.com/zakiego/palui/pull/86))
+- Other agents can no longer read or change your memory through recall's tools. ([#85](https://github.com/zakiego/palui/pull/85))
+- A photo or document from earlier in the chat can still be saved. ([#84](https://github.com/zakiego/palui/pull/84))
 
 ### Changed
 
-- Every message to a contact now ends with a signature, added by Palui itself instead of the agent remembering an instruction. It covers messages sent now, scheduled and repeating ones, and flow message steps with `contact`, and it sits after the text with one blank line between. The approval and the 15-second cancel notice show it, so you approve exactly what goes out. The default says the message is automatic and replies to that number aren't read. Turn it off or edit it under "Limits and signature" on the Outbound page. To send one message without it, ask for that in chat (`send_message` takes `signature: false`, and a flow message step can set it too). A text that already ends with the signature, or with one of the earlier texts, isn't signed twice. The body limit stays at 1800 characters and the signature can be up to 150, so the total always fits the 2000 character cap. You can delete the standing instruction that added the signature by hand.
-- The Messages to contacts tools have English names now: `outbound__send_message`, `outbound__cancel_message`, `outbound__list_contacts` and `outbound__list_outbound_messages` (they were `kirim_pesan`, `batal_pesan`, `daftar_kontak` and `daftar_pesan_keluar`). Palui still answers in Indonesian. If you set a per-tool permission for one of the old names on an agent's Tools tab, set it again.
-- The landing page at palui.zakiego.com is redesigned. Asks type themselves in above Palui, which acts each one out, and seven boxes below show what it does as live demos: chatting, asking before it acts, remembering, reminders, connectors, scheduled jobs and the install commands. It stands still when your system asks for reduced motion.
-- The landing page now matches the dashboard: Inter instead of IBM Plex, the dashboard's dark neutrals and corner radii, an indigo focus ring, and demos that show a finished step as a green check and a connector that's on as an indigo switch. The share card for links to the site has the same look.
-- Forgetting several memories asks you once. `forget_memory` takes up to 20 ids in one call, so cleaning up a batch of facts is one "ya" instead of one prompt per fact.
-- The new version notice also goes out when a deploy runs a new commit on the same version. It names the new and old short commit and lists up to 8 commit titles in between, like "Palui di-update ke commit abc1234 (sebelumnya def5678), versi 0.8.0". A version bump adds the short commit to the usual message. A restart on the same commit still sends nothing, and a build that doesn't know its commit (a local `docker build`) falls back to the version alone. The deploy's `scripts/pre-deploy.sh` writes the commit into `build-info.json`, which the image carries.
-- The dashboard has a new, quieter look: near-black panels at night, Inter type, compact pill buttons, hairline cards and an indigo switch for "on". The header is shorter, the sidebar drops its tagline, the command palette opens near the top, Settings and Activity switch sections with line tabs, every status shows an icon next to its word, model logos are drawn in plain black or white, and helper text is one short line. Pages, data and controls work the same as before.
-- The docs at palui.zakiego.com/docs match the dashboard: Inter and Geist Mono, the dashboard's neutrals in both themes, quieter callouts and tables, code blocks without a card look, and a search box that opens at once.
-- Placeholders like `{{trigger.label}}` stand out on a flow's graph. In a step's card, the trigger pill and the step detail, each `{{...}}` shows as a small mono chip, so `🕌 {{trigger.label}}` reads as a fixed emoji plus a value filled in at run time.
+- Messages to contacts end with a signature Palui adds itself. Edit it on the Outbound page. ([#101](https://github.com/zakiego/palui/pull/101))
+- The Messages to contacts tools have English names. Set their per-tool permissions again. ([#100](https://github.com/zakiego/palui/pull/100))
+- The landing page is redesigned with live demos. ([#94](https://github.com/zakiego/palui/pull/94))
+- The landing page matches the dashboard's look. ([#95](https://github.com/zakiego/palui/pull/95))
+- `forget_memory` forgets up to 20 memories with one approval. ([#89](https://github.com/zakiego/palui/pull/89))
+- The new version notice also goes out for a new commit on the same version. ([#82](https://github.com/zakiego/palui/pull/82))
+- The dashboard has a new, quieter look. ([#93](https://github.com/zakiego/palui/pull/93))
+- The docs match the dashboard's look. ([#96](https://github.com/zakiego/palui/pull/96))
+- `{{placeholders}}` stand out on a flow's graph. ([#98](https://github.com/zakiego/palui/pull/98))
 
 ## 0.8.0 (2026-11-13)
 
 ### Added
 
-- Saved attachments can be previewed and shared. On the Attachments page, click a file's title or the eye icon to see an image, PDF or text file, or open it in a new tab. The link icon makes a temporary link: public for anyone who has it, or private so it only opens when you're signed in, for 1 hour, 24 hours or 7 days. Each file lists its live links, how often they were opened, and a button to turn one off. The agent can do the same with the new `share_attachment` and `unshare_attachment` tools, so asking for your KTP gets you a link that opens the file itself. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Tool permissions per agent. On an agent's Tools tab, "Allow every tool without asking" stops the approval prompts for your own messages, and each tool has a select: Default, Allow, Ask first or Off. Off hides the tool from that agent. Jobs, flows, hooks and other people keep the usual rules. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- An MCP server can be global or belong to one agent. On its connector page, "Who can use it" is Global (the default) or "One agent". Only the owner gets its tools, sees it in its capability list and can call it from a flow. Add the same server twice to give two agents different logins. On an agent's Tools tab each MCP server has a select for global or only this agent, and "Add MCP" adds one that agent owns. The Connectors page tags owned servers. Deleting an agent pauses the servers it owned. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Each agent's page is now split into tabs: Settings, Chats, Instructions, Memory and Tools. Chats shows where it answers, with the reply mode and "Answer here" for each. Memory shows its recall container, how many memories are in it and when it last saved. Tools lists every tool it can use by connector, marks MCP servers, says who can use them (you, you in groups, other people) and how often it ran each one this week.
-- Groups have a reply mode: mentions only (the default) or every message. Set it with `/reply all` and `/reply mention` in the group, or with the new select on the Chats page. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Setting up a WhatsApp group no longer needs the dashboard. Mention Palui in a new group and it replies with your agents and the `/agent <slug>` to send. Before, every message in a group that wasn't allowed yet was dropped, `/agent` included.
-- The Chats page marks chats whose "Answer here" is off as Off.
-- You can answer a flow check-in before it asks. While a run is still waiting before its check-in (like the 10 minutes after "Waktu Ashar sudah masuk"), "udah" is kept, and when the run gets there it skips the question and its reminders and follows that answer's branch. Only a closing answer counts early; a "belum" still waits for the question.
-- Palui can tell you when a new version is running. It's off by default. On an agent's Chats tab, turn on "New version notice" for the chats you want it in. After a deploy each of them gets one message, from the bot that answers there, with the new and old version and a link to the changelog. A restart on the same version, or a fresh install, sends nothing.
-- The agent knows the dashboard's pages. Ask it where to add a connector, change the model or set up a webhook and it replies with the full link, like `/app/connectors/new` or `/app/settings?tab=models`, built from `APP_URL`. Only in your own chats, never in shared ones.
+- Preview saved attachments and share them with temporary links. Adds a migration. ([#80](https://github.com/zakiego/palui/pull/80))
+- Set tool permissions per agent on its Tools tab. Adds a migration. ([#75](https://github.com/zakiego/palui/pull/75))
+- An MCP server can be global or belong to one agent. Adds a migration. ([#66](https://github.com/zakiego/palui/pull/66))
+- An agent's page has Settings, Chats, Instructions, Memory and Tools tabs. ([#65](https://github.com/zakiego/palui/pull/65))
+- Groups have a reply mode, mentions only or every message, set with `/reply`. Adds a migration. ([#64](https://github.com/zakiego/palui/pull/64))
+- Set up a WhatsApp group from inside it by mentioning Palui. ([#64](https://github.com/zakiego/palui/pull/64))
+- The Chats page marks chats that are off. ([#64](https://github.com/zakiego/palui/pull/64))
+- Answer a flow check-in before it asks. ([#70](https://github.com/zakiego/palui/pull/70))
+- A notice in the chats you pick when a new version is running. Off by default. ([#72](https://github.com/zakiego/palui/pull/72))
+- The agent knows the dashboard's pages and links to them. ([#73](https://github.com/zakiego/palui/pull/73))
 
 ### Changed
 
-- Home shows what needs attention first: a connector with an error, or one that's on but paused, sits at the top with its reason and a link to fix it. Tokens today has a bar for each of the last 7 days, the next reminders read like an agenda with the time first, and on a phone the connector map moves to the bottom.
-- Switching pages in the dashboard is close to instant. Every sidebar page loads in the background once you're in, and a page you've already seen shows right away and refreshes behind it. Before, each switch waited on the server twice.
-- A flow's page is split into Steps, Runs and Versions tabs, and lines up at one width with its header.
-- An agent's Tools tab is split into "Only this agent" and "Global", two cards you click between. Each server is one closed row with its tool count and how many are destructive, so the list fits on a screen. Open a row to see its tools. Changing a server's scope moves it to the other card. Searching opens every row with a match.
-- Picking an agent for a chat, Palui included, turns the chat on. You no longer have to flip "Answer here" as well.
-- In a group that has no agent, your own messages now need a mention like everyone else's, unless the group's reply mode is every message. That includes phrases meant for a flow's chat trigger; commands still work without one.
-- In a WhatsApp group that's still off, only `/agent`, `/reply`, `/help` and `/id` run.
-- Built-in tool names are English now, like `reminders__set_reminder`, `flows__list_flows`, `flows__recap` and `palui__search_tools` (they were Indonesian, like `ingatkan` and `daftar_flow`). Palui still answers in Indonesian. A flow you wrote by hand with an old built-in tool name fails its check until you update the step.
+- Home shows what needs attention first. ([#77](https://github.com/zakiego/palui/pull/77))
+- Switching dashboard pages is close to instant. ([#76](https://github.com/zakiego/palui/pull/76))
+- A flow's page has Steps, Runs and Versions tabs. ([#74](https://github.com/zakiego/palui/pull/74))
+- An agent's Tools tab is split into "Only this agent" and "Global". ([#69](https://github.com/zakiego/palui/pull/69))
+- Picking an agent for a chat turns the chat on. ([#64](https://github.com/zakiego/palui/pull/64))
+- In a group without an agent, your own messages need a mention too. ([#64](https://github.com/zakiego/palui/pull/64))
+- In a WhatsApp group that's off, only `/agent`, `/reply`, `/help` and `/id` run. ([#64](https://github.com/zakiego/palui/pull/64))
+- Built-in tool names are English. Update hand-written flows that use the old names. ([#67](https://github.com/zakiego/palui/pull/67))
 
 ### Fixed
 
-- Sending a saved file to an MCP tool is safer and clearer. After the agent reads something untrusted (a web page, an external server), a call that carries a saved file always waits for your yes, even with "Allow every tool without asking". The approval message names the file and its size instead of an id. Flows never send a file that outside data picked. A server that repeats the file back no longer fills the agent's context, and one call carries at most 15 MB of files.
-- The agent is told right in the attachment results how to hand a file to another app (upload it there with its `fileRef`, then use that app's id), so it stops passing Palui's own file id and getting "File not found".
-- A photo or document saved in chat can now go to another app's MCP tool, like uploading a receipt to a finance app and attaching it to a transaction. Before, the agent passed Palui's own file id, the app answered "File not found", and the receipt stayed in Palui only. Files only go to MCP servers marked as your own, never to external ones.
-- Clicking Connect on a connector that's already running no longer leaves it stuck on Connecting. It goes back to On (or its error) right away. On a connector waiting to retry after an error, Connect or a saved fix like a new token now retries at once instead of up to 10 minutes later.
-- Adding a connector from an agent's Tools tab now has a back link to that agent, not to the Connectors page.
-- WhatsApp and Telegram show their own logos in the dashboard and docs, not a speech bubble and a paper plane.
-- A flow run with a chain of check-in reminders no longer shows as missed when you answered a later reminder. `flow_history` and recaps read the check-in that decided the run, and a late answer corrects that same one.
+- Sending a saved file to an MCP tool after untrusted content always asks first. ([#81](https://github.com/zakiego/palui/pull/81))
+- The agent hands files to other apps with their `fileRef`, not Palui's own id. ([#81](https://github.com/zakiego/palui/pull/81))
+- A saved photo or document can go to your own MCP server's tools. ([#79](https://github.com/zakiego/palui/pull/79))
+- Connect on a running connector no longer leaves it stuck on Connecting. ([#78](https://github.com/zakiego/palui/pull/78))
+- Adding a connector from an agent's Tools tab links back to that agent. ([#71](https://github.com/zakiego/palui/pull/71))
+- WhatsApp and Telegram show their real logos. ([#68](https://github.com/zakiego/palui/pull/68))
+- A flow run answered on a later reminder no longer shows as missed. ([#70](https://github.com/zakiego/palui/pull/70))
 
 ## 0.7.0 (2026-11-12)
 
 ### Breaking
 
-- Routines are gone; flows do everything they did. The routine engine, the routine tools (`buat_rutinitas` and the rest), the Routines page, the `palui flows status` and `palui flows mode` commands and the old routine answer buttons are removed, and the app deletes the Routines connector on start. Routines that weren't handed over to flows stop firing, so if `palui flows status` on 0.6.0 still shows routines, run `palui flows mode flows` there and wait a minute before you upgrade. The routine tables stay for one more release, so rolling back to 0.6.0 still works.
+- Routines are removed and flows replace them. If `palui flows status` on 0.6.0 still shows routines, run `palui flows mode flows` there before you upgrade. ([#61](https://github.com/zakiego/palui/pull/61))
 
 ### Added
 
-- Agents can message other people for you. Say "chat Budi sekarang, bilang gue otw", "malam ini jam 8 chat Budi, ingetin dia gue otw" or "tiap Jumat jam 11 kabarin Siti", and the new builtin Messages to contacts connector sends it now, at that time or on a repeat. It only sends to saved contacts, and each agent has its own list. A new number is saved when you approve the first message to it. Every message shows you the recipient, the time and the exact text first, unless you set that contact to Always allow on the new Outbound page, and even then only when you named the contact yourself in a turn no web page, tool result or webhook touched. Messages sent now wait 15 seconds with a Batalin button (or reply "batal"). A flow's message step can send to a contact with `contact`, approved once per flow version. The Outbound page has a kill switch, daily limits (5 per contact, 20 in total by default), an optional signature, scheduled messages and a log of every send. WhatsApp messages go out from the number Palui is linked to. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- A flow check-in's deadline can now be computed. `{kind:"at", at:"{{steps.nextp.data.next.timestamp}}", plusMin:-10}` stops it 10 minutes before a time a tool returned, `{kind:"next", plusMin:-10}` stops it 10 minutes before the schedule's next occurrence, and `after` takes a template like `"{{vars.left}}"`. A deadline that has already passed skips the ask and takes `onMissed`, so a reminder chain like "last reminder 10 minutes before the next prayer" works whatever the gap between prayers is.
-- Flow expressions get `choose(cond, a, b)`, which returns `a` when `cond` is true and `b` otherwise. "Remind at +70 minutes unless that's within 10 minutes of the last reminder" is now `choose(trigger.at + 70 * 60000 <= vars.last - 10 * 60000, trigger.at + 70 * 60000, vars.last)`.
+- Agents can message your contacts now, later or on a repeat, with your approval. Adds a migration. ([#99](https://github.com/zakiego/palui/pull/99))
+- A flow check-in's deadline can be computed from a time. ([#60](https://github.com/zakiego/palui/pull/60))
+- Flow expressions get `choose(cond, a, b)`. ([#63](https://github.com/zakiego/palui/pull/63))
 
 ### Changed
 
-- The default turn time limit is now 5 minutes instead of 2. A slow model (Opus on high effort) spent 70 to 80 seconds on each step that wrote a flow draft, so a 2 minute turn fit one such step and then had to stop and say it ran out of time. An install that saved its budgets keeps its own value; change "Turn time limit" in Settings or ask Palui to.
-- A flow run can send 10 messages instead of 5. A prayer check-in chain (the ask, reminders at +10, +30, +70 and +150 minutes, and a last one before the next prayer) is six asks, and the Zuhur and Isya runs failed with "More than 5 messages in one run". Re-asks and missed notes still don't count.
-- The newest call of each tool keeps its arguments in the history up to 32,000 characters, so the next turn sees the flow draft it wrote last time instead of "arguments left out of the history" and fixes it rather than rebuilding it. Older large calls are still left out.
-- A flow id or set value name that breaks the naming rule now gets a problem that quotes the name (`"Init": Ids use lowercase letters...`, `Key "L": Variable names use...`) instead of "Invalid key in record", and buat_flow spells the rule out.
-- A flow's page now draws its steps as a graph: triggers on top, each step as a card, branches as labelled arrows, and an "ends" mark wherever a run can finish. Click a step to read it in full under the graph.
+- The default turn time limit is 5 minutes instead of 2. ([#63](https://github.com/zakiego/palui/pull/63))
+- A flow run can send 10 messages instead of 5. ([#63](https://github.com/zakiego/palui/pull/63))
+- The latest call of each tool keeps its arguments in history, up to 32,000 characters. ([#63](https://github.com/zakiego/palui/pull/63))
+- A bad flow id or variable name gets an error that quotes it. ([#63](https://github.com/zakiego/palui/pull/63))
+- A flow's page draws its steps as a graph. ([#62](https://github.com/zakiego/palui/pull/62))
 
 ### Fixed
 
-- A turn that runs out of time no longer ends in silence. When the next step probably won't fit in the time left, or it's the last allowed step, the model is told to answer now with no tools. If a turn still times out, the chat gets a short note saying what ran, whether anything changed, and to say "lanjut" to continue, and the next turn sees that note too.
-- On the Flows page, clicking anywhere on a flow's row now opens it. Before, only the flow's name was a link, so most of the row did nothing.
+- A turn that runs out of time replies instead of going silent. ([#60](https://github.com/zakiego/palui/pull/60))
+- Clicking anywhere on a flow's row opens it. ([#59](https://github.com/zakiego/palui/pull/59))
 
 ## 0.6.0 (2026-11-12)
 
 ### Added
 
-- Palui can read its own setup and change its settings from chat. Ask "timezone kamu apa?" or "ganti model fast ke claude-haiku-4-5" and the new builtin Settings connector looks up or changes the timezone, language, model roles, budgets and fallback channel. Every change asks you first, only Palui (not other agents) can make one, and secrets are never shown.
-- `/report` in any chat replies with a debug snapshot of that chat: chat and session ids, recent runs with every tool call they made and the approvals behind them, the last 10 messages, unsent outbox rows, recent warnings and state changes (flows, routines, approvals, reminders), what the chat has scheduled right now, where the database lives and a dashboard link. It stays within one WhatsApp or Telegram message and says what it left out. Add a note after it (`/report it answered twice`) and paste the reply into a coding agent; sent without a note, the reply asks for one next time. Each report gets an id (`rpt_...`) and is saved in the database, so the id alone is enough later. In a group the report goes to your own chat and the group only sees the id. A flow can no longer use `/report` as its chat trigger. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Eight new chat commands. `/help` lists the commands, including the ones your flows answer to. `/usage` shows today's tokens and runs by model and agent. `/models` lists what each model connector offers, and `/model <name>` puts a model first for a role (the same setting as the dashboard's Settings page). `/tools` shows the tools a turn in this chat would get. `/btw <question>` answers a side question without adding it to the session. `/compact` folds the older messages into the session summary now. `/id` shows the chat, session and message ids, and the ids of a message you quote.
-- Ask Palui to turn a routine into a flow and it keeps the routine's schedule, pause state, open check-ins and whole log (the new `jadikan_flow` routine tool). Before, replacing a routine meant deleting it, and its history and shadow flow went with it. Deleting a routine now says plainly that its log goes too.
+- Palui can read and change its own settings from chat, with your approval. ([#53](https://github.com/zakiego/palui/pull/53))
+- `/report` replies with a debug snapshot of the chat to paste into a coding agent. Adds a migration. ([#58](https://github.com/zakiego/palui/pull/58))
+- New chat commands: `/help`, `/usage`, `/models`, `/model`, `/tools`, `/btw`, `/compact` and `/id`. ([#55](https://github.com/zakiego/palui/pull/55))
+- Palui can turn a routine into a flow and keep its schedule and log. ([#57](https://github.com/zakiego/palui/pull/57))
 
 ### Changed
 
-- `/help`, `/models`, `/model`, `/usage`, `/btw`, `/compact`, `/tools` and `/id` are now built-in commands, so a flow can't use them as its chat command. A flow that already does stops answering to it: give it another command.
+- Those eight commands are built in, so a flow can't use them as its command. ([#55](https://github.com/zakiego/palui/pull/55))
 
 ### Fixed
 
-- On WhatsApp, "typing…" no longer flashes for a split second and disappears before the ⏳ reaction. The reaction now goes first and typing starts about 1.5 seconds later, and a reply that comes faster than that skips typing altogether.
-- After you approve a tool, Palui no longer trusts lists it read in the same step before your answer. It used to say a delete hadn't worked because a list taken a second earlier still showed the item.
-- A routine's shadow flow no longer blocks a flow you create with the same name. Shadow flows are now hidden from every flow tool, not only the list, and the shadow one moves aside to `<name> (rutinitas)`.
-- Checking a draft flow now finds the recap tool (`flows__ringkasan`) for a recap step, and a re-ask that uses the routine-style `{{n}}` points to `{{run.followUps}}`.
+- On WhatsApp, the ⏳ reaction comes before typing instead of typing flashing first. ([#56](https://github.com/zakiego/palui/pull/56))
+- After an approval, Palui no longer trusts lists it read before your answer. ([#57](https://github.com/zakiego/palui/pull/57))
+- A routine's shadow flow no longer blocks a new flow with the same name. ([#57](https://github.com/zakiego/palui/pull/57))
+- Checking a draft flow finds the recap tool. ([#57](https://github.com/zakiego/palui/pull/57))
 
 ## 0.5.0 (2026-11-12)
 
 ### Added
 
-- A Routines page in the dashboard lists every routine across your chats with its schedule, next time, action, recap and anything that needs a look: a failing source, a source connector that's missing or off, or a check-in waiting for an answer. Open one to see it drawn as the steps it runs (when, ask or send, what happens with no answer, recap), its next times, done per item, and its log with counts per status, filtered by date. You can pause, pause until a time, resume or delete it there; creating and editing stays in chat.
-- Each agent now has its own page (`/app/agents/<slug>`), opened from its row on the Agents page. It holds the profile, the shared-chat rules, the daily cap with today's usage, the recall container, its standing instructions (add, edit, switch off and delete them right there) and the chats it answers in, each with its Answer here switch. New agent asks only for a name, slug and persona, then opens that page.
-- Flows: automations Palui builds from chat out of triggers and steps. A flow starts on a schedule, a webhook, a chat command or phrase, a value that changes, another flow's check-in or run, or by hand, and its steps call tools, branch on conditions, set variables, send messages, ask check-ins, wait, run a prompt, or repeat for each item in a list. Nothing calls the model unless a prompt step asks, and every run is logged step by step, skips included. Ask in chat; Palui checks and dry-runs a flow before saving it, and `kenapa_flow` explains why one didn't run. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Write tools in a flow are approved once per flow version. A run still asks when an argument comes from outside data, when a tool's class changed, or when the tool is set to ask every run (the new "In flows, ask" setting on an MCP server's tool list). Destructive tools never run in a flow.
-- A read-only Flows page in the dashboard lists every flow with its next time and last run. A flow's page shows its steps and branches, versions and recent runs, and a flow run opens its step log on the run page.
-- Webhooks get a third mode, `flow`: the body starts the flows listening to that hook, deduped by the `x-palui-delivery` or `X-GitHub-Delivery` header. Saving a flow with a webhook trigger switches its hook to this mode.
-- `palui__cari_tool` results now say each tool's class and whether its output is untrusted.
+- A Routines page lists every routine and its log. ([#47](https://github.com/zakiego/palui/pull/47))
+- Each agent has its own page. ([#45](https://github.com/zakiego/palui/pull/45))
+- Flows: automations Palui builds from chat out of triggers and steps. Adds a migration. ([#50](https://github.com/zakiego/palui/pull/50))
+- Write tools in a flow are approved once per flow version. ([#50](https://github.com/zakiego/palui/pull/50))
+- A read-only Flows page lists every flow and its runs. ([#50](https://github.com/zakiego/palui/pull/50))
+- Webhooks get a `flow` mode that starts flows. ([#50](https://github.com/zakiego/palui/pull/50))
+- Tool search results say each tool's class and whether its output is untrusted. ([#50](https://github.com/zakiego/palui/pull/50))
 
 ### Changed
 
-- Routines are moving to flows. After this upgrade each routine also gets a flow that runs in shadow: it computes the same times but sends nothing, and differences are logged (the Flows page and `palui flows status` show the count). The routine engine keeps sending until you run `palui flows mode flows`, which hands over with open check-ins and old buttons intact; `palui flows mode legacy` goes back. After the handover the routine tools edit flows, and the Routines page links each routine to its flow and pauses or deletes the flow along with it.
-- Prompt caching now works between turns, not only inside one. The clock, recall and check-ins moved out of the system prompt to the end of your newest message, so the model can reuse the tools, the system prompt and the earlier conversation it already read. Against CLIProxyAPI, a follow-up turn read 98% of its input from the cache where it read none before.
-- Tokens read from the prompt cache now count at 10% against the global, agent, job and flow daily caps, about what they cost next to fresh input. Fresh input, cache writes and output still count in full, and `/status` shows the weighted number. On 2026-11-11 the old count paused turns at 2.03M tokens when about 0.8M was real cost.
-- A run's page (Activity) shows input read from the cache and input written to it separately, plus what the run counted toward the caps. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- The global daily token cap (Settings, Limits) can now be set to 0 to turn it off, the same as an agent's or a job's cap, so turns never pause on token use. `/status` shows `tanpa batas` when it's off.
+- Each routine runs with a shadow flow until you hand over with `palui flows mode flows`. ([#50](https://github.com/zakiego/palui/pull/50))
+- Prompt caching works between turns. ([#51](https://github.com/zakiego/palui/pull/51))
+- Cached tokens count at 10% against the daily caps. ([#51](https://github.com/zakiego/palui/pull/51))
+- A run's page shows cache reads and writes apart. Adds a migration. ([#51](https://github.com/zakiego/palui/pull/51))
+- A global daily token cap of 0 means no cap. ([#48](https://github.com/zakiego/palui/pull/48))
 
 ### Fixed
 
-- Raising the daily token cap or runs per hour (or setting the token cap to 0) now lifts a budget pause on the next message instead of at midnight, and `/status` shows the cap that applies now. Before, a pause stayed until midnight even after you raised the cap, and turns could fail once that pause ran out.
+- Raising a budget cap lifts a pause on the next message instead of at midnight. ([#49](https://github.com/zakiego/palui/pull/49))
 
 ## 0.4.0 (2026-11-11)
 
 ### Added
 
-- Tool search. When more tools are enabled than Tools per turn (Settings, Limits), Palui loads a core set and lists the rest by name. It finds what it needs with `palui__cari_tool` (keywords in any language or exact names), calls it in the same turn, and keeps it loaded for the rest of the conversation. However many skills and MCP servers you add, none of their tools get dropped. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Agents: named personas with their own instructions, recall memory, daily token cap and avatar (an uploaded photo, or an icon and a color). Give one to a WhatsApp or Telegram group, or to someone else's DM, from the new Agents and Chats pages or with `/agent <slug>`, and it answers the people there. In groups it only answers when it's mentioned or replied to. Other people get safe tools only, and approvals from a shared chat come to your DM. Palui stays your personal agent and never answers anyone else. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- An Agent bot (Telegram) connector gives an agent its own Telegram bot, so people can add it to a group and @mention it by name.
-- Palui now reads WhatsApp groups. Nothing changes until you give a group an agent: messages there are ignored unless they mention Palui or reply to it.
-- A Notes page and an Instructions & preferences skill. Palui can save standing instructions (always after your approval) and key-value defaults like `default_city`, and reads both at the start of every turn. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- A Remote MCP setup skill: ask Palui in chat to add a public MCP server (https, no auth) and it checks the URL, lists the tools and adds it after you approve. It can also list servers and remove the ones it added. See the Jadwal Sholat example in the docs.
-- Palui can keep the important files you send in chat, like an ID card, a receipt or a ticket. Ask it in chat ("simpan KTP ini"), and the new Attachments page lists what it saved, with download and delete. It doesn't save everything you send, only files that matter or that you ask for. Files are encrypted with `MASTER_KEY` inside the database, capped at 10 MB, and limited to images, PDF, text and Office files. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- The chat header has a Copy menu: copy the whole conversation as Markdown (the newest 150 messages, with tool calls listed under each reply) or just the chat ID.
-- Palui knows which chat it's in. Every turn now tells it the chat ID, the channel's own id (WhatsApp JID or Telegram chat id) and the current conversation ID, so "berapa chat id ini?" gets a real answer.
-- A `thread_chat_ini` tool in the T3 Code connector lists the threads started or followed up from the current chat, with their ids and links. Thread results now also say which part of the link is the environment id (the same for every thread) and which is the thread id.
-- A Chat history skill: ask Palui in a DM or the web chat to find another chat and read it ("cari chat grup keluarga terus rangkum obrolan terakhirnya"). `cari_chat` searches chats by title or id, and `baca_chat` reads up to 100 recent messages with optional time and text filters. Both are read-only and taint the turn, and they're never offered in a group or a webhook turn.
-- A Routines skill: Palui builds recurring automations from chat out of generic parts. A time source (fixed times, a repeat rule, or times read daily from any read-only connector tool) plus an action (a message, a check-in with your own answer options that re-asks until you answer, or a prompt), with active days, pause until a date, and a daily or weekly recap. Answer a check-in with a button, by quoting it, or just by saying "udah". Adds a migration; rolling back past this release needs the pre-deploy snapshot.
-- Each run on the Activity page and the Home runs card now opens its own page (`/app/activity/runs/<id>`). It shows the status, tokens (cached included), steps, model, the full error, the prompt, every tool call with its args and result, and the reply.
+- Tool search, so no tool from your MCP servers gets dropped. Adds a migration. ([#42](https://github.com/zakiego/palui/pull/42))
+- Agents: named personas you give to groups or other people's DMs. Adds a migration. ([#43](https://github.com/zakiego/palui/pull/43))
+- An Agent bot connector gives an agent its own Telegram bot. ([#43](https://github.com/zakiego/palui/pull/43))
+- Palui reads a WhatsApp group once you give it an agent. ([#43](https://github.com/zakiego/palui/pull/43))
+- A Notes page with standing instructions and preferences. Adds a migration. ([#36](https://github.com/zakiego/palui/pull/36))
+- Ask Palui in chat to add a public MCP server. ([#36](https://github.com/zakiego/palui/pull/36))
+- Palui can keep important files you send, listed on a new Attachments page. Adds a migration. ([#37](https://github.com/zakiego/palui/pull/37))
+- Copy a conversation as Markdown, or its chat ID, from the chat header. ([#32](https://github.com/zakiego/palui/pull/32))
+- Palui knows the chat, channel and conversation IDs it's in. ([#39](https://github.com/zakiego/palui/pull/39))
+- The T3 Code connector lists the threads started from the current chat. ([#39](https://github.com/zakiego/palui/pull/39))
+- Palui can find and read your other chats from your DM. ([#40](https://github.com/zakiego/palui/pull/40))
+- Routines: recurring automations built from chat. Adds a migration. ([#44](https://github.com/zakiego/palui/pull/44))
+- Each run has its own page on Activity. ([#41](https://github.com/zakiego/palui/pull/41))
 
 ### Changed
 
-- The persona moved from Settings to Palui's entry on the Agents page, and the Notes page edits instructions per agent. Your existing persona and instructions carry over to Palui.
-- Each connector now opens on its own page (`/app/connectors/<id>`) instead of a side sheet, with a back link and the Save, Test and Connect buttons pinned at the bottom. Old `?open=<id>` links redirect there.
-- The T3 Code setup asks for the pairing code first and shows the command to make one in a block with a Copy button. The text on its page is cut down to one short line per field, and the longer explanation lives in the docs.
-- A connector that isn't set up yet opens with just the setup guide and the fields it needs. The optional settings sit behind a "More settings" link and show in full once it's connected. A step with a command now shows the command above the box you paste into.
-- Every connector's setup now puts the guide above the field: where the value comes from first, then the box to paste it into. Telegram shows `/newbot` to send to @BotFather, CLIProxyAPI shows the command that prints its keys, and Google Calendar shows your real redirect URI with a Copy button before asking for the client ID.
-- The rest of the dashboard got the same cut as T3 Code. Pages drop their subtitles, every connector page loses its long description, and field helpers, empty states and confirms are one short line. The how-it-works detail is in the docs, and the Google Calendar page there now has the OAuth client setup steps.
+- The persona moved to Palui's entry on the Agents page. ([#43](https://github.com/zakiego/palui/pull/43))
+- Each connector opens on its own page instead of a side sheet. ([#28](https://github.com/zakiego/palui/pull/28))
+- The T3 Code setup asks for the pairing code first. ([#30](https://github.com/zakiego/palui/pull/30))
+- A connector that isn't set up shows only its setup guide. ([#31](https://github.com/zakiego/palui/pull/31))
+- Every connector's setup shows the guide above the field. ([#34](https://github.com/zakiego/palui/pull/34))
+- Dashboard text is one short line per field, with the details in the docs. ([#35](https://github.com/zakiego/palui/pull/35))
 
 ### Fixed
 
-- Tools from an MCP server added last no longer vanish. A turn offered 30 tools at most, the skills took most of them, and a new server's tools were cut without a word while it still showed as on. The up-front limit is now 64, and anything past it loads through tool search (see Added).
-- A connector page no longer stays on "Connecting" after the connector is already on. The status refreshes with the rest of the page every few seconds.
-- Adding an MCP server shows Auth and Token right away instead of hiding them under "More settings". Header name shows only for the custom header mode, and Token only when the server needs one.
-- Palui no longer re-checks your reminders, or any earlier work, on every message. Later turns now see the tool calls earlier turns made and their results, so it stops doubting its own replies and stops taking back answers that were right.
-- Asking for the same thing again while an approval prompt still waits now drops the older request. You no longer get a late "that didn't run" message about something that was already answered.
+- Tools from the last MCP server you added no longer vanish. ([#42](https://github.com/zakiego/palui/pull/42))
+- A connector page no longer stays on Connecting after it's on. ([#31](https://github.com/zakiego/palui/pull/31))
+- Adding an MCP server shows Auth and Token right away. ([#34](https://github.com/zakiego/palui/pull/34))
+- Palui no longer re-checks earlier work on every message. ([#33](https://github.com/zakiego/palui/pull/33))
+- Asking again while an approval waits drops the older request. ([#33](https://github.com/zakiego/palui/pull/33))
 
 ## 0.3.0 (2026-11-11)
 
 ### Added
 
-- Palui can run CLI commands on the Docker host through the new host bridge, a small MCP server you install with `ops/install-host-bridge.sh` and connect with the Host commands preset. Only commands you list in `~/.config/palui/host-bridge.json` run, with the values the model fills in checked against your patterns.
-- The host bridge has an opt-in `dangerouslyAllowAnyCommand` setting that adds a `shell` tool for any command line. It's marked destructive, so every call asks first.
+- Run allowlisted CLI commands on the Docker host through the host bridge. ([#20](https://github.com/zakiego/palui/pull/20))
+- The host bridge has an opt-in `shell` tool that always asks first. ([#20](https://github.com/zakiego/palui/pull/20))
 
 ### Changed
 
-- Add connector is now its own page (`/app/connectors/new`) instead of a dialog. The MCP server has its own section that separates Custom (any URL you set up yourself) from the presets, and each preset shows the host it connects to.
+- Add connector is its own page, with custom MCP servers apart from presets. ([#27](https://github.com/zakiego/palui/pull/27))
 
 ### Fixed
 
-- The MCP tool table now lets you save tool classes you didn't change. Before, Save stayed disabled, so every tool from a new MCP server asked for approval as destructive. The "External server" switch moved up next to the tool table.
+- The MCP tool table saves tool classes you didn't change. ([#20](https://github.com/zakiego/palui/pull/20))
 
 ## 0.2.0 (2026-11-11)
 
 ### Added
 
-- T3 Code connector: ask Palui in chat to work on one of your projects and it starts a T3 Code thread in its own worktree, then messages the same chat with the agent's reply and the link when the thread finishes. Set it up with a pairing code from `t3 auth pairing create`.
+- T3 Code connector: ask Palui in chat to work on a project in a T3 Code thread. ([#23](https://github.com/zakiego/palui/pull/23))
 
 ## 0.1.0 (2026-11-11)
 
@@ -294,57 +292,57 @@ The first tagged release. It covers everything built so far toward v1.
 
 ### Chat
 
-- Telegram and WhatsApp DMs, plus the web chat in the dashboard, in Indonesian or English. WhatsApp runs on Palui's own number.
-- One owner, claimed with a Telegram nonce link and a WhatsApp phone number.
-- Durable inbox and outbox with at-least-once delivery, so a deploy doesn't drop a message.
-- Sessions with compaction past about 40 messages.
-- Chat commands: `/connectors`, `/new`, `/stop`, `/status`.
-- Voice messages transcribed with ElevenLabs Scribe (Voice-in). Photos and small documents on Telegram.
-- Pipe tables in replies render as tables in the web chat.
+- Telegram and WhatsApp DMs, plus the web chat in the dashboard, in Indonesian or English. ([#4](https://github.com/zakiego/palui/pull/4))
+- One owner, claimed with a Telegram nonce link and a WhatsApp phone number. ([#4](https://github.com/zakiego/palui/pull/4))
+- Durable inbox and outbox, so a deploy doesn't drop a message. ([#4](https://github.com/zakiego/palui/pull/4))
+- Sessions with compaction past about 40 messages. ([#4](https://github.com/zakiego/palui/pull/4))
+- Chat commands: `/connectors`, `/new`, `/stop`, `/status`. ([#4](https://github.com/zakiego/palui/pull/4))
+- Voice messages transcribed with ElevenLabs Scribe. Photos and small documents on Telegram. ([#4](https://github.com/zakiego/palui/pull/4))
+- Pipe tables in replies render as tables in the web chat. ([#4](https://github.com/zakiego/palui/pull/4))
 
 ### Connectors
 
-- Every capability is a connector of kind `channel`, `model`, `memory`, `tools` or `skill`.
-- Pause, resume and remove from the dashboard, from chat or from the CLI, with no restart.
-- A supervisor with isolated connectors and backoff (5 s, 30 s, 2 min, 10 min cap), and an alert after 5 minutes in `error`.
+- Every capability is a connector of kind `channel`, `model`, `memory`, `tools` or `skill`. ([#4](https://github.com/zakiego/palui/pull/4))
+- Pause, resume and remove from the dashboard, chat or CLI, with no restart. ([#4](https://github.com/zakiego/palui/pull/4))
+- A supervisor with backoff, and an alert after 5 minutes in `error`. ([#4](https://github.com/zakiego/palui/pull/4))
 
 ### Agent
 
-- CLIProxyAPI and ai-gateway as model providers, with per-role failover.
-- Pick each role's model from the list your gateway serves, or type any id it doesn't list, and set a reasoning effort per step in the chain.
-- recall as long-term memory: tools, auto-recall, auto-save.
-- Any Streamable HTTP MCP server as a tool source, with per-tool switches, classes and trust flags.
-- Tool classes that fail closed, approvals that survive restarts, and the taint rule.
-- A persona in Settings that shapes how Palui talks.
-- Turn budgets (12 steps, 120 s, about 30 tools) and global caps.
+- CLIProxyAPI and ai-gateway as model providers, with per-role failover. ([#4](https://github.com/zakiego/palui/pull/4))
+- Pick each role's model from your gateway's list and set a reasoning effort per step. ([#19](https://github.com/zakiego/palui/pull/19))
+- recall as long-term memory: tools, auto-recall, auto-save. ([#4](https://github.com/zakiego/palui/pull/4))
+- Any Streamable HTTP MCP server as a tool source, with per-tool switches and classes. ([#4](https://github.com/zakiego/palui/pull/4))
+- Tool classes that fail closed, approvals that survive restarts, and the taint rule. ([#4](https://github.com/zakiego/palui/pull/4))
+- A persona in Settings that shapes how Palui talks. ([#4](https://github.com/zakiego/palui/pull/4))
+- Turn budgets and global caps. ([#4](https://github.com/zakiego/palui/pull/4))
 
 ### Skills
 
-- Reminders in natural language, with RRULE recurrence, IANA zones, Done and Snooze, and delivery that survives restarts.
-- Scheduled jobs, with a daily briefing and a heartbeat preset.
-- Web fetch behind an SSRF guard.
-- Inbound webhooks with HMAC signatures, in forward and summarize modes.
-- Google Calendar, read-only.
+- Reminders in natural language, with recurrence, time zones, Done and Snooze. ([#4](https://github.com/zakiego/palui/pull/4))
+- Scheduled jobs, with a daily briefing and a heartbeat preset. ([#4](https://github.com/zakiego/palui/pull/4))
+- Web fetch behind an SSRF guard. ([#4](https://github.com/zakiego/palui/pull/4))
+- Inbound webhooks with HMAC signatures. ([#4](https://github.com/zakiego/palui/pull/4))
+- Google Calendar, read-only. ([#4](https://github.com/zakiego/palui/pull/4))
 
 ### Dashboard
 
-- Dashboard at `/app` with passkeys: Home, Chats, Reminders, Jobs, Connectors, Activity, Settings.
-- No sign-up. The owner gets in with a single-use link from `palui owner invite` (15 minutes), which is also how you recover a lost passkey.
-- Mono palette and the mascot head as the mark, matching the site.
-- Page skeletons shaped like the real pages, and a progress bar while a page switch waits.
-- Every page holds up on a phone and with very long names, big numbers and empty lists.
+- Dashboard at `/app` with passkeys. ([#4](https://github.com/zakiego/palui/pull/4))
+- No sign-up. The owner gets in with a single-use link from `palui owner invite`. ([#4](https://github.com/zakiego/palui/pull/4))
+- Mono palette and the mascot head as the mark. ([#12](https://github.com/zakiego/palui/pull/12))
+- Page skeletons and a progress bar while a page loads. ([#15](https://github.com/zakiego/palui/pull/15))
+- Every page holds up on a phone and with very long names, big numbers and empty lists. ([#11](https://github.com/zakiego/palui/pull/11))
 
 ### Operations
 
-- Docker Compose with two services from one image and one SQLite volume.
-- `GET /health` reports the app version, and the runtime's version next to it.
-- Pre-deploy snapshots, nightly age-encrypted backups to R2, and a restore drill.
-- Landing page and these docs on Cloudflare Pages.
+- Docker Compose with two services from one image and one SQLite volume. ([#4](https://github.com/zakiego/palui/pull/4))
+- `GET /health` reports the app version. ([#21](https://github.com/zakiego/palui/pull/21))
+- Pre-deploy snapshots, nightly encrypted backups to R2, and a restore drill. ([#4](https://github.com/zakiego/palui/pull/4))
+- Landing page and these docs on Cloudflare Pages. ([#4](https://github.com/zakiego/palui/pull/4))
 
 ### Site
 
-- A [brand page](/brand) with profile pictures for the bot's WhatsApp or Telegram account, in seven designs, dark and light, as PNG and SVG.
-- The landing page describes Palui as a simple, friendly agent that keeps you company.
+- A [brand page](/brand) with profile pictures for the bot's account. ([#17](https://github.com/zakiego/palui/pull/17))
+- The landing page describes Palui as a simple, friendly agent. ([#18](https://github.com/zakiego/palui/pull/18))
 
 ## Not in v1
 

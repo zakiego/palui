@@ -76,6 +76,7 @@ When the owner asks for a release right now, run steps 1 to 6 yourself. Only whe
 ## When it goes wrong
 
 - `HEAD isn't origin/main`: main moved or you're on a branch. Redo step 1.
+- `entry doesn't end with its PR link`: an Unreleased bullet has no PR link. Find its PR with `git log origin/main -S '<a phrase from the bullet>' -- apps/site/content/docs/changelog.mdx`, open a `docs(changelog): link missing PRs` PR that adds the links, and report it. Don't cut the release that night.
 - `release/vX.Y.Z already exists on origin`: a PR from an earlier run is still open. Step 5 decides whether to keep or close it.
 - `couldn't find the commit on origin/main that set X.Y.Z`: someone bumped the version outside a release PR. Stop and tell the owner.
 - The tag push failed after tagging: `git push origin vX.Y.Z`.

@@ -16,6 +16,11 @@ const RELEASE_HEADING = /^## (\d+\.\d+\.\d+) \((\d{4}-\d{2}-\d{2})\)$/
 // Anything that starts like a version but isn't the exact shape above.
 const VERSION_LIKE = /^## v?\d/
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/
+// Every released entry ends with the PR (or PRs) that made it:
+// ([#123](https://github.com/zakiego/palui/pull/123)), comma-separated for several.
+export const PR_URL = "https://github.com/zakiego/palui/pull/"
+const PR_REF = String.raw`\[#(\d+)\]\(https://github\.com/zakiego/palui/pull/\1\)`
+const PR_LINK_END = new RegExp(String.raw`\(${PR_REF}(?:, \[#(\d+)\]\(https://github\.com/zakiego/palui/pull/\2\))*\)$`)
 
 type Section = { heading: string; body: string[]; line: number }
 
@@ -96,6 +101,9 @@ export function checkChangelog(src: string, version: string): string[] {
     if (unreleasedAt === -1 || i < unreleasedAt) problems.push(`line ${s.line}: ${v} comes before \`## Unreleased\``)
     if (!validDate(date)) problems.push(`line ${s.line}: ${date} is not a real date`)
     if (!s.body.some((l) => /^\s*- \S/.test(l))) problems.push(`line ${s.line}: ${v} has no bullet points`)
+    for (const [j, l] of s.body.entries())
+      if (l.startsWith("- ") && !PR_LINK_END.test(l.trimEnd()))
+        problems.push(`line ${s.line + 1 + j}: ${v} entry doesn't end with its PR link, like ([#123](${PR_URL}123))`)
     if (prev) {
       if (compareVersions(v, prev.version) >= 0) problems.push(`line ${s.line}: ${v} is listed below ${prev.version}, so it must be older`)
       if (date > prev.date) problems.push(`line ${s.line}: ${v} is dated after ${prev.version}`)

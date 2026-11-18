@@ -72,7 +72,7 @@ From `apps/server`, the Go gate is `gofmt -l .` (prints nothing), `go build ./..
 ## Versions and changelog
 
 - SemVer. The version lives only in the root `package.json` `"version"`. The Docker build stamps it into the binary (`internal/version`), and `GET /health` reports it.
-- The changelog is `apps/site/content/docs/changelog.mdx` (https://palui.zakiego.com/docs/changelog). Every user-visible PR adds its bullet under `## Unreleased` in the same PR. `apps/site/lib/changelog.test.ts` fails when the changelog and the version disagree.
+- The changelog is `apps/site/content/docs/changelog.mdx` (https://palui.zakiego.com/docs/changelog). Every user-visible PR adds one short bullet under `## Unreleased` in the same PR, ending with its PR link once the PR is open. `apps/site/lib/changelog.test.ts` fails when the changelog and the version disagree, or a released entry has no PR link.
 - The owner doesn't pick versions. A T3 scheduled task runs `palui-release` every night at 00:00 WITA in a new thread: it tags the last merged release (`pnpm release tag-merged`), then opens a `chore(release): vX.Y.Z` PR from `release/vX.Y.Z` when Unreleased has something (`pnpm release open <bump>`). Merging that PR is the owner's yes. Other PRs never bump the version. Never bump it by hand. While on `0.x`, the v1 scope is still being built; `1.0.0` means v1 is done, and only the owner calls that.
 
 ## Skills
