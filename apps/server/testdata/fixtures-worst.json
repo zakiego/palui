@@ -479,6 +479,10 @@
     ["<out#7>","<chat#28>","whatsapp","{\"text\":\"Pesan lama ke kontak yang udah dihapus\",\"format\":\"plain\"}","sent",0,1793584800000,null,null,"outbound:<obm#10>",null,null,1793584800000,null,1793584800000,null]
    ]
   },
+  "outbox_media": {
+   "columns": ["id","chat_id","kind","mime_type","filename","size","sha256","source","source_ref","data","created_at"],
+   "rows": []
+  },
   "owner_invites": {
    "columns": ["id","token_hash","expires_at","used_at","created_at"],
    "rows": []
