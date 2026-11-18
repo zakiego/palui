@@ -81,6 +81,9 @@ type SupervisorOptions struct {
 	OnRemoved func(row db.Connector, unlinked bool) error
 	// Restart backoff (tests); default RestartBackoffMs.
 	BackoffMs []int64
+	// Called (in its own goroutine) when a connector turns on after being
+	// anything else: the engine retries turns that failed meanwhile.
+	OnOnline func(connectorID string)
 }
 
 // RemovedInfo is passed to OnRemoved.
@@ -129,9 +132,26 @@ func (s *Supervisor) waitFor(n int) int64 {
 }
 
 func (s *Supervisor) setStatus(id, status string, detail *string) {
-	if err := SetStatus(s.opts.DB, id, status, detail, s.clock()); err != nil {
+	if err := s.writeStatus(id, status, detail); err != nil {
 		s.opts.Log.Error("setStatus failed", logx.Fields{"connector_id": id, "error": err})
 	}
+}
+
+// writeStatus is SetStatus plus OnOnline when the connector just turned on.
+func (s *Supervisor) writeStatus(id, status string, detail *string) error {
+	was := ""
+	if status == "on" && s.opts.OnOnline != nil {
+		if row, ok, err := Get(s.opts.DB, id); err == nil && ok {
+			was = row.Status
+		}
+	}
+	if err := SetStatus(s.opts.DB, id, status, detail, s.clock()); err != nil {
+		return err
+	}
+	if status == "on" && was != "" && was != "on" && s.opts.OnOnline != nil {
+		go s.opts.OnOnline(id)
+	}
+	return nil
 }
 
 // armRetry reconciles at `at` (mu held).
@@ -251,7 +271,7 @@ func (s *Supervisor) buildContext(row db.Connector, ctx context.Context, sl *slo
 				restart = status == "error" && sl.handle != nil && !sl.starting && s.restartsOnError(row)
 				s.mu.Unlock()
 			}
-			if err := SetStatus(s.opts.DB, id, status, detail, s.clock()); err != nil {
+			if err := s.writeStatus(id, status, detail); err != nil {
 				clog.Error("setStatus failed", logx.Fields{"error": err})
 			}
 			if restart {

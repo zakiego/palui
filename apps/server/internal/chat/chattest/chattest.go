@@ -63,6 +63,9 @@ type Options struct {
 	TurnTimeoutMs int64
 	Clock         *Clock
 	Log           *logx.Logger
+	// Waits before a failed message turn runs again (default: an hour, so a
+	// test fires retries itself with Engine.RetryNow).
+	RetryDelaysMs []int64
 }
 
 // Harness is what harness() returns.
@@ -98,18 +101,27 @@ func New(t testing.TB, o Options) *Harness {
 	if log == nil {
 		log = logx.Silent
 	}
+	retryDelays := o.RetryDelaysMs
+	if retryDelays == nil {
+		retryDelays = []int64{3_600_000, 3_600_000, 3_600_000, 3_600_000}
+	}
 	services := &connectors.Services{}
 	var engine *chat.Engine
 	sup := connectors.NewSupervisor(connectors.SupervisorOptions{
 		DB: d, Registry: o.Registry, Services: services, Log: log, MasterKey: testutil.TestKey, DataDir: "/tmp/palui-test",
 		Clock: clock.Now,
 		InUse: func(id string) bool { return engine != nil && engine.InUse(id) },
+		OnOnline: func(string) {
+			if engine != nil {
+				engine.RetryNow()
+			}
+		},
 	})
 	bus := chat.NewBus()
 	engine = chat.NewEngine(chat.EngineOptions{
 		DB: d, Host: sup, Log: log, Clock: clock.Now, Bus: bus, Deps: o.Deps,
 		AppURL: config.Get().AppURL, DataDir: config.Get().DataDir,
-		ApprovalTTLMs: o.ApprovalTTLMs, TurnTimeoutMs: o.TurnTimeoutMs, SendWaitMs: 20, RetryDelay: time.Millisecond,
+		ApprovalTTLMs: o.ApprovalTTLMs, TurnTimeoutMs: o.TurnTimeoutMs, SendWaitMs: 20, RetryDelay: time.Millisecond, RetryDelaysMs: retryDelays,
 	})
 	*services = *engine.Services
 	sup.Reconcile()

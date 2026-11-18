@@ -242,6 +242,11 @@ func (a *App) buildRuntime(d *db.DB, key string, startedAt int64) {
 		MasterKey: key, DataDir: cfg.DataDir, Clock: o.Clock,
 		InUse:     func(id string) bool { return engine != nil && engine.InUse(id) },
 		OnRemoved: whatsapp.RemoveConnectorFiles(cfg.DataDir),
+		OnOnline: func(string) {
+			if engine != nil {
+				engine.RetryNow()
+			}
+		},
 	})
 	built := deps.Build(deps.Options{
 		DB: d, Log: log,

@@ -45,6 +45,8 @@ type EngineOptions struct {
 	TurnTimeoutMs int64
 	// The model retry's first wait (2 s by default).
 	RetryDelay time.Duration
+	// Waits before a failed message turn runs again; RetryDelaysMs by default.
+	RetryDelaysMs []int64
 	// performance.now() in ms; a monotonic clock by default.
 	Monotonic func() float64
 	// Encrypts auto-saved files; config's master key when empty.
@@ -77,6 +79,8 @@ type Engine struct {
 	sweepStop      chan struct{}
 	quotaWarned    map[string]int64
 	lastAutoPrune  int64
+	// Message turns waiting for a retry, by chat.
+	retrying map[string]*retryWait
 }
 
 // NewEngine is createEngine.
@@ -102,7 +106,7 @@ func NewEngine(o EngineOptions) *Engine {
 	e.Ctx = &EngineCtx{
 		DB: o.DB, Host: o.Host, Log: o.Log, Clock: o.Clock, Bus: o.Bus, Deps: o.Deps,
 		AppURL: o.AppURL, DataDir: o.DataDir, ApprovalTTLMs: o.ApprovalTTLMs, TurnTimeoutMs: o.TurnTimeoutMs,
-		RetryDelay: o.RetryDelay, Monotonic: o.Monotonic,
+		RetryDelay: o.RetryDelay, RetryDelaysMs: o.RetryDelaysMs, Monotonic: o.Monotonic,
 	}
 	e.Ctx.ResumeRun = e.maybeResume
 	e.queue = NewQueue(e.runQueuedTurn, func(chatID string, err error) {
@@ -138,8 +142,17 @@ func NewEngine(o EngineOptions) *Engine {
 
 func (e *Engine) runQueuedTurn(chatID string, ids []string) {
 	c := e.Ctx
+	// Messages waiting for a retry join this turn: one reply covers them all.
+	if waiting := e.takeRetry(chatID); len(waiting) > 0 {
+		ids = append(waiting, ids...)
+	}
 	var pending []string
+	seen := map[string]bool{}
 	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
 		var status string
 		if err := c.DB.QueryRow("SELECT status FROM messages WHERE id = ?", id).Scan(&status); err == nil && status == "pending" {
 			pending = append(pending, id)
@@ -148,13 +161,25 @@ func (e *Engine) runQueuedTurn(chatID string, ids []string) {
 	if len(pending) == 0 {
 		return
 	}
+	chat, ok, err := chats.Get(c.DB, chatID)
+	if err != nil {
+		panic(err)
+	}
+	if ok {
+		if pending, err = e.dropExpired(chat, pending); err != nil {
+			panic(err)
+		}
+		if len(pending) == 0 {
+			return
+		}
+	}
 	r, err := ExecuteTurn(c, ExecInput{TurnOptions: TurnOptions{ChatID: chatID, Trigger: "message"}, BatchIDs: pending})
 	if err != nil {
 		panic(err)
 	}
-	chat, ok, err := chats.Get(c.DB, chatID)
-	if err != nil {
-		panic(err)
+	if r.Status == "retry" {
+		e.scheduleRetry(chatID, pending, r.RetryInMs)
+		return
 	}
 	if r.Status == "ok" && ok && chat.SessionID != nil {
 		if _, err := MaybeCompact(c, *chat.SessionID); err != nil {
@@ -928,6 +953,8 @@ func (e *Engine) Stop(timeoutMs int64) {
 	c := e.Ctx
 	c.SetDraining(true)
 	e.queue.Pause()
+	// Waiting retries stay pending; the next start replays them.
+	e.stopRetries()
 	e.mu.Lock()
 	if e.sweepStop != nil {
 		close(e.sweepStop)

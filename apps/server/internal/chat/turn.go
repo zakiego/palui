@@ -100,6 +100,9 @@ type EngineCtx struct {
 	TurnTimeoutMs int64
 	// RetryDelay is the model retry's first wait (2 s); tests shorten it.
 	RetryDelay time.Duration
+	// RetryDelaysMs overrides RetryDelaysMs, the waits before a failed message
+	// turn runs again (tests).
+	RetryDelaysMs []int64
 	// GroupLookupTimeout overrides the wait on a group's participant list
 	// (GroupLookupTimeout, 3 s); tests shorten it.
 	GroupLookupTimeout time.Duration
@@ -176,12 +179,14 @@ type TurnOptions struct {
 }
 
 // TurnResult is TurnResult. Status is ok, error, aborted, awaiting_approval,
-// budget, no_model, draining or interrupted.
+// budget, no_model, draining, interrupted or retry (the messages failed for a
+// temporary reason and run again in RetryInMs).
 type TurnResult struct {
-	RunID   string `json:"runId"`
-	Text    string `json:"text"`
-	Status  string `json:"status"`
-	Tainted bool   `json:"tainted"`
+	RunID     string `json:"runId"`
+	Text      string `json:"text"`
+	Status    string `json:"status"`
+	Tainted   bool   `json:"tainted"`
+	RetryInMs int64  `json:"retryInMs,omitempty"`
 }
 
 type resumeData struct {
@@ -202,6 +207,8 @@ type ExecInput struct {
 type SendExtra struct {
 	Actions []db.OutboxAction
 	Format  string
+	// The channel message the reply quotes.
+	ReplyTo string
 }
 
 // SendToChat enqueues a message to a chat's channel.
@@ -213,7 +220,7 @@ func SendToChat(c *EngineCtx, chat db.Chat, text, source string, extra SendExtra
 func sendToChatQ(c *EngineCtx, q db.Q, chat db.Chat, text, source string, extra SendExtra) (db.Outbox, error) {
 	now := c.Clock()
 	exp := now + ReplyTTLMs
-	row, err := outbox.Enqueue(q, outbox.EnqueueInput{ChatID: chat.ID, Channel: chat.Channel, ConnectorID: chat.ConnectorID, Payload: db.OutboxPayload{Text: text, Actions: extra.Actions, Format: extra.Format}, Source: source, ExpiresAt: &exp}, now)
+	row, err := outbox.Enqueue(q, outbox.EnqueueInput{ChatID: chat.ID, Channel: chat.Channel, ConnectorID: chat.ConnectorID, Payload: db.OutboxPayload{Text: text, Actions: extra.Actions, Format: extra.Format, ReplyToChannelMsgID: extra.ReplyTo}, Source: source, ExpiresAt: &exp}, now)
 	if err != nil {
 		return row, err
 	}
@@ -388,12 +395,17 @@ func finishToolCall(c *EngineCtx, chatID, runID, previousRunID, toolCallID, tool
 // DeliverReply is deliverReply: the final reply, stored in the session
 // (context and auto-save) and sent.
 func DeliverReply(c *EngineCtx, chat db.Chat, runID, text string) {
+	deliverReply(c, chat, runID, text, "")
+}
+
+// deliverReply is DeliverReply quoting the channel message replyTo ("" for none).
+func deliverReply(c *EngineCtx, chat db.Chat, runID, text, replyTo string) {
 	now := c.Clock()
 	content, _ := db.Raw(map[string]string{"text": text})
 	if _, err := c.DB.Exec("INSERT INTO messages (id, chat_id, session_id, role, content, text, status, run_id, created_at) VALUES (?, ?, ?, 'assistant', ?, ?, 'handled', ?, ?)", secret.NewID("msg"), chat.ID, chat.SessionID, content, text, runID, now); err != nil {
 		c.Log.Error("reply write failed", logx.Fields{"chat_id": chat.ID, "error": err})
 	}
-	c.send(chat, text, "reply:"+runID, SendExtra{Format: "markdown"})
+	c.send(chat, text, "reply:"+runID, SendExtra{Format: "markdown", ReplyTo: replyTo})
 }
 
 // ownerChatFor is ownerChat(from.channel) ?? ownerChat("web").
@@ -808,6 +820,28 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		return TurnResult{}, err
 	}
 	if len(chain) == 0 {
+		// The model connector is enabled but still starting (a restart, or
+		// recovering from an error): keep the messages for when it's on.
+		if isMessage && rs == nil && len(input.BatchIDs) > 0 {
+			starting, err := modelStarting(q, agent.ModelRoles.V, role)
+			if err != nil {
+				return TurnResult{}, err
+			}
+			plan, err := planRetry(c, input.BatchIDs, "", nil, starting)
+			if err != nil {
+				return TurnResult{}, err
+			}
+			if plan.ok {
+				if err := requeue(c, input.BatchIDs, "", plan, "no model connector is on yet"); err != nil {
+					return TurnResult{}, err
+				}
+				tlog.Warn("no model connector running yet; turn retried later", logx.Fields{"role": role, "retry": plan.attempt, "delay_ms": plan.delayMs})
+				return TurnResult{Status: "retry", RetryInMs: plan.delayMs}, nil
+			}
+			if starting {
+				tlog.Warn("no model connector running; not retried", logx.Fields{"role": role, "reason": plan.reason})
+			}
+		}
 		if isMessage {
 			text := ModelOffText
 			if shared {
@@ -894,6 +928,22 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 	var ran []RanTool
 	wrapUp := ""
 	toolChoiceViolated := false
+	var turnErr error
+	retryInMs := int64(0)
+	// A batch that already failed once: its answer quotes the first message
+	// in a group, where other talk came in between.
+	retried := false
+	if isMessage && rs == nil && len(input.BatchIDs) > 0 {
+		n, err := countRetries(q, input.BatchIDs)
+		if err != nil {
+			return TurnResult{}, err
+		}
+		retried = n > 0
+	}
+	replyTo := ""
+	if retried && chat.Kind == "group" {
+		replyTo = quoteTarget(q, input.BatchIDs)
+	}
 	failNotice := func() {
 		if shared {
 			c.send(chat, SharedBusyText, "system", SendExtra{})
@@ -908,6 +958,40 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			return
 		}
 		c.send(chat, fmt.Sprintf("Waduh, gagal jawab: %s. Coba lagi bentar ya.", shortError(errMsg)), "system", SendExtra{})
+	}
+	// retryOrFail: a message turn that failed for a temporary reason goes back
+	// to the queue (the first retry silently, then once with a holding notice);
+	// anything else, or past the cap or the window, gets the failure notice.
+	retryOrFail := func() {
+		if isMessage && rs == nil && !toolChoiceViolated {
+			plan, err := planRetry(c, input.BatchIDs, runID, turnErr, models.IsTransient(turnErr))
+			if err != nil {
+				rlog.Error("retry check failed", logx.Fields{"error": err})
+			} else if plan.ok {
+				if err := requeue(c, input.BatchIDs, runID, plan, errMsg); err != nil {
+					rlog.Error("requeue failed", logx.Fields{"error": err})
+				} else {
+					rlog.Warn("turn failed for a temporary reason; retried later", logx.Fields{"retry": plan.attempt, "delay_ms": plan.delayMs, "error": shortError(errMsg)})
+					cause := errMsg
+					errMsg += fmt.Sprintf("; retry %d in %ds", plan.attempt, plan.delayMs/1000)
+					retryInMs = plan.delayMs
+					if plan.attempt == 2 {
+						if shared {
+							c.send(chat, RetryHoldText, "system", SendExtra{})
+						} else {
+							c.send(chat, fmt.Sprintf(RetryHoldOwnerText, shortError(cause)), "system", SendExtra{})
+						}
+					}
+					return
+				}
+			} else {
+				rlog.Warn("turn failed; not retried", logx.Fields{"reason": plan.reason, "error": shortError(errMsg)})
+				if plan.reason != "permanent error" {
+					c.event(events.Input{Kind: "turn.retry_exhausted", Level: "warn", Message: fmt.Sprintf("Run %s failed and wasn't retried: %s", runID, plan.reason), Data: obj("runId", runID, "messageIds", input.BatchIDs)}, c.Clock())
+				}
+			}
+		}
+		failNotice()
 	}
 
 	body := func() error {
@@ -1336,6 +1420,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					finishToolCall(c, chat.ID, runID, previousRunID, p.ToolCallID, p.ToolName, "denied", "denied", timer)
 				case "error":
 					status = "error"
+					turnErr = p.Err
 					setErr(errText(p.Err))
 					if isToolChoiceViolation(p.Err) {
 						toolChoiceViolated = true
@@ -1405,10 +1490,10 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			status = "awaiting_approval"
 		case status == "ok":
 			if text != "" && deliver && !silent {
-				DeliverReply(c, chat, runID, text)
+				deliverReply(c, chat, runID, text, replyTo)
 			}
 		case status == "error" && notify:
-			failNotice()
+			retryOrFail()
 		}
 		return nil
 	}
@@ -1421,13 +1506,14 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			status = "error"
 		}
 		setErr(err.Error())
+		turnErr = err
 		if aborted && c.Draining() {
 			interrupted = true
 		} else if !aborted {
 			rlog.Error("turn failed", logx.Fields{"error": err})
 		}
 		if !interrupted && status == "error" && notify {
-			failNotice()
+			retryOrFail()
 		}
 	}
 	typing(false)
@@ -1524,6 +1610,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 	rlog.Info("turn finished", fields)
 	if interrupted {
 		return TurnResult{RunID: runID, Status: "interrupted", Tainted: tainted.Load()}, nil
+	}
+	if retryInMs > 0 {
+		return TurnResult{RunID: runID, Status: "retry", Tainted: tainted.Load(), RetryInMs: retryInMs}, nil
 	}
 	return TurnResult{RunID: runID, Text: text, Status: status, Tainted: tainted.Load()}, nil
 }
