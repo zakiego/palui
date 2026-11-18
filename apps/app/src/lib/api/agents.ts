@@ -80,7 +80,8 @@ export type SaveAgentInput = {
 export type MemberChannel = "whatsapp" | "telegram"
 // address is the bare JID, LID or Telegram id; label is how to show it.
 export type MemberAccount = { id: string; channel: MemberChannel; address: string; label: string }
-export type MemberView = { id: string; name: string; accounts: MemberAccount[]; agents: { id: string; slug: string; name: string }[] }
+// canSetRules: the owner lets this member add and remove chat rules (members of this agent only).
+export type MemberView = { id: string; name: string; accounts: MemberAccount[]; agents: { id: string; slug: string; name: string }[]; canSetRules: boolean }
 export type Person = { channel: MemberChannel; address: string; label: string; name: string | null; lastAt: number }
 // members: in this agent. others: in other agents. people: wrote in a chat, not a member yet.
 export type AgentMembers = { members: MemberView[]; others: MemberView[]; people: Person[] }
@@ -96,6 +97,27 @@ export const saveAgentFn = withInput<SaveAgentInput, { id: string; slug: string 
 export const getAgentMembersFn = withInput<{ id: string }, AgentMembers>("getAgentMembersFn", "GET")
 export const saveMemberFn = withInput<SaveMemberInput, { id: string }>("saveMemberFn", "POST")
 export const setAgentMemberFn = withInput<{ agentId: string; memberId: string; on: boolean }, Ok>("setAgentMemberFn", "POST")
+
+// Chat rules: short rules for one shared chat, added from that chat by the
+// owner or a member the owner allowed. by is "Owner" or the member's name.
+export type ChatRule = { id: string; chatId: string; chatTitle: string; title: string; body: string; by: string; fromOwner: boolean; createdAt: number }
+export type ChatRuleChange = {
+  id: string
+  chatId: string
+  chatTitle: string
+  action: "add" | "remove"
+  title: string
+  body: string
+  by: string
+  fromOwner: boolean
+  createdAt: number
+  undoneAt: number | null
+}
+export type ChatRules = { rules: ChatRule[]; changes: ChatRuleChange[] }
+export const getChatRulesFn = withInput<{ id: string }, ChatRules>("getChatRulesFn", "GET")
+export const setMemberRulesFn = withInput<{ agentId: string; memberId: string; on: boolean }, Ok>("setMemberRulesFn", "POST")
+export const deleteChatRuleFn = withInput<{ agentId: string; id: string }, Ok>("deleteChatRuleFn", "POST")
+export const undoChatRuleChangeFn = withInput<{ agentId: string; id: string }, Ok>("undoChatRuleChangeFn", "POST")
 export const deleteAgentFn = withInput<{ id: string }, Ok>("deleteAgentFn", "POST")
 export const setAgentToolPermissionsFn = withInput<ToolPermissionsInput, { toolPermissions: ToolPermissions }>("setAgentToolPermissionsFn", "POST")
 // saved: false when the runtime was down, so the session wasn't saved to the old agent's memory first.
