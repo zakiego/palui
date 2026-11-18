@@ -792,23 +792,13 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		}
 	}
 	// Who can read the chat decides the tools, not who sent the message (PLAN 19.4).
-	audience, err := Audience(c, chat, agent)
+	sessionID := ""
+	if session != nil {
+		sessionID = session.ID
+	}
+	audience, err := TurnAudience(c, chat, agent, sessionID, history)
 	if err != nil {
 		return TurnResult{}, err
-	}
-	if audience == tools.AudienceMembers {
-		sessionID := ""
-		if session != nil {
-			sessionID = session.ID
-		}
-		outsider, err := HistoryHasOutsider(q, chat, agent.ID, sessionID, history)
-		if err != nil {
-			return TurnResult{}, err
-		}
-		if outsider {
-			tlog.Info("members chat counted as outside", logx.Fields{"reason": "history holds a message from someone who is not a member"})
-			audience = tools.AudienceOutside
-		}
 	}
 	mode := audience
 

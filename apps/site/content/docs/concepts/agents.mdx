@@ -68,11 +68,11 @@ What a chat gets depends on who is in it:
 
 | Who is in the chat | What the agent can use |
 |---|---|
-| Only you | Everything, with approvals as usual |
+| Only you (your DM, the web chat, or a WhatsApp group with nobody else in it) | Everything, with approvals as usual |
 | You and members of this agent (a member's DM, or a WhatsApp group of only you and members) | Tools for that chat plus this agent's own data: its MCP servers, notes, contacts and memory. No approvals, nothing destructive |
 | Anyone else | Only tools whose data stays in that chat or that keep nothing, see below |
 
-For a WhatsApp group, everyone in it has to be you or a member. The list is checked when a turn starts. It's read again when someone joins or leaves, and at least every 10 minutes. If the list can't be read, the group counts as having outsiders. So does a group where someone who isn't a member wrote earlier in the conversation, even after they've left, until the conversation starts over (`/new`). Telegram groups never count as members only, because a bot can't see who's in a group.
+For a WhatsApp group, everyone in it has to be you or a member. The list is checked when a turn starts. It's read again when someone joins or leaves, and at least every 10 minutes. If the list can't be read, the group counts as having outsiders. So does a group where someone who isn't a member wrote earlier in the conversation, even after they've left, until the conversation starts over (`/new`). A WhatsApp group with only you and Palui's number in it is your own chat, for every agent, including Palui and an agent with no members. Telegram groups never count as only you or members only, because a bot can't see who's in a group.
 
 Members can read what the agent knows: its notes, contacts, memory and what was said in its other chats. They can't change its instructions, send messages to contacts, or approve anything. Commands, approvals and reminder buttons stay yours. The one thing you can let them change is the rules of a chat they're in, see [Chat rules](#chat-rules).
 
@@ -100,7 +100,7 @@ This is about chats with someone who isn't you or a member: a group with an outs
 
 - One switch, Tools for other people: those tools, or none.
 - No approvals there. A tool the chat gets runs right away, and destructive tools are never offered.
-- Your own message in a group gets the same set as everyone else's. That includes Palui when you pick it for a group.
+- Your own message in a group with other people gets the same set as everyone else's. That includes Palui when you pick it for a group.
 - A tool you set to "Ask first" or "Off" on the Tools tab isn't offered in shared chats at all.
 - Sharing a saved file as a public link only works from your own chats.
 - The Tools tab says who gets each tool: "Everyone in the chat", "You and members" or "Only you".

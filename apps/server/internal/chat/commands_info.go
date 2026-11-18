@@ -306,22 +306,17 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 		}
 	}
 	// A shared chat gets what a fresh turn there gets (same rules as ExecuteTurn).
-	audience, err := Audience(c, chat, agent)
+	sessionID := ""
+	var history []db.Message
+	if session != nil {
+		sessionID = session.ID
+		if history, err = LoadHistory(q, session.ID, session.SummarizedUntil); err != nil {
+			return "", err
+		}
+	}
+	audience, err := TurnAudience(c, chat, agent, sessionID, history)
 	if err != nil {
 		return "", err
-	}
-	if audience == tools.AudienceMembers && session != nil {
-		history, err := LoadHistory(q, session.ID, session.SummarizedUntil)
-		if err != nil {
-			return "", err
-		}
-		outsider, err := HistoryHasOutsider(q, chat, agent.ID, session.ID, history)
-		if err != nil {
-			return "", err
-		}
-		if outsider {
-			audience = tools.AudienceOutside
-		}
 	}
 	if audience == tools.AudienceOutside && agent.GuestTools == "none" {
 		return "Gak ada tool buat " + agent.Name + " di chat ini: tool buat orang lain dimatiin.", nil
