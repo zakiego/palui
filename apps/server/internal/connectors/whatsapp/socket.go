@@ -72,10 +72,19 @@ type User struct {
 	Name string
 }
 
-// Content is { text } or { react: { text, key } }.
+// Content is { text }, { react: { text, key } } or { media } (Text is then the caption).
 type Content struct {
 	Text  string    `json:"text,omitempty"`
 	React *Reaction `json:"react,omitempty"`
+	Media *Media    `json:"media,omitempty"`
+}
+
+// Media is a file to upload and send: Kind is a db.Media* kind.
+type Media struct {
+	Kind     string `json:"kind"`
+	MimeType string `json:"mimeType"`
+	Filename string `json:"filename,omitempty"`
+	Bytes    []byte `json:"-"`
 }
 
 type Reaction struct {

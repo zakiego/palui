@@ -195,7 +195,7 @@ func (f *Fake) defaultResult(method string, p *jsonx.Object) any {
 	case "getFile":
 		id, _ := p.Get("file_id")
 		return map[string]any{"file_id": id, "file_unique_id": fmt.Sprintf("u-%v", id), "file_path": fmt.Sprintf("files/%v", id)}
-	case "sendMessage":
+	case "sendMessage", "sendPhoto", "sendDocument", "sendVideo", "sendVoice", "sendAudio", "sendSticker":
 		f.mu.Lock()
 		id := f.nextID
 		f.nextID++

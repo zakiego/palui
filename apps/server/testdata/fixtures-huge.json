@@ -176,6 +176,12 @@
    "first": null,
    "last": null
   },
+  "outbox_media": {
+   "columns": ["id","chat_id","kind","mime_type","filename","size","sha256","source","source_ref","data","created_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
   "owner_invites": {
    "columns": ["id","token_hash","expires_at","used_at","created_at"],
    "count": 0,

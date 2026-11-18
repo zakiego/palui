@@ -18,6 +18,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/kit"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
+	"github.com/zakiego/palui/apps/server/internal/outmedia"
 	"github.com/zakiego/palui/apps/server/internal/zod"
 )
 
@@ -55,6 +56,8 @@ type Options struct {
 	Clock  func() int64
 	Key    func() string
 	AppURL func() string
+	// Downloads for send_media (safenet.Fetch by default).
+	Fetch outmedia.Fetcher
 }
 
 func failErr(err error) (any, error) {
@@ -197,7 +200,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 	sendTo := func(cond bool) any { return kit.If(ownerChat && cond, sendNote) }
 	getDescription := "Get one saved file's details by id: title, description, type, size and when it was saved."
 	if ownerChat {
-		getDescription = "Get one saved file's details by id: title, description, type, size, when it was saved, and the dashboard link where the owner can open or download it after signing in. Files can't be sent back into the chat yet; to give someone the file itself, call share_attachment." + hint
+		getDescription = "Get one saved file's details by id: title, description, type, size, when it was saved, and the dashboard link where the owner can open or download it after signing in. To put the file itself into this chat, call send_media with its id." + hint
 	}
 	own := func(id string) (db.AttachmentMeta, any, error) {
 		a, ok, err := attachments.Get(d, id)
@@ -378,6 +381,17 @@ func Tools(d *db.DB, turn connectors.TurnInfo, opts Options) *connectors.ToolSet
 				}),
 		})
 	}
+	set.Set("send_media", connectors.PaluiTool{
+		Data:      connectors.DataChat,
+		Class:     "write",
+		GuestSafe: true,
+		Title:     "Send a photo or file",
+		Preview:   sendPreview,
+		Tool: kit.Tool(sendDescription, sendInput,
+			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
+				return sendMedia(ctx, d, turn, in, key(), clock, opts.Fetch)
+			}),
+	})
 	set.Set("delete_attachment", connectors.PaluiTool{
 		Data:  connectors.DataChat,
 		Class: "destructive",

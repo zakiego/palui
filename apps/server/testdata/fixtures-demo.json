@@ -301,6 +301,10 @@
     ["<out#2>","<chat#23>","whatsapp","{\"text\":\"Bu, Zaki pulang Jumat ya.\",\"format\":\"plain\"}","sent",0,1794448800000,null,null,"outbound:<obm#3>",null,null,1794448800000,null,1794448800000,null]
    ]
   },
+  "outbox_media": {
+   "columns": ["id","chat_id","kind","mime_type","filename","size","sha256","source","source_ref","data","created_at"],
+   "rows": []
+  },
   "owner_invites": {
    "columns": ["id","token_hash","expires_at","used_at","created_at"],
    "rows": []

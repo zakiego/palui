@@ -986,7 +986,7 @@
      {
       "name": "get_attachment",
       "title": "Get a saved attachment",
-      "description": "Get one saved file's details by id: title, description, type, size, when it was saved, and the dashboard link where the owner can open or download it after signing in. Files can't be sent back into the chat yet; to give someone the file itself, call share_attachment. To hand a saved file to another app's tool (for example to upload a receipt and attach it to a transaction there), pass its `fileRef` as that tool's file argument where it asks for the file's contents or a base64 data URL; Palui fills in the file. Another app can't read Palui's ids, so never pass `id` as that app's own attachment id: upload the file there first and use the id that app returns. Check that app's size and type limits against `size` and `mimeType` first.",
+      "description": "Get one saved file's details by id: title, description, type, size, when it was saved, and the dashboard link where the owner can open or download it after signing in. To put the file itself into this chat, call send_media with its id. To hand a saved file to another app's tool (for example to upload a receipt and attach it to a transaction there), pass its `fileRef` as that tool's file argument where it asks for the file's contents or a base64 data URL; Palui fills in the file. Another app can't read Palui's ids, so never pass `id` as that app's own attachment id: upload the file there first and use the id that app returns. Check that app's size and type limits against `size` and `mimeType` first.",
       "class": "read",
       "untrusted": false,
       "guestSafe": false,
@@ -1073,6 +1073,60 @@
        },
        "required": [
         "id"
+       ],
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "send_media",
+      "title": "Send a photo or file",
+      "description": "Send a photo, file, voice note, video or sticker that already exists into this chat: a public URL (an image or file found on the web, or a link another tool returned) or a file saved in this chat (`attachment_id` from list_attachments). Use it when someone asks to see a picture or wants a file, instead of saying you can't send images. It can't make new images or speak text: only send what exists. Pass the direct link to the file itself (it usually ends in .jpg, .png, .pdf, .mp4, .ogg), not a web page that shows it; if you only have a page, read it first and take the file's link. Pick `kind`: image (JPEG, PNG or WebP), video (MP4), voice_note (an existing Ogg/Opus recording; MP3 or M4A goes out as an audio file), file (any document: PDF, Office, text, zip) or sticker (WebP). A file that can't go as that kind is sent as a document. At most 16 MB (images 10 MB). The file is queued at once and arrives before your reply; don't paste the URL again in your reply. Never tell anyone a file was sent unless this tool returned ok.",
+      "class": "write",
+      "untrusted": false,
+      "guestSafe": true,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": true,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "kind": {
+         "type": "string",
+         "enum": [
+          "image",
+          "video",
+          "voice_note",
+          "file",
+          "sticker"
+         ],
+         "description": "How it shows in the chat: image, video, voice_note, file or sticker."
+        },
+        "url": {
+         "description": "Public http(s) link to the file itself. Give this or attachment_id.",
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 2000
+        },
+        "attachment_id": {
+         "description": "A file saved in this chat (att_...). Give this or url.",
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 64
+        },
+        "caption": {
+         "description": "Short text shown with the file, in the chat's language. Voice notes and stickers show none.",
+         "type": "string",
+         "maxLength": 1024
+        },
+        "filename": {
+         "description": "File name shown for a file, e.g. \"jadwal-imunisasi.pdf\".",
+         "type": "string",
+         "maxLength": 200
+        }
+       },
+       "required": [
+        "kind"
        ],
        "additionalProperties": false
       }

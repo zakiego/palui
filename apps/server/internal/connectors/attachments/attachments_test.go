@@ -83,7 +83,7 @@ func TestManifestIsABuiltinSkill(t *testing.T) {
 
 func TestExposesTheToolsWithClassesAndTellsTheModelToSaveOnlyWhatMatters(t *testing.T) {
 	e := setup(t)
-	if got := strings.Join(conntest.Classes(e.tools), ","); got != "save_attachment:write,list_attachments:read,get_attachment:read,share_attachment:write,unshare_attachment:write,delete_attachment:destructive" {
+	if got := strings.Join(conntest.Classes(e.tools), ","); got != "save_attachment:write,list_attachments:read,get_attachment:read,share_attachment:write,unshare_attachment:write,send_media:write,delete_attachment:destructive" {
 		t.Fatal(got)
 	}
 	pt, _ := e.tools.Get("save_attachment")
@@ -232,7 +232,7 @@ func TestASharedChatGetsNoDashboardLinksFileRefsOrShareLinks(t *testing.T) {
 	outside := e.turn
 	outside.Mode = "outside"
 	shared := attconn.Tools(e.db, outside, opts())
-	if got := strings.Join(conntest.Classes(shared), ","); got != "save_attachment:write,list_attachments:read,get_attachment:read,delete_attachment:destructive" {
+	if got := strings.Join(conntest.Classes(shared), ","); got != "save_attachment:write,list_attachments:read,get_attachment:read,send_media:write,delete_attachment:destructive" {
 		t.Fatal(got)
 	}
 	for _, name := range []string{"save_attachment", "list_attachments", "get_attachment"} {

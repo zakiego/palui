@@ -27,6 +27,21 @@ export type TranscriptMessage = {
   status: MessageStatus
   createdAt: number
   tools: ToolCallView[]
+  // Files the run sent with send_media (assistant rows only).
+  media: SentMediaView[]
+}
+
+export type SentMediaKind = "image" | "video" | "voice" | "audio" | "document" | "sticker"
+
+export type SentMediaView = {
+  id: string
+  kind: SentMediaKind
+  mimeType: string
+  filename: string
+  size: number
+  caption: string
+  status: "pending" | "sending" | "sent" | "failed" | "cancelled"
+  error: string | null
 }
 
 export type Transcript = {

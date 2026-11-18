@@ -16,6 +16,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/events"
 	"github.com/zakiego/palui/apps/server/internal/logx"
+	"github.com/zakiego/palui/apps/server/internal/outmedia"
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 )
@@ -59,7 +60,13 @@ type WorkerOptions struct {
 	// outbound/service.ts outboundFailed (M4): tells the owner a message to a
 	// contact gave up. Called for every expired row; nil does nothing.
 	OutboundFailed func(q db.Q, row db.Outbox, now int64)
+	// The bytes of a row's media (outmedia.Load with the master key).
+	// outmedia.ErrGone fails the row for good. Nil fails every media row.
+	LoadMedia func(q db.Q, id string) ([]byte, error)
 }
+
+// MediaSweepEveryMs is how often a tick sweeps media no row can send anymore.
+const MediaSweepEveryMs = 10 * 60_000
 
 func safeReachable(ch Channel) (ok bool) {
 	defer func() {
@@ -202,6 +209,8 @@ type Worker struct {
 	ticker   *time.Ticker
 	done     chan struct{}
 	late     sync.WaitGroup
+	// When media was last swept (Unix ms), under tickMu.
+	sweptAt int64
 }
 
 func NewWorker(o WorkerOptions) *Worker {
@@ -446,6 +455,25 @@ func (w *Worker) sendOne(row db.Outbox) string {
 		w.fail(row, fmt.Sprintf("channel %s isn't running", name), w.o.Clock())
 		return "failed"
 	}
+	if m := row.Payload.Media; m != nil {
+		// A copy, so the bytes never reach the stored payload or the next attempt.
+		media := *m
+		var err error
+		if w.o.LoadMedia == nil {
+			err = errors.New("media sending isn't set up")
+		} else {
+			media.Bytes, err = w.o.LoadMedia(q, media.ID)
+		}
+		if errors.Is(err, outmedia.ErrGone) {
+			w.giveUp(row, "the media file is gone", w.o.Clock())
+			return "failed"
+		}
+		if err != nil {
+			w.fail(row, err.Error(), w.o.Clock())
+			return "failed"
+		}
+		row.Payload.Media = &media
+	}
 	results := make(chan sendRes, 1)
 	go func() {
 		r, err := safeSend(handle, chat.ExternalID, row.Payload)
@@ -567,6 +595,34 @@ func (w *Worker) fail(row db.Outbox, msg string, now int64) {
 	w.o.Log.Warn("outbox send failed", logx.Fields{"outbox_id": row.ID, "channel": row.Channel, "attempts": attempts, "error": msg})
 }
 
+// giveUp fails a row that can never be sent, without retries.
+func (w *Worker) giveUp(row db.Outbox, msg string, now int64) {
+	q := w.o.DB
+	if _, err := q.Exec("UPDATE outbox SET status = 'failed', attempts = attempts + 1, claimed_at = NULL, error = ? WHERE id = ?", msg, row.ID); err != nil {
+		w.o.Log.Error("outbox give up failed", logx.Fields{"error": err})
+		return
+	}
+	ch := row.Channel
+	data := struct {
+		OutboxID string `json:"outboxId"`
+	}{row.ID}
+	_, _ = events.Log(q, events.Input{ConnectorID: &ch, Kind: "outbox.failed", Level: "error", Message: fmt.Sprintf("Gave up sending %s: %s", row.Source, msg), Data: data}, now)
+}
+
+// sweepMedia drops media no pending or sending row points at, at most every
+// MediaSweepEveryMs.
+func (w *Worker) sweepMedia(now int64) {
+	if w.sweptAt != 0 && now-w.sweptAt < MediaSweepEveryMs {
+		return
+	}
+	w.sweptAt = now
+	if n, err := outmedia.Sweep(w.o.DB, now); err != nil {
+		w.o.Log.Warn("outbox media sweep failed", logx.Fields{"error": err})
+	} else if n > 0 {
+		w.o.Log.Info("outbox media swept", logx.Fields{"count": n})
+	}
+}
+
 // Tick runs housekeeping and claims, then one send loop per channel (or agent
 // bot, keyed "bot:<id>") unless one is already running. It returns once the
 // loops this tick started have settled.
@@ -593,6 +649,7 @@ func (w *Worker) Tick() {
 			w.o.Log.Error("outbox tick failed", logx.Fields{"error": err})
 			return
 		}
+		w.sweepMedia(now)
 		q := w.o.DB
 		isBusy := func(key string) bool {
 			w.mu.Lock()

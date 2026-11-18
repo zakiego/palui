@@ -5,6 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
@@ -477,6 +480,87 @@ func TestSend(t *testing.T) {
 		}
 		eq(t, plain.String(), strings.Repeat("&", 5000))
 	})
+}
+
+func TestSendMedia(t *testing.T) {
+	media := func(kind, mime string) *db.OutboxMedia {
+		return &db.OutboxMedia{ID: "med_1", Kind: kind, MimeType: mime, Filename: "f", Size: 3, Bytes: []byte{1, 2, 3}}
+	}
+	t.Run("uploads each kind with its method and an HTML caption", func(t *testing.T) {
+		e := setup(t)
+		r := e.start(t)
+		res, err := r.Channel.Send(context.Background(), "42", db.OutboxPayload{Text: "**Inhaler** + spacer", ReplyToChannelMsgID: "55", Media: media(db.MediaImage, "image/jpeg")})
+		testutil.Must(t, err)
+		sent := e.fake.CallsTo("sendPhoto")
+		eq(t, len(sent), 1)
+		eq(t, jsonx.Stringify(sent[0]), `{"chat_id":"42","photo":{"file":"f","mimeType":"image/jpeg","size":3},"caption":"<b>Inhaler</b> + spacer","parse_mode":"HTML","reply_parameters":{"message_id":55,"allow_sending_without_reply":true}}`)
+		f, _ := sent[0].Get("photo")
+		eq(t, f.(*telegram.InputFile).Bytes, []byte{1, 2, 3})
+		eq(t, res.ChannelMsgID != "", true)
+		eq(t, len(e.fake.CallsTo("sendMessage")), 0)
+		for kind, method := range map[string]string{db.MediaVideo: "sendVideo", db.MediaVoice: "sendVoice", db.MediaAudio: "sendAudio", db.MediaDocument: "sendDocument", db.MediaSticker: "sendSticker"} {
+			_, err := r.Channel.Send(context.Background(), "42", db.OutboxPayload{Text: "c", Format: "plain", Media: media(kind, "x/y")})
+			testutil.Must(t, err)
+			calls := e.fake.CallsTo(method)
+			eq(t, len(calls), 1)
+			_, hasCaption := calls[0].Get("caption")
+			eq(t, hasCaption, kind != db.MediaSticker)
+		}
+	})
+	t.Run("sends a refused photo again as a document", func(t *testing.T) {
+		e := setup(t)
+		r := e.start(t)
+		e.fake.On("sendPhoto", func(*jsonx.Object) any {
+			return &tgtest.APIError{Code: 400, Description: "Bad Request: PHOTO_INVALID_DIMENSIONS"}
+		})
+		_, err := r.Channel.Send(context.Background(), "42", db.OutboxPayload{Media: media(db.MediaImage, "image/png")})
+		testutil.Must(t, err)
+		eq(t, len(e.fake.CallsTo("sendDocument")), 1)
+	})
+	t.Run("rethrows other errors so the outbox retries", func(t *testing.T) {
+		e := setup(t)
+		r := e.start(t)
+		e.fake.On("sendVoice", func(*jsonx.Object) any {
+			return &tgtest.APIError{Code: 403, Description: "Forbidden: bot was blocked by the user"}
+		})
+		if _, err := r.Channel.Send(context.Background(), "42", db.OutboxPayload{Media: media(db.MediaVoice, "audio/ogg")}); err == nil {
+			t.Fatal("no error")
+		}
+		eq(t, len(e.fake.CallsTo("sendDocument")), 0)
+		if _, err := r.Channel.Send(context.Background(), "42", db.OutboxPayload{Media: &db.OutboxMedia{ID: "med_2", Kind: db.MediaImage}}); err == nil {
+			t.Fatal("sent without bytes")
+		}
+	})
+}
+
+func TestHTTPTransportUploadsMultipart(t *testing.T) {
+	var got struct {
+		path, contentType, chatID, caption, markup, filename, fileType string
+		file                                                           []byte
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.path, got.contentType = r.URL.Path, r.Header.Get("content-type")
+		testutil.Must(t, r.ParseMultipartForm(1<<20))
+		got.chatID, got.caption, got.markup = r.FormValue("chat_id"), r.FormValue("caption"), r.FormValue("reply_markup")
+		f, h, err := r.FormFile("photo")
+		testutil.Must(t, err)
+		got.file, _ = io.ReadAll(f)
+		got.filename, got.fileType = h.Filename, h.Header.Get("Content-Type")
+		_, _ = w.Write([]byte(`{"ok":true,"result":{"message_id":5,"date":0,"chat":{"id":42,"type":"private"}}}`))
+	}))
+	defer srv.Close()
+	tr := &telegram.HTTPTransport{Token: "T", Root: srv.URL, Client: srv.Client()}
+	p := jsonx.NewMap[any]()
+	p.Set("chat_id", "42")
+	p.Set("photo", &telegram.InputFile{Name: `in"haler.jpg`, MimeType: "image/jpeg", Bytes: []byte{9, 8}})
+	p.Set("caption", "hai")
+	markup := jsonx.NewMap[any]()
+	markup.Set("inline_keyboard", []any{})
+	p.Set("reply_markup", markup)
+	_, err := tr.Call(context.Background(), "sendPhoto", p)
+	testutil.Must(t, err)
+	eq(t, []any{got.path, strings.HasPrefix(got.contentType, "multipart/form-data"), got.chatID, got.caption, got.markup, got.file, got.filename, got.fileType},
+		[]any{"/botT/sendPhoto", true, "42", "hai", `{"inline_keyboard":[]}`, []byte{9, 8}, `in"haler.jpg`, "image/jpeg"})
 }
 
 func TestTyping(t *testing.T) {

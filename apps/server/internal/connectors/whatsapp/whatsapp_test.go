@@ -917,6 +917,40 @@ func TestTypingAndSend(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+	t.Run("sends media as one message with its caption, keeping the thinking reaction", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		e.sock().Message(dm("IN1", nil, nil), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 1 })
+		testutil.Must(t, typer(r).Typing(bg, ownerJID, true, connectors.TypingOptions{}))
+		res, err := r.Channel.Send(bg, ownerJID, db.OutboxPayload{
+			Text: "**Inhaler** dengan spacer", ReplyToChannelMsgID: "IN1",
+			Media: &db.OutboxMedia{ID: "med_1", Kind: db.MediaImage, MimeType: "image/jpeg", Filename: "inhaler.jpg", Size: 3, Bytes: []byte{1, 2, 3}},
+		})
+		testutil.Must(t, err)
+		var media []watest.Sent
+		for _, s := range e.sock().SentList() {
+			if s.Content.Media != nil {
+				media = append(media, s)
+			}
+		}
+		eq(t, len(media), 1)
+		m := media[0]
+		eq(t, []any{m.Content.Text, m.Content.Media.Kind, m.Content.Media.MimeType, m.Content.Media.Filename, m.Content.Media.Bytes, m.Quoted.Key.ID},
+			[]any{"*Inhaler* dengan spacer", db.MediaImage, "image/jpeg", "inhaler.jpg", []byte{1, 2, 3}, "IN1"})
+		eq(t, res.ChannelMsgID != "", true)
+		eq(t, lastSent(t, e.sock()).Content.Media != nil, true)
+	})
+	t.Run("sends a voice note without a caption and refuses media without bytes", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		_, err := r.Channel.Send(bg, ownerJID, db.OutboxPayload{Text: "ignored", Media: &db.OutboxMedia{ID: "med_2", Kind: db.MediaVoice, MimeType: "audio/ogg", Bytes: []byte("OggS")}})
+		testutil.Must(t, err)
+		s := lastSent(t, e.sock())
+		eq(t, []any{s.Content.Text, s.Content.Media.Kind}, []any{"", db.MediaVoice})
+		_, err = r.Channel.Send(bg, ownerJID, db.OutboxPayload{Media: &db.OutboxMedia{ID: "med_3", Kind: db.MediaImage}})
+		if err == nil {
+			t.Fatal("sent media without bytes")
+		}
+	})
 }
 
 func writeLock(t *testing.T, dir, name, info string, ageMs int64) string {

@@ -35,6 +35,7 @@ import { AgentAvatar } from "@/components/agent-avatar"
 import { SimpleSelect } from "@/components/simple-select"
 import { AckControl } from "@/components/ack-control"
 import { SaveMediaControl } from "@/components/save-media-control"
+import { SentMedia } from "@/components/sent-media"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -332,6 +333,7 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
             {transcript.messages.map((m) => (
               <MessageScrollerItem key={m.id}>
                 {m.role === "assistant" && m.tools.length > 0 && <ToolTrace className="mb-2" tools={m.tools.map((x) => ({ id: x.id, tool: x.tool, class: x.class, status: x.status as LiveTool["status"], ms: x.ms ?? undefined, preview: x.result ?? undefined, args: x.args }))} />}
+                {m.role === "assistant" && m.media?.length > 0 && <SentMedia className="mb-2" media={m.media} />}
                 <ChatMessage role={m.role} source={m.source} sender={m.sender} text={m.text} at={m.createdAt} />
               </MessageScrollerItem>
             ))}

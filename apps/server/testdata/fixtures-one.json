@@ -145,6 +145,10 @@
    "columns": ["id","chat_id","channel","payload","status","attempts","next_attempt_at","claimed_at","channel_msg_id","source","error","fallback_from","created_at","expires_at","sent_at","connector_id"],
    "rows": []
   },
+  "outbox_media": {
+   "columns": ["id","chat_id","kind","mime_type","filename","size","sha256","source","source_ref","data","created_at"],
+   "rows": []
+  },
   "owner_invites": {
    "columns": ["id","token_hash","expires_at","used_at","created_at"],
    "rows": []

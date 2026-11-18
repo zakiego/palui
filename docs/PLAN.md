@@ -204,6 +204,7 @@ Telegram (the first channel built)
 - Connect: paste the token. Test calls `getMe` and shows `@bot_username`. The wizard then shows `t.me/<bot>?start=<nonce>` as a link and a QR. The nonce is single use and expires after 10 minutes. Only a `/start <nonce>` claims owner, and the wizard waits with a live status line until it arrives.
 - Runtime: Bot API long polling, typing action during a turn, replies split at 4096 chars and sent as HTML.
 - Media in: photos (vision), voice (transcription skill), small documents (text extracted).
+- Media out: the attachments skill's `send_media` sends a photo, file, voice note (Ogg/Opus, PTT on WhatsApp), video or sticker that already exists (a public URL through safenet, or a file saved in the chat). The bytes live encrypted in `outbox_media`, the outbox row points at them (`payload.media`), and the worker loads them just before the send. Same at-least-once delivery as text. No image generation, no TTS.
 - Inline keyboards for reminder actions, approvals and `/connectors`.
 
 WhatsApp
