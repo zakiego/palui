@@ -561,6 +561,53 @@
    ]
   },
   {
+   "id": "printer",
+   "kind": "tools",
+   "name": "Printer",
+   "icon": "printer",
+   "summary": "Print files from chat on your printer.",
+   "setup": [
+    {
+     "field": "url",
+     "label": "Printer URL",
+     "help": "A CUPS queue on the Mac works best. lpstat -p lists the queue names.",
+     "command": "lpstat -p -d",
+     "placeholder": "ipp://host.docker.internal:631/printers/My_Printer"
+    }
+   ],
+   "multiple": true,
+   "trust": "own",
+   "pauseNote": "While paused, Palui can't print. Jobs already sent keep printing.",
+   "removeWarning": "This removes the printer from Palui. The printer and its queue aren't touched.",
+   "docs": {
+    "commands": [
+     "lpstat -p -d"
+    ],
+    "notes": [
+     "Prints PDFs, JPEGs and PNGs sent in the chat or saved as attachments.",
+     "Use the Mac's CUPS queue, not the printer's own address: many printers only take raster formats, and CUPS converts the file for them.",
+     "Printing is a write tool: it runs right away in your own chat, and asks first after untrusted content or in a scheduled job."
+    ]
+   },
+   "configKeys": [
+    "url"
+   ],
+   "configDefaults": {
+    "ok": false,
+    "issues": [
+     {
+      "expected": "string",
+      "code": "invalid_type",
+      "path": [
+       "url"
+      ],
+      "message": "Invalid input: expected string, received undefined"
+     }
+    ]
+   },
+   "secretFields": []
+  },
+  {
    "id": "reminders",
    "kind": "skill",
    "name": "Reminders",
@@ -3400,6 +3447,98 @@
       }
      }
     ]
+   }
+  ],
+  "printer": [
+   {
+    "tools": [
+     {
+      "name": "printer_status",
+      "title": "Check the printer",
+      "description": "Check the printer: its state (idle, processing, stopped), any problem it reports (out of paper, jam, low ink), ink levels when it knows them, and the jobs still waiting. It reads the print queue: a printer that's off or asleep can still look idle until a job is sent.",
+      "class": "read",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {},
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "print_file",
+      "title": "Print a file",
+      "description": "Print a PDF, JPEG or PNG on the printer. By default it prints the file in the current message. A file from an earlier message can be printed with `earlier: true` (call it without `nomor` first to see the recent files), and a saved file with its attachment_id. Only print when the owner asks. Never tell the owner it printed unless this tool returned ok, and even then say it was sent to the printer: ask them to check the tray.",
+      "class": "write",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "attachment_id": {
+         "description": "A saved file's id from list_attachments. Omit to print a file sent in the chat.",
+         "type": "string",
+         "minLength": 1
+        },
+        "nomor": {
+         "description": "Which file, 1-based. In the current message: in the order they were sent. With `earlier`: the number from the list, 1 being the most recent. Omit when there is only one.",
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 9007199254740991
+        },
+        "earlier": {
+         "description": "Print a file from an earlier message in this chat instead of the current one: the last 24 hours, at most 10 files, newest first.",
+         "type": "boolean"
+        },
+        "copies": {
+         "description": "How many copies. Default 1.",
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 20
+        },
+        "color": {
+         "description": "gray saves color ink. Default: the printer's own setting.",
+         "type": "string",
+         "enum": [
+          "color",
+          "gray"
+         ]
+        },
+        "paper": {
+         "description": "Paper size. Default: the printer's own paper.",
+         "type": "string",
+         "enum": [
+          "A4",
+          "A5",
+          "A6",
+          "Letter",
+          "Legal",
+          "4x6"
+         ]
+        },
+        "pages": {
+         "description": "PDF pages to print, e.g. 1-3,5. Default: all.",
+         "type": "string",
+         "pattern": "^\\d+(-\\d+)?(,\\d+(-\\d+)?)*$"
+        },
+        "fit_to_page": {
+         "description": "Scale the file to fit the paper. Useful for photos and screenshots.",
+         "type": "boolean"
+        }
+       },
+       "additionalProperties": false
+      }
+     }
+    ],
+    "variant": "default"
    }
   ]
  },

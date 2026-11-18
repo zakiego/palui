@@ -207,6 +207,13 @@ func worst(k *Kit) {
 	// --- agents (PLAN 19): a name and slug at the limit, a cap already hit, guests in a group ---
 	// Its own bot, with the longest username Telegram allows.
 	k.Connector("tgbot-arisan", "tgbot", ConnectorOpts{Label: ptr("Arisan bot"), Status: "on", Config: obj("botUsername", within("koordinator_arisan_haul_bani_bot", L.botUsername)), Secrets: sec("botToken", "123456789:AAbbccddeeffgghhiijjkkllmmnnooppqqrs")})
+	// A printer with the longest label and an error naming its whole queue URL.
+	k.Connector("printer-meeting-room", "printer", ConnectorOpts{
+		Label:  ptr(within("Meeting room printer, second floor, main building (color, A4 and A3)", L.connectorLabel)),
+		Status: "error",
+		Detail: ptr("Can't reach the printer at ipp://host.docker.internal:631/printers/Meeting_Room_Second_Floor_Color_Laser. Check the URL, and that the Mac and CUPS are up."),
+		Config: obj("url", "ipp://host.docker.internal:631/printers/Meeting_Room_Second_Floor_Color_Laser"),
+	})
 	var readContainers []string
 	for i := 1; i <= 5; i++ {
 		readContainers = append(readContainers, fmt.Sprintf("kb-arisan-keluarga-bani-abdurrahman-siddiq-banjarmasin-catatan-%d", i))

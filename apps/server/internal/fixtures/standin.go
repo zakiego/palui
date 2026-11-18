@@ -165,6 +165,10 @@ var builtinTools = map[string][]struct {
 	"webfetch": {{tool: "fetch_page", class: "read", title: "Ambil isi halaman web", guestSafe: true, untrusted: true}},
 	"notes":    {{tool: "tambah_instruksi", class: "write", title: "Tambah instruksi tetap"}},
 	"chats":    {{tool: "cari_obrolan", class: "read"}},
+	"printer": {
+		{tool: "printer_status", class: "read", title: "Check the printer"},
+		{tool: "print_file", class: "write", title: "Print a file"},
+	},
 }
 
 // builtinData is each built-in skill's data scope, as the real tools declare it.
@@ -173,6 +177,7 @@ var builtinData = map[string]string{
 	"webfetch":  connectors.DataNone,
 	"notes":     connectors.DataAgent,
 	"chats":     connectors.DataAgent,
+	"printer":   connectors.DataChat,
 }
 
 // demoToolSet is demo-runtime.ts's agentTools for one connector: the fake MCP
