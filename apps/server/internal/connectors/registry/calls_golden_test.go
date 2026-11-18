@@ -26,6 +26,7 @@ import (
 	settingsconn "github.com/zakiego/palui/apps/server/internal/connectors/settings"
 	webfetchconn "github.com/zakiego/palui/apps/server/internal/connectors/webfetch"
 	"github.com/zakiego/palui/apps/server/internal/db"
+	"github.com/zakiego/palui/apps/server/internal/flows"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/safenet"
 	"github.com/zakiego/palui/apps/server/internal/testutil"
@@ -170,6 +171,12 @@ func TestScriptedCallsMatchTheTSBuild(t *testing.T) {
 	var g goldenCalls
 	testutil.Must(t, json.Unmarshal(raw, &g))
 	goldenConfig(t, g.Version)
+	// explain_flow says Palui was likely down for a time before the engine
+	// started. The real start is when the test runs, which is after the
+	// golden's dates once those pass, so pin it to the seed's clock.
+	started, swept := flows.EngineClock()
+	flows.SetEngineClock(g.SeedNow, 0)
+	t.Cleanup(func() { flows.SetEngineClock(started, swept) })
 	steps := 0
 	for _, sc := range g.Calls {
 		t.Run(sc.Name, func(t *testing.T) {
