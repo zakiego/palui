@@ -630,13 +630,14 @@ type Agent struct {
 	CreatedAt            int64                     `json:"createdAt"`
 	UpdatedAt            int64                     `json:"updatedAt"`
 	ModelRoles           NullJSON[AgentModels]     `json:"modelRoles"`
+	TranscribeVoice      bool                      `json:"transcribeVoice"`
 }
 
-const AgentCols = "id, slug, name, persona, is_default, recall_container, recall_read_containers, recall_per_chat, guest_tools, daily_token_cap, tool_permissions, telegram_connector_id, avatar_image, avatar_icon, avatar_color, created_at, updated_at, model_roles"
+const AgentCols = "id, slug, name, persona, is_default, recall_container, recall_read_containers, recall_per_chat, guest_tools, daily_token_cap, tool_permissions, telegram_connector_id, avatar_image, avatar_icon, avatar_color, created_at, updated_at, model_roles, transcribe_voice"
 
 func ScanAgent(s Scanner) (Agent, error) {
 	var a Agent
-	err := s.Scan(&a.ID, &a.Slug, &a.Name, &a.Persona, &a.IsDefault, &a.RecallContainer, &a.RecallReadContainers, &a.RecallPerChat, &a.GuestTools, &a.DailyTokenCap, &a.ToolPermissions, &a.TelegramConnectorID, &a.AvatarImage, &a.AvatarIcon, &a.AvatarColor, &a.CreatedAt, &a.UpdatedAt, &a.ModelRoles)
+	err := s.Scan(&a.ID, &a.Slug, &a.Name, &a.Persona, &a.IsDefault, &a.RecallContainer, &a.RecallReadContainers, &a.RecallPerChat, &a.GuestTools, &a.DailyTokenCap, &a.ToolPermissions, &a.TelegramConnectorID, &a.AvatarImage, &a.AvatarIcon, &a.AvatarColor, &a.CreatedAt, &a.UpdatedAt, &a.ModelRoles, &a.TranscribeVoice)
 	return a, err
 }
 

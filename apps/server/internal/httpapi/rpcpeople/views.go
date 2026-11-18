@@ -28,6 +28,7 @@ type agentViewT struct {
 	RecallContainer      *string            `json:"recallContainer"`
 	RecallReadContainers []string           `json:"recallReadContainers"`
 	RecallPerChat        bool               `json:"recallPerChat"`
+	TranscribeVoice      bool               `json:"transcribeVoice"`
 	Container            *string            `json:"container"`
 	TelegramConnectorID  *string            `json:"telegramConnectorId"`
 	AvatarImage          *string            `json:"avatarImage"`
@@ -58,7 +59,7 @@ func agentView(q db.Q, a db.Agent, chatCount int, now int64) (agentViewT, error)
 	return agentViewT{
 		ID: a.ID, Slug: a.Slug, Name: a.Name, Persona: a.Persona, IsDefault: a.IsDefault, GuestTools: a.GuestTools,
 		DailyTokenCap: a.DailyTokenCap, ToolPermissions: permissionsOf(a), RecallContainer: a.RecallContainer, RecallReadContainers: agents.ReadContainers(a),
-		RecallPerChat: a.RecallPerChat, Container: agents.Container(a, ""), TelegramConnectorID: a.TelegramConnectorID,
+		RecallPerChat: a.RecallPerChat, TranscribeVoice: a.TranscribeVoice, Container: agents.Container(a, ""), TelegramConnectorID: a.TelegramConnectorID,
 		AvatarImage: a.AvatarImage, AvatarIcon: a.AvatarIcon, AvatarColor: a.AvatarColor,
 		Chats: chatCount, Instructions: len(ins), TokensToday: tokens,
 	}, nil

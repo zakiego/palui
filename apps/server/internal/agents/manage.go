@@ -234,10 +234,13 @@ type Input struct {
 	RecallContainer      *string
 	RecallReadContainers *[]string
 	RecallPerChat        *bool
-	TelegramConnectorID  *string
-	AvatarImage          *string
-	AvatarIcon           *string
-	AvatarColor          *string
+	// TranscribeVoice: voice notes sent to this agent go through the voice
+	// connector. nil leaves it; a new agent starts off.
+	TranscribeVoice     *bool
+	TelegramConnectorID *string
+	AvatarImage         *string
+	AvatarIcon          *string
+	AvatarColor         *string
 	// ModelRoles: nil leaves it; a role left empty uses the global chain.
 	ModelRoles *db.AgentModels
 }
@@ -447,8 +450,9 @@ func Create(q db.Q, in Input, now int64) (db.Agent, error) {
 		cap = *f.DailyTokenCap
 	}
 	perChat := f.RecallPerChat != nil && *f.RecallPerChat
-	return db.ScanAgent(q.WQueryRow("INSERT INTO agents (id, slug, name, persona, guest_tools, daily_token_cap, recall_container, recall_read_containers, recall_per_chat, telegram_connector_id, avatar_image, avatar_icon, avatar_color, model_roles, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.AgentCols,
-		secret.NewID("agt"), slug, name, persona, guestTools, cap, orNull(f.RecallContainer), listValue(f.RecallReadContainers), db.Bool(perChat), orNull(f.TelegramConnectorID), orNull(f.AvatarImage), orNull(f.AvatarIcon), orNull(f.AvatarColor), modelsValue(f.ModelRoles), now, now))
+	voice := f.TranscribeVoice != nil && *f.TranscribeVoice
+	return db.ScanAgent(q.WQueryRow("INSERT INTO agents (id, slug, name, persona, guest_tools, daily_token_cap, recall_container, recall_read_containers, recall_per_chat, transcribe_voice, telegram_connector_id, avatar_image, avatar_icon, avatar_color, model_roles, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.AgentCols,
+		secret.NewID("agt"), slug, name, persona, guestTools, cap, orNull(f.RecallContainer), listValue(f.RecallReadContainers), db.Bool(perChat), db.Bool(voice), orNull(f.TelegramConnectorID), orNull(f.AvatarImage), orNull(f.AvatarIcon), orNull(f.AvatarColor), modelsValue(f.ModelRoles), now, now))
 }
 
 // Update is updateAgent (Slug is ignored).
@@ -508,6 +512,9 @@ func Update(q db.Q, id string, patch Input, now int64) (db.Agent, error) {
 	}
 	if f.RecallPerChat != nil {
 		set("recall_per_chat", db.Bool(*f.RecallPerChat))
+	}
+	if f.TranscribeVoice != nil {
+		set("transcribe_voice", db.Bool(*f.TranscribeVoice))
 	}
 	if f.TelegramConnectorID != nil {
 		set("telegram_connector_id", orNull(f.TelegramConnectorID))

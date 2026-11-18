@@ -213,9 +213,10 @@ func mediaEntry(pairs ...any) *jsonx.Object {
 }
 
 // PrepareMedia is prepareMedia: audio becomes "[voice] ..." text through the
-// first running connector with Transcribe, small text documents are inlined.
-// Images stay as base64 parts for the vision role. Updates the row.
-func PrepareMedia(ctx context.Context, q db.Q, row db.Message, running []connectors.RunningEntry, log *logx.Logger) (db.Message, error) {
+// first running connector with Transcribe when the chat's agent has voice
+// notes on (transcribe), small text documents are inlined. Images stay as
+// base64 parts for the vision role. Updates the row.
+func PrepareMedia(ctx context.Context, q db.Q, row db.Message, running []connectors.RunningEntry, transcribe bool, log *logx.Logger) (db.Message, error) {
 	c := ParseContent(row.Content)
 	needs := false
 	for _, m := range c.Media {
@@ -252,6 +253,11 @@ func PrepareMedia(ctx context.Context, q db.Q, row db.Message, running []connect
 				// Transcribing costs money per note, so only the owner's are.
 				texts = append(texts, "[voice] (pesan suara dari tamu, gak ditranskrip)")
 				kept = append(kept, mediaEntry("kind", "audio", "mimeType", m.MimeType, "note", "guest, not transcribed"))
+				continue
+			}
+			if !transcribe {
+				texts = append(texts, "[voice] (pesan suara, tapi transkripsi voice note lagi mati buat agent ini)")
+				kept = append(kept, mediaEntry("kind", "audio", "mimeType", m.MimeType, "note", "transcription off for this agent"))
 				continue
 			}
 			if transcriber == nil || data == "" {
