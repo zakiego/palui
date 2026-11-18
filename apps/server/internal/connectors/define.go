@@ -135,6 +135,16 @@ type TurnInfo struct {
 	// The owner's own messages in this batch, as typed.
 	OwnerText *string
 	Memory    *MemoryScope
+	// Set when this turn may add and remove the chat's rules: a members chat
+	// where everyone in the batch is the owner or a member the owner let set
+	// rules. Who the newest message came from; MemberID nil is the owner.
+	RuleSetter *RuleSetter
+}
+
+// RuleSetter is who a turn's chat rule changes are recorded under.
+type RuleSetter struct {
+	MemberID *string
+	Name     string
 }
 
 // ToolCallInfo is what a tool's Execute gets besides its input.

@@ -113,13 +113,64 @@ type AgentMember struct {
 	AgentID   string `json:"agentId"`
 	MemberID  string `json:"memberId"`
 	CreatedAt int64  `json:"createdAt"`
+	// The owner lets this member add and remove chat rules (0019).
+	CanSetRules bool `json:"canSetRules"`
 }
 
-const AgentMemberCols = "agent_id, member_id, created_at"
+const AgentMemberCols = "agent_id, member_id, created_at, can_set_rules"
 
 func ScanAgentMember(s Scanner) (AgentMember, error) {
 	var r AgentMember
-	err := s.Scan(&r.AgentID, &r.MemberID, &r.CreatedAt)
+	err := s.Scan(&r.AgentID, &r.MemberID, &r.CreatedAt, &r.CanSetRules)
+	return r, err
+}
+
+// ChatRule is a short rule for one shared chat, added from that chat by the
+// owner or a member the owner allowed (0019). MemberID nil means the owner.
+type ChatRule struct {
+	ID         string  `json:"id"`
+	AgentID    string  `json:"agentId"`
+	ChatID     string  `json:"chatId"`
+	Title      string  `json:"title"`
+	Body       string  `json:"body"`
+	MemberID   *string `json:"memberId"`
+	AuthorName string  `json:"authorName"`
+	CreatedAt  int64   `json:"createdAt"`
+}
+
+const ChatRuleCols = "id, agent_id, chat_id, title, body, member_id, author_name, created_at"
+
+func ScanChatRule(s Scanner) (ChatRule, error) {
+	var r ChatRule
+	err := s.Scan(&r.ID, &r.AgentID, &r.ChatID, &r.Title, &r.Body, &r.MemberID, &r.AuthorName, &r.CreatedAt)
+	return r, err
+}
+
+// ChatRuleChange is one add or remove of a chat rule: the rule as it was,
+// who wrote it (MemberID, AuthorName), who changed it (ByMemberID, ByName;
+// nil member means the owner) and when the owner undid it.
+type ChatRuleChange struct {
+	ID         string  `json:"id"`
+	AgentID    string  `json:"agentId"`
+	ChatID     string  `json:"chatId"`
+	RuleID     string  `json:"ruleId"`
+	Action     string  `json:"action"`
+	Title      string  `json:"title"`
+	Body       string  `json:"body"`
+	MemberID   *string `json:"memberId"`
+	AuthorName string  `json:"authorName"`
+	ByMemberID *string `json:"byMemberId"`
+	ByName     string  `json:"byName"`
+	RunID      *string `json:"runId"`
+	CreatedAt  int64   `json:"createdAt"`
+	UndoneAt   *int64  `json:"undoneAt"`
+}
+
+const ChatRuleChangeCols = "id, agent_id, chat_id, rule_id, action, title, body, member_id, author_name, by_member_id, by_name, run_id, created_at, undone_at"
+
+func ScanChatRuleChange(s Scanner) (ChatRuleChange, error) {
+	var r ChatRuleChange
+	err := s.Scan(&r.ID, &r.AgentID, &r.ChatID, &r.RuleID, &r.Action, &r.Title, &r.Body, &r.MemberID, &r.AuthorName, &r.ByMemberID, &r.ByName, &r.RunID, &r.CreatedAt, &r.UndoneAt)
 	return r, err
 }
 

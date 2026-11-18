@@ -266,7 +266,17 @@ var Runtime = &connectors.Runtime{
 		return &connectors.RunningConnector{
 			Stop: func(context.Context) error { return nil },
 			Tools: func(ctx context.Context, turn connectors.TurnInfo) (*connectors.ToolSet, error) {
-				return Tools(c.DB, nil, turn.AgentID)
+				set, err := Tools(c.DB, nil, turn.AgentID)
+				if err != nil {
+					return nil, err
+				}
+				if extra := ChatRuleTools(c.DB, func() int64 { return time.Now().UnixMilli() }, turn); extra != nil {
+					for _, k := range extra.Keys() {
+						t, _ := extra.Get(k)
+						set.Set(k, t)
+					}
+				}
+				return set, nil
 			},
 		}, nil
 	},

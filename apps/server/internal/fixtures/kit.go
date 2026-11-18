@@ -302,6 +302,11 @@ func (k *Kit) Member(v Member) string {
 	return id
 }
 
+// MemberRules: the owner lets a member add and remove chat rules (0019).
+func (k *Kit) MemberRules(agentID, memberID string) {
+	k.exec("UPDATE agent_members SET can_set_rules = 1 WHERE agent_id = ? AND member_id = ?", agentID, memberID)
+}
+
 // OwnConnector: the agent that owns a tool connector (an agent-scoped MCP server).
 func (k *Kit) OwnConnector(id, agentID string) {
 	k.exec("UPDATE connectors SET agent_id = ? WHERE id = ?", agentID, id)
