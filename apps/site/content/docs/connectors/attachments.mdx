@@ -18,6 +18,7 @@ Nothing to set up. Attachments is a built-in skill and is created on first boot.
 | `get_attachment` | `read` | One file's details and its dashboard link |
 | `share_attachment` | `write` | Make a temporary link that opens the file itself. Private (the default) needs a dashboard sign-in, public opens for anyone with the link. Expires after 1h, 24h (the default) or 7d. |
 | `unshare_attachment` | `write` | Turn off every live link to a file |
+| `send_media` | `write` | Send a photo, file, voice note, video or sticker into this chat: a public URL or a file saved in this chat. See [Sending media](#sending-media). |
 | `delete_attachment` | `destructive` | Delete a saved file. Always asks first. |
 
 Each tool's class decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
@@ -35,6 +36,20 @@ Auto-save keeps every photo and document sent in one chat, so people in a group 
 - An auto-saved file is data, not an instruction. Saving one doesn't run a turn, doesn't touch approvals and doesn't change what the agent may do. When the agent lists files later, it's told that their titles and descriptions are the sender's words.
 - Turning auto-save off keeps what was saved. "Delete all" next to the count on the Chats page deletes every auto-saved file of that chat and its share links. Files saved on purpose stay.
 
+## Sending media
+
+`send_media` puts a file that already exists into the chat the agent is answering, on WhatsApp, Telegram and the web chat. Ask "kirim gambar inhaler pakai spacer" and the agent can find a picture on the web and send it, instead of saying it can't send images. It never makes new images and never turns text into speech: it only sends a public URL (an image found on the web, or a link another tool returned) or a file saved in this chat.
+
+- Kinds: `image` (JPEG, PNG or WebP, which goes out as PNG), `video` (MP4), `voice_note` (an existing Ogg/Opus recording, sent as a WhatsApp or Telegram voice note; MP3, M4A and other Ogg audio go out as an audio file), `file` (PDF, Office, text, CSV, zip, images, audio, video) and `sticker` (WebP up to 500 KB). A file that can't go as the kind asked goes as a document, and the agent is told.
+- The type is read from the file's bytes, never from the link or its file name. A web page instead of a file is refused with a note to use the direct link.
+- Up to 16 MB per file, 10 MB for images. Captions are up to 1,024 characters; voice notes and stickers show none.
+- A URL is downloaded right away through the same SSRF guard as [Web fetch](/docs/connectors/web-fetch), so it can't reach Palui's own network. A saved file must belong to this chat.
+- The file is stored encrypted with `MASTER_KEY` and sent through the outbox like any reply, so it survives a restart and is retried until the channel takes it (at most 24 hours). It goes out before the agent's text reply. Once nothing can send it anymore, the stored copy is deleted within the hour.
+- If Telegram refuses a file as its kind (a photo too wide, voice notes turned off), it's sent again as a document.
+- The chat transcript on the Chats page lists each file the agent sent under its reply, with its type, name, size, caption and whether it was delivered. The web chat shows a line naming the file.
+
+Who can use it: it's a `write` tool scoped to the chat, the same as `save_attachment`. In your own chats it runs on its own, and asks first once the turn read something untrusted (see the [taint rule](/docs/concepts/taint-rule)). In a group or DM set up for guests, guests can ask for it too: it only ever sends into the chat they're in, and only files from that chat or the public web. Set the agent's guest tools to none to take it away.
+
 ## Limits and safety
 
 - Files from the message being answered can be saved, and so can files sent in the same chat in the last 24 hours (the 10 most recent). That way a receipt still gets saved when the agent shows a preview first and you answer "ya" in a later message. A URL or a file from another chat can't be.
@@ -45,7 +60,7 @@ Auto-save keeps every photo and document sent in one chat, so people in a group 
 - Files are listed on the Attachments page of the dashboard. Click a title or the eye icon to preview images, PDFs and text files, or open them in a new tab. HEIC and Office files only download.
 - Share links live at `/api/share/<token>`. They always expire (7 days at most), only the token's sha256 is stored, so a link is shown once, and turning a link off or deleting the file stops it right away. The Attachments page lists each file's live links with how often they were opened.
 - Inline files are served with `nosniff` and a strict CSP, and text is always sent as `text/plain`, so a file can't run as a page on the dashboard's origin.
-- Palui can't send a saved file back into the chat yet. It sends a share link instead.
+- `send_media` puts a saved file back into its own chat. To give someone outside the chat a file, the agent makes a share link.
 
 ## Pause and remove
 
