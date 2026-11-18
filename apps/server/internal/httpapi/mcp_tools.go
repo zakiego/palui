@@ -132,5 +132,7 @@ func MCPTools() []MCPTool {
 		{Name: "create_attachment_share", RPC: "createAttachmentShareFn", Title: "Share attachment", Description: "Make a share link for an attachment: public or private (owner only), for 1h, 24h or 7d."},
 		{Name: "revoke_attachment_share", RPC: "revokeAttachmentShareFn", Title: "Revoke attachment share", Description: "Stop a share link working.", Destructive: true},
 		{Name: "delete_attachment", RPC: "deleteAttachmentFn", Title: "Delete attachment", Description: "Delete a saved attachment and its share links.", Destructive: true},
+		{Name: "set_chat_save_media", RPC: "setChatSaveMediaFn", Title: "Set chat auto-save", Description: "Turn auto-saving a chat's photos and documents on or off, and pick how many days they stay (7, 30, 90, 365, or 0 to keep them). Off by default; turning it off keeps what was saved.", Idempotent: true},
+		{Name: "delete_auto_saved", RPC: "deleteAutoSavedFn", Title: "Delete auto-saved files", Description: "Delete every auto-saved file of a chat and their share links. Files saved on purpose stay.", Destructive: true},
 	}
 }

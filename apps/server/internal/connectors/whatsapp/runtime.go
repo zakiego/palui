@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zakiego/palui/apps/server/internal/attachments"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/channelutil"
 	"github.com/zakiego/palui/apps/server/internal/db"
@@ -721,12 +722,23 @@ func quotedPicture(c *waE2E.Message) *MediaInfo {
 // fetchMedia downloads a wanted photo, sticker, voice note or document. It
 // returns the media for the model (nil when it couldn't be read), the label
 // (a sticker's may change once its bytes are seen) and a note for the text.
-func (w *wa) fetchMedia(s Socket, m *Message, info *MediaInfo, label string) (*connectors.InboundMedia, string, string) {
+// fetchMedia downloads one message's media. forModel: the model will see it,
+// within the channel's limits. save: the chat auto-saves it, so a file up to
+// the attachments store's cap is fetched too, marked SaveOnly when the model
+// can't take it (the note then says it wasn't read).
+func (w *wa) fetchMedia(s Socket, m *Message, info *MediaInfo, label string, forModel, save bool) (*connectors.InboundMedia, string, string) {
 	max := MediaMaxBytes
 	if info.Kind == "document" {
 		max = DocumentMaxBytes
 	}
-	if info.Bytes > int64(max) {
+	limit := max
+	switch {
+	case !forModel:
+		limit = attachments.MaxBytes
+	case save:
+		limit = maxInt(max, attachments.MaxBytes)
+	}
+	if info.Bytes > int64(limit) {
 		return nil, label, overLimitNote(info, max)
 	}
 	data, err := s.Download(w.ctx(), m)
@@ -734,11 +746,18 @@ func (w *wa) fetchMedia(s Socket, m *Message, info *MediaInfo, label string) (*c
 	case err != nil:
 		w.log.Warn("whatsapp media download failed", map[string]any{"err": err.Error()})
 		return nil, label, fmt.Sprintf("[%s could not be downloaded]", info.Kind)
-	case len(data) > max:
+	case len(data) > limit:
 		return nil, label, overLimitNote(info, max)
 	}
-	media := connectors.InboundMedia{Kind: info.Kind, MimeType: info.MimeType, Filename: info.Filename, DurationSec: info.DurationSec}
+	media := connectors.InboundMedia{Kind: info.Kind, MimeType: info.MimeType, Filename: info.Filename, DurationSec: info.DurationSec, SaveOnly: !forModel}
+	note := ""
+	// Over the model's limit by either the declared or the real size, as above.
+	if forModel && (len(data) > max || info.Bytes > int64(max)) {
+		media.SaveOnly = true
+		note = overLimitNote(info, max)
+	}
 	if info.Sticker {
+		media.Sticker = true
 		// WebP, often animated: send a PNG (the first frame) so any vision
 		// model can read it.
 		animated := sticker.IsAnimated(data)
@@ -755,7 +774,14 @@ func (w *wa) fetchMedia(s Socket, m *Message, info *MediaInfo, label string) (*c
 		return &media, label, ""
 	}
 	media.Data = base64.StdEncoding.EncodeToString(data)
-	return &media, label, ""
+	return &media, label, note
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func (w *wa) deliver(s Socket, m *Message) error {
@@ -865,18 +891,35 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		}
 		return w.c.Services.IsOwner("whatsapp", BareJID(sender), alt)
 	}
+	// Photos and documents in a chat that auto-saves are fetched even when
+	// the model won't see them. Stickers and voice notes never are.
+	saves := func() bool {
+		return info != nil && !info.Sticker && (info.Kind == "image" || info.Kind == "document") &&
+			w.c.Services.SavesMedia != nil && w.c.Services.SavesMedia(msg)
+	}
 	note := ""
 	if info != nil {
 		// Without the bytes the row still says what was sent, so a photo
 		// with no caption isn't lost (group context shows it as a placeholder).
 		stub := connectors.InboundMedia{Kind: info.Kind, MimeType: info.MimeType, Filename: info.Filename, DurationSec: info.DurationSec}
-		if !wants() {
+		forModel, save := wants(), saves()
+		switch {
+		case !forModel && !save:
 			// Dropped by the router or kept as context: don't download it.
 			msg.Media = []connectors.InboundMedia{stub}
-		} else {
+		case !forModel:
+			// Only for the auto-save: the text stays as if it weren't fetched.
+			media, _, _ := w.fetchMedia(s, m, info, label, false, true)
+			if media == nil {
+				media = &stub
+			}
+			media.Caption = text
+			msg.Media = []connectors.InboundMedia{*media}
+		default:
 			var media *connectors.InboundMedia
-			media, label, note = w.fetchMedia(s, m, info, label)
+			media, label, note = w.fetchMedia(s, m, info, label, true, save)
 			if media != nil {
+				media.Caption = text
 				msg.Media = []connectors.InboundMedia{*media}
 			}
 		}
@@ -890,7 +933,7 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		if qi.Sticker {
 			what = "sticker"
 		}
-		media, _, qnote := w.fetchMedia(s, qm, qi, stickerLabel(qi))
+		media, _, qnote := w.fetchMedia(s, qm, qi, stickerLabel(qi), true, false)
 		if media != nil {
 			msg.Media = []connectors.InboundMedia{*media}
 			note = fmt.Sprintf("[the quoted %s is attached]", what)

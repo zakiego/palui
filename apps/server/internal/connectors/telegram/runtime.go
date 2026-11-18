@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zakiego/palui/apps/server/internal/attachments"
 	"github.com/zakiego/palui/apps/server/internal/config"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/channelutil"
@@ -616,16 +617,25 @@ func hasMedia(msg *Message) bool {
 	return len(msg.Photo) > 0 || msg.Voice != nil || msg.Document != nil
 }
 
-// mediaOf downloads the media only when wanted (see Services.WantsMedia).
-// Otherwise it returns the media without bytes, so a photo with no caption
-// still reaches the inbox (group context shows it as a placeholder).
-func (b *bot) mediaOf(msg *Message, wanted bool) ([]connectors.InboundMedia, string) {
-	failed := func(kind string) ([]connectors.InboundMedia, string) {
+// mediaOf downloads the media only when wanted (see Services.WantsMedia),
+// or when the chat auto-saves it (save, photos and documents only; see
+// Services.SavesMedia). Otherwise it returns the media without bytes, so a
+// photo with no caption still reaches the inbox (group context shows it as a
+// placeholder). Media fetched only for the auto-save is SaveOnly and adds no note.
+func (b *bot) mediaOf(msg *Message, wanted, save bool) ([]connectors.InboundMedia, string) {
+	caption := ""
+	if msg.Caption != nil {
+		caption = *msg.Caption
+	}
+	failed := func(stub connectors.InboundMedia, kind string) ([]connectors.InboundMedia, string) {
+		if !wanted {
+			return []connectors.InboundMedia{stub}, ""
+		}
 		return nil, fmt.Sprintf("[%s could not be downloaded]", kind)
 	}
 	if len(msg.Photo) > 0 {
 		stub := connectors.InboundMedia{Kind: "image", MimeType: "image/jpeg"}
-		if !wanted {
+		if !wanted && !save {
 			return []connectors.InboundMedia{stub}, ""
 		}
 		largest := msg.Photo[0]
@@ -636,9 +646,11 @@ func (b *bot) mediaOf(msg *Message, wanted bool) ([]connectors.InboundMedia, str
 		}
 		data := b.download(largest.FileID)
 		if data == nil {
-			return failed("image")
+			return failed(stub, "image")
 		}
 		stub.Data = base64.StdEncoding.EncodeToString(data)
+		stub.SaveOnly = !wanted
+		stub.Caption = caption
 		return []connectors.InboundMedia{stub}, ""
 	}
 	if msg.Voice != nil {
@@ -653,7 +665,7 @@ func (b *bot) mediaOf(msg *Message, wanted bool) ([]connectors.InboundMedia, str
 		}
 		data := b.download(msg.Voice.FileID)
 		if data == nil {
-			return failed("audio")
+			return failed(stub, "audio")
 		}
 		stub.Data = base64.StdEncoding.EncodeToString(data)
 		return []connectors.InboundMedia{stub}, ""
@@ -669,25 +681,42 @@ func (b *bot) mediaOf(msg *Message, wanted bool) ([]connectors.InboundMedia, str
 			mime = *doc.MimeType
 		}
 		stub := connectors.InboundMedia{Kind: "document", MimeType: mime, Filename: name}
-		if !wanted {
+		if !wanted && !save {
 			return []connectors.InboundMedia{stub}, ""
+		}
+		limit := float64(DocumentMaxBytes)
+		if save {
+			limit = attachments.MaxBytes
 		}
 		size := 0.0
 		if doc.FileSize != nil {
 			size = *doc.FileSize
 		}
-		if size > DocumentMaxBytes {
+		if size > limit {
+			if !wanted {
+				return []connectors.InboundMedia{stub}, ""
+			}
 			mb := strx.ToFixed(size/1024/1024, 1)
 			return nil, fmt.Sprintf("[document %s (%s MB) is over the 1 MB limit and was not read]", name, mb)
 		}
 		data := b.download(doc.FileID)
 		if data == nil {
-			return failed("document")
+			return failed(stub, "document")
 		}
-		if len(data) > DocumentMaxBytes {
+		if float64(len(data)) > limit {
+			if !wanted {
+				return []connectors.InboundMedia{stub}, ""
+			}
 			return nil, fmt.Sprintf("[document %s is over the 1 MB limit and was not read]", name)
 		}
 		stub.Data = base64.StdEncoding.EncodeToString(data)
+		stub.Caption = caption
+		stub.SaveOnly = !wanted
+		if wanted && len(data) > DocumentMaxBytes {
+			// Kept for the auto-save only; the model can't take it.
+			stub.SaveOnly = true
+			return []connectors.InboundMedia{stub}, fmt.Sprintf("[document %s is over the 1 MB limit and was not read]", name)
+		}
 		return []connectors.InboundMedia{stub}, ""
 	}
 	return nil, ""
@@ -806,7 +835,9 @@ func (b *bot) onMessage(msg *Message) error {
 		} else {
 			wanted = b.c.Services.IsOwner("telegram", in.SenderExternalID, "")
 		}
-		media, note := b.mediaOf(msg, wanted)
+		save := len(msg.Photo) > 0 || msg.Document != nil
+		save = save && b.c.Services.SavesMedia != nil && b.c.Services.SavesMedia(in)
+		media, note := b.mediaOf(msg, wanted, save)
 		if note != "" {
 			in.Text = strings.TrimPrefix(in.Text+"\n"+note, "\n")
 		}

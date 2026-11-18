@@ -46,6 +46,8 @@ type EngineOptions struct {
 	RetryDelay time.Duration
 	// performance.now() in ms; a monotonic clock by default.
 	Monotonic func() float64
+	// Encrypts auto-saved files; config's master key when empty.
+	MasterKey string
 }
 
 type routeJob struct {
@@ -72,6 +74,8 @@ type Engine struct {
 	blockedResumes []string
 	hooksRunning   map[string]bool
 	sweepStop      chan struct{}
+	quotaWarned    map[string]int64
+	lastAutoPrune  int64
 }
 
 // NewEngine is createEngine.
@@ -121,6 +125,10 @@ func NewEngine(o EngineOptions) *Engine {
 		},
 		WantsMedia: func(m connectors.InboundMessage) bool {
 			ok, err := MediaWanted(o.DB, m, e.Ctx.Clock())
+			return ok && err == nil
+		},
+		SavesMedia: func(m connectors.InboundMessage) bool {
+			ok, err := MediaSaved(o.DB, m)
 			return ok && err == nil
 		},
 	}
@@ -229,19 +237,32 @@ func (e *Engine) Inbound(msg connectors.InboundMessage) (*InboundResult, error) 
 		}
 		return nil, nil
 	}
-	if verdict.Context && len(msg.Media) > 0 {
-		// Group talk is only ever shown as text later ("[gambar dari
-		// sebelumnya]"), so its media bytes aren't worth keeping.
-		media := make([]connectors.InboundMedia, len(msg.Media))
-		for i, m := range msg.Media {
-			m.Data = ""
-			media[i] = m
+	// Taken before the bytes are dropped below; saved only if the chat
+	// auto-saves (WriteInbound returns the chat row).
+	toSave := autoSavable(msg.Media)
+	if len(msg.Media) > 0 {
+		media := make([]connectors.InboundMedia, 0, len(msg.Media))
+		for _, m := range msg.Media {
+			switch {
+			case verdict.Context:
+				// Group talk is only ever shown as text later ("[gambar dari
+				// sebelumnya]"), so its media bytes aren't worth keeping.
+				m.Data = ""
+			case m.SaveOnly:
+				// Fetched only for auto-save (a document over the model's
+				// limit): the text already says it wasn't read.
+				continue
+			}
+			media = append(media, m)
 		}
 		msg.Media = media
 	}
 	chat, row, err := WriteInbound(c.DB, msg, now, verdict.FromOwner)
 	if err != nil {
 		return nil, err
+	}
+	if chat.SaveMedia && len(toSave) > 0 {
+		e.autoSave(chat.ID, row.ID, msg, toSave)
 	}
 	if verdict.Context {
 		_, err := c.DB.Exec("UPDATE messages SET status = 'context' WHERE id = ?", row.ID)
@@ -865,6 +886,7 @@ func (e *Engine) Start() error {
 		e.maybeResume(runID)
 	}
 	e.ExpireApprovals(c.Clock())
+	e.PruneAutoSaved(c.Clock())
 	stop := make(chan struct{})
 	e.mu.Lock()
 	e.sweepStop = stop
@@ -884,6 +906,7 @@ func (e *Engine) Start() error {
 						}
 					}()
 					e.ExpireApprovals(c.Clock())
+					e.PruneAutoSaved(c.Clock())
 				}()
 			}
 		}

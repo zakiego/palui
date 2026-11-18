@@ -248,7 +248,7 @@ func (a *App) buildRuntime(d *db.DB, key string, startedAt int64) {
 		Clock:   o.Clock,
 		Running: sup.Running,
 	})
-	engine = chat.NewEngine(chat.EngineOptions{DB: d, Host: sup, Log: log.Child(logx.Fields{"component": "engine"}), Clock: o.Clock, Bus: chat.DefaultBus, Deps: built.Deps, AppURL: cfg.AppURL, DataDir: cfg.DataDir})
+	engine = chat.NewEngine(chat.EngineOptions{DB: d, Host: sup, Log: log.Child(logx.Fields{"component": "engine"}), Clock: o.Clock, Bus: chat.DefaultBus, Deps: built.Deps, AppURL: cfg.AppURL, DataDir: cfg.DataDir, MasterKey: key})
 	*services = *engine.Services
 	services.Reconcile = sup.Poke
 	caller := tools.ConnectorToolCaller(sup.Running, tools.CallerOptions{Clock: o.Clock, TZ: func() string {

@@ -249,6 +249,11 @@ type SaveInput struct {
 	MimeType    string
 	Filename    string
 	Bytes       []byte
+	// "tool" (the default) or "auto".
+	Origin     string
+	SenderID   string
+	SenderName string
+	SentAt     int64
 }
 
 // Saved is the stored row, Deduped when the same bytes were already saved in this chat.
@@ -280,10 +285,19 @@ func Save(q db.Q, in SaveInput, masterKey string, now int64) (Saved, error) {
 		f := CleanFilename(in.Filename)
 		filename = &f
 	}
-	row, err := db.ScanAttachmentMeta(q.WQueryRow("INSERT INTO saved_attachments (id, chat_id, message_id, run_id, title, description, kind, mime_type, filename, size, sha256, data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.AttachmentMetaCols,
+	origin := in.Origin
+	if origin == "" {
+		origin = OriginTool
+	}
+	var sentAt *int64
+	if in.SentAt != 0 {
+		sentAt = &in.SentAt
+	}
+	row, err := db.ScanAttachmentMeta(q.WQueryRow("INSERT INTO saved_attachments (id, chat_id, message_id, run_id, title, description, kind, mime_type, filename, size, sha256, data, created_at, origin, sender_id, sender_name, sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.AttachmentMetaCols,
 		secret.NewID("att"), in.ChatID, in.MessageID, in.RunID,
 		strx.Slice16(strx.Trim(in.Title), 200), strx.Slice16(strx.Trim(in.Description), 1000),
-		kind, NormalizeMime(in.MimeType), filename, len(in.Bytes), hash, data, now))
+		kind, NormalizeMime(in.MimeType), filename, len(in.Bytes), hash, data, now,
+		origin, nilIfEmpty(in.SenderID), nilIfEmpty(strx.Slice16(strx.Trim(in.SenderName), 80)), sentAt))
 	if err != nil {
 		return Saved{}, err
 	}
@@ -349,7 +363,7 @@ func Read(q db.Q, id, masterKey string) (File, bool, error) {
 	r, ok, err := db.One(q.QueryRow("SELECT "+db.AttachmentMetaCols+", data FROM saved_attachments WHERE id = ?", id), func(s db.Scanner) (row, error) {
 		var r row
 		a := &r.meta
-		err := s.Scan(&a.ID, &a.ChatID, &a.MessageID, &a.RunID, &a.Title, &a.Description, &a.Kind, &a.MimeType, &a.Filename, &a.Size, &a.Sha256, &a.CreatedAt, &r.data)
+		err := s.Scan(append(db.AttachmentMetaDest(a), &r.data)...)
 		return r, err
 	})
 	if err != nil || !ok {

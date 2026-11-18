@@ -140,13 +140,22 @@ type Chat struct {
 	AckEmoji      string  `json:"ackEmoji"`
 	LastMessageAt *int64  `json:"lastMessageAt"`
 	CreatedAt     int64   `json:"createdAt"`
+	// Keep every photo and document sent here in saved_attachments (off by default).
+	SaveMedia bool `json:"saveMedia"`
+	// Days an auto-saved file stays; 0 keeps it until someone deletes it.
+	SaveMediaDays int64 `json:"saveMediaDays"`
 }
 
-const ChatCols = "id, channel, external_id, title, kind, session_id, connector_id, allowed, agent_id, reply_mode, ack, ack_emoji, last_message_at, created_at"
+const ChatCols = "id, channel, external_id, title, kind, session_id, connector_id, allowed, agent_id, reply_mode, ack, ack_emoji, last_message_at, created_at, save_media, save_media_days"
+
+// ChatDest is ScanChat's scan targets, for queries that select more columns after ChatCols.
+func ChatDest(c *Chat) []any {
+	return []any{&c.ID, &c.Channel, &c.ExternalID, &c.Title, &c.Kind, &c.SessionID, &c.ConnectorID, &c.Allowed, &c.AgentID, &c.ReplyMode, &c.Ack, &c.AckEmoji, &c.LastMessageAt, &c.CreatedAt, &c.SaveMedia, &c.SaveMediaDays}
+}
 
 func ScanChat(s Scanner) (Chat, error) {
 	var c Chat
-	err := s.Scan(&c.ID, &c.Channel, &c.ExternalID, &c.Title, &c.Kind, &c.SessionID, &c.ConnectorID, &c.Allowed, &c.AgentID, &c.ReplyMode, &c.Ack, &c.AckEmoji, &c.LastMessageAt, &c.CreatedAt)
+	err := s.Scan(ChatDest(&c)...)
 	return c, err
 }
 
@@ -266,13 +275,25 @@ type AttachmentMeta struct {
 	Size        int64   `json:"size"`
 	Sha256      string  `json:"sha256"`
 	CreatedAt   int64   `json:"createdAt"`
+	// "tool" (save_attachment) or "auto" (the chat's auto-save).
+	Origin string `json:"origin"`
+	// Who sent the file and when, when known.
+	SenderID   *string `json:"senderId"`
+	SenderName *string `json:"senderName"`
+	SentAt     *int64  `json:"sentAt"`
 }
 
-const AttachmentMetaCols = "id, chat_id, message_id, run_id, title, description, kind, mime_type, filename, size, sha256, created_at"
+const AttachmentMetaCols = "id, chat_id, message_id, run_id, title, description, kind, mime_type, filename, size, sha256, created_at, origin, sender_id, sender_name, sent_at"
+
+// AttachmentMetaDest is ScanAttachmentMeta's scan targets, for queries that
+// select more columns after AttachmentMetaCols.
+func AttachmentMetaDest(a *AttachmentMeta) []any {
+	return []any{&a.ID, &a.ChatID, &a.MessageID, &a.RunID, &a.Title, &a.Description, &a.Kind, &a.MimeType, &a.Filename, &a.Size, &a.Sha256, &a.CreatedAt, &a.Origin, &a.SenderID, &a.SenderName, &a.SentAt}
+}
 
 func ScanAttachmentMeta(s Scanner) (AttachmentMeta, error) {
 	var a AttachmentMeta
-	err := s.Scan(&a.ID, &a.ChatID, &a.MessageID, &a.RunID, &a.Title, &a.Description, &a.Kind, &a.MimeType, &a.Filename, &a.Size, &a.Sha256, &a.CreatedAt)
+	err := s.Scan(AttachmentMetaDest(&a)...)
 	return a, err
 }
 
