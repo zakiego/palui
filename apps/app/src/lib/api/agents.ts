@@ -49,7 +49,7 @@ export type CatalogTool = {
 export type DataScope = "chat" | "agent" | "shared" | "none"
 
 // tools is null when the runtime couldn't list them (error says why).
-export type AgentTools = { tools: CatalogTool[] | null; error: string | null; used: { [tool: string]: number }; scopes: { [connectorId: string]: string | null }; noPrivateData?: string[] }
+export type AgentTools = { tools: CatalogTool[] | null; error: string | null; used: { [tool: string]: number }; scopes: { [connectorId: string]: string[] }; noPrivateData?: string[] }
 
 export type ContainerStats = { container: string; memories: number; documents: number; lastActivity: number | null }
 

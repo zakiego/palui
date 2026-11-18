@@ -11,14 +11,15 @@ export type ConnectorItem = {
   status: ConnectorStatus
   statusDetail: string | null
   trust: Trust
-  agentId: string | null
+  // The agents a tool connector serves; empty means every agent.
+  agentIds: string[]
   // Masked: the stored values are never sent back.
   secrets: { [field: string]: string }
   secretsError: string | null
   updatedAt: number
   config: JsonObject
-  // The agent that owns a scoped connector ("" once that agent is gone); null when global.
-  ownerName: string | null
+  // Names of the agents in agentIds, in order ("" for one that's gone).
+  ownerNames: string[]
 }
 
 export type ConnectorLive = { running: boolean; status: string; detail: string | null }
@@ -49,7 +50,8 @@ export type ConnectorDraft = {
   config?: { [field: string]: unknown }
   secrets?: { [field: string]: string }
   trust?: Trust
-  agentId?: string | null
+  // Empty means every agent. Left out, the agents stay as they are.
+  agentIds?: string[]
 }
 
 export type FieldResult = { ok: true } | { ok: false; message: string; fields: { [field: string]: string } }
@@ -65,6 +67,9 @@ export const connectConnectorFn = withInput<ConnectorDraft, FieldResult & { runt
 export const testConnectorFn = withInput<{ id: string }, { ok: true; detail: string; data: JsonObject }>("testConnectorFn", "POST")
 export const connectorActionFn = withInput<{ id: string; name: string; input?: { [key: string]: unknown } }, JsonObject>("connectorActionFn", "POST")
 export const setWhatsAppOwnerFn = withInput<{ phone: string }, { jid: string }>("setWhatsAppOwnerFn", "POST")
-export const setConnectorOwnerFn = withInput<{ id: string; agentId: string | null }, Ok>("setConnectorOwnerFn", "POST")
+// Which agents get a tool connector's tools; an empty list is every agent.
+export const setConnectorOwnerFn = withInput<{ id: string; agentIds: string[] }, Ok>("setConnectorOwnerFn", "POST")
+// Copy a connector into a new paused draft; returns the copy's id.
+export const duplicateConnectorFn = withInput<{ id: string }, { ok: true; id: string }>("duplicateConnectorFn", "POST")
 // Mark an MCP server as holding no private data (PLAN 19.4), or clear the mark.
 export const setConnectorDataFn = withInput<{ id: string; noPrivateData: boolean }, Ok>("setConnectorDataFn", "POST")

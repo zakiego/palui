@@ -27,7 +27,8 @@ export type ToolsViewProps = {
   tools: ToolItem[]
   groups: ToolItem[][]
   query: string
-  ownerOf: (connectorId: string) => string | null
+  // The agents a tool connector serves; empty means every agent.
+  agentsOf: (connectorId: string) => string[]
   setScope: (connectorId: string, scope: string) => void
   // Whether the owner marked an MCP server as holding no private data.
   noPrivate: (connectorId: string) => boolean
@@ -167,14 +168,16 @@ export function ConnectorGlyph({ type, size = "md" }: { type: string; size?: "sm
   )
 }
 
-// Global (every agent) or owned by this agent. A server another agent owns
-// never shows here: this agent doesn't get its tools.
-export function ScopeSelect({ connectorLabel, scope, onChange }: { connectorLabel: string; scope: string | null; onChange: (v: string) => void }) {
+// Global (every agent) or only this agent. A server shared with other agents
+// too says so (pick it on the connector's page); one this agent isn't on never
+// shows here, since this agent doesn't get its tools.
+export function ScopeSelect({ connectorLabel, agentId, agents, onChange }: { connectorLabel: string; agentId: string; agents: string[]; onChange: (v: string) => void }) {
   const t = useT()
-  const value = scope === null ? "all" : "only"
+  const value = agents.length === 0 ? "all" : agents.length === 1 && agents[0] === agentId ? "only" : "some"
   const options = [
     { value: "all", label: t("agents.tools.scopeAll"), icon: <GlobeIcon aria-hidden="true" /> },
     { value: "only", label: t("agents.tools.scopeHere"), icon: <BotIcon aria-hidden="true" /> },
+    ...(value === "some" ? [{ value: "some", label: t("agents.tools.scopeShared", { n: agents.filter((a) => a !== agentId).length.toLocaleString() }), icon: <UsersIcon aria-hidden="true" /> }] : []),
   ]
   return <SimpleSelect size="sm" className="w-fit max-w-full min-w-0" aria-label={t("agents.tools.scopeFor", { name: connectorLabel })} value={value} options={options} onChange={onChange} />
 }
@@ -188,7 +191,7 @@ export function GroupActions({ head, props }: { head: ToolItem; props: ToolsView
     <div className="flex flex-col gap-4 pb-2">
       <div className="flex flex-wrap items-center gap-2">
         {head.connectorId in props.data.scopes && (
-          <ScopeSelect connectorLabel={head.connectorLabel} scope={props.ownerOf(head.connectorId)} onChange={(v) => props.setScope(head.connectorId, v)} />
+          <ScopeSelect connectorLabel={head.connectorLabel} agentId={props.agent.id} agents={props.agentsOf(head.connectorId)} onChange={(v) => props.setScope(head.connectorId, v)} />
         )}
         <Button
           variant="ghost"
@@ -207,7 +210,7 @@ export function GroupActions({ head, props }: { head: ToolItem; props: ToolsView
             <FieldLabel htmlFor={id}>{t("agents.tools.noPrivate")}</FieldLabel>
             <FieldDescription>
               {t("agents.tools.noPrivateHint")}
-              {props.ownerOf(head.connectorId) === null && ` ${t("agents.tools.noPrivateGlobal")}`}
+              {props.agentsOf(head.connectorId).length !== 1 && ` ${t("agents.tools.noPrivateGlobal")}`}
             </FieldDescription>
           </FieldContent>
           <Switch id={id} checked={props.noPrivate(head.connectorId)} onCheckedChange={(v) => props.setNoPrivate(head.connectorId, v)} />

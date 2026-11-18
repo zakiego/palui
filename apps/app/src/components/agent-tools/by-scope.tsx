@@ -41,10 +41,10 @@ export function ToolsByScope(props: ToolsViewProps) {
   const { groups, query, agent } = props;
   const searching = query.trim() !== "";
   const own = groups.filter(
-    (list) => props.ownerOf(list[0]!.connectorId) === agent.id,
+    (list) => props.agentsOf(list[0]!.connectorId).includes(agent.id),
   );
   const shared = groups.filter(
-    (list) => props.ownerOf(list[0]!.connectorId) !== agent.id,
+    (list) => !props.agentsOf(list[0]!.connectorId).includes(agent.id),
   );
   const [picked, setPicked] = React.useState<Part>(
     own.length > 0 ? "own" : "shared",
@@ -108,7 +108,7 @@ export function ToolsByScope(props: ToolsViewProps) {
     {
       value: "own",
       Icon: BotIcon,
-      title: t("agents.tools.scopeHere"),
+      title: t("agents.tools.partHere"),
       count: own.length,
     },
     {
@@ -164,7 +164,7 @@ export function ToolsByScope(props: ToolsViewProps) {
       {part === "own" ? (
         <section
           id="agent-tools-own"
-          aria-label={t("agents.tools.scopeHere")}
+          aria-label={t("agents.tools.partHere")}
           className="flex flex-col gap-3"
         >
           {own.length > 0 ? (
@@ -236,7 +236,8 @@ function Groups({
           const head = list[0]!;
           // Whose data, from every tool on the server (not only the search
           // hits). Each tool says its own only when the server mixes scopes.
-          const owned = props.ownerOf(head.connectorId) !== null;
+          // Agent data only when it serves just one agent, like the server.
+          const owned = props.agentsOf(head.connectorId).length === 1;
           const noPrivate = props.noPrivate(head.connectorId);
           const all = props.tools.filter(
             (x) => x.connectorId === head.connectorId,

@@ -61,11 +61,7 @@ function ConnectorCard({ item, live, onOpen }: { item: ConnectorItem; live: Conn
       <CardFooter className="flex-wrap gap-2 border-t pt-(--card-spacing) pb-(--card-spacing)">
         <ConnectorStatusBadge status={item.status} />
         {item.trust === "external" && <Badge variant="outline">{t("connectors.external")}</Badge>}
-        {item.ownerName !== null && (
-          <Badge variant="outline" className="max-w-full">
-            <span className="truncate">{item.ownerName ? t("agents.tools.scopeOnly", { name: item.ownerName }) : t("connectors.agentsNoneShort")}</span>
-          </Badge>
-        )}
+        {item.ownerNames.length > 0 && <AgentsBadge names={item.ownerNames} />}
         {detail && (
           <span className="min-w-0 flex-1 basis-32 truncate text-caption text-muted-foreground" title={detail}>
             {detail}
@@ -118,4 +114,17 @@ export function ConnectorGridSkeleton() {
       </div>
     </div>
   ))
+}
+
+// Who gets a scoped connector: one name, or how many with the names on hover.
+// Agents deleted since don't count.
+function AgentsBadge({ names }: { names: string[] }) {
+  const t = useT()
+  const live = names.filter(Boolean)
+  const text = live.length === 0 ? t("connectors.agentsNoneShort") : live.length === 1 ? t("agents.tools.scopeOnly", { name: live[0]! }) : t("connectors.agentsCount", { n: live.length.toLocaleString() })
+  return (
+    <Badge variant="outline" className="max-w-full" title={live.length > 1 ? live.join(", ") : undefined}>
+      <span className="truncate">{text}</span>
+    </Badge>
+  )
 }

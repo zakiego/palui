@@ -3,12 +3,13 @@
 // the danger area. Leaving the page with unsaved edits keeps them as a draft.
 import * as React from "react"
 import { useNavigate, useRouter } from "@tanstack/react-router"
-import { BotIcon, BugIcon, GlobeIcon } from "lucide-react"
+import { BotIcon, BugIcon, CopyIcon, GlobeIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { ConnectorManifest, SetupStep } from "@/shared/connectors/define"
 
 import { ConnectorStatusBadge } from "@/components/connector-status"
 import { SimpleSelect } from "@/components/simple-select"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { CircleAlertIcon } from "lucide-react"
 import { RuntimeAlert } from "@/components/runtime-alert"
 import { ConnectorsBackLink } from "@/components/connectors/shared"
@@ -38,7 +39,7 @@ import type { ConnectorTarget } from "@/components/connectors/targets"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { usePoll } from "@/hooks/use-poll"
-import { connectConnectorFn, getConnectorDetail, removeConnectorFn, saveConnectorDraft, testConnectorFn } from "@/lib/api/connectors"
+import { connectConnectorFn, duplicateConnectorFn, getConnectorDetail, removeConnectorFn, saveConnectorDraft, testConnectorFn } from "@/lib/api/connectors"
 import { errorMessage, inZone } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 import { type FieldStep, type WizardField, wizardFieldInfo as fieldInfo, wizardInitialValues, wizardPayload } from "@/lib/zod-fields"
@@ -67,13 +68,13 @@ export function ConnectorDetail({
   const [values, setValues] = React.useState(() => wizardInitialValues(m, target.config))
   const [label, setLabel] = React.useState(target.label)
   const [trust, setTrust] = React.useState(target.trust)
-  const [owner, setOwner] = React.useState(target.agentId)
+  const [owners, setOwners] = React.useState(target.agentIds)
   // Sent only once changed here (or set by "Add MCP" on a new one), so a save
-  // never undoes an owner picked on the agent page meanwhile.
-  const [ownerTouched, setOwnerTouched] = React.useState(target.isNew && target.agentId !== null)
+  // never undoes agents picked on the agent page meanwhile.
+  const [ownerTouched, setOwnerTouched] = React.useState(target.isNew && target.agentIds.length > 0)
   const [dirty, setDirty] = React.useState(false)
   const [errors, setErrors] = React.useState<Record<string, string>>({})
-  const [busy, setBusy] = React.useState<null | "save" | "test" | "connect" | "remove">(null)
+  const [busy, setBusy] = React.useState<null | "save" | "test" | "connect" | "remove" | "duplicate">(null)
   const [saved, setSaved] = React.useState(!target.isNew)
 
   const detail = usePoll(() => getConnectorDetail({ data: { id: target.id } }), { intervalMs: 3000, deps: [target.id] })
@@ -97,7 +98,7 @@ export function ConnectorDetail({
 
   const payload = () => {
     const { config, secrets } = wizardPayload(m, values)
-    return { id: target.id, type: m.id, label: label.trim() || m.name, config, secrets, trust: m.multiple ? trust : undefined, agentId: m.kind === "tools" && ownerTouched ? owner : undefined }
+    return { id: target.id, type: m.id, label: label.trim() || m.name, config, secrets, trust: m.multiple ? trust : undefined, agentIds: m.kind === "tools" && ownerTouched ? owners : undefined }
   }
 
   const clearSecretInputs = () =>
@@ -196,6 +197,22 @@ export function ConnectorDetail({
     }
   }
 
+  // A copy to change and give to other agents. Unsaved edits are saved first,
+  // so the copy is what the form shows.
+  const onDuplicate = async () => {
+    setBusy("duplicate")
+    try {
+      if (dirty && !(await save())) return
+      const res = await duplicateConnectorFn({ data: { id: target.id } })
+      toast.success(t("connectors.duplicated", { name: label || m.name }))
+      void navigate({ to: "/connectors/$id", params: { id: res.id }, search: { agent: fromAgent?.id } })
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
   // Wizard progress survives leaving the page (PLAN 11.5): save a draft.
   const removed = React.useRef(false)
   const latest = React.useRef({ dirty, busy, save, t })
@@ -225,7 +242,15 @@ export function ConnectorDetail({
   return (
     <>
       <div className="flex flex-col gap-3">
-        <ConnectorsBackLink agent={fromAgent} />
+        <div className="flex items-center justify-between gap-2">
+          <ConnectorsBackLink agent={fromAgent} />
+          {m.multiple && m.kind === "tools" && (!target.isNew || saved) && (
+            <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void onDuplicate()}>
+              {busy === "duplicate" ? <Spinner data-icon="inline-start" /> : <CopyIcon data-icon="inline-start" aria-hidden="true" />}
+              {t("connectors.duplicate")}
+            </Button>
+          )}
+        </div>
         <div className="flex min-w-0 flex-col gap-1.5">
           <h1 className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 font-heading text-title">
             <span className="min-w-0 break-words">{label || m.name}</span>
@@ -299,9 +324,9 @@ export function ConnectorDetail({
         <AgentScope
           id={target.id}
           agents={agents}
-          value={owner}
+          value={owners}
           onChange={(v) => {
-            setOwner(v)
+            setOwners(v)
             setOwnerTouched(true)
             setDirty(true)
           }}
@@ -401,6 +426,7 @@ export function ConnectorDetail({
               {t("connectors.test")}
             </Button>
           ) : null}
+
           <Button className="ms-auto" disabled={busy !== null} onClick={() => void onConnect()}>
             {busy === "connect" && <Spinner data-icon="inline-start" />}
             {status === "on" || status === "connecting" ? t("connectors.saveReconnect") : t("connectors.connect")}
@@ -411,42 +437,62 @@ export function ConnectorDetail({
   )
 }
 
-// Global (every agent gets its tools) or owned by one agent. Never two owners:
-// two agents that need different logins get a copy each. Choice cards, title only.
-function AgentScope({ id, agents, value, onChange }: { id: string; agents: ScopeAgent[]; value: string | null; onChange: (v: string | null) => void }) {
+// Global (every agent gets its tools) or only the agents picked. Two agents
+// that need different logins get a copy each (Duplicate). Choice cards, title
+// only, then the agents as toggles.
+function AgentScope({ id, agents, value, onChange }: { id: string; agents: ScopeAgent[]; value: string[]; onChange: (v: string[]) => void }) {
   const t = useT()
-  // Back to "One agent" after "Global" picks the last owner again.
+  // Back to "Chosen agents" after "Global" picks the last ones again.
   const last = React.useRef(value)
-  if (value !== null) last.current = value
-  const gone = value !== null && !agents.some((a) => a.id === value)
+  if (value.length > 0) last.current = value
+  // Agents deleted since: still listed until turned off, then gone.
+  const gone = value.filter((v) => !agents.some((a) => a.id === v))
   return (
     <FieldSet className="gap-3">
       <FieldLegend variant="label">{t("connectors.agents")}</FieldLegend>
-      <RadioGroup value={value === null ? "all" : "one"} onValueChange={(v) => onChange(v === "one" ? (value ?? last.current ?? agents[0]?.id ?? null) : null)} className="grid grid-cols-1 gap-3 @md/main:grid-cols-2">
-        {(["all", "one"] as const).map((v) => (
+      <RadioGroup
+        value={value.length === 0 ? "all" : "some"}
+        onValueChange={(v) => onChange(v === "some" ? (last.current.length > 0 ? last.current : agents.slice(0, 1).map((a) => a.id)) : [])}
+        className="grid grid-cols-1 gap-3 @md/main:grid-cols-2"
+      >
+        {(["all", "some"] as const).map((v) => (
           <FieldLabel key={v} htmlFor={`${id}-agents-${v}`}>
             <Field orientation="horizontal" className="items-center gap-3">
               {v === "all" ? <GlobeIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /> : <BotIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
               <FieldContent>
-                <FieldTitle>{t(v === "all" ? "connectors.agentsAll" : "connectors.agentsOne")}</FieldTitle>
+                <FieldTitle>{t(v === "all" ? "connectors.agentsAll" : "connectors.agentsSome")}</FieldTitle>
               </FieldContent>
               <RadioGroupItem value={v} id={`${id}-agents-${v}`} />
             </Field>
           </FieldLabel>
         ))}
       </RadioGroup>
-      {value !== null && (
-        <Field>
-          <FieldLabel htmlFor={`${id}-owner`} className="sr-only">
-            {t("connectors.owner")}
-          </FieldLabel>
-          <SimpleSelect
-            id={`${id}-owner`}
-            value={gone ? "" : value}
-            options={[...(gone ? [{ value: "", label: t("connectors.ownerGone") }] : []), ...agents.map((a) => ({ value: a.id, label: a.name, icon: <AgentAvatar agent={a} size="xs" /> }))]}
-            onChange={(v) => v && onChange(v)}
-          />
-        </Field>
+      {value.length > 0 && (
+        <ToggleGroup
+          multiple
+          variant="outline"
+          aria-label={t("connectors.agentsPick")}
+          className="w-full flex-wrap"
+          value={value}
+          // Never empty: no agent picked would make it global. Deleted agents
+          // go once a live one is picked, since the server refuses them.
+          onValueChange={(v: string[]) => {
+            const live = v.filter((x) => agents.some((a) => a.id === x))
+            if (v.length > 0) onChange(live.length > 0 ? live : v)
+          }}
+        >
+          {agents.map((a) => (
+            <ToggleGroupItem key={a.id} value={a.id} className="max-w-full min-w-0">
+              <AgentAvatar agent={a} size="xs" />
+              <span className="truncate">{a.name}</span>
+            </ToggleGroupItem>
+          ))}
+          {gone.map((g) => (
+            <ToggleGroupItem key={g} value={g} className="text-muted-foreground">
+              {t("connectors.ownerGone")}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       )}
     </FieldSet>
   )
