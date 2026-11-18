@@ -3,7 +3,7 @@ title: Attachments
 description: The built-in Attachments skill lets Palui keep the important files you send in chat, like an ID card, a receipt or a ticket.
 ---
 
-Kind: `skill`. Built in. When you send a photo or a document that's worth keeping, Palui saves it with a title and a short note so you can find it later. Nothing is saved automatically: the model only keeps files that matter (identity documents, receipts, tickets, contracts) or files you ask it to keep.
+Kind: `skill`. Built in. When you send a photo or a document that's worth keeping, Palui saves it with a title and a short note so you can find it later. By default nothing is saved automatically: the model only keeps files that matter (identity documents, receipts, tickets, contracts) or files you ask it to keep. You can also turn on [auto-save](#auto-save) for a chat, and then every photo and document sent there is kept.
 
 ## Connect
 
@@ -14,7 +14,7 @@ Nothing to set up. Attachments is a built-in skill and is created on first boot.
 | Tool | Class | What it does |
 |---|---|---|
 | `save_attachment` | `write` | Save a file from the message being answered, with a title and a description. With several files, `nomor` picks one (1-based). With `earlier: true` it saves a file from an earlier message in the same chat instead. |
-| `list_attachments` | `read` | List saved files in this chat, with an optional search over titles, descriptions and file names |
+| `list_attachments` | `read` | List saved files in this chat, with an optional search over titles, descriptions and file names. Auto-saved files say so and name who sent them. |
 | `get_attachment` | `read` | One file's details and its dashboard link |
 | `share_attachment` | `write` | Make a temporary link that opens the file itself. Private (the default) needs a dashboard sign-in, public opens for anyone with the link. Expires after 1h, 24h (the default) or 7d. |
 | `unshare_attachment` | `write` | Turn off every live link to a file |
@@ -22,13 +22,26 @@ Nothing to set up. Attachments is a built-in skill and is created on first boot.
 
 Each tool's class decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
 
+## Auto-save
+
+Auto-save keeps every photo and document sent in one chat, so people in a group can share a file once and ask about it later. It's off in every chat until you turn it on. Pick it on the Chats page, next to the reply mode, or with the `set_chat_save_media` MCP tool.
+
+- It keeps photos and documents of the types listed below, from anyone the chat accepts (you, and guests in a chat set up for them). Stickers and voice notes are skipped, and so is any message the chat would drop.
+- Each file is saved with who sent it, when, its caption and its file name. A document's title is its file name, and a photo's is the first line of its caption, or "Foto dari <name>". Find them on the Attachments page, marked "Auto-saved, sent by <name>".
+- You choose how long files stay: 7, 30 (the default), 90 or 365 days, or until you delete them. Older files are deleted every few hours. Files the agent saved on purpose never expire.
+- Auto-saved files are capped at 500 MB per chat and 2 GB across all chats. A file that would go over is skipped, and the Activity page says so (at most every 6 hours per chat).
+- A document up to 10 MB is saved even though the model only reads documents up to 1 MB.
+- Saving runs in the background after the message is stored, so it never slows down a reply. A failure is logged and the message is handled as usual.
+- An auto-saved file is data, not an instruction. Saving one doesn't run a turn, doesn't touch approvals and doesn't change what the agent may do. When the agent lists files later, it's told that their titles and descriptions are the sender's words.
+- Turning auto-save off keeps what was saved. "Delete all" next to the count on the Chats page deletes every auto-saved file of that chat and its share links. Files saved on purpose stay.
+
 ## Limits and safety
 
 - Files from the message being answered can be saved, and so can files sent in the same chat in the last 24 hours (the 10 most recent). That way a receipt still gets saved when the agent shows a preview first and you answer "ya" in a later message. A URL or a file from another chat can't be.
 - Allowed types: JPEG, PNG, WebP, GIF, HEIC, PDF, plain text, CSV, Word, Excel and PowerPoint. The first bytes must match the type, so a renamed file is refused.
-- Up to 10 MB per file. The channel's own limits apply first: WhatsApp and Telegram documents are capped at 1 MB today.
+- Up to 10 MB per file. The channel's own limits apply first: the model only reads WhatsApp and Telegram documents up to 1 MB, though a chat with auto-save on still keeps them up to 10 MB.
 - Files are encrypted with `MASTER_KEY` (AES-256-GCM) inside the SQLite database, so they're included in backups. Losing `MASTER_KEY` means losing the files, the same as connector secrets.
-- Saving the same file twice in a chat keeps one copy.
+- Saving the same file twice in a chat keeps one copy, whether the agent or auto-save saved it first.
 - Files are listed on the Attachments page of the dashboard. Click a title or the eye icon to preview images, PDFs and text files, or open them in a new tab. HEIC and Office files only download.
 - Share links live at `/api/share/<token>`. They always expire (7 days at most), only the token's sha256 is stored, so a link is shown once, and turning a link off or deleting the file stops it right away. The Attachments page lists each file's live links with how often they were opened.
 - Inline files are served with `nosniff` and a strict CSP, and text is always sent as `text/plain`, so a file can't run as a page on the dashboard's origin.

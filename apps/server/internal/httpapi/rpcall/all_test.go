@@ -20,7 +20,7 @@ var want = map[string]string{
 	"getAgentMembersFn": "GET", "saveMemberFn": "POST", "setAgentMemberFn": "POST",
 	// attachments.ts
 	"getAttachments": "GET", "deleteAttachmentFn": "POST", "getAttachmentShares": "GET",
-	"createAttachmentShareFn": "POST", "revokeAttachmentShareFn": "POST",
+	"createAttachmentShareFn": "POST", "revokeAttachmentShareFn": "POST", "setChatSaveMediaFn": "POST", "deleteAutoSavedFn": "POST",
 	// chats.ts
 	"getChats": "GET", "getTranscript": "GET", "sendWebMessage": "POST", "decideApproval": "POST", "stopTurn": "POST",
 	// connectors.ts
@@ -56,8 +56,8 @@ var want = map[string]string{
 var public = map[string]bool{"getSession": true, "getInvite": true, "acceptInvite": true}
 
 func TestEveryServerFunctionIsRegistered(t *testing.T) {
-	if len(want) != 91 {
-		t.Fatalf("the list has %d names, want 91", len(want))
+	if len(want) != 93 {
+		t.Fatalf("the list has %d names, want 93", len(want))
 	}
 	got := map[string]httpapi.Handler{}
 	for _, h := range httpapi.Handlers() {

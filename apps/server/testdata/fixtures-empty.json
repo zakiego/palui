@@ -19,7 +19,7 @@
    "rows": []
   },
   "chats": {
-   "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji"],
+   "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji","save_media","save_media_days"],
    "rows": []
   },
   "claims": {
@@ -149,7 +149,7 @@
    "rows": []
   },
   "saved_attachments": {
-   "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at"],
+   "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at","origin","sender_id","sender_name","sent_at"],
    "rows": []
   },
   "session": {
