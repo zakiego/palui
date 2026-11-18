@@ -473,7 +473,17 @@ func ResumeBlocker(c *EngineCtx, rc approvals.ResumeContext) (string, error) {
 			}
 		}
 	}
-	chain, err := models.ResolveChain(c.DB, c.Host, rc.ModelRole)
+	var own db.AgentModels
+	if rc.AgentID != "" {
+		agent, found, err := agents.Get(c.DB, rc.AgentID)
+		if err != nil {
+			return "", err
+		}
+		if found {
+			own = agent.ModelRoles.V
+		}
+	}
+	chain, err := models.ResolveAgentChain(c.DB, c.Host, own, rc.ModelRole)
 	if err != nil {
 		return "", err
 	}
@@ -802,7 +812,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 	}
 	mode := audience
 
-	chain, err := models.ResolveChain(q, c.Host, role)
+	chain, err := models.ResolveAgentChain(q, c.Host, agent.ModelRoles.V, role)
 	if err != nil {
 		return TurnResult{}, err
 	}

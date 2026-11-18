@@ -2,6 +2,7 @@
 // recall container, Telegram bot, tools and memory, and the per-chat switches.
 import { withInput, noInput } from "./client"
 import type { AgentColor, AgentIcon } from "@/shared/constants"
+import type { ModelRoles } from "./settings"
 import type { AgentView, Channel, ChatKind, ConnectorStatus, GuestTools, Instruction, Ok, ReplyMode, TelegramBot, ToolClass, ToolPermission, ToolPermissions } from "./types"
 
 export type AgentsPage = { agents: AgentView[]; bots: TelegramBot[] }
@@ -21,8 +22,12 @@ export type AgentChatRow = {
 
 // `agent` is null when the slug doesn't exist (and nothing else is sent).
 export type AgentPage =
-  | { agent: null; bots?: undefined; instructions?: undefined; chats?: undefined; chatsTotal?: undefined }
-  | { agent: AgentView; bots: TelegramBot[]; instructions: Instruction[]; chats: AgentChatRow[]; chatsTotal: number }
+  | { agent: null; models?: undefined; bots?: undefined; instructions?: undefined; chats?: undefined; chatsTotal?: undefined }
+  | { agent: AgentView; models: AgentModels; bots: TelegramBot[]; instructions: Instruction[]; chats: AgentChatRow[]; chatsTotal: number }
+
+// The agent's own chains (a role left empty uses the global one), the global
+// chains, and the model connectors a step can pick.
+export type AgentModels = { own: ModelRoles; global: ModelRoles; connectors: { id: string; label: string; status: ConnectorStatus; icon?: string }[] }
 
 export type CatalogTool = {
   name: string
@@ -72,6 +77,8 @@ export type SaveAgentInput = {
   avatarImage: string | null
   avatarIcon: AgentIcon | null
   avatarColor: AgentColor | null
+  // Left out keeps the agent's models; an empty role uses the global chain.
+  modelRoles?: ModelRoles
   id?: string
   slug?: string
 }

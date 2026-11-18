@@ -13,11 +13,16 @@ func TimezoneZod() *zod.StringS {
 
 // ModelChainZod is modelChainSchema.
 func ModelChainZod() *zod.ArrayS {
-	return zod.Array(zod.Object(
+	return zod.Array(ModelLinkZod()).Min(1).Max(6)
+}
+
+// ModelLinkZod is one step of a model chain.
+func ModelLinkZod() *zod.ObjectS {
+	return zod.Object(
 		zod.F("connectorId", zod.String().Min(1).Max(64)),
 		zod.F("model", zod.String().Trim().Min(1).Max(120)),
 		zod.F("effort", zod.Enum(ReasoningEfforts...).Optional()),
-	)).Min(1).Max(6)
+	)
 }
 
 // BudgetsZod is budgetsSchema.

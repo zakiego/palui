@@ -11,9 +11,9 @@
    "rows": []
   },
   "agents": {
-   "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat"],
+   "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat","model_roles"],
    "rows": [
-    ["<agt#1>","palui","Palui","Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.\nDefault bahasa Indonesia santai. Kalau Zaki menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.\nJangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.\nKalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.",1,null,"off","safe",0,null,null,null,null,"<wall clock>","<wall clock>",null,null,0]
+    ["<agt#1>","palui","Palui","Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.\nDefault bahasa Indonesia santai. Kalau Zaki menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.\nJangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.\nKalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.",1,null,"off","safe",0,null,null,null,null,"<wall clock>","<wall clock>",null,null,0,null]
    ]
   },
   "attachment_shares": {

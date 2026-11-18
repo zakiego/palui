@@ -226,6 +226,8 @@ func worst(k *Kit) {
 		RecallReadContainers: readContainers,
 		RecallPerChat:        ptr(true),
 		TelegramConnectorID:  ptr("tgbot-arisan"),
+		// Its own six-step default chain (with the removed connector) and fast model; vision follows the global one.
+		ModelRoles: obj("default", sixSteps(), "fast", []any{obj("connectorId", "ai-gateway", "model", "claude-haiku-4-5-20251001")}),
 	})
 	// An uploaded photo: a small gradient PNG, the shape a browser-resized photo has.
 	cs := k.Agent(Agent{Slug: "cs", Name: "CS", Persona: "Jawab pertanyaan pelanggan Vorneo.", GuestTools: "none", AvatarImage: ptr(GradientAvatar48())})

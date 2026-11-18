@@ -19,11 +19,8 @@ import (
 // ReasoningEfforts are the values a model chain link may carry.
 var ReasoningEfforts = []string{"none", "minimal", "low", "medium", "high", "xhigh", "max"}
 
-type ModelChainLink struct {
-	ConnectorID string `json:"connectorId"`
-	Model       string `json:"model"`
-	Effort      string `json:"effort,omitempty"`
-}
+// ModelChainLink is one step of a chain (db.ModelLink, shared with agents.model_roles).
+type ModelChainLink = db.ModelLink
 
 type ModelRoles struct {
 	Default []ModelChainLink `json:"default"`

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/zakiego/palui/apps/server/internal/budget"
+	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/models"
 	"github.com/zakiego/palui/apps/server/internal/settings"
@@ -323,6 +324,36 @@ func TestResolveChain(t *testing.T) {
 	links, _ = models.ResolveChain(d, h, "vision")
 	if len(links) != 1 || links[0].Model != "v1" {
 		t.Fatal(links)
+	}
+}
+
+func TestResolveAgentChain(t *testing.T) {
+	d := testutil.DB(t)
+	testutil.Must(t, settings.Set(d, "modelRoles", settings.ModelRoles{
+		Default: []settings.ModelChainLink{{ConnectorID: "gw", Model: "global"}},
+		Fast:    []settings.ModelChainLink{},
+		Vision:  []settings.ModelChainLink{{ConnectorID: "gw", Model: "global-vision"}},
+	}, 1))
+	h := host{"gw": func(m, r string) (models.LanguageModel, error) { return models.NewScripted(), nil }}
+	own := db.AgentModels{Default: []db.ModelLink{{ConnectorID: "gw", Model: "mine", Effort: "high"}}}
+	first := func(role string, own db.AgentModels) string {
+		t.Helper()
+		links, err := models.ResolveAgentChain(d, h, own, role)
+		testutil.Must(t, err)
+		if len(links) == 0 {
+			t.Fatalf("no links for %s", role)
+		}
+		return links[0].Model
+	}
+	// Its own chain wins, a role it left empty uses the global one, and an
+	// empty global role falls back to its own default before the global one.
+	for _, c := range []struct{ role, want string }{{"default", "mine"}, {"vision", "global-vision"}, {"fast", "mine"}} {
+		if got := first(c.role, own); got != c.want {
+			t.Errorf("%s: got %s, want %s", c.role, got, c.want)
+		}
+	}
+	if got := first("fast", db.AgentModels{}); got != "global" {
+		t.Errorf("no override: got %s", got)
 	}
 }
 

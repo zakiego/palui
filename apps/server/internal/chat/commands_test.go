@@ -254,6 +254,23 @@ func TestModelsAndModel(t *testing.T) {
 		jsonEq(t, need(settings.Get[settings.ModelRoles](h.DB, "modelRoles")).Default[0], `{"connectorId":"cliproxy","model":"m"}`)
 	})
 
+	t.Run("/model changes the agent's own chain when it has one, and leaves the global one", func(t *testing.T) {
+		h := cmdSetup(t, nil, offers(), extra{})
+		palui := need(agents.GetDefault(h.DB, 1))
+		need(agents.SetModels(h.DB, palui.ID, db.AgentModels{Default: []db.ModelLink{{ConnectorID: "gateway", Model: "gpt-5"}}}, 1))
+		h.say("/model")
+		contains(t, lastText(t, h.DB), "• default: gateway/gpt-5 (khusus Palui)")
+		contains(t, lastText(t, h.DB), "• fast: cliproxy/m → gateway/m")
+		h.say("/status")
+		contains(t, lastText(t, h.DB), "Model: gateway/gpt-5")
+		h.say("/model sonnet")
+		contains(t, lastText(t, h.DB), "Berlaku mulai pesan berikutnya, khusus Palui.")
+		own, _, err := agents.Get(h.DB, palui.ID)
+		testutil.Must(t, err)
+		jsonEq(t, own.ModelRoles.V.Default, `[{"connectorId":"gateway","model":"claude-sonnet-4-6"},{"connectorId":"cliproxy","model":"claude-sonnet-4-6"},{"connectorId":"gateway","model":"gpt-5"}]`)
+		jsonEq(t, need(settings.Get[settings.ModelRoles](h.DB, "modelRoles")).Default[0], `{"connectorId":"cliproxy","model":"m"}`)
+	})
+
 	t.Run("says so when a connector's model list can't be fetched", func(t *testing.T) {
 		h := cmdSetup(t, nil, []offer{{id: "cliproxy", err: errors.New("503")}}, extra{})
 		h.say("/models")

@@ -11,8 +11,6 @@ import (
 
 	"github.com/zakiego/palui/apps/server/internal/auth"
 	"github.com/zakiego/palui/apps/server/internal/backup"
-	"github.com/zakiego/palui/apps/server/internal/connectors"
-	"github.com/zakiego/palui/apps/server/internal/connectors/registry"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/hooks"
 	"github.com/zakiego/palui/apps/server/internal/httpapi"
@@ -59,13 +57,6 @@ func settingValue(q db.Q, key string) (any, error) {
 	return stored, nil
 }
 
-type modelOption struct {
-	ID     string  `json:"id"`
-	Label  string  `json:"label"`
-	Status string  `json:"status"`
-	Icon   *string `json:"icon,omitempty"`
-}
-
 func getSettingsPage(c *httpapi.Call) (any, error) {
 	q := c.DB()
 	page := jsonx.NewMap[any]()
@@ -78,21 +69,9 @@ func getSettingsPage(c *httpapi.Call) (any, error) {
 		values.Set(k, v)
 	}
 	page.Set("settings", values)
-	rows, err := connectors.List(q)
+	models, err := httpapi.ModelOptions(q)
 	if err != nil {
 		return nil, err
-	}
-	models := []modelOption{}
-	for _, r := range rows {
-		if r.Kind != "model" {
-			continue
-		}
-		m := modelOption{ID: r.ID, Label: r.Label, Status: r.Status}
-		if man, ok := registry.Manifest(r.Type); ok {
-			icon := man.Icon
-			m.Icon = &icon
-		}
-		models = append(models, m)
 	}
 	page.Set("models", models)
 	passkeys, err := auth.ListPasskeys(q, c.Viewer.User.ID)

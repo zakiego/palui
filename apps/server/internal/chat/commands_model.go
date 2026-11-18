@@ -193,13 +193,21 @@ func chainText(c *EngineCtx, links []settings.ModelChainLink) string {
 	return strings.Join(parts, " → ")
 }
 
-func currentModels(c *EngineCtx) (string, error) {
+func currentModels(c *EngineCtx, chat db.Chat) (string, error) {
 	roles, err := settings.Get[settings.ModelRoles](c.DB, "modelRoles")
+	if err != nil {
+		return "", err
+	}
+	agent, err := agents.ForChat(c.DB, chat.AgentID, c.Clock())
 	if err != nil {
 		return "", err
 	}
 	lines := []string{"Model sekarang:"}
 	for _, r := range modelRoles {
+		if own := agent.ModelRoles.V.Role(r); len(own) > 0 {
+			lines = append(lines, fmt.Sprintf("• %s: %s (khusus %s)", r, chainText(c, own), agent.Name))
+			continue
+		}
 		lines = append(lines, fmt.Sprintf("• %s: %s", r, chainText(c, roles.Role(r))))
 	}
 	lines = append(lines, "", "Ganti: /model <nama>, /model fast <nama> atau /model vision <nama>. Daftarnya: /models.")
@@ -216,6 +224,18 @@ func setRole(r settings.ModelRoles, role string, chain []settings.ModelChainLink
 		r.Default = chain
 	}
 	return r
+}
+
+func setAgentRole(m db.AgentModels, role string, chain []db.ModelLink) db.AgentModels {
+	switch role {
+	case "fast":
+		m.Fast = chain
+	case "vision":
+		m.Vision = chain
+	default:
+		m.Default = chain
+	}
+	return m
 }
 
 // setModel: `/model <name>` puts a model first in a role's failover chain, on
@@ -300,7 +320,17 @@ func setModel(c *EngineCtx, chat db.Chat, role, query string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// An agent with its own chain for the role changes that chain, not the global one.
+	agent, err := agents.ForChat(q, chat.AgentID, c.Clock())
+	if err != nil {
+		return "", err
+	}
+	own := agent.ModelRoles.V
+	mine := len(own.Role(role)) > 0
 	old := roles.Role(role)
+	if mine {
+		old = own.Role(role)
+	}
 	// Connectors already in the chain keep their order; new ones follow.
 	rank := func(id string) int {
 		for i, l := range old {
@@ -359,18 +389,34 @@ func setModel(c *EngineCtx, chat db.Chat, role, query string) (string, error) {
 	if _, err := settings.ValidateModelChain("modelRoles."+role, next); err != nil {
 		return fmt.Sprintf("Nama model `%s` gak bisa dipakai.", model), nil
 	}
-	if err := settings.Set(q, "modelRoles", setRole(roles, role, next), c.Clock()); err != nil {
-		return "", err
+	scope := "buat semua agent yang ikut model global"
+	if mine {
+		own = setAgentRole(own, role, next)
+		if _, err := agents.SetModels(q, agent.ID, own, c.Clock()); err != nil {
+			return "", err
+		}
+		scope = "khusus " + agent.Name
+	} else {
+		roles = setRole(roles, role, next)
+		if err := settings.Set(q, "modelRoles", roles, c.Clock()); err != nil {
+			return "", err
+		}
 	}
+	// What this chat's photos use after the change.
+	vision := models.EffectiveChain(roles, own, "vision")
 	names := make([]string, len(next))
 	for i, l := range next {
 		names[i] = linkName(l)
 	}
-	if _, err := events.Log(q, events.Input{Kind: "settings.update", Message: fmt.Sprintf("Settings changed from chat (%s): %s model set to %s", chat.Channel, role, linkName(next[0])), Data: obj("role", role, "chain", names)}, c.Clock()); err != nil {
+	event := events.Input{Kind: "settings.update", Message: fmt.Sprintf("Settings changed from chat (%s): %s model set to %s", chat.Channel, role, linkName(next[0])), Data: obj("role", role, "chain", names)}
+	if mine {
+		event = events.Input{Kind: "settings.update", Message: fmt.Sprintf("Agent %s changed from chat (%s): %s model set to %s", agent.Name, chat.Channel, role, linkName(next[0])), Data: obj("agentId", agent.ID, "role", role, "chain", names)}
+	}
+	if _, err := events.Log(q, event, c.Clock()); err != nil {
 		return "", err
 	}
-	lines := []string{fmt.Sprintf("Oke, model %s sekarang %s.", role, linkName(next[0])), "Urutannya: " + chainText(c, next), "Berlaku mulai pesan berikutnya, buat semua chat dan agent."}
-	if vision := roles.Vision; role == "default" && len(vision) > 0 && linkName(vision[0]) != linkName(next[0]) {
+	lines := []string{fmt.Sprintf("Oke, model %s sekarang %s.", role, linkName(next[0])), "Urutannya: " + chainText(c, next), "Berlaku mulai pesan berikutnya, " + scope + "."}
+	if role == "default" && len(vision) > 0 && linkName(vision[0]) != linkName(next[0]) {
 		lines = append(lines, fmt.Sprintf("Pesan bergambar tetap pakai %s. Ganti pakai /model vision <nama>.", linkName(vision[0])))
 	}
 	return strings.Join(lines, "\n"), nil
@@ -398,7 +444,7 @@ func CmdModel(c *EngineCtx, chat db.Chat, args []string) (CommandReply, error) {
 		query = args[0]
 	}
 	if query == "" {
-		t, err := currentModels(c)
+		t, err := currentModels(c, chat)
 		return CommandReply{Text: t}, err
 	}
 	role := "default"
@@ -450,7 +496,7 @@ func CmdBtw(c *EngineCtx, chat db.Chat, msg *CommandMessage) (CommandReply, erro
 	if over {
 		return CommandReply{Text: fmt.Sprintf("%s lagi istirahat, jatah hari ini udah habis. Besok lagi ya.", agent.Name)}, nil
 	}
-	chain, err := models.ResolveChain(q, c.Host, "default")
+	chain, err := models.ResolveAgentChain(q, c.Host, agent.ModelRoles.V, "default")
 	if err != nil {
 		return CommandReply{}, err
 	}

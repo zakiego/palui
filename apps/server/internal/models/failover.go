@@ -35,17 +35,21 @@ type ModelHost interface {
 	ConnectorModel(connectorID, modelID, role string) (LanguageModel, bool, error)
 }
 
-// ResolveChain is resolveChain: the running links of a role's chain (the
-// default chain when the role's own is empty).
+// ResolveChain is resolveChain: the running links of a role's global chain
+// (the default chain when the role's own is empty).
 func ResolveChain(q db.Q, host ModelHost, role string) ([]ModelLink, error) {
+	return ResolveAgentChain(q, host, db.AgentModels{}, role)
+}
+
+// ResolveAgentChain is ResolveChain for one agent: its own chain for the role
+// when it set one, else the global chain. A role with neither uses the agent's
+// default chain, then the global one.
+func ResolveAgentChain(q db.Q, host ModelHost, own db.AgentModels, role string) ([]ModelLink, error) {
 	roles, err := settings.Get[settings.ModelRoles](q, "modelRoles")
 	if err != nil {
 		return nil, err
 	}
-	chain := roles.Role(role)
-	if len(chain) == 0 {
-		chain = roles.Default
-	}
+	chain := EffectiveChain(roles, own, role)
 	var out []ModelLink
 	for _, link := range chain {
 		lm, ok, err := safeModel(host, link.ConnectorID, link.Model, role)
@@ -55,6 +59,16 @@ func ResolveChain(q db.Q, host ModelHost, role string) ([]ModelLink, error) {
 		out = append(out, ModelLink{ConnectorID: link.ConnectorID, Model: link.Model, Effort: link.Effort, LM: lm})
 	}
 	return out, nil
+}
+
+// EffectiveChain is the chain a role uses, before checking what's running.
+func EffectiveChain(roles settings.ModelRoles, own db.AgentModels, role string) []settings.ModelChainLink {
+	for _, chain := range [][]settings.ModelChainLink{own.Role(role), roles.Role(role), own.Default, roles.Default} {
+		if len(chain) > 0 {
+			return chain
+		}
+	}
+	return nil
 }
 
 func safeModel(host ModelHost, id, model, role string) (lm LanguageModel, ok bool, err error) {
