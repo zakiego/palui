@@ -130,7 +130,8 @@ func ResolveQuote(q db.Q, chatID string, msg connectors.InboundMessage) (*Stored
 	if id := msg.ReplyToChannelMsgID; id != "" {
 		var role, text string
 		var content db.RawJSON
-		err := q.QueryRow("SELECT role, text, content FROM messages WHERE chat_id = ? AND channel_msg_id = ? ORDER BY created_at DESC LIMIT 1", chatID, id).Scan(&role, &text, &content)
+		var senderID *string
+		err := q.QueryRow("SELECT role, text, content, sender_id FROM messages WHERE chat_id = ? AND channel_msg_id = ? ORDER BY created_at DESC LIMIT 1", chatID, id).Scan(&role, &text, &content, &senderID)
 		if err != nil && !isNoRows(err) {
 			return nil, err
 		}
@@ -146,7 +147,7 @@ func ResolveQuote(q db.Q, chatID string, msg connectors.InboundMessage) (*Stored
 				media = "[image]"
 			}
 			if t != "" || media != "" {
-				return &StoredQuote{From: role, Text: t, Media: media}, nil
+				return &StoredQuote{From: storedQuoteFrom(role, senderID, msg), Text: t, Media: media}, nil
 			}
 		}
 		var payload db.JSON[db.OutboxPayload]
@@ -167,6 +168,27 @@ func ResolveQuote(q db.Q, chatID string, msg connectors.InboundMessage) (*Stored
 		from = "unknown"
 	}
 	return &StoredQuote{From: from, Text: capQuote(qt.Text), Media: qt.Media}, nil
+}
+
+// storedQuoteFrom: who wrote a quoted row we stored. A "user" row is the
+// sender's own only when they sent it; in a group it can be anyone's, and
+// calling it theirs hid who the model was really reading
+// (rpt_0mwm8tx7y3elwuzgdhl) and skipped the outsider taint. When the stored
+// sender doesn't match either form of the new sender's id, the channel's own
+// verdict decides (it maps LIDs and phone JIDs), and without one it's "other".
+func storedQuoteFrom(role string, senderID *string, msg connectors.InboundMessage) string {
+	if role != "user" || senderID == nil || *senderID == "" {
+		return role
+	}
+	for _, id := range []string{msg.SenderExternalID, msg.SenderAltID} {
+		if id != "" && id == *senderID {
+			return "user"
+		}
+	}
+	if msg.Quoted != nil && msg.Quoted.From == "sender" {
+		return "user"
+	}
+	return "other"
 }
 
 func decodedSize(b64 string) int { return len(b64) * 3 / 4 }

@@ -214,6 +214,21 @@ func TestAgentsAck(t *testing.T) {
 }
 
 func TestAgentsGroupContext(t *testing.T) {
+	t.Run("a /report pointing at a guest's message says it's someone else's", func(t *testing.T) {
+		// rpt_0mwm8tx7y3elwuzgdhl called a guest's message the owner's own.
+		h := agentsWorld(t, []models.Step{models.Say("ok")}, extra{})
+		h.owner("/agent chef")
+		h.Engine.Idle()
+		h.guest("punyaku belum direspon", func(m *connectors.InboundMessage) { m.ChannelMsgID = "G1" })
+		h.Engine.Idle()
+		h.owner("/report agent terskip", func(m *connectors.InboundMessage) {
+			m.ReplyToChannelMsgID = "G1"
+			m.Quoted = &connectors.InboundQuote{From: "other", Text: "punyaku belum direspon"}
+		})
+		h.Engine.Idle()
+		saved := need(db.ScanReport(h.DB.QueryRow("SELECT " + db.ReportCols + " FROM reports")))
+		contains(t, saved.Text, "Owner replied to someone else's message with this report")
+	})
 	t.Run("keeps unaddressed group talk as context and answers only the mention", func(t *testing.T) {
 		h := agentsWorld(t, []models.Step{models.Say("10 shot kebanyakan")}, extra{})
 		h.owner("/agent chef")

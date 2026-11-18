@@ -209,6 +209,13 @@ func storeRow(t *testing.T, q db.Q, chatID, role, text, channelMsgID string) {
 	testutil.Must(t, err)
 }
 
+func storeSenderRow(t *testing.T, q db.Q, chatID, senderID, text, channelMsgID string) {
+	t.Helper()
+	content, _ := db.Raw(map[string]string{"text": text})
+	_, err := q.Exec("INSERT INTO messages (id, chat_id, role, content, text, channel_msg_id, sender_id, from_owner, status, created_at) VALUES (?, ?, 'user', ?, ?, ?, ?, 0, 'handled', ?)", secret.NewID("msg"), chatID, content, text, channelMsgID, senderID, quoteNow-1000)
+	testutil.Must(t, err)
+}
+
 func TestResolveQuote(t *testing.T) {
 	t.Run("prefers the stored reply over what the channel sent", func(t *testing.T) {
 		d, c := quoteSetup(t)
@@ -227,6 +234,39 @@ func TestResolveQuote(t *testing.T) {
 			m.Quoted = &connectors.InboundQuote{From: "sender", Text: "", Media: "[voice note]"}
 		})))
 		jsonEq(t, q, `{"from":"user","text":"[voice] beli susu"}`)
+	})
+	t.Run("says a group member's stored message is someone else's, not the sender's own", func(t *testing.T) {
+		// rpt_0mwm8tx7y3elwuzgdhl: a guest quoting the owner's line was told
+		// it was their own earlier message.
+		d, c := quoteSetup(t)
+		storeSenderRow(t, d, c.ID, "OWNERLID@lid", "lihati yet", "G1")
+		q := need(chat.ResolveQuote(d, c.ID, quoteInbound(func(m *connectors.InboundMessage) {
+			m.ChatKind = "group"
+			m.SenderExternalID = "BAYU@lid"
+			m.ReplyToChannelMsgID = "G1"
+			m.Quoted = &connectors.InboundQuote{From: "other", Text: "lihati yet"}
+		})))
+		jsonEq(t, q, `{"from":"other","text":"lihati yet"}`)
+		eq(t, chat.QuotesOutsider([]db.Message{{ID: "n", Role: "user", Content: need(db.Raw(map[string]any{"text": "x", "quoted": q}))}}, map[string]bool{"n": true}), true)
+	})
+	t.Run("keeps a group member's own stored message theirs, by either id or the channel's word", func(t *testing.T) {
+		d, c := quoteSetup(t)
+		storeSenderRow(t, d, c.ID, "BAYU@lid", "bungul", "G2")
+		storeSenderRow(t, d, c.ID, "62811@s.whatsapp.net", "lagi", "G3")
+		storeSenderRow(t, d, c.ID, "OLD@lid", "lama", "G4")
+		group := func(reply string, quoted *connectors.InboundQuote) connectors.InboundMessage {
+			return quoteInbound(func(m *connectors.InboundMessage) {
+				m.ChatKind = "group"
+				m.SenderExternalID = "BAYU@lid"
+				m.SenderAltID = "62811@s.whatsapp.net"
+				m.ReplyToChannelMsgID = reply
+				m.Quoted = quoted
+			})
+		}
+		eq(t, need(chat.ResolveQuote(d, c.ID, group("G2", nil))).From, "user")
+		eq(t, need(chat.ResolveQuote(d, c.ID, group("G3", nil))).From, "user")
+		eq(t, need(chat.ResolveQuote(d, c.ID, group("G4", &connectors.InboundQuote{From: "sender"}))).From, "user")
+		eq(t, need(chat.ResolveQuote(d, c.ID, group("G4", nil))).From, "other")
 	})
 	t.Run("finds reminders and job results in the outbox", func(t *testing.T) {
 		d, c := quoteSetup(t)
