@@ -338,7 +338,7 @@ func TestGoldenContext(t *testing.T) {
 		for _, id := range c.WithImages {
 			with[id] = true
 		}
-		got := string(need(models.MarshalMessages(chat.ToModelMessages(c.Rows, with, c.Calls, c.LabelSenders))))
+		got := string(need(models.MarshalMessages(chat.ToModelMessages(c.Rows, with, c.Calls, c.LabelSenders, nil))))
 		sameJSON(t, "history "+c.Name, got, jsonx.Stringify(need(jsonx.Parse(c.Output))))
 	}
 

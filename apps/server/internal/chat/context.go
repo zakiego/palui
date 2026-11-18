@@ -184,7 +184,7 @@ type InboundInfo struct {
 func inboundLines(i SystemInput) []string {
 	var out []string
 	if i.Chat != nil && i.Chat.Kind == "group" && i.ReplyMode == "mention" {
-		out = append(out, "In this group you see every message, but you only answer when someone @mentions you or replies to one of your messages. The other messages in the conversation are the group's talk, there as context: never answer them on their own, only use them to understand the newest message. A photo in that talk shows only as [gambar dari sebelumnya]: you see a photo when it comes with the message that mentions you or replies to you, so ask for it again that way. You only see what was said since you joined this group.")
+		out = append(out, "In this group you see every message, but you only answer when someone @mentions you or replies to one of your messages. Those messages are labeled \"to you\" after the sender's name, like [Name, to you]. Answer every message labeled \"to you\" since your last reply: when more than one person addressed you, answer each of them in the same reply, by name, and don't drop the earlier ones because newer talk came after them. The other messages are the group's talk, there as context: never answer them on their own, only use them to understand the messages addressed to you. A photo in that talk shows only as [gambar dari sebelumnya]: you see a photo when it comes with the message that mentions you or replies to you, so ask for it again that way. You only see what was said since you joined this group.")
 	}
 	if i.Inbound != nil {
 		voice := "Voice notes reach you only as a note that they couldn't be transcribed, so you can't hear them."
@@ -688,10 +688,17 @@ func SenderLabel(fromOwner bool, senderName, senderID *string) string {
 	return name
 }
 
+// AddressedSuffix follows the sender label of a group message the turn
+// answers: "[Budi, to you]: ...".
+const AddressedSuffix = ", to you"
+
 // ToModelMessages is toModelMessages: rows to model messages. Images only for
 // withImages rows; consecutive same-role rows merge; the list starts with a
 // user message; calls are replayed as real tool-call and tool-result parts.
-func ToModelMessages(rows []db.Message, withImages map[string]bool, calls []ToolCallRow, labelSenders bool) []models.Message {
+// addressed marks the rows this turn answers (a group in mention mode): their
+// sender label says "to you", so a batch of several mentions doesn't read as
+// one more line of group talk (rpt_0mwm8tx7y3elwuzgdhl).
+func ToModelMessages(rows []db.Message, withImages map[string]bool, calls []ToolCallRow, labelSenders bool, addressed map[string]bool) []models.Message {
 	var out []models.Message
 	byRun := map[string][]ToolCallRow{}
 	for _, c := range calls {
@@ -779,7 +786,11 @@ func ToModelMessages(rows []db.Message, withImages map[string]bool, calls []Tool
 		}
 		text := body
 		if labelSenders && body != "" {
-			text = fmt.Sprintf("[%s]: %s", SenderLabel(r.FromOwner, r.SenderName, r.SenderID), body)
+			label := SenderLabel(r.FromOwner, r.SenderName, r.SenderID)
+			if addressed[r.ID] {
+				label += AddressedSuffix
+			}
+			text = fmt.Sprintf("[%s]: %s", label, body)
 		}
 		if text != "" {
 			parts = append(parts, models.TextPart(text))
