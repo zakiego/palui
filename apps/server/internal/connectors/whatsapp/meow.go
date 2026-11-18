@@ -40,6 +40,7 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/logx"
 )
 
@@ -340,21 +341,14 @@ func (s *meowSocket) SendMessage(ctx context.Context, jid string, content Conten
 			sender = s.cli.Store.ID.ToNonAD()
 		}
 		msg = s.cli.BuildReaction(chat, sender, k.ID, content.React.Text)
+	case content.Media != nil:
+		if msg, err = s.mediaMessage(ctx, content, quoted); err != nil {
+			return nil, err
+		}
 	case quoted != nil:
-		participant := quoted.Key.Participant
-		if participant == "" {
-			participant = quoted.Key.RemoteJID
-		}
-		if quoted.Key.FromMe && s.cli.Store.ID != nil {
-			participant = s.cli.Store.ID.ToNonAD().String()
-		}
 		msg = &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{
-			Text: proto.String(content.Text),
-			ContextInfo: &waE2E.ContextInfo{
-				StanzaID:      proto.String(quoted.Key.ID),
-				Participant:   proto.String(BareJID(participant)),
-				QuotedMessage: quoted.Message,
-			},
+			Text:        proto.String(content.Text),
+			ContextInfo: s.quoteInfo(quoted),
 		}}
 	default:
 		msg = &waE2E.Message{Conversation: proto.String(content.Text)}
@@ -364,6 +358,94 @@ func (s *meowSocket) SendMessage(ctx context.Context, jid string, content Conten
 		return nil, err
 	}
 	return &Message{Key: Key{RemoteJID: jid, FromMe: true, ID: resp.ID}, Message: msg, Timestamp: resp.Timestamp.Unix()}, nil
+}
+
+// quoteInfo is the ContextInfo that quotes a message.
+func (s *meowSocket) quoteInfo(quoted *Message) *waE2E.ContextInfo {
+	participant := quoted.Key.Participant
+	if participant == "" {
+		participant = quoted.Key.RemoteJID
+	}
+	if quoted.Key.FromMe && s.cli.Store.ID != nil {
+		participant = s.cli.Store.ID.ToNonAD().String()
+	}
+	return &waE2E.ContextInfo{
+		StanzaID:      proto.String(quoted.Key.ID),
+		Participant:   proto.String(BareJID(participant)),
+		QuotedMessage: quoted.Message,
+	}
+}
+
+// mediaMessage uploads the file and builds the message for its kind.
+func (s *meowSocket) mediaMessage(ctx context.Context, content Content, quoted *Message) (*waE2E.Message, error) {
+	m := content.Media
+	appInfo := whatsmeow.MediaDocument
+	switch m.Kind {
+	case db.MediaImage, db.MediaSticker:
+		appInfo = whatsmeow.MediaImage
+	case db.MediaVideo:
+		appInfo = whatsmeow.MediaVideo
+	case db.MediaVoice, db.MediaAudio:
+		appInfo = whatsmeow.MediaAudio
+	}
+	up, err := s.cli.Upload(ctx, m.Bytes, appInfo)
+	if err != nil {
+		return nil, err
+	}
+	var ctxInfo *waE2E.ContextInfo
+	if quoted != nil {
+		ctxInfo = s.quoteInfo(quoted)
+	}
+	return buildMediaMessage(m, content.Text, up, ctxInfo, time.Now().Unix()), nil
+}
+
+// buildMediaMessage is the message for an uploaded file of m's kind.
+func buildMediaMessage(m *Media, text string, up whatsmeow.UploadResponse, ctxInfo *waE2E.ContextInfo, now int64) *waE2E.Message {
+	var caption *string
+	if text != "" {
+		caption = proto.String(text)
+	}
+	ts := proto.Int64(now)
+	switch m.Kind {
+	case db.MediaImage:
+		return &waE2E.Message{ImageMessage: &waE2E.ImageMessage{
+			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: proto.String(m.MimeType),
+			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
+			MediaKeyTimestamp: ts, Caption: caption, ContextInfo: ctxInfo,
+		}}
+	case db.MediaSticker:
+		return &waE2E.Message{StickerMessage: &waE2E.StickerMessage{
+			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: proto.String(m.MimeType),
+			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
+			MediaKeyTimestamp: ts, ContextInfo: ctxInfo,
+		}}
+	case db.MediaVideo:
+		return &waE2E.Message{VideoMessage: &waE2E.VideoMessage{
+			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: proto.String(m.MimeType),
+			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
+			MediaKeyTimestamp: ts, Caption: caption, ContextInfo: ctxInfo,
+		}}
+	case db.MediaVoice, db.MediaAudio:
+		mime := m.MimeType
+		if m.Kind == db.MediaVoice {
+			// WhatsApp plays a voice note only when it says Opus.
+			mime = "audio/ogg; codecs=opus"
+		}
+		return &waE2E.Message{AudioMessage: &waE2E.AudioMessage{
+			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: proto.String(mime),
+			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
+			MediaKeyTimestamp: ts, PTT: proto.Bool(m.Kind == db.MediaVoice), ContextInfo: ctxInfo,
+		}}
+	}
+	name := m.Filename
+	if name == "" {
+		name = "file"
+	}
+	return &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{
+		URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: proto.String(m.MimeType),
+		FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
+		MediaKeyTimestamp: ts, FileName: proto.String(name), Title: proto.String(name), Caption: caption, ContextInfo: ctxInfo,
+	}}
 }
 
 func (s *meowSocket) RequestPairingCode(ctx context.Context, phone string) (string, error) {

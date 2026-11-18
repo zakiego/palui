@@ -33,6 +33,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/logx"
+	"github.com/zakiego/palui/apps/server/internal/outmedia"
 	"github.com/zakiego/palui/apps/server/internal/owner"
 	"github.com/zakiego/palui/apps/server/internal/sticker"
 	"github.com/zakiego/palui/apps/server/internal/strx"
@@ -1110,6 +1111,9 @@ func (w *wa) Send(ctx context.Context, jid string, payload db.OutboxPayload) (co
 		quoted = w.recent[payload.ReplyToChannelMsgID]
 		w.mu.Unlock()
 	}
+	if m := payload.Media; m != nil {
+		return w.sendMedia(ctx, s, jid, *m, full, quoted)
+	}
 	if full == "" {
 		full = " "
 	}
@@ -1132,6 +1136,31 @@ func (w *wa) Send(ctx context.Context, jid string, payload db.OutboxPayload) (co
 	}
 	w.stopThinking(jid)
 	return connectors.SendResult{ChannelMsgID: lastID}, nil
+}
+
+// sendMedia sends one photo, file, voice note, video or sticker with its
+// caption. It leaves the thinking reaction alone: media goes out mid-turn and
+// the text reply that ends the turn clears it.
+func (w *wa) sendMedia(ctx context.Context, s Socket, jid string, m db.OutboxMedia, caption string, quoted *Message) (connectors.SendResult, error) {
+	if len(m.Bytes) == 0 {
+		return connectors.SendResult{}, errors.New("media bytes missing")
+	}
+	if m.Kind == db.MediaSticker || m.Kind == db.MediaVoice || m.Kind == db.MediaAudio {
+		// No caption on these in WhatsApp.
+		caption = ""
+	}
+	caption = strx.Slice16(caption, outmedia.MaxCaption)
+	sent, err := s.SendMessage(ctx, jid, Content{Text: caption, Media: &Media{Kind: m.Kind, MimeType: m.MimeType, Filename: m.Filename, Bytes: m.Bytes}}, quoted)
+	if err != nil {
+		return connectors.SendResult{}, err
+	}
+	w.mu.Lock()
+	w.remember(sent)
+	w.mu.Unlock()
+	if sent == nil {
+		return connectors.SendResult{}, nil
+	}
+	return connectors.SendResult{ChannelMsgID: sent.Key.ID}, nil
 }
 
 func (w *wa) clearThinkingTimers(t *thinking) {
