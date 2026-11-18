@@ -375,6 +375,37 @@ func TestAnswerCheckinAnswersTheNewestOpenFlowCheckin(t *testing.T) {
 	}
 }
 
+func TestOnlyAnswerCheckinIsAnOwnerReply(t *testing.T) {
+	e := setup(t)
+	for _, name := range e.tools.Keys() {
+		pt, _ := e.tools.Get(name)
+		if pt.OwnerReply != (name == "answer_checkin") {
+			t.Errorf("%s OwnerReply=%v", name, pt.OwnerReply)
+		}
+	}
+}
+
+func TestAnswerCheckinRefusesARunFromAnotherChat(t *testing.T) {
+	e, _ := withRun(t)
+	allowed := true
+	other, err := chats.Ensure(e.db, chats.EnsureInput{Channel: "telegram", ExternalID: "42", Kind: "dm", Allowed: &allowed}, NOW)
+	testutil.Must(t, err)
+	open, err := flows.OpenFlowCheckins(e.db, e.chatID)
+	testutil.Must(t, err)
+	if len(open) != 1 {
+		t.Fatal(len(open))
+	}
+	turn := e.turn
+	turn.ChatID = other.ID
+	tools := flowsconn.Tools(e.db, turn, flowsconn.Deps{Clock: func() int64 { return AT11 }})
+	if r := call(t, tools, "answer_checkin", `{"answer":"done","runId":"`+open[0].ID+`"}`); r.B("ok") {
+		t.Fatal(r)
+	}
+	if r := call(t, tools, "answer_checkin", `{"answer":"done"}`); r.B("ok") {
+		t.Fatal(r)
+	}
+}
+
 func TestRecapReturnsCountsAndTheRecapText(t *testing.T) {
 	e, id := withRun(t)
 	call(t, e.tools, "answer_checkin", `{"answer":"done"}`)

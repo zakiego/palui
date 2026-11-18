@@ -709,9 +709,10 @@ func Tools(d *db.DB, turn connectors.TurnInfo, deps Deps) *connectors.ToolSet {
 			}),
 	})
 	set.Set("answer_checkin", connectors.PaluiTool{
-		Data:  connectors.DataChat,
-		Class: "write",
-		Title: "Record a check-in answer",
+		Data:       connectors.DataChat,
+		Class:      "write",
+		OwnerReply: true,
+		Title:      "Record a check-in answer",
 		Tool: kit.Tool(`Record the owner's answer to a check-in. Use it when their message answers one ("udah", "belum", "skip hari ini"). Without runId it answers the newest open check-in in this chat, or else the newest run that will ask one later. A run that has not asked yet keeps a closing answer (early: true) and skips the question when it gets there. Pass the run id from the system prompt or flow_history for another one, or to correct an earlier answer. answer is an answer id or its label.`,
 			zod.Object(
 				zod.F("answer", zod.String().Min(1).Max(40)),

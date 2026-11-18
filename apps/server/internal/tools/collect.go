@@ -49,7 +49,9 @@ type ToolMeta struct {
 	Label         string                             `json:"label,omitempty"`
 	NeedsApproval func(input json.RawMessage) bool   `json:"-"`
 	Preview       func(input json.RawMessage) string `json:"-"`
-	GuestSafe     bool                               `json:"guestSafe"`
+	// Records the owner's own reply (PaluiTool.OwnerReply).
+	OwnerReply bool `json:"-"`
+	GuestSafe  bool `json:"guestSafe"`
 	// Whose data it touches, as the tool declares it ("" follows the connector).
 	Data string `json:"-"`
 	// Data resolved against the connector (connectors.ResolveData).
@@ -245,7 +247,7 @@ func Collect(ctx context.Context, running []connectors.RunningEntry, opts Collec
 			if contains(opts.Deny, name) {
 				continue
 			}
-			meta := &ToolMeta{Name: name, ConnectorID: e.ID, Tool: toolName, Class: cls, Untrusted: pt.Untrusted || pt.OthersWrote || e.Row.Trust == "external", OthersWrote: pt.OthersWrote, Title: pt.Title, Label: e.Row.Label, GuestSafe: pt.GuestSafe, Data: pt.Data, Scope: connectors.ResolveData(pt.Data, e.Row), NeedsApproval: pt.NeedsApproval, Preview: pt.Preview}
+			meta := &ToolMeta{Name: name, ConnectorID: e.ID, Tool: toolName, Class: cls, Untrusted: pt.Untrusted || pt.OthersWrote || e.Row.Trust == "external", OthersWrote: pt.OthersWrote, Title: pt.Title, Label: e.Row.Label, GuestSafe: pt.GuestSafe, Data: pt.Data, Scope: connectors.ResolveData(pt.Data, e.Row), NeedsApproval: pt.NeedsApproval, Preview: pt.Preview, OwnerReply: pt.OwnerReply}
 			out.Tools.Set(name, wrapTool(pt.Tool, meta, opts))
 			out.Meta[name] = meta
 			order = append(order, name)

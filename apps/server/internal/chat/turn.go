@@ -1280,13 +1280,15 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					class = meta.Class
 				}
 				return tools.NeedsApproval(tools.ApprovalInput{
-					Class:       class,
-					Permission:  tools.PermissionFor(&perms, call.ToolName),
-					OwnerTurn:   ownerTurn,
-					Tainted:     approvalTainted(),
-					OthersWrote: othersWrote.Load(),
-					Strict:      strict,
-					SendsFile:   len(attachments.FindRefs(call.Input)) > 0,
+					Class:         class,
+					Permission:    tools.PermissionFor(&perms, call.ToolName),
+					OwnerTurn:     ownerTurn,
+					Tainted:       tainted.Load(),
+					ReplayTainted: replayTainted.Load(),
+					OwnerReply:    meta != nil && meta.OwnerReply,
+					OthersWrote:   othersWrote.Load(),
+					Strict:        strict,
+					SendsFile:     len(attachments.FindRefs(call.Input)) > 0,
 				})
 			},
 			Emit: func(p Part) {
