@@ -230,6 +230,13 @@ type InboundMedia struct {
 	Data        string   `json:"data"`
 	Filename    string   `json:"filename,omitempty"`
 	DurationSec *float64 `json:"durationSec,omitempty"`
+	// The bytes are here only for the chat's auto-save (Services.SavesMedia):
+	// the model never sees them (too big for it, or group talk kept as context).
+	SaveOnly bool `json:"-"`
+	// A sticker, converted to an image. Auto-save skips it.
+	Sticker bool `json:"-"`
+	// The text the sender wrote with it, without Palui's labels and notes.
+	Caption string `json:"-"`
 }
 
 // InboundQuote is the message an inbound one quotes, as the channel saw it.
@@ -398,6 +405,10 @@ type Services struct {
 	// Dropped messages and group talk kept as context never show their media.
 	// Optional; without it only the owner's media is downloaded.
 	WantsMedia func(msg InboundMessage) bool
+	// Whether this message's chat auto-saves media (chats.save_media), so its
+	// photos and documents are worth downloading even when WantsMedia says no.
+	// Such media is marked SaveOnly unless the model wants it too. Optional.
+	SavesMedia func(msg InboundMessage) bool
 	// Reconcile now instead of on the next tick. Optional.
 	Reconcile func()
 	// Call a read-only tool of another running connector, server-side. Optional.

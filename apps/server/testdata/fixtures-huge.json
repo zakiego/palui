@@ -39,10 +39,10 @@
    "last": null
   },
   "chats": {
-   "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji"],
+   "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji","save_media","save_media_days"],
    "count": 1287,
-   "first": ["<chat#1>","web","web","Palui (web)","dm","<ses#1>",1,null,1794621600000,"",null,"mention",1,"⏳"],
-   "last": ["<chat#2>","telegram","flowchat1","Flows 2","dm","<ses#2>",1,null,1794621600000,"",null,"mention",1,"⏳"]
+   "first": ["<chat#1>","web","web","Palui (web)","dm","<ses#1>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+   "last": ["<chat#2>","telegram","flowchat1","Flows 2","dm","<ses#2>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30]
   },
   "claims": {
    "columns": ["nonce","channel","expires_at","used_at","used_by","created_at"],
@@ -231,7 +231,7 @@
    "last": ["<run#2>","<chat#7>",null,"message","model-07",null,11350,690,0,0,0,"ok",null,null,1791922140000,16700,null,0]
   },
   "saved_attachments": {
-   "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at"],
+   "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at","origin","sender_id","sender_name","sent_at"],
    "count": 0,
    "first": null,
    "last": null

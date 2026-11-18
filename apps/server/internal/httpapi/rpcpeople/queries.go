@@ -6,6 +6,7 @@ import (
 
 	"github.com/rivo/uniseg"
 
+	"github.com/zakiego/palui/apps/server/internal/attachments"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/strx"
@@ -152,6 +153,11 @@ type transcriptChat struct {
 	Ack         bool    `json:"ack"`
 	AckEmoji    string  `json:"ackEmoji"`
 	ConnectorID string  `json:"connectorId"`
+	// Auto-save: on or off, retention in days (0 keeps), and what it holds now.
+	SaveMedia     bool  `json:"saveMedia"`
+	SaveMediaDays int64 `json:"saveMediaDays"`
+	AutoSaved     int64 `json:"autoSaved"`
+	AutoSavedSize int64 `json:"autoSavedSize"`
 }
 
 type transcriptMessage struct {
@@ -261,8 +267,13 @@ func transcript(q db.Q, chatID string) (*transcriptView, error) {
 	for _, a := range pending {
 		approvals = append(approvals, transcriptApproval{ID: a.ID, Tool: a.Tool, Class: a.ToolClass, ArgsPreview: a.ArgsPreview, ExpiresAt: a.ExpiresAt})
 	}
+	autoSaved, autoSize, err := attachments.AutoCount(q, chat.ID)
+	if err != nil {
+		return nil, err
+	}
 	return &transcriptView{
-		Chat:      transcriptChat{ID: chat.ID, Channel: chat.Channel, Title: titleOf(chat.Title, chat.ExternalID), Kind: chat.Kind, AgentID: chat.AgentID, Allowed: chat.Allowed, ReplyMode: chat.ReplyMode, Ack: chat.Ack, AckEmoji: chat.AckEmoji, ConnectorID: chat.ConnectorID},
+		Chat: transcriptChat{ID: chat.ID, Channel: chat.Channel, Title: titleOf(chat.Title, chat.ExternalID), Kind: chat.Kind, AgentID: chat.AgentID, Allowed: chat.Allowed, ReplyMode: chat.ReplyMode, Ack: chat.Ack, AckEmoji: chat.AckEmoji, ConnectorID: chat.ConnectorID,
+			SaveMedia: chat.SaveMedia, SaveMediaDays: chat.SaveMediaDays, AutoSaved: autoSaved, AutoSavedSize: autoSize},
 		Messages:  items,
 		Approvals: approvals,
 	}, nil

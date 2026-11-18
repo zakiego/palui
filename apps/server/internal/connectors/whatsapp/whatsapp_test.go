@@ -750,6 +750,33 @@ func TestInbound(t *testing.T) {
 		}
 		eq(t, e.sock().Downloads(), []string(nil))
 	})
+	t.Run("fetches photos and documents for a chat that auto-saves, never stickers or voice notes", func(t *testing.T) {
+		e, _ := openRunning(t, opts{})
+		e.ctx.Services.WantsMedia = func(m connectors.InboundMessage) bool { return m.Addressed }
+		e.ctx.Services.SavesMedia = func(m connectors.InboundMessage) bool { return true }
+		inGroup := func(k *whatsapp.Key) { k.RemoteJID, k.Participant = "120363@g.us", "62811@s.whatsapp.net" }
+		// Group talk: fetched for the auto-save only, the text says nothing more.
+		e.sock().Message(dm("AS1", &waE2E.Message{ImageMessage: &waE2E.ImageMessage{Mimetype: proto.String("image/jpeg"), Caption: proto.String("struk")}}, inGroup), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 1 })
+		in := e.ctx.Inbound()[0]
+		eq(t, []any{in.Text, len(in.Media), in.Media[0].SaveOnly, in.Media[0].Caption, in.Media[0].Data != ""}, []any{"struk", 1, true, "struk", true})
+		// A 5 MB document someone asked about: saved, but too big for the model.
+		big := &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{FileName: proto.String("big.pdf"), FileLength: proto.Uint64(5 * 1024 * 1024), Mimetype: proto.String("application/pdf"), Caption: proto.String("@bot simpan"),
+			ContextInfo: &waE2E.ContextInfo{MentionedJID: []string{"628980001472@s.whatsapp.net"}}}}
+		e.sock().Message(dm("AS2", big, inGroup), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 2 })
+		in = e.ctx.Inbound()[1]
+		if !strings.Contains(in.Text, "over the 1 MB limit") || len(in.Media) != 1 || !in.Media[0].SaveOnly {
+			t.Fatalf("%q %+v", in.Text, in.Media)
+		}
+		// Over the store's 10 MB cap: not fetched at all.
+		huge := &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{FileName: proto.String("huge.pdf"), FileLength: proto.Uint64(11 * 1024 * 1024), Mimetype: proto.String("application/pdf")}}
+		e.sock().Message(dm("AS3", huge, inGroup), "")
+		e.sock().Message(dm("AS4", &waE2E.Message{AudioMessage: &waE2E.AudioMessage{PTT: proto.Bool(true)}}, inGroup), "")
+		e.sock().Message(dm("AS5", &waE2E.Message{StickerMessage: &waE2E.StickerMessage{Mimetype: proto.String("image/webp")}}, inGroup), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 5 })
+		eq(t, e.sock().Downloads(), []string{"AS1", "AS2"})
+	})
 }
 
 func typer(r *connectors.RunningConnector) connectors.Typer { return r.Channel.(connectors.Typer) }

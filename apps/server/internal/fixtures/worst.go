@@ -280,7 +280,8 @@ func worst(k *Kit) {
 	k.Message(family, "user", "؟", now-30_000, MsgExtra{FromOwner: ptr(false), SenderName: ptr[*string](nil), SenderID: ptr("1000000100")})
 
 	// No title yet: the list falls back to the raw JID.
-	noTitleGroup := k.Chat("whatsapp", "120363041234567890123456@g.us", "", ChatOpts{Kind: "group"})
+	// Auto-save on, keeping files forever.
+	noTitleGroup := k.Chat("whatsapp", "120363041234567890123456@g.us", "", ChatOpts{Kind: "group", SaveMediaDays: ptr[int64](0)})
 	k.Assign(noTitleGroup, arisan, true)
 	sayAs(noTitleGroup, "**Rekap** minggu ini:\n\n1. *3 deal* masuk\n2. `bayar listrik` besok", now-59*MIN, "assistant")
 	// Nurul may set chat rules for arisan; the members list shows the switch on.
@@ -603,6 +604,20 @@ func worst(k *Kit) {
 	}
 	k.Attachment(Attachment{ChatID: arabic.ID, Title: "بطاقة الهوية", Description: "", Kind: "jpeg", Size: ptr[int64](1), CreatedAt: ptr(now - 3*365*D)})
 	k.Attachment(Attachment{ChatID: worstRemoved, Title: "J", Kind: "jpeg", Size: ptr[int64](999_999), CreatedAt: ptr(now + 2*H)})
+	// Auto-saved from a group: the longest sender name WhatsApp shows, a caption
+	// at the description limit, a sender with no name, and one sent long before it was saved.
+	k.Attachment(Attachment{
+		ChatID:      noTitleGroup.ID,
+		Title:       within(fill("Notulen rapat pengurus RT 07 Kelurahan Guntung Manggis tentang iuran keamanan ", 80), 80),
+		Description: within(fill(worstParagraph, L.attachmentDescription), L.attachmentDescription),
+		Kind:        "jpeg",
+		Size:        ptr[int64](10 * 1024 * 1024),
+		SenderID:    "628115550199@s.whatsapp.net",
+		SenderName:  within("Sekretaris RT 07 Guntung Manggis 🏘️ (semua catatan rapat dikumpulkan di sini)", 80),
+		SentAt:      ptr(now - 50_000),
+		CreatedAt:   ptr(now - 40_000),
+	})
+	k.Attachment(Attachment{ChatID: noTitleGroup.ID, Title: "Dokumen", Kind: "pdf", Filename: worstDeck, Size: ptr[int64](2048), SenderID: "98765432101234@lid", SentAt: ptr(now - 400*D), CreatedAt: ptr(now - 2*D)})
 	k.Attachment(Attachment{ChatID: cjk.ID, Title: "身份证 王秀英 正反面", Description: "身份证正反面照片，有效期至2036年。", Kind: "png", Filename: "身份证_王秀英.png", Size: ptr[int64](1536), CreatedAt: ptr(now - 12*D)})
 }
 

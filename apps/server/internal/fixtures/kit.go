@@ -195,6 +195,8 @@ type ChatOpts struct {
 	ReplyMode string
 	Ack       *bool
 	AckEmoji  string
+	// Auto-save on, with its retention in days (0 keeps files).
+	SaveMediaDays *int64
 }
 
 func (k *Kit) Chat(channel, externalID, title string, o ChatOpts) db.Chat {
@@ -205,6 +207,9 @@ func (k *Kit) Chat(channel, externalID, title string, o ChatOpts) db.Chat {
 	row := must(chats.Ensure(k.Q, chats.EnsureInput{Channel: channel, ExternalID: externalID, Title: title, Kind: o.Kind, Allowed: o.Allowed}, at))
 	if o.ReplyMode != "" {
 		k.exec("UPDATE chats SET reply_mode = ? WHERE id = ?", o.ReplyMode, row.ID)
+	}
+	if o.SaveMediaDays != nil {
+		k.exec("UPDATE chats SET save_media = 1, save_media_days = ? WHERE id = ?", *o.SaveMediaDays, row.ID)
 	}
 	if o.Ack != nil || o.AckEmoji != "" {
 		ack := true
@@ -302,7 +307,7 @@ func (k *Kit) Member(v Member) string {
 	return id
 }
 
-// MemberRules: the owner lets a member add and remove chat rules (0019).
+// MemberRules: the owner lets a member add and remove chat rules (0020).
 func (k *Kit) MemberRules(agentID, memberID string) {
 	k.exec("UPDATE agent_members SET can_set_rules = 1 WHERE agent_id = ? AND member_id = ?", agentID, memberID)
 }
@@ -764,6 +769,10 @@ type Attachment struct {
 	Filename    string
 	Size        *int64
 	CreatedAt   *int64
+	// Auto-saved (origin "auto") from this sender; "" is a save_attachment row.
+	SenderID   string
+	SenderName string
+	SentAt     *int64
 }
 
 // Attachment saves fake bytes behind the right magic number, so the type
@@ -774,6 +783,12 @@ func (k *Kit) Attachment(v Attachment) string {
 		at = *v.CreatedAt
 	}
 	in := attachments.SaveInput{ChatID: v.ChatID, Title: v.Title, Description: v.Description, Filename: v.Filename}
+	if v.SenderID != "" {
+		in.Origin, in.SenderID, in.SenderName = attachments.OriginAuto, v.SenderID, v.SenderName
+		if v.SentAt != nil {
+			in.SentAt = *v.SentAt
+		}
+	}
 	if v.Kind == "png" {
 		in.MimeType, in.Bytes = "image/png", bytes.Clone(gradient320)
 		return must(attachments.Save(k.Q, in, k.Key, at)).Row.ID

@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/zakiego/palui/apps/server/internal/attachments"
+	"github.com/zakiego/palui/apps/server/internal/chats"
+	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/httpapi"
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/zod"
@@ -29,9 +31,78 @@ type attachmentItem struct {
 	Chat        string  `json:"chat"`
 	Preview     *string `json:"preview"`
 	Shares      int64   `json:"shares"`
+	// "tool" or "auto", and who sent the file (auto-saved ones).
+	Origin     string  `json:"origin"`
+	SenderName *string `json:"senderName"`
+	SentAt     *int64  `json:"sentAt"`
+}
+
+// senderOf names who sent an auto-saved file: their name, else their id.
+func senderOf(a db.AttachmentMeta) *string {
+	if a.Origin != attachments.OriginAuto {
+		return nil
+	}
+	if a.SenderName != nil && *a.SenderName != "" {
+		return a.SenderName
+	}
+	return a.SenderID
 }
 
 func init() {
+	// Auto-save for one chat: on or off, and how many days files stay (0 keeps
+	// them). Turning it off keeps what was saved.
+	httpapi.Register(httpapi.Handler{
+		Name:   "setChatSaveMediaFn",
+		Method: http.MethodPost,
+		Guard:  httpapi.Writer,
+		Input:  zod.Object(zod.F("chatId", chatIDArg), zod.F("on", zod.Optional(zod.Bool())), zod.F("days", zod.Optional(zod.Int().Min(0).Max(365)))),
+		Fn: func(c *httpapi.Call) (any, error) {
+			o := c.Obj()
+			chatID, _ := o.Get("chatId")
+			var patch chats.SaveMediaPatch
+			if v, ok := o.Get("on"); ok {
+				b := v.(bool)
+				patch.On = &b
+			}
+			if v, ok := o.Get("days"); ok {
+				days, _ := v.(float64)
+				if !attachments.ValidAutoDays(int64(days)) {
+					return nil, httpapi.Fail("Pick 7, 30, 90 or 365 days, or keep files until deleted.")
+				}
+				n := int64(days)
+				patch.Days = &n
+			}
+			_, ok, err := chats.SetSaveMedia(c.DB(), chatID.(string), patch)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				return nil, httpapi.Fail(chatGone)
+			}
+			return okResult{OK: true}, nil
+		},
+	})
+
+	// Deletes every auto-saved file of a chat (and their links). Files saved
+	// with save_attachment stay.
+	httpapi.Register(httpapi.Handler{
+		Name:   "deleteAutoSavedFn",
+		Method: http.MethodPost,
+		Guard:  httpapi.Writer,
+		Input:  zod.Object(zod.F("chatId", chatIDArg)),
+		Fn: func(c *httpapi.Call) (any, error) {
+			chatID, _ := c.Obj().Get("chatId")
+			n, err := attachments.DeleteAuto(c.DB(), chatID.(string))
+			if err != nil {
+				return nil, err
+			}
+			return struct {
+				OK      bool  `json:"ok"`
+				Deleted int64 `json:"deleted"`
+			}{true, n}, nil
+		},
+	})
+
 	httpapi.Register(httpapi.Handler{
 		Name:   "getAttachments",
 		Method: http.MethodGet,
@@ -60,7 +131,8 @@ func init() {
 				if p := attachments.PreviewKind(a.MimeType); p != "" {
 					preview = &p
 				}
-				list = append(list, attachmentItem{ID: a.ID, ChatID: a.ChatID, Title: a.Title, Description: a.Description, Kind: a.Kind, MimeType: a.MimeType, Filename: a.Filename, Size: a.Size, CreatedAt: a.CreatedAt, Chat: chat, Preview: preview, Shares: shares[a.ID]})
+				list = append(list, attachmentItem{ID: a.ID, ChatID: a.ChatID, Title: a.Title, Description: a.Description, Kind: a.Kind, MimeType: a.MimeType, Filename: a.Filename, Size: a.Size, CreatedAt: a.CreatedAt, Chat: chat, Preview: preview, Shares: shares[a.ID],
+					Origin: a.Origin, SenderName: senderOf(a), SentAt: a.SentAt})
 			}
 			tz, err := settings.Timezone(q)
 			if err != nil {

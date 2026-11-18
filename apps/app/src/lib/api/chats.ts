@@ -41,6 +41,10 @@ export type Transcript = {
     ack: boolean
     ackEmoji: string
     connectorId: string
+    saveMedia: boolean
+    saveMediaDays: number
+    autoSaved: number
+    autoSavedSize: number
   }
   messages: TranscriptMessage[]
   approvals: { id: string; tool: string; class: ToolClass; argsPreview: string | null; expiresAt: number }[]

@@ -2,7 +2,7 @@
 // Preview, share as a temporary link, download and delete; saving happens in chat.
 import * as React from "react"
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
-import { DownloadIcon, ExternalLinkIcon, EyeIcon, FileTextIcon, ImageIcon, Link2Icon, PaperclipIcon, Trash2Icon } from "lucide-react"
+import { ArchiveIcon, DownloadIcon, ExternalLinkIcon, EyeIcon, FileTextIcon, ImageIcon, Link2Icon, PaperclipIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -28,7 +28,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { createAttachmentShareFn, deleteAttachmentFn, getAttachments, getAttachmentShares, revokeAttachmentShareFn } from "@/lib/api/attachments"
-import { ago, errorMessage, inZone } from "@/lib/format"
+import { ago, errorMessage, fileSize, inZone } from "@/lib/format"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -44,11 +44,7 @@ export const Route = createFileRoute("/_app/attachments")({
 
 type Row = Awaited<ReturnType<typeof getAttachments>>["attachments"][number]
 
-function size(n: number): string {
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`
-}
+const size = fileSize
 
 function AttachmentsPage() {
   const data = Route.useLoaderData()
@@ -151,6 +147,14 @@ function FileCell({ row, timezone }: { row: Row; timezone: string }) {
         </button>
         {row.description && <span className="mt-1 line-clamp-2 text-sm break-words text-muted-foreground">{row.description}</span>}
         <span className="mt-1 block truncate font-mono text-caption text-muted-foreground">{row.filename ?? row.mimeType}</span>
+        {row.origin === "auto" && (
+          <span className="mt-1 flex min-w-0 items-center gap-1 text-caption text-muted-foreground">
+            <ArchiveIcon aria-hidden="true" className="size-3.5 shrink-0 text-primary" />
+            <span className="truncate" dir="auto" title={row.senderName ?? undefined}>
+              {row.senderName ? t("attachments.autoSavedFrom", { name: row.senderName }) : t("attachments.autoSaved")}
+            </span>
+          </span>
+        )}
         {row.shares > 0 && (
           <span className="mt-1 flex items-center gap-1 text-caption text-muted-foreground">
             <Link2Icon aria-hidden="true" className="size-3.5 shrink-0 text-primary" />
