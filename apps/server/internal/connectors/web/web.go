@@ -60,6 +60,28 @@ func (w *channel) Send(_ context.Context, chatExternalID string, payload db.Outb
 		chatID = c.ID
 	}
 	messageID := secret.NewID("webmsg")
-	w.bus.Publish(chat.TurnEvent{Type: "message", ChatID: chatID, MessageID: messageID, Role: "assistant", Text: payload.Text})
+	w.bus.Publish(chat.TurnEvent{Type: "message", ChatID: chatID, MessageID: messageID, Role: "assistant", Text: MediaText(payload)})
 	return connectors.SendResult{ChannelMsgID: messageID}, nil
+}
+
+// MediaText is what the web chat shows for a payload: its text, or for media a
+// line naming the file, then the caption. The file itself stays on the server.
+func MediaText(payload db.OutboxPayload) string {
+	m := payload.Media
+	if m == nil {
+		return payload.Text
+	}
+	label := map[string]string{db.MediaImage: "Image", db.MediaVideo: "Video", db.MediaVoice: "Voice note", db.MediaAudio: "Audio", db.MediaSticker: "Sticker"}[m.Kind]
+	if label == "" {
+		label = "File"
+	}
+	line := "[" + label
+	if m.Filename != "" {
+		line += ": " + m.Filename
+	}
+	line += "]"
+	if payload.Text != "" {
+		return line + "\n" + payload.Text
+	}
+	return line
 }

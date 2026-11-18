@@ -52,3 +52,19 @@ func TestUnknownChatFallsBackToTheExternalID(t *testing.T) {
 		t.Fatal(tr)
 	}
 }
+
+func TestMediaShowsAsALineNamingTheFile(t *testing.T) {
+	bus := chat.NewBus()
+	var seen []chat.TurnEvent
+	bus.Subscribe(func(e chat.TurnEvent) { seen = append(seen, e) })
+	h, err := web.New(bus).Start(conntest.Ctx(t, nil, "web", nil, nil))
+	testutil.Must(t, err)
+	_, err = h.Channel.Send(context.Background(), "web", db.OutboxPayload{Text: "Ini contohnya", Media: &db.OutboxMedia{ID: "med_1", Kind: db.MediaImage, Filename: "inhaler.jpg", Bytes: []byte{1}}})
+	testutil.Must(t, err)
+	if seen[0].Text != "[Image: inhaler.jpg]\nIni contohnya" {
+		t.Fatalf("%q", seen[0].Text)
+	}
+	if got := web.MediaText(db.OutboxPayload{Media: &db.OutboxMedia{Kind: db.MediaDocument}}); got != "[File]" {
+		t.Fatalf("%q", got)
+	}
+}
