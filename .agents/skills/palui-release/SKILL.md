@@ -32,11 +32,11 @@ PRs other than the release PR never bump the version, so parallel PRs can't figh
 
    | Unreleased has | 0.x | >= 1.0 |
    | --- | --- | --- |
-   | only `### Fixed` | patch | patch |
-   | any `### Added` or `### Changed` | minor | minor |
+   | only `Fixed:` entries | patch | patch |
+   | any `Added:` or `Changed:` entry | minor | minor |
    | any `### Breaking` | minor | major |
 
-   `1.0.0` happens only when the owner says v1 is done. Never open it on your own. If a bullet sits under the wrong heading (a feature filed under Fixed), go with the script's bump and say so in the PR body. Don't fix headings in the nightly run.
+   `1.0.0` happens only when the owner says v1 is done. Never open it on your own. If an entry has the wrong type (a feature marked `Fixed:`), go with the script's bump and say so in the PR body. Don't fix entries in the nightly run.
 5. Check for an open release PR:
    ```bash
    gh pr list --state open --json number,headRefName,url -q '.[] | select(.headRefName | startswith("release/v"))'

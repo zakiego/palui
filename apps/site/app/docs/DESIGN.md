@@ -22,7 +22,7 @@ The docs under /docs. `apps/site/DESIGN.md` covers the landing and the brand pag
 - Code: the fill step, a 5% hairline, radius 8, Geist Mono 13 px, the copy button only on hover for a mouse.
 - Tables: no card and no vertical rules, a 590 head over a hairline, quieter row rules.
 - Callouts: shadcn `Alert` (`components/docs/callout.tsx`, `role="note"`). A flat 16 px icon, hued only for warning, error and success; info and idea stay neutral. No colored bar or fill.
-- Changelog: its contents list only the releases (h2), not every Added, Changed and Fixed.
+- Changelog: each release groups its entries by feature (h3: Breaking first, then Chat, Agents, Tools, Automations, Dashboard, API, Self-hosting, Site), and its contents list only the releases. An entry's `Added:`, `Changed:` or `Fixed:` prefix renders as a label column (`components/docs/changelog-item.tsx`): a 6 px dot (green, blue, amber) and 13 px muted text, so the label carries the meaning and the dot only helps scanning.
 
 ## Motion
 

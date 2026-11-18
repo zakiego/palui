@@ -9,6 +9,7 @@ import {
 } from 'fumadocs-ui/layouts/docs/page';
 import { notFound } from 'next/navigation';
 import { getMDXComponents } from '@/components/mdx';
+import { ChangelogItem } from '@/components/docs/changelog-item';
 import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { getPageImageUrl, getPageMarkdownUrl } from '@/lib/shared';
@@ -20,9 +21,11 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
 
   const MDX = page.data.body;
   const markdownUrl = getPageMarkdownUrl(page).url;
-  // The changelog has an Added/Changed/Fixed heading under every release, so
-  // its contents list only the releases.
-  const toc = page.slugs.join('/') === 'changelog' ? page.data.toc.filter((item) => item.depth <= 2) : page.data.toc;
+  // The changelog has category headings under every release, so its contents
+  // list only the releases, and its entries render their Added/Changed/Fixed
+  // prefix as a label.
+  const isChangelog = page.slugs.join('/') === 'changelog';
+  const toc = isChangelog ? page.data.toc.filter((item) => item.depth <= 2) : page.data.toc;
 
   return (
     <DocsPage toc={toc} full={page.data.full}>
@@ -37,6 +40,7 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
           components={getMDXComponents({
             // this allows you to link to other pages with relative file paths
             a: createRelativeLink(source, page),
+            ...(isChangelog && { li: ChangelogItem }),
           })}
         />
       </DocsBody>

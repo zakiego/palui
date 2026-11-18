@@ -28,6 +28,7 @@
   --docs-red: #c2383a;
   --docs-green: #1a7f37;
   --docs-amber: #8a6100;
+  --docs-blue: #2f6fd0;
   --docs-code-edge: rgb(0 0 0 / 0.06);
   --docs-shadow-pop: 0 0 0 1px rgb(0 0 0 / 0.08), 0 4px 24px rgb(0 0 0 / 0.1);
 
@@ -100,6 +101,7 @@
   --docs-red: #f08484;
   --docs-green: #4cb782;
   --docs-amber: #f2c94c;
+  --docs-blue: #4ea7fc;
   --docs-code-edge: rgb(255 255 255 / 0.05);
   --docs-shadow-pop: 0 0 0 1px #23252a, 0 7px 32px rgb(0 0 0 / 0.45);
 
@@ -319,6 +321,41 @@
 #nd-page .prose > :first-child {
   margin-top: 0;
 }
+
+/* Changelog entries: the type in its own column as a colored dot and a quiet
+   label, so a release scans by color and the text still lines up. The label
+   carries the meaning; the dot is a scanning aid. */
+#nd-page .prose ul:has(> .cl-item) {
+  padding-inline-start: 0;
+}
+#nd-page .prose li.cl-item {
+  display: grid;
+  grid-template-columns: 5.25rem minmax(0, 1fr);
+  align-items: baseline;
+  padding-inline-start: 0;
+  list-style: none;
+}
+#nd-page .prose li.cl-item::marker {
+  content: none;
+}
+#nd-page .prose .cl-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 510;
+  color: var(--docs-text-3);
+}
+#nd-page .prose .cl-type::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--cl-dot);
+}
+#nd-page .prose .cl-item[data-type="added"] { --cl-dot: var(--docs-green); }
+#nd-page .prose .cl-item[data-type="changed"] { --cl-dot: var(--docs-blue); }
+#nd-page .prose .cl-item[data-type="fixed"] { --cl-dot: var(--docs-amber); }
 
 /* Links in prose: full ink, a faint underline that lights up on hover. */
 #nd-page .prose a:not([data-card]) {

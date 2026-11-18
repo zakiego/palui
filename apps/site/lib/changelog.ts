@@ -6,11 +6,24 @@
 //   ## Unreleased                 always first, "Nothing yet." when empty
 //   ## 0.2.0 (2026-11-20)         one per release, newest first
 //   ## Not in v1                  any other h2 that isn't version-like is free text
+//
+// Inside Unreleased and each release:
+//   ### Breaking                  first, when the release needs action on upgrade
+//   ### Chat                      then the feature categories, in CATEGORIES order
+//   - Added: Something new.       every entry under a category starts with its type
 
 export type Release = { version: string; date: string; body: string }
 export type Changelog = { unreleased: string | null; releases: Release[] }
 
 export const EMPTY_UNRELEASED = "Nothing yet."
+
+// The h3 groups, in the order they appear. Breaking isn't a feature: it's the
+// list of things to do on upgrade, so it always comes first.
+export const CATEGORIES = ["Chat", "Agents", "Tools", "Automations", "Dashboard", "API", "Self-hosting", "Site"] as const
+export const CHANGE_TYPES = ["Added", "Changed", "Fixed"] as const
+export type ChangeType = (typeof CHANGE_TYPES)[number]
+const HEADINGS = ["Breaking", ...CATEGORIES] as string[]
+const TYPED_ENTRY = new RegExp(`^- (${CHANGE_TYPES.join("|")}): \\S`)
 
 const RELEASE_HEADING = /^## (\d+\.\d+\.\d+) \((\d{4}-\d{2}-\d{2})\)$/
 // Anything that starts like a version but isn't the exact shape above.
@@ -81,6 +94,31 @@ function validDate(date: string): boolean {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === date
 }
 
+// The h3 and entry rules for one section (Unreleased or a release).
+function checkGroups(s: Section, label: string): string[] {
+  const problems: string[] = []
+  let heading: string | null = null
+  let last = -1
+  let fenced = false
+  for (const [j, l] of s.body.entries()) {
+    const at = `line ${s.line + 1 + j}`
+    if (l.startsWith("```")) fenced = !fenced
+    if (fenced) continue
+    if (l.startsWith("### ")) {
+      heading = l.slice(4).trim()
+      const rank = HEADINGS.indexOf(heading)
+      if (rank === -1) problems.push(`${at}: "${l.trimEnd()}" in ${label} isn't one of ${HEADINGS.join(", ")}`)
+      else if (rank <= last) problems.push(`${at}: "${heading}" in ${label} is out of order or repeated, keep ${HEADINGS.join(", ")}`)
+      else last = rank
+    } else if (l.startsWith("- ")) {
+      if (heading === null) problems.push(`${at}: ${label} entry isn't under a category like \`### Chat\``)
+      else if (heading !== "Breaking" && !TYPED_ENTRY.test(l))
+        problems.push(`${at}: ${label} entry should start with ${CHANGE_TYPES.map((t) => `"${t}: "`).join(", ")}`)
+    }
+  }
+  return problems
+}
+
 // Every rule the changelog must hold, as readable problems. Empty means fine.
 // `version` is the root package.json version.
 export function checkChangelog(src: string, version: string): string[] {
@@ -89,6 +127,7 @@ export function checkChangelog(src: string, version: string): string[] {
   const unreleasedAt = all.findIndex((s) => s.heading === "## Unreleased")
   if (unreleasedAt === -1) problems.push("missing the `## Unreleased` section")
   if (all.filter((s) => s.heading === "## Unreleased").length > 1) problems.push("more than one `## Unreleased` section")
+  if (unreleasedAt !== -1) problems.push(...checkGroups(all[unreleasedAt]!, "Unreleased"))
 
   let prev: { version: string; date: string } | null = null
   for (const [i, s] of all.entries()) {
@@ -101,6 +140,7 @@ export function checkChangelog(src: string, version: string): string[] {
     if (unreleasedAt === -1 || i < unreleasedAt) problems.push(`line ${s.line}: ${v} comes before \`## Unreleased\``)
     if (!validDate(date)) problems.push(`line ${s.line}: ${date} is not a real date`)
     if (!s.body.some((l) => /^\s*- \S/.test(l))) problems.push(`line ${s.line}: ${v} has no bullet points`)
+    problems.push(...checkGroups(s, v))
     for (const [j, l] of s.body.entries())
       if (l.startsWith("- ") && !PR_LINK_END.test(l.trimEnd()))
         problems.push(`line ${s.line + 1 + j}: ${v} entry doesn't end with its PR link, like ([#123](${PR_URL}123))`)
@@ -147,20 +187,29 @@ export type Suggestion = { bump: Bump | null; reason: string }
 
 // Picks the bump from the Unreleased notes, the same way a person would:
 // any `### Breaking` is a major (still a minor while on 0.x, since 1.0.0 is
-// reserved for "v1 is done"), any `### Added` or `### Changed` is a minor,
-// and `### Fixed` alone is a patch. Bullets under any other heading count as
-// a minor, so an unsorted entry never ships as a quiet patch.
+// reserved for "v1 is done"), any `Added:` or `Changed:` entry is a minor,
+// and `Fixed:` alone is a patch. An entry without a type counts as a minor,
+// so an unsorted entry never ships as a quiet patch. Older notes that sort
+// entries under `### Added`, `### Changed` and `### Fixed` still read the same.
 export function suggestBump(src: string, version: string): Suggestion {
   const { unreleased } = parseChangelog(src)
   if (!unreleased || !/^\s*- \S/m.test(unreleased)) return { bump: null, reason: "`## Unreleased` has nothing in it" }
-  const headings = [...unreleased.matchAll(/^### (.+)$/gm)].map((m) => m[1]!.trim().toLowerCase())
+  const types: string[] = []
+  let heading = ""
+  for (const l of unreleased.split("\n")) {
+    if (l.startsWith("### ")) heading = l.slice(4).trim().toLowerCase()
+    else if (l.startsWith("- ")) {
+      const typed = /^- (Added|Changed|Fixed): /.exec(l)
+      types.push(heading === "breaking" ? "breaking" : typed ? typed[1]!.toLowerCase() : ["added", "changed", "fixed"].includes(heading) ? heading : "unsorted")
+    }
+  }
   const preOne = version.startsWith("0.")
-  if (headings.includes("breaking"))
+  if (types.includes("breaking"))
     return preOne
       ? { bump: "minor", reason: "has Breaking, but 0.x stays on minors until v1 is done" }
       : { bump: "major", reason: "has Breaking" }
-  const featureish = headings.filter((h) => h === "added" || h === "changed")
-  if (featureish.length) return { bump: "minor", reason: `has ${[...new Set(featureish)].map((h) => h[0]!.toUpperCase() + h.slice(1)).join(" and ")}` }
-  if (headings.length && headings.every((h) => h === "fixed")) return { bump: "patch", reason: "only Fixed" }
-  return { bump: "minor", reason: "notes aren't sorted under Added, Changed or Fixed, so playing it safe" }
+  const featureish = types.filter((t) => t === "added" || t === "changed")
+  if (featureish.length) return { bump: "minor", reason: `has ${[...new Set(featureish)].map((t) => t[0]!.toUpperCase() + t.slice(1)).join(" and ")}` }
+  if (types.every((t) => t === "fixed")) return { bump: "patch", reason: "only Fixed" }
+  return { bump: "minor", reason: "some entries don't say Added, Changed or Fixed, so playing it safe" }
 }
