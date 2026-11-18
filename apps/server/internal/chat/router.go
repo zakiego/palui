@@ -105,6 +105,13 @@ func SenderCheck(q db.Q, msg connectors.InboundMessage, now int64) (SenderVerdic
 		return SenderVerdict{}, err
 	}
 	scope := ChatScope(msg.Channel, msg.ConnectorID)
+	// A WhatsApp DM can arrive on the sender's LID while their chat was made
+	// on their phone number (or the other way round): keep it one chat.
+	if msg.Channel == "whatsapp" && msg.ChatKind == "dm" {
+		if _, err := chats.LinkWhatsAppDM(q, scope, msg.ChatExternalID, msg.SenderAltID); err != nil {
+			return SenderVerdict{}, err
+		}
+	}
 	chat, found, err := chats.Find(q, msg.Channel, msg.ChatExternalID, scope)
 	if err != nil {
 		return SenderVerdict{}, err

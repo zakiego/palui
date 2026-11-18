@@ -94,6 +94,19 @@ func TestRouterOwnership(t *testing.T) {
 		eq(t, messageByID(t, d, r.MessageID).Status, "handled")
 	})
 
+	t.Run("a guest writing from their LID reuses the chat made on their phone number", func(t *testing.T) {
+		d := testutil.DB(t)
+		need(owner.SetWhatsAppOwner(d, "08123456789", 1))
+		no := false
+		phone := need(chats.Ensure(d, chats.EnsureInput{Channel: "whatsapp", ExternalID: "628999@s.whatsapp.net", Title: "Guest", Kind: "dm", Allowed: &no}, 1))
+		h := chattest.New(t, chattest.Options{DB: d, Registry: map[string]*connectors.Runtime{"whatsapp": conntest.ChannelRuntime("whatsapp", conntest.NewFakeChannel("whatsapp"))}, Rows: []chattest.Row{{"whatsapp", "channel"}}})
+		if r := need(h.Engine.Inbound(waMsg("444@lid", "444@lid", "halo", func(m *connectors.InboundMessage) { m.SenderAltID = "628999@s.whatsapp.net" }))); r != nil {
+			t.Fatal(r)
+		}
+		eq(t, count(t, d, "chats"), 1)
+		eq(t, found(chats.Get(d, phone.ID)).ExternalID, "444@lid")
+	})
+
 	t.Run("keeps a new WhatsApp group off until the owner picks an agent from inside it", func(t *testing.T) {
 		d := testutil.DB(t)
 		need(owner.SetWhatsAppOwner(d, "08123456789", 1))
