@@ -224,13 +224,16 @@ type Session struct {
 	LoadedTools     NullJSON[[]string] `json:"loadedTools"`
 	CreatedAt       int64              `json:"createdAt"`
 	ClosedAt        *int64             `json:"closedAt"`
+	// The setup of the session's last message turn (chat.SetupSnapshot),
+	// internal: never sent to the dashboard.
+	SetupSnapshot *string `json:"-"`
 }
 
-const SessionCols = "id, chat_id, summary, summarized_until, saved_to_recall_at, loaded_tools, created_at, closed_at"
+const SessionCols = "id, chat_id, summary, summarized_until, saved_to_recall_at, loaded_tools, created_at, closed_at, setup_snapshot"
 
 func ScanSession(s Scanner) (Session, error) {
 	var r Session
-	err := s.Scan(&r.ID, &r.ChatID, &r.Summary, &r.SummarizedUntil, &r.SavedToRecallAt, &r.LoadedTools, &r.CreatedAt, &r.ClosedAt)
+	err := s.Scan(&r.ID, &r.ChatID, &r.Summary, &r.SummarizedUntil, &r.SavedToRecallAt, &r.LoadedTools, &r.CreatedAt, &r.ClosedAt, &r.SetupSnapshot)
 	return r, err
 }
 

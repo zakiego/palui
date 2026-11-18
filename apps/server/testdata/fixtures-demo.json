@@ -410,7 +410,7 @@
    "rows": []
   },
   "sessions": {
-   "columns": ["id","chat_id","summary","summarized_until","saved_to_recall_at","created_at","closed_at","loaded_tools"],
+   "columns": ["id","chat_id","summary","summarized_until","saved_to_recall_at","created_at","closed_at","loaded_tools","setup_snapshot"],
    "rows": [
     ["<ses#1>","<chat#1>",null,null,null,1794621600000,null,null],
     ["<ses#2>","<chat#2>",null,null,null,1794621600000,null,null],

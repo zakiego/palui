@@ -32,6 +32,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 	"github.com/zakiego/palui/apps/server/internal/tools"
+	"github.com/zakiego/palui/apps/server/internal/version"
 )
 
 const (
@@ -1119,7 +1120,20 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			if agent.IsDefault {
 				recallAbout = "owner"
 			}
-			turnContext := BuildTurnContext(TurnContextInput{Now: startedAt, TZ: all.Timezone, Checkins: checkins, Recall: recall, RecallAbout: recallAbout})
+			setupNote := ""
+			if isMessage && session != nil {
+				snap := TakeSetupSnapshot(SetupInput{
+					Version: version.Version, Commit: currentCommit(), Audience: audience, Tools: collected,
+					Persona: agent.Persona, Notes: notesText, ChatRules: rulesText,
+				})
+				if setupNote, err = SessionSetupNote(q, session, snap, buildSubjects); err != nil {
+					return err
+				}
+				if setupNote != "" {
+					rlog.Info("setup changed since the last turn", logx.Fields{"note": setupNote})
+				}
+			}
+			turnContext := BuildTurnContext(TurnContextInput{Now: startedAt, TZ: all.Timezone, SetupChanges: setupNote, Checkins: checkins, Recall: recall, RecallAbout: recallAbout})
 			// Past tool calls are replayed only next to a tool list.
 			var pastCalls []ToolCallRow
 			if collected.Tools.Len() > 0 {
