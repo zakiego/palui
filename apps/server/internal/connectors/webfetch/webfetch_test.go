@@ -165,3 +165,76 @@ func TestSearchWebTellsAnEmptySearchFromABlockedOne(t *testing.T) {
 		t.Fatal(down)
 	}
 }
+
+// sequence answers each call with the next step and counts the calls.
+func sequence(calls *int, steps ...func() (*safenet.Response, error)) webfetch.Fetcher {
+	return func(_ context.Context, _ string, opts safenet.Options) (*safenet.Response, error) {
+		if opts.TimeoutMs != webfetch.SearchTimeoutMs {
+			panic("search should use its own short timeout")
+		}
+		step := steps[min(*calls, len(steps)-1)]
+		*calls++
+		return step()
+	}
+}
+
+func timedOut() (*safenet.Response, error) {
+	return nil, &safenet.Error{Code: safenet.CodeTimeout, Message: "Timed out after 7000 ms"}
+}
+
+func TestSearchWebTriesAgainOnceWhenDuckDuckGoHangs(t *testing.T) {
+	ok := func() (*safenet.Response, error) { return response(ddgPage, "text/html", 0, false), nil }
+
+	calls := 0
+	out := conntest.Of(webfetch.SearchWeb(context.Background(), "cara pakai inhaler", sequence(&calls, timedOut, ok)))
+	if !out.B("ok") || calls != 2 {
+		t.Fatal(calls, out)
+	}
+
+	calls = 0
+	dropped := func() (*safenet.Response, error) {
+		return nil, &safenet.Error{Code: safenet.CodeNetwork, Message: "connection reset"}
+	}
+	if out := conntest.Of(webfetch.SearchWeb(context.Background(), "q", sequence(&calls, dropped, ok))); !out.B("ok") || calls != 2 {
+		t.Fatal(calls, out)
+	}
+
+	calls = 0
+	busy := func() (*safenet.Response, error) { return response("busy", "text/html", 503, false), nil }
+	if out := conntest.Of(webfetch.SearchWeb(context.Background(), "q", sequence(&calls, busy, ok))); !out.B("ok") || calls != 2 {
+		t.Fatal(calls, out)
+	}
+
+	// Two hung tries in a row: give up with the timeout, no third try.
+	calls = 0
+	out = conntest.Of(webfetch.SearchWeb(context.Background(), "q", sequence(&calls, timedOut)))
+	if out.String() != `{"ok":false,"query":"q","error":"The page took too long to answer"}` || calls != 2 {
+		t.Fatal(calls, out)
+	}
+}
+
+func TestSearchWebDoesNotRetryAnAnswerOrACancelledTurn(t *testing.T) {
+	for name, step := range map[string]func() (*safenet.Response, error){
+		"4xx": func() (*safenet.Response, error) { return response("no", "text/html", 403, false), nil },
+		"blocked": func() (*safenet.Response, error) {
+			return response(`<form id="challenge-form"></form>`, "text/html", 0, false), nil
+		},
+		"refused": func() (*safenet.Response, error) {
+			return nil, &safenet.Error{Code: safenet.CodeBlockedAddress, Message: "private"}
+		},
+	} {
+		calls := 0
+		webfetch.SearchWeb(context.Background(), "q", sequence(&calls, step))
+		if calls != 1 {
+			t.Fatal(name, calls)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	calls := 0
+	webfetch.SearchWeb(ctx, "q", sequence(&calls, timedOut))
+	if calls != 1 {
+		t.Fatal("cancelled", calls)
+	}
+}
