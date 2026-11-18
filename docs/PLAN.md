@@ -268,7 +268,7 @@ Budget
 ### 5.5 Skills (built-in connectors)
 
 - Reminders (section 6) and Jobs (section 7).
-- Voice-in: ElevenLabs Scribe. Gemini audio through CLIProxyAPI is the fallback if the M0 spike shows it works.
+- Voice-in: ElevenLabs Scribe, Indonesian (`id`) by default. Gemini audio through CLIProxyAPI is the fallback if the M0 spike shows it works. Transcription is a per-agent switch (`agents.transcribe_voice`), off by default because each note costs money; agents that existed while the voice connector was on keep it on after the upgrade. Only the owner's voice notes are transcribed.
 - Web fetch: fetch + readability behind the SSRF guard. Results taint the turn.
 - Inbound webhooks: `POST /api/hooks/:slug` with an HMAC secret per hook. It forwards the event to me as text. The "summarize" option runs with zero tools.
 - Calendar: D7 decides whether a Google Calendar read connector is in v1.

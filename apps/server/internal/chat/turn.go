@@ -1089,7 +1089,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			if origin == "message" {
 				inbound = &InboundInfo{}
 				for _, e := range c.Host.Running() {
-					if e.Handle.Transcribe != nil {
+					if agent.TranscribeVoice && e.Handle.Transcribe != nil {
 						inbound.Voice = true
 						break
 					}

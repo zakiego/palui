@@ -94,6 +94,7 @@ type Form = {
   // Comma or space separated in the input, a list on save.
   reads: string
   perChat: boolean
+  voice: boolean
   bot: string
   avatarImage: string | null
   avatarIcon: string | null
@@ -110,6 +111,7 @@ function formFor(a: Agent): Form {
     container: a.recallContainer ?? "",
     reads: a.recallReadContainers.join(", "),
     perChat: a.recallPerChat,
+    voice: a.transcribeVoice,
     bot: a.telegramConnectorId ?? "",
     avatarImage: a.avatarImage,
     avatarIcon: a.avatarIcon,
@@ -243,6 +245,7 @@ function AgentSettings({ data }: { data: Loaded }) {
           recallContainer: clean.container || null,
           recallReadContainers: reads,
           recallPerChat: clean.perChat,
+          transcribeVoice: clean.voice,
           telegramConnectorId: clean.bot || null,
           avatarImage: clean.avatarImage,
           avatarIcon: (clean.avatarIcon || null) as SaveData["avatarIcon"],
@@ -338,6 +341,21 @@ function AgentSettings({ data }: { data: Loaded }) {
 
             <Section id="model" title={t("agents.section.model")} description={t("agents.modelBody")}>
               <AgentModelsFields models={models} onChange={setModels} data={data.models} newKey={withKeys} />
+            </Section>
+
+            <Section id="voice" title={t("agents.section.voice")}>
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="agent-voice">{t("agents.field.voice")}</FieldLabel>
+                  <FieldDescription className="text-pretty">
+                    {t("agents.voiceHint")}{" "}
+                    <Link to="/connectors/new" className="underline underline-offset-4">
+                      {t("agents.voiceSetup")}
+                    </Link>
+                  </FieldDescription>
+                </FieldContent>
+                <Switch id="agent-voice" checked={form.voice} onCheckedChange={(v) => set("voice", v)} />
+              </Field>
             </Section>
 
             {!isDefault && (

@@ -73,6 +73,8 @@ export type SaveAgentInput = {
   recallContainer: string | null
   recallReadContainers: string[]
   recallPerChat: boolean
+  // Left out keeps the agent's setting; a new agent starts off.
+  transcribeVoice?: boolean
   telegramConnectorId: string | null
   avatarImage: string | null
   avatarIcon: AgentIcon | null

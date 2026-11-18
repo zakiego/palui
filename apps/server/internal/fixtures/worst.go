@@ -232,6 +232,7 @@ func worst(k *Kit) {
 		// Five shared containers at 64 characters each (MAX_READ_CONTAINERS, RECALL_CONTAINER).
 		RecallReadContainers: readContainers,
 		RecallPerChat:        ptr(true),
+		TranscribeVoice:      ptr(true),
 		TelegramConnectorID:  ptr("tgbot-arisan"),
 		// Its own six-step default chain (with the removed connector) and fast model; vision follows the global one.
 		ModelRoles: obj("default", sixSteps(), "fast", []any{obj("connectorId", "ai-gateway", "model", "claude-haiku-4-5-20251001")}),

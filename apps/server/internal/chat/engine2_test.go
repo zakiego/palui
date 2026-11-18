@@ -342,10 +342,45 @@ func TestHooksAndReminders(t *testing.T) {
 }
 
 func TestInbox(t *testing.T) {
+	voiceOn := func(t *testing.T, d *db.DB) {
+		t.Helper()
+		def := need(agents.GetDefault(d, 1))
+		yes := true
+		need(agents.Update(d, def.ID, agents.Input{TranscribeVoice: &yes}, 1))
+	}
+
+	t.Run("leaves voice notes untranscribed while the agent has them off", func(t *testing.T) {
+		d := testutil.DB(t)
+		chattest.OwnTelegram(t, d)
+		chattest.ModelChain(t, d, "cliproxy")
+		m := models.NewScripted(models.Say("oke"))
+		calls := 0
+		voice := conntest.ToolsRuntime("voice", tools(), "skill", func(h *connectors.RunningConnector) {
+			h.Transcribe = func(ctx context.Context, a connectors.InboundMedia) (string, error) {
+				calls++
+				return "ingetin aku besok", nil
+			}
+		})
+		h := chattest.New(t, chattest.Options{DB: d, Registry: map[string]*connectors.Runtime{"cliproxy": chattest.Model("cliproxy", m), "telegram": conntest.ChannelRuntime("telegram", conntest.NewFakeChannel("telegram")), "voice": voice},
+			Rows: []chattest.Row{{"cliproxy", "model"}, {"telegram", "channel"}, {"voice", "skill"}}})
+		testutil.Must(t, h.Engine.Start())
+		need(h.Engine.Inbound(tgMsg("", func(x *connectors.InboundMessage) {
+			x.Media = []connectors.InboundMedia{{Kind: "audio", MimeType: "audio/ogg", Data: base64.StdEncoding.EncodeToString([]byte("x"))}}
+		})))
+		h.Engine.Idle()
+		row := need(db.ScanMessage(d.QueryRow("SELECT " + db.MessageCols + " FROM messages WHERE role = 'user'")))
+		eq(t, row.Text, "[voice] (pesan suara, tapi transkripsi voice note lagi mati buat agent ini)")
+		contains(t, string(row.Content), `"note":"transcription off for this agent"`)
+		eq(t, calls, 0)
+		contains(t, models.PromptText(m.Prompts[0]), "Voice notes reach you only as a note that they couldn't be transcribed")
+		h.Engine.Stop(100)
+	})
+
 	t.Run("replays pending messages on start and transcribes voice through a transcribe connector", func(t *testing.T) {
 		d := testutil.DB(t)
 		chattest.OwnTelegram(t, d)
 		chattest.ModelChain(t, d, "cliproxy")
+		voiceOn(t, d)
 		m := models.NewScripted(models.Say("oke"))
 		voice := conntest.ToolsRuntime("voice", tools(), "skill", func(h *connectors.RunningConnector) {
 			h.Transcribe = func(ctx context.Context, a connectors.InboundMedia) (string, error) { return "ingetin aku besok", nil }
@@ -365,6 +400,7 @@ func TestInbox(t *testing.T) {
 		eq(t, row.Text, "[voice] ingetin aku besok")
 		eq(t, row.Status, "handled")
 		contains(t, models.PromptText(m.Prompts[0]), "[voice] ingetin aku besok")
+		contains(t, models.PromptText(m.Prompts[0]), "Voice notes reach you as a transcript, marked [voice].")
 		h.Engine.Stop(100)
 	})
 
@@ -584,14 +620,14 @@ func TestPrepareMediaGuestVoice(t *testing.T) {
 	audio := []connectors.InboundMedia{{Kind: "audio", MimeType: "audio/ogg", Data: base64.StdEncoding.EncodeToString([]byte("x"))}}
 	_, guest, err := chat.WriteInbound(d, tgMsg("", func(m *connectors.InboundMessage) { m.Media = audio }), 1, false)
 	testutil.Must(t, err)
-	row := need(chat.PrepareMedia(context.Background(), d, guest, running, nil))
+	row := need(chat.PrepareMedia(context.Background(), d, guest, running, true, nil))
 	eq(t, row.Text, "[voice] (pesan suara dari tamu, gak ditranskrip)")
 	eq(t, calls, 0)
 	contains(t, string(row.Content), `"note":"guest, not transcribed"`)
 
 	_, own, err := chat.WriteInbound(d, tgMsg("", func(m *connectors.InboundMessage) { m.Media = audio }), 2, true)
 	testutil.Must(t, err)
-	row = need(chat.PrepareMedia(context.Background(), d, own, running, nil))
+	row = need(chat.PrepareMedia(context.Background(), d, own, running, true, nil))
 	eq(t, row.Text, "[voice] halo")
 	eq(t, calls, 1)
 }
