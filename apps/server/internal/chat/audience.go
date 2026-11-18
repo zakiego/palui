@@ -35,10 +35,11 @@ func channelOf(c *EngineCtx, chat db.Chat) connectors.ChannelHandle {
 }
 
 // Audience is who can read this chat (PLAN 19.4): owner, members or outside.
-// Cheapest check first. Every doubt is outside: a default agent, an agent
-// with no members, every Telegram group, and a WhatsApp group whose
-// participant list can't be read in time. A database error is returned; a
-// channel error never is.
+// Every doubt is outside: a Telegram group, a WhatsApp group whose
+// participant list can't be read in time, and for members a default agent or
+// an agent with no members. A WhatsApp group where everyone but this account
+// is the owner is the owner's own chat, for every agent. A database error is
+// returned; a channel error never is.
 func Audience(c *EngineCtx, chat db.Chat, agent db.Agent) (string, error) {
 	q := c.DB
 	shared, err := agents.IsSharedChat(q, chat)
@@ -47,6 +48,9 @@ func Audience(c *EngineCtx, chat db.Chat, agent db.Agent) (string, error) {
 	}
 	if !shared {
 		return tools.AudienceOwner, nil
+	}
+	if chat.Kind == "group" && chat.Channel == db.ChannelWhatsApp {
+		return groupAudience(c, chat, agent)
 	}
 	if agent.IsDefault {
 		return tools.AudienceOutside, nil
@@ -62,9 +66,14 @@ func Audience(c *EngineCtx, chat db.Chat, agent db.Agent) (string, error) {
 		}
 		return tools.AudienceMembers, nil
 	}
-	if chat.Kind != "group" || chat.Channel != db.ChannelWhatsApp {
-		return tools.AudienceOutside, nil
-	}
+	return tools.AudienceOutside, nil
+}
+
+// groupAudience reads a WhatsApp group's participant list: owner when nobody
+// else is in it, members when everyone else is a member of this agent (never
+// for the default agent), outside otherwise.
+func groupAudience(c *EngineCtx, chat db.Chat, agent db.Agent) (string, error) {
+	q := c.DB
 	outside := func(reason string) {
 		if c.Log != nil {
 			c.Log.Info("group counted as outside", logx.Fields{"chat_id": chat.ID, "reason": reason})
@@ -94,6 +103,7 @@ func Audience(c *EngineCtx, chat db.Chat, agent db.Agent) (string, error) {
 		outside("empty participant list")
 		return tools.AudienceOutside, nil
 	}
+	var others []connectors.Participant
 	for _, p := range list {
 		if p.ExternalID == "" && p.AltID == "" {
 			outside("participant without an id")
@@ -103,9 +113,18 @@ func Audience(c *EngineCtx, chat db.Chat, agent db.Agent) (string, error) {
 		if err != nil {
 			return tools.AudienceOutside, err
 		}
-		if isOwner {
-			continue
+		if !isOwner {
+			others = append(others, p)
 		}
+	}
+	if len(others) == 0 {
+		return tools.AudienceOwner, nil
+	}
+	if agent.IsDefault {
+		outside("the default agent has no members")
+		return tools.AudienceOutside, nil
+	}
+	for _, p := range others {
 		isMember, err := members.IsMember(q, agent.ID, members.Sender{Channel: chat.Channel, ExternalID: p.ExternalID, AltID: p.AltID})
 		if err != nil {
 			return tools.AudienceOutside, err
@@ -118,11 +137,42 @@ func Audience(c *EngineCtx, chat db.Chat, agent db.Agent) (string, error) {
 	return tools.AudienceMembers, nil
 }
 
+// TurnAudience is Audience plus the session's history: a shared chat whose
+// session holds a message from someone the audience doesn't cover (a stranger
+// who wrote and left) runs as outside until the session starts over. An
+// owner-only group demotes on anyone but the owner, a members chat on anyone
+// who is neither the owner nor a member.
+func TurnAudience(c *EngineCtx, chat db.Chat, agent db.Agent, sessionID string, history []db.Message) (string, error) {
+	audience, err := Audience(c, chat, agent)
+	if err != nil {
+		return audience, err
+	}
+	covered := ""
+	switch {
+	case audience == tools.AudienceMembers:
+		covered = agent.ID
+	case audience == tools.AudienceOwner && chat.Kind == "group":
+	default:
+		return audience, nil
+	}
+	outsider, err := HistoryHasOutsider(c.DB, chat, covered, sessionID, history)
+	if err != nil {
+		return tools.AudienceOutside, err
+	}
+	if outsider {
+		if c.Log != nil {
+			c.Log.Info("chat counted as outside", logx.Fields{"chat_id": chat.ID, "was": audience, "reason": "history holds a message from someone the audience doesn't cover"})
+		}
+		return tools.AudienceOutside, nil
+	}
+	return audience, nil
+}
+
 // HistoryHasOutsider reports whether the session holds a message from
-// someone who is neither the owner nor a member of this agent, such as a
-// stranger who has since left the group. Their text would reach a members
-// turn as if a member wrote it (in the history window or folded into the
-// summary), so the turn runs as outside until the session starts over. It
+// someone who is neither the owner nor a member of this agent (agentID ""
+// counts no one as a member), such as a stranger who has since left the
+// group. Their text would reach the turn as if someone the audience covers
+// wrote it (in the history window or folded into the summary). It
 // reads every sender of the session, not only the loaded window, plus the
 // loaded history for messages of this batch. Hook messages are left to the
 // taint of their own turn.
