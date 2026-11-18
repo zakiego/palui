@@ -570,10 +570,7 @@ function SectionTabs({ counts }: { counts: Partial<Record<Tab, number>> }) {
 function AgentModelsFields({ models, onChange, data, newKey }: { models: ModelsForm; onChange: React.Dispatch<React.SetStateAction<ModelsForm>>; data: Loaded["models"]; newKey: ReturnType<typeof useLinkKeys> }) {
   const t = useT()
   const options = connectorOptions(data.connectors)
-  const catalogs = useCatalogs(
-    ROLES.filter((r) => models[r].custom).map((r) => models[r].chain),
-    new Set(options.map((o) => o.value)),
-  )
+  const catalogs = useCatalogs(options)
   const set = (role: Role, patch: Partial<ModelsForm[Role]>) => onChange((m) => ({ ...m, [role]: { ...m[role], ...patch } }))
   return (
     <FieldGroup>

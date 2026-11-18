@@ -275,7 +275,7 @@ function ModelsTab({ data }: { data: Data }) {
   const t = useT()
   const { busy, save } = useSave()
   const options = connectorOptions(data.models)
-  const catalogs = useCatalogs(ROLES.map((r) => roles[r]), new Set(options.map((o) => o.value)))
+  const catalogs = useCatalogs(options)
   const setChain = (role: Role, chain: KeyedLink[]) => setRoles((r) => ({ ...r, [role]: chain }))
 
   return (
@@ -292,7 +292,7 @@ function ModelsTab({ data }: { data: Data }) {
           </Alert>
         )}
         {ROLES.map((role) => (
-          <FieldSet key={role} className="gap-2">
+          <FieldSet key={role} className="min-w-0 gap-2">
             <FieldLegend variant="label" className="font-mono">
               {role}
             </FieldLegend>
