@@ -108,7 +108,10 @@ type Config struct {
 	DefaultContainer string
 }
 
-// ConfigFrom reads a stored config (no defaults, like ctx.config).
+// ConfigFrom reads a stored config (no defaults, like ctx.config), except
+// autoRecall and autoSave: the setup form never asks for them, so a missing
+// key means the manifest's default (on), and only an explicit false turns
+// one off.
 func ConfigFrom(o *jsonx.Object) Config {
 	get := func(k string) any {
 		if o == nil {
@@ -118,7 +121,7 @@ func ConfigFrom(o *jsonx.Object) Config {
 		return v
 	}
 	s := func(k string) string { x, _ := get(k).(string); return x }
-	return Config{URL: s("url"), Container: s("container"), AutoRecall: get("autoRecall") == true, AutoSave: get("autoSave") == true, DefaultContainer: s("defaultContainer")}
+	return Config{URL: s("url"), Container: s("container"), AutoRecall: get("autoRecall") != false, AutoSave: get("autoSave") != false, DefaultContainer: s("defaultContainer")}
 }
 
 // MemoryHandle is createMemoryHandle.

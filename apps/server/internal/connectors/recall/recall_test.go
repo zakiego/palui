@@ -489,6 +489,22 @@ func TestSavePostsToMemoriesWithTheContainerAndSourceID(t *testing.T) {
 	}
 }
 
+// The setup form only sends url and the key, and the runtime later learns
+// defaultContainer: that stored shape keeps auto-recall and auto-save on.
+func TestAutoRecallAndAutoSaveDefaultOnWhenTheConfigLeavesThemOut(t *testing.T) {
+	f := fakeRecall(t, fakeOpts{})
+	o, err := jsonx.ParseObject([]byte(`{"url":"` + f.base + `","defaultContainer":"zaki"}`))
+	testutil.Must(t, err)
+	running, _ := start(t, o)
+	if !running.Memory.AutoRecall || !running.Memory.AutoSave {
+		t.Fatal("flags", running.Memory.AutoRecall, running.Memory.AutoSave)
+	}
+	live := conntest.Of(running.Live())
+	if live.Get("autoRecall") != true || live.Get("autoSave") != true {
+		t.Fatal(live)
+	}
+}
+
 func TestStartFailsWhenRecallIsUnreachable(t *testing.T) {
 	_, err := recall.Runtime.Start(conntest.Ctx(t, nil, "recall", cfg(t, "http://127.0.0.1:1", ""), map[string]string{"apiKey": KEY}))
 	if err == nil || !strings.Contains(err.Error(), "Can't reach recall") {
