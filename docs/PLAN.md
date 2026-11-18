@@ -607,7 +607,7 @@ Audience, worked out when the turn starts:
 
 | Audience | When |
 |---|---|
-| `owner` | The owner's DM or the web chat. |
+| `owner` | The owner's DM, the web chat, or a WhatsApp group whose participant list holds nobody but the owner (any agent, the default one too). |
 | `members` | A shared chat where every participant is the owner or a member of this chat's agent: a DM with a member, or a WhatsApp group whose participant list (`GetGroupInfo`, cached, refreshed on participant changes) holds nobody else. The agent needs at least one member; Palui has none, so it never gets this audience. |
 | `outside` | Anything else. A participant list Palui can't read counts as `outside` (fail closed), and so does every Telegram group, since a bot can't list a group's members. |
 
@@ -629,7 +629,7 @@ Data scope is `PaluiTool.Data` from the connector contract: `none`, `chat`, `age
 - `owner` turns keep today's rules: destructive asks, a write after untrusted content asks, `allow`/`ask`/`deny` per tool apply.
 - Approvals only ever happen in the owner's own chats now, so a shared chat never sends a prompt to the owner's DM. A request that resumes in a chat with no approvals (asked before this rule, or the chat stopped being the owner's) is answered as denied and runs nothing.
 - Attachments in a shared chat leave out the share and unshare tools, the dashboard link and file refs, so public file links are made from the owner's chats only. T3 Code's chat thread list has no scope of its own and follows the connector.
-- A group Palui answers in is a shared chat like any agent's, so the owner's own message there gets the same tools as everyone else's.
+- A group Palui answers in is a shared chat like any agent's, so the owner's own message there gets the same tools as everyone else's. The one exception is a WhatsApp group of only the owner: nobody else can read it, so it's `owner`. A session that holds a message from anyone else keeps it `outside` until the session starts over.
 
 Reading down: Palui can read other agents' chats and memory (new read tools on Palui only, `owner` audience). What it reads was written by other people, so it taints the turn: a write after it asks for approval. No other agent can read Palui or another agent (#110 keeps jobs, MCP servers and settings per agent).
 
