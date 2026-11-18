@@ -34,11 +34,23 @@ import { CLASS_TONE, ToolTrace } from "@/components/tool-trace"
 import { AgentAvatar } from "@/components/agent-avatar"
 import { SimpleSelect } from "@/components/simple-select"
 import { AckControl } from "@/components/ack-control"
+import { SaveMediaControl } from "@/components/save-media-control"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Switch } from "@/components/ui/switch"
 import { setChatAgentFn, setChatAllowedFn, setChatReplyModeFn } from "@/lib/api/agents"
+import { deleteAutoSavedFn } from "@/lib/api/attachments"
 import { decideApproval, getChats, getTranscript, sendWebMessage, stopTurn } from "@/lib/api/chats"
 import { notifyUnauthorized } from "@/lib/api/client"
-import { ago, errorMessage } from "@/lib/format"
+import { ago, errorMessage, fileSize } from "@/lib/format"
 import { markdownToPlain } from "@/lib/markdown"
 import { transcriptToMarkdown } from "@/lib/transcript-text"
 import { useLabel, useT } from "@/lib/i18n"
@@ -468,13 +480,62 @@ function AgentBar({ transcript }: { transcript: Transcript }) {
           />
         )}
         {chat.channel === "whatsapp" && <AckControl chat={chat} />}
+        {chat.channel !== "web" && <SaveMediaControl chat={chat} />}
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={allowed} disabled={busy} onCheckedChange={(v) => void toggle(v)} aria-label={t("chats.allowedFor", { name: chat.title })} />
           {t("chats.allowed")}
         </label>
       </div>
+      {(chat.saveMedia || chat.autoSaved > 0) && <AutoSavedNote chat={chat} />}
       {transcript.shared && transcript.agent.isDefault && <p className="text-caption text-muted-foreground">{t("chats.guestsWaiting")}</p>}
       {chat.channel === "telegram" && chat.kind === "group" && replyMode === "all" && <p className="text-caption text-muted-foreground">{t("chats.privacyMode")}</p>}
+    </div>
+  )
+}
+
+// What the chat's auto-save holds, with a link to the files and a way to
+// delete them all at once (files saved on purpose stay).
+function AutoSavedNote({ chat }: { chat: Transcript["chat"] }) {
+  const t = useT()
+  const router = useRouter()
+  const [confirm, setConfirm] = React.useState(false)
+  const remove = async () => {
+    try {
+      const r = await deleteAutoSavedFn({ data: { chatId: chat.id } })
+      toast.success(t("chats.autoSavedDeleted", { n: r.deleted.toLocaleString() }))
+      void router.invalidate()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    }
+  }
+  const n = chat.autoSaved.toLocaleString()
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted-foreground">
+      <span>{chat.saveMedia ? t("chats.saveMediaOn") : t("chats.saveMediaWasOn")}</span>
+      {chat.autoSaved > 0 && (
+        <>
+          <Link to="/attachments" className="underline underline-offset-4 hover:text-foreground">
+            {t("chats.autoSaved", { n, size: fileSize(chat.autoSavedSize) })}
+          </Link>
+          <Button variant="ghost" size="sm" className="h-auto px-1 py-0 text-caption text-destructive" onClick={() => setConfirm(true)}>
+            {t("chats.autoSavedDelete")}
+          </Button>
+        </>
+      )}
+      <AlertDialog open={confirm} onOpenChange={setConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("chats.autoSavedDeleteTitle", { n })}</AlertDialogTitle>
+            <AlertDialogDescription>{t("chats.autoSavedDeleteBody")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.keep")}</AlertDialogCancel>
+            <AlertDialogAction variant="danger" onClick={() => void remove()}>
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

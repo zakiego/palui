@@ -97,3 +97,10 @@ export function duration(ms: number | null | undefined): string {
   const days = Math.floor(hours / 24)
   return hours % 24 ? `${days} d ${hours % 24} h` : `${days} d`
 }
+
+// A file size the way the Attachments page shows it.
+export function fileSize(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
