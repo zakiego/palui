@@ -17,7 +17,7 @@ None in v1.
 
 Two tools, both marked untrusted and both open to guests in a shared chat:
 
-- `fetch_page` fetches a URL and returns the page's readable text.
+- `fetch_page` fetches a URL and returns the page's readable text, plus up to 8 picture links found on the page (`images`): the page's own preview image (`og:image`, `twitter:image`) first, then its pictures in order, without logos, icons, tracking pixels, SVG and inline data. The agent can pass one to `send_media` to send it into the chat.
 - `search_web` searches the web through DuckDuckGo's plain HTML results page and returns up to 8 results (title, link, snippet). No key needed.
 
 ## Safety

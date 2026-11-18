@@ -140,3 +140,34 @@ func TestSendMediaIsAChatScopedWriteInEveryAudience(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+func TestSendMediaFromAPageLinkSendsItsPreviewImage(t *testing.T) {
+	e := setup(t)
+	page := `<!doctype html><html><head><meta property="og:image" content="/img/inhaler.jpg"></head><body><p>Cara pakai inhaler</p></body></html>`
+	var urls []string
+	fetch := func(_ context.Context, url string, _ safenet.Options) (*safenet.Response, error) {
+		urls = append(urls, url)
+		if strings.HasSuffix(url, ".jpg") {
+			return &safenet.Response{URL: url, Status: 200, OK: true, ContentType: "image/jpeg", Bytes: jpegBytes}, nil
+		}
+		return &safenet.Response{URL: url, Status: 200, OK: true, ContentType: "text/html", Bytes: []byte(page)}, nil
+	}
+	set := sendTools(e, e.turn, fetch)
+	r := conntest.Call(t, set, "send_media", `{"kind":"image","url":"https://example.com/artikel/inhaler"}`)
+	if !r.B("ok") || r.S("kind") != db.MediaImage || r.S("url") != "https://example.com/img/inhaler.jpg" || !strings.Contains(r.S("note"), "preview image") {
+		t.Fatal(r)
+	}
+	if strings.Join(urls, " ") != "https://example.com/artikel/inhaler https://example.com/img/inhaler.jpg" {
+		t.Fatal(urls)
+	}
+	// A page with no picture, and a page asked for as a file, are refused.
+	bare := sendTools(e, e.turn, func(_ context.Context, url string, _ safenet.Options) (*safenet.Response, error) {
+		return &safenet.Response{URL: url, Status: 200, OK: true, ContentType: "text/html", Bytes: []byte("<!doctype html><p>no pictures</p>")}, nil
+	})
+	if r := conntest.Call(t, bare, "send_media", `{"kind":"image","url":"https://example.com/a"}`); r.B("ok") || !strings.Contains(r.S("error"), "no picture") {
+		t.Fatal(r)
+	}
+	if r := conntest.Call(t, set, "send_media", `{"kind":"file","url":"https://example.com/artikel/inhaler"}`); r.B("ok") || !strings.Contains(r.S("error"), "web page") {
+		t.Fatal(r)
+	}
+}
