@@ -185,8 +185,8 @@ func TestAnotherAgentsServersStayItsOwn(t *testing.T) {
 	}
 	row, _, err := connectors.Get(d, "mcp-kas")
 	testutil.Must(t, err)
-	if row.AgentID == nil || *row.AgentID != "agt_friends" {
-		t.Fatalf("%+v", row.AgentID)
+	if strings.Join(row.AgentIDs, ",") != "agt_friends" {
+		t.Fatalf("%+v", row.AgentIDs)
 	}
 	// The owner's agent neither lists nor removes it; the friends' agent can't
 	// remove a server every agent shares.

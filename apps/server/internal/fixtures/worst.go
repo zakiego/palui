@@ -257,6 +257,8 @@ func worst(k *Kit) {
 	k.OwnConnector("mcp-files", arisan)
 	k.OwnConnector("mcp-vorneo", cs)
 	k.OwnConnector("mcp-keuangan", "agt_deleted")
+	// Every agent but the default, plus one deleted since.
+	k.ShareConnector("mcp-linear", arisan, cs, "agt_deleted")
 	// The agent page (/agents/<slug>): instructions at the limits, and (below)
 	// a chat with no title and a chat it no longer answers in.
 	k.Instruction(Instruction{

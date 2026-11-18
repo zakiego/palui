@@ -882,19 +882,19 @@ function ToolsTab({ agent }: { agent: Agent }) {
   const t = useT()
   const [query, setQuery] = React.useState("")
   const { data, error, refresh } = useTabData(() => getAgentToolsFn({ data: { id: agent.id } }), agent.id)
-  // Owners changed here, on top of what the tab loaded. A changed server
+  // Agents changed here, on top of what the tab loaded. A changed server
   // moves to the other part of the list.
-  const [owners, setOwners] = React.useState<Record<string, string | null>>({})
-  const ownerOf = (id: string) => (id in owners ? owners[id]! : (data?.scopes[id] ?? null))
+  const [owners, setOwners] = React.useState<Record<string, string[]>>({})
+  const agentsOf = (id: string) => (id in owners ? owners[id]! : (data?.scopes[id] ?? []))
 
-  // Global (every agent) or owned by this agent. Saves at once.
+  // Global (every agent) or only this agent. Saves at once.
   const setScope = async (connectorId: string, scope: string) => {
     if (scope !== "all" && scope !== "only") return
-    const before = ownerOf(connectorId)
-    const next = scope === "all" ? null : agent.id
+    const before = agentsOf(connectorId)
+    const next = scope === "all" ? [] : [agent.id]
     setOwners((o) => ({ ...o, [connectorId]: next }))
     try {
-      await setConnectorOwnerFn({ data: { id: connectorId, agentId: next } })
+      await setConnectorOwnerFn({ data: { id: connectorId, agentIds: next } })
     } catch (err) {
       setOwners((o) => ({ ...o, [connectorId]: before }))
       toast.error(errorMessage(err))
@@ -1009,7 +1009,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
       )}
       {tools && tools.length > 0 && groups.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">{t("agents.tools.searchEmpty")}</p>}
       {data && tools && groups.length > 0 && (
-        <ToolsByScope agent={agent} data={data} tools={tools} groups={groups} query={query} ownerOf={ownerOf} setScope={(id, scope) => void setScope(id, scope)} noPrivate={noPrivate} setNoPrivate={(id, on) => void setNoPrivate(id, on)} permissions={permissions} setPermission={setPermission} />
+        <ToolsByScope agent={agent} data={data} tools={tools} groups={groups} query={query} agentsOf={agentsOf} setScope={(id, scope) => void setScope(id, scope)} noPrivate={noPrivate} setNoPrivate={(id, on) => void setNoPrivate(id, on)} permissions={permissions} setPermission={setPermission} />
       )}
     </>
   )

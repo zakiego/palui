@@ -18,6 +18,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/events"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
+	"github.com/zakiego/palui/apps/server/internal/strx"
 	"github.com/zakiego/palui/apps/server/internal/zod"
 )
 
@@ -102,9 +103,10 @@ type DraftInput struct {
 	// Only keys sent are replaced; "" deletes that secret.
 	Secrets *jsonx.Map[string]
 	Trust   *string
-	// The agent that owns it (nil: global) when AgentIDSet; left out, it's kept.
-	AgentID    *string
-	AgentIDSet bool
+	// The agents it serves (empty: every agent) when AgentIDsSet; left out,
+	// they're kept.
+	AgentIDs    []string
+	AgentIDsSet bool
 }
 
 var idRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
@@ -198,14 +200,11 @@ func SaveDraft(q db.Q, in DraftInput, masterKey string, now int64) (db.Connector
 	if found && existing.Type != m.ID {
 		return db.Connector{}, fail(fmt.Sprintf("%q is already used by another connector.", in.ID))
 	}
-	// Only tool connectors have an owner, and only an agent that exists.
-	if in.AgentIDSet && in.AgentID != nil && *in.AgentID != "" {
-		list, err := agents.List(q, now)
-		if err != nil {
+	// Only tool connectors have agents, and only agents that exist.
+	agentIDs := connectors.CleanAgentIDs(in.AgentIDs)
+	if in.AgentIDsSet {
+		if err := AgentsExist(q, agentIDs, now); err != nil {
 			return db.Connector{}, err
-		}
-		if !slices.ContainsFunc(list, func(a db.Agent) bool { return a.ID == *in.AgentID }) {
-			return db.Connector{}, fail("That agent doesn't exist anymore.")
 		}
 	}
 	// The owner vouched for the server at the old address, not the new one: a
@@ -218,11 +217,8 @@ func SaveDraft(q db.Q, in DraftInput, masterKey string, now int64) (db.Connector
 		}
 	}
 	up := connectors.UpsertInput{ID: in.ID, Manifest: m.Row(), Label: in.Label, Config: config, Secrets: secrets, Trust: in.Trust, ClearConfig: clear}
-	if m.Kind == "tools" && in.AgentIDSet {
-		up.AgentIDSet = true
-		if in.AgentID != nil && *in.AgentID != "" {
-			up.AgentID = in.AgentID
-		}
+	if m.Kind == "tools" && in.AgentIDsSet {
+		up.AgentIDsSet, up.AgentIDs = true, agentIDs
 	}
 	row, err := connectors.Upsert(q, up, masterKey, now)
 	if err != nil {
@@ -243,6 +239,86 @@ func SaveDraft(q db.Q, in DraftInput, masterKey string, now int64) (db.Connector
 		}
 	}
 	return row, nil
+}
+
+// AgentsExist fails when any of the ids isn't an agent (anymore).
+func AgentsExist(q db.Q, ids []string, now int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	list, err := agents.List(q, now)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if !slices.ContainsFunc(list, func(a db.Agent) bool { return a.ID == id }) {
+			return fail("That agent doesn't exist anymore.")
+		}
+	}
+	return nil
+}
+
+// CanDuplicate: a tool connector a type allows several of (an MCP server).
+// Channels are left out: a copied bot token would fight the original for its
+// updates.
+func CanDuplicate(m connectors.Manifest) bool { return m.Multiple && m.Kind == "tools" }
+
+// Duplicate copies a tool connector under the next free id: label, config,
+// secrets, trust and agents. The copy starts as a paused draft, so the owner
+// can change it before connecting.
+func Duplicate(q db.Q, id, masterKey string, now int64) (db.Connector, error) {
+	var copied db.Connector
+	err := q.Tx(func(tx db.Q) error {
+		row, err := MustExist(tx, id)
+		if err != nil {
+			return err
+		}
+		m, ok := registry.Manifest(row.Type)
+		if !ok {
+			return fail(fmt.Sprintf("Unknown connector type %q.", row.Type))
+		}
+		if !CanDuplicate(m) {
+			return fail(row.Label + " can't be duplicated.")
+		}
+		secrets, err := connectors.Secrets(row, masterKey)
+		if err != nil {
+			return fail("These credentials can't be decrypted with the current MASTER_KEY, so they can't be copied.")
+		}
+		config := row.Config.Clone()
+		// The copy is made on the dashboard, so chat can't remove it.
+		config.Delete("addedFromChat")
+		// Free inside the same transaction, so the insert never lands on a row.
+		newID, err := nextID(tx, row.ID)
+		if err != nil {
+			return err
+		}
+		label := strx.Slice16(row.Label, 80-7) + " (copy)"
+		if copied, err = connectors.Upsert(tx, connectors.UpsertInput{ID: newID, Manifest: m.Row(), Label: &label, Config: config, Secrets: secrets, Trust: &row.Trust, AgentIDs: row.AgentIDs, AgentIDsSet: true}, masterKey, now); err != nil {
+			return err
+		}
+		_, err = events.Log(tx, events.Input{ConnectorID: &copied.ID, Kind: "duplicate", Message: "Copied from " + row.Label}, now)
+		return err
+	})
+	return copied, err
+}
+
+var trailingNumber = regexp.MustCompile(`-\d+$`)
+
+// nextID is the first free "<base>-<n>" from 2 up, where base is id without
+// a trailing number (mcp-linear-2 copies to mcp-linear-3).
+func nextID(q db.Q, id string) (string, error) {
+	base := trailingNumber.ReplaceAllString(id, "")
+	if len(base) > 58 {
+		base = base[:58]
+	}
+	for n := 2; ; n++ {
+		next := fmt.Sprintf("%s-%d", base, n)
+		if _, found, err := connectors.Get(q, next); err != nil {
+			return "", err
+		} else if !found {
+			return next, nil
+		}
+	}
 }
 
 // urlChanged: the draft sends a url and it isn't the stored one. sent is the
@@ -325,11 +401,18 @@ type Item struct {
 	Status       string             `json:"status"`
 	StatusDetail *string            `json:"statusDetail"`
 	Trust        string             `json:"trust"`
-	AgentID      *string            `json:"agentId"`
+	AgentIDs     []string           `json:"agentIds"`
 	Config       *jsonx.Object      `json:"config"`
 	Secrets      *jsonx.Map[string] `json:"secrets"`
 	SecretsError *string            `json:"secretsError"`
 	UpdatedAt    int64              `json:"updatedAt"`
+}
+
+func orEmpty(ids []string) []string {
+	if ids == nil {
+		return []string{}
+	}
+	return ids
 }
 
 // ListItems is listConnectorItems: what the Connectors page renders.
@@ -347,7 +430,7 @@ func ListItems(q db.Q, masterKey string) ([]Item, error) {
 			msg := "These credentials can't be decrypted with the current MASTER_KEY."
 			secretsError = &msg
 		}
-		out = append(out, Item{ID: row.ID, Type: row.Type, Kind: row.Kind, Label: row.Label, Enabled: row.Enabled, Status: row.Status, StatusDetail: row.StatusDetail, Trust: row.Trust, AgentID: row.AgentID, Config: row.Config, Secrets: secrets, SecretsError: secretsError, UpdatedAt: row.UpdatedAt})
+		out = append(out, Item{ID: row.ID, Type: row.Type, Kind: row.Kind, Label: row.Label, Enabled: row.Enabled, Status: row.Status, StatusDetail: row.StatusDetail, Trust: row.Trust, AgentIDs: orEmpty(row.AgentIDs), Config: row.Config, Secrets: secrets, SecretsError: secretsError, UpdatedAt: row.UpdatedAt})
 	}
 	return out, nil
 }

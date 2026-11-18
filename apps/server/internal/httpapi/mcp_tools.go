@@ -87,9 +87,10 @@ func MCPTools() []MCPTool {
 		{Name: "pause_connector", RPC: "pauseConnectorFn", Title: "Pause connector", Description: "Turn a connector off. Its config is kept.", Idempotent: true},
 		{Name: "resume_connector", RPC: "resumeConnectorFn", Title: "Resume connector", Description: "Turn a paused connector back on.", Idempotent: true},
 		{Name: "test_connector", RPC: "testConnectorFn", Title: "Test connector", Description: "Run a connector's connection test and return the result."},
+		{Name: "duplicate_connector", RPC: "duplicateConnectorFn", Title: "Duplicate connector", Description: "Copy a connector a type allows several of (an MCP server) with its config, secrets and agents. The copy is a paused draft; returns its id."},
 		{Name: "remove_connector", RPC: "removeConnectorFn", Title: "Remove connector", Description: "Delete a connector with its config and secrets.", Destructive: true},
 		{Name: "run_connector_action", RPC: "connectorActionFn", Title: "Run connector action", Description: "Run a named action a connector's runtime offers (for example authUrl on Google Calendar). input is the action's arguments. Use only an action the user or the connector's docs named."},
-		{Name: "set_connector_owner", RPC: "setConnectorOwnerFn", Title: "Set connector owner agent", Description: "Bind a channel connector (an agent bot) to an agent, or null to unbind.", Idempotent: true},
+		{Name: "set_connector_owner", RPC: "setConnectorOwnerFn", Title: "Set connector agents", Description: "Choose which agents get a tool connector's tools: agentIds lists them, an empty list is every agent.", Idempotent: true},
 		{Name: "set_whatsapp_owner", RPC: "setWhatsAppOwnerFn", Title: "Set WhatsApp owner", Description: "Set the owner's own WhatsApp number, so Palui knows which chat is the owner's.", Idempotent: true},
 
 		// Notes

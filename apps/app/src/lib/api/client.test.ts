@@ -50,11 +50,11 @@ describe("rpc encoding", () => {
 
   it("sends a POST's input as a JSON body", async () => {
     next = () => Response.json({ ok: true })
-    await saveConnectorDraft({ data: { id: "mcp-x", type: "mcp", config: { url: "https://x.dev" }, agentId: null } })
+    await saveConnectorDraft({ data: { id: "mcp-x", type: "mcp", config: { url: "https://x.dev" }, agentIds: [] } })
     expect(calls[0]!.url).toBe("/api/rpc/saveConnectorDraft")
     expect(calls[0]!.init.method).toBe("POST")
     expect((calls[0]!.init.headers as Record<string, string>)["content-type"]).toBe("application/json")
-    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ id: "mcp-x", type: "mcp", config: { url: "https://x.dev" }, agentId: null })
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ id: "mcp-x", type: "mcp", config: { url: "https://x.dev" }, agentIds: [] })
   })
 
   it("sends no body for a POST without input", async () => {

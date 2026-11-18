@@ -87,7 +87,7 @@ func TestSeededDatabaseUsesTheDevMasterKey(t *testing.T) {
 // sincePort lists the migrations added after seeded.db was frozen at the Go
 // port, in order. Append each new migration here: the frozen database must
 // report exactly these as missing and take them on open.
-var sincePort = []string{"0016_mcp_access", "0017_custom_commands", "0018_members", "0019_save_media", "0020_chat_rules", "0021_agent_models", "0022_outbox_media"}
+var sincePort = []string{"0016_mcp_access", "0017_custom_commands", "0018_members", "0019_save_media", "0020_chat_rules", "0021_agent_models", "0022_outbox_media", "0023_connector_agents"}
 
 func TestSeededDatabaseReportsSchemaOK(t *testing.T) {
 	d, s := openCopy(t, db.OpenOptions{NoMigrate: true})
@@ -114,7 +114,7 @@ func TestSeededDatabaseReportsSchemaOK(t *testing.T) {
 }
 
 func TestSeededDatabaseDecryptsEveryConnectorSecret(t *testing.T) {
-	d, s := openCopy(t, db.OpenOptions{NoMigrate: true})
+	d, s := openCopy(t, db.OpenOptions{})
 	want := map[string]string{}
 	for _, c := range s.Connectors {
 		var buf bytes.Buffer

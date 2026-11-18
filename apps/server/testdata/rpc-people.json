@@ -116,7 +116,7 @@
               ]
             }
           },
-          "result": "{\"tools\":[{\"name\":\"mcp-files__read\",\"tool\":\"read\",\"connectorId\":\"mcp-files\",\"connectorLabel\":\"Files\",\"connectorType\":\"mcp\",\"class\":\"read\",\"title\":null,\"untrusted\":true,\"guestSafe\":false},{\"name\":\"reminders__set_reminder\",\"tool\":\"set_reminder\",\"connectorId\":\"reminders\",\"connectorLabel\":\"Reminders\",\"connectorType\":\"reminders\",\"class\":\"write\",\"title\":\"Set a reminder\",\"untrusted\":false,\"guestSafe\":true}],\"error\":null,\"used\":{},\"scopes\":{\"gcal\":null,\"golden-mcp\":null,\"mcp-de\":null,\"mcp-files\":\"agt_0mwfavogs42b5joh3on\",\"mcp-fox\":null,\"mcp-host\":null,\"mcp-j\":null,\"mcp-keuangan\":\"agt_deleted\",\"mcp-linear\":null,\"mcp-northwind-industries-holdings-internal-knowledge-base-prod\":null,\"mcp-notion\":null,\"mcp-notion-2\":null,\"mcp-rnd\":null,\"mcp-todomap\":null,\"mcp-vn\":null,\"mcp-vorneo\":\"agt_0mwfavoh23qqz2cayx0\",\"t3code\":null}}"
+          "result": "{\"tools\":[{\"name\":\"mcp-files__read\",\"tool\":\"read\",\"connectorId\":\"mcp-files\",\"connectorLabel\":\"Files\",\"connectorType\":\"mcp\",\"class\":\"read\",\"title\":null,\"untrusted\":true,\"guestSafe\":false},{\"name\":\"reminders__set_reminder\",\"tool\":\"set_reminder\",\"connectorId\":\"reminders\",\"connectorLabel\":\"Reminders\",\"connectorType\":\"reminders\",\"class\":\"write\",\"title\":\"Set a reminder\",\"untrusted\":false,\"guestSafe\":true}],\"error\":null,\"used\":{},\"scopes\":{\"gcal\":[],\"golden-mcp\":[],\"mcp-de\":[],\"mcp-files\":[\"agt_0mwfavogs42b5joh3on\"],\"mcp-fox\":[],\"mcp-host\":[],\"mcp-j\":[],\"mcp-keuangan\":[\"agt_deleted\"],\"mcp-linear\":[],\"mcp-northwind-industries-holdings-internal-knowledge-base-prod\":[],\"mcp-notion\":[],\"mcp-notion-2\":[],\"mcp-rnd\":[],\"mcp-todomap\":[],\"mcp-vn\":[],\"mcp-vorneo\":[\"agt_0mwfavoh23qqz2cayx0\"],\"t3code\":[]}}"
         },
         {
           "fn": "getAgentToolsFn",
@@ -127,7 +127,7 @@
             ]
           ],
           "input": "{\"id\":\"agt_0mwfavohdfkyeb1kl5c\"}",
-          "result": "{\"tools\":[],\"error\":null,\"used\":{},\"scopes\":{\"gcal\":null,\"golden-mcp\":null,\"mcp-de\":null,\"mcp-files\":\"agt_0mwfavogs42b5joh3on\",\"mcp-fox\":null,\"mcp-host\":null,\"mcp-j\":null,\"mcp-keuangan\":\"agt_deleted\",\"mcp-linear\":null,\"mcp-northwind-industries-holdings-internal-knowledge-base-prod\":null,\"mcp-notion\":null,\"mcp-notion-2\":null,\"mcp-rnd\":null,\"mcp-todomap\":null,\"mcp-vn\":null,\"mcp-vorneo\":\"agt_0mwfavoh23qqz2cayx0\",\"t3code\":null}}"
+          "result": "{\"tools\":[],\"error\":null,\"used\":{},\"scopes\":{\"gcal\":[],\"golden-mcp\":[],\"mcp-de\":[],\"mcp-files\":[\"agt_0mwfavogs42b5joh3on\"],\"mcp-fox\":[],\"mcp-host\":[],\"mcp-j\":[],\"mcp-keuangan\":[\"agt_deleted\"],\"mcp-linear\":[],\"mcp-northwind-industries-holdings-internal-knowledge-base-prod\":[],\"mcp-notion\":[],\"mcp-notion-2\":[],\"mcp-rnd\":[],\"mcp-todomap\":[],\"mcp-vn\":[],\"mcp-vorneo\":[\"agt_0mwfavoh23qqz2cayx0\"],\"t3code\":[]}}"
         },
         {
           "fn": "getAgentToolsFn",
@@ -136,7 +136,7 @@
           "rt": {
             "down": true
           },
-          "result": "{\"tools\":null,\"error\":\"The runtime isn't reachable. Check docker compose logs runtime.\",\"used\":{},\"scopes\":{\"gcal\":null,\"golden-mcp\":null,\"mcp-de\":null,\"mcp-files\":\"agt_0mwfavogs42b5joh3on\",\"mcp-fox\":null,\"mcp-host\":null,\"mcp-j\":null,\"mcp-keuangan\":\"agt_deleted\",\"mcp-linear\":null,\"mcp-northwind-industries-holdings-internal-knowledge-base-prod\":null,\"mcp-notion\":null,\"mcp-notion-2\":null,\"mcp-rnd\":null,\"mcp-todomap\":null,\"mcp-vn\":null,\"mcp-vorneo\":\"agt_0mwfavoh23qqz2cayx0\",\"t3code\":null}}"
+          "result": "{\"tools\":null,\"error\":\"The runtime isn't reachable. Check docker compose logs runtime.\",\"used\":{},\"scopes\":{\"gcal\":[],\"golden-mcp\":[],\"mcp-de\":[],\"mcp-files\":[\"agt_0mwfavogs42b5joh3on\"],\"mcp-fox\":[],\"mcp-host\":[],\"mcp-j\":[],\"mcp-keuangan\":[\"agt_deleted\"],\"mcp-linear\":[],\"mcp-northwind-industries-holdings-internal-knowledge-base-prod\":[],\"mcp-notion\":[],\"mcp-notion-2\":[],\"mcp-rnd\":[],\"mcp-todomap\":[],\"mcp-vn\":[],\"mcp-vorneo\":[\"agt_0mwfavoh23qqz2cayx0\"],\"t3code\":[]}}"
         },
         {
           "fn": "getAgentToolsFn",
@@ -155,7 +155,7 @@
               }
             }
           },
-          "result": "{\"tools\":null,\"error\":\"No such agent\",\"used\":{},\"scopes\":{\"gcal\":null,\"golden-mcp\":null,\"mcp-de\":null,\"mcp-files\":\"agt_0mwfavogs42b5joh3on\",\"mcp-fox\":null,\"mcp-host\":null,\"mcp-j\":null,\"mcp-keuangan\":\"agt_deleted\",\"mcp-linear\":null,\"mcp-northwind-industries-holdings-internal-knowledge-base-prod\":null,\"mcp-notion\":null,\"mcp-notion-2\":null,\"mcp-rnd\":null,\"mcp-todomap\":null,\"mcp-vn\":null,\"mcp-vorneo\":\"agt_0mwfavoh23qqz2cayx0\",\"t3code\":null}}"
+          "result": "{\"tools\":null,\"error\":\"No such agent\",\"used\":{},\"scopes\":{\"gcal\":[],\"golden-mcp\":[],\"mcp-de\":[],\"mcp-files\":[\"agt_0mwfavogs42b5joh3on\"],\"mcp-fox\":[],\"mcp-host\":[],\"mcp-j\":[],\"mcp-keuangan\":[\"agt_deleted\"],\"mcp-linear\":[],\"mcp-northwind-industries-holdings-internal-knowledge-base-prod\":[],\"mcp-notion\":[],\"mcp-notion-2\":[],\"mcp-rnd\":[],\"mcp-todomap\":[],\"mcp-vn\":[],\"mcp-vorneo\":[\"agt_0mwfavoh23qqz2cayx0\"],\"t3code\":[]}}"
         },
         {
           "fn": "getAgentToolsFn",

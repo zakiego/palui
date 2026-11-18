@@ -35,7 +35,7 @@
    "rows": []
   },
   "connectors": {
-   "columns": ["id","type","kind","label","enabled","status","status_detail","trust","config","secrets","config_hash","error_since","alerted_at","sort_order","created_at","updated_at","agent_id"],
+   "columns": ["id","type","kind","label","enabled","status","status_detail","trust","config","secrets","config_hash","error_since","alerted_at","sort_order","created_at","updated_at","agent_id","agent_ids"],
    "rows": []
   },
   "contacts": {

@@ -7,7 +7,6 @@ package rpcsetup
 import (
 	"net/http"
 	"regexp"
-	"slices"
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
@@ -73,8 +72,9 @@ type pokeResult struct {
 
 type pageItem struct {
 	manage.Item
-	// The agent that owns a scoped connector ("" once it's gone); null when global.
-	OwnerName *string `json:"ownerName"`
+	// The names of the agents a scoped connector serves ("" for one that's
+	// gone), in its order; empty when global.
+	OwnerNames []string `json:"ownerNames"`
 }
 
 type liveEntry struct {
@@ -109,10 +109,9 @@ func getConnectorsPage(c *httpapi.Call) (any, error) {
 	}
 	items := make([]pageItem, 0, len(rows))
 	for _, it := range rows {
-		p := pageItem{Item: it}
-		if it.AgentID != nil && *it.AgentID != "" {
-			n := names[*it.AgentID]
-			p.OwnerName = &n
+		p := pageItem{Item: it, OwnerNames: []string{}}
+		for _, id := range it.AgentIDs {
+			p.OwnerNames = append(p.OwnerNames, names[id])
 		}
 		items = append(items, p)
 	}
@@ -284,8 +283,24 @@ func draftZod() *zod.ObjectS {
 		zod.F("config", zod.Record(zod.Unknown()).Optional()),
 		zod.F("secrets", zod.Record(zod.String().Max(4000)).Optional()),
 		zod.F("trust", zod.Enum("own", "external").Optional()),
+		zod.F("agentIds", agentIDsZod().Optional()),
+		// The older form: one agent, or null for every agent.
 		zod.F("agentId", zod.Nullable(zod.String().Min(1).Max(100)).Optional()),
 	)
+}
+
+func agentIDsZod() *zod.ArrayS { return zod.Array(zod.String().Min(1).Max(100)).Max(100) }
+
+// stringList reads a validated array of strings.
+func stringList(v any) []string {
+	list, _ := v.([]any)
+	out := make([]string, 0, len(list))
+	for _, x := range list {
+		if s, ok := x.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func draftInput(o *jsonx.Object) manage.DraftInput {
@@ -313,10 +328,12 @@ func draftInput(o *jsonx.Object) manage.DraftInput {
 		s, _ := v.(string)
 		in.Trust = &s
 	}
-	if v, ok := present(o, "agentId"); ok {
-		in.AgentIDSet = true
+	if v, ok := present(o, "agentIds"); ok {
+		in.AgentIDsSet, in.AgentIDs = true, stringList(v)
+	} else if v, ok := present(o, "agentId"); ok {
+		in.AgentIDsSet = true
 		if s, ok := v.(string); ok {
-			in.AgentID = &s
+			in.AgentIDs = []string{s}
 		}
 	}
 	return in
@@ -427,8 +444,26 @@ func setWhatsAppOwner(c *httpapi.Call) (any, error) {
 	}{row.ExternalID}, nil
 }
 
-// setConnectorOwner makes a tool connector global (null) or owned by one
-// agent. The runtime reads the row each turn, so no poke is needed.
+// duplicateConnector copies a connector into a new paused draft and returns
+// its id, so the page can open the copy.
+func duplicateConnector(c *httpapi.Call) (any, error) {
+	row, err := manage.Duplicate(c.DB(), str(c, "id"), c.MasterKey(), c.Now())
+	if err != nil {
+		if me, ok := manage.IsError(err); ok {
+			return nil, httpapi.Fail("%s", me.Message)
+		}
+		return nil, err
+	}
+	return struct {
+		OK bool   `json:"ok"`
+		ID string `json:"id"`
+	}{true, row.ID}, nil
+}
+
+// setConnectorOwner makes a tool connector global (agentIds empty) or serve
+// only the agents listed. agentId (one agent, or null for global) is the older
+// form, kept for /mcp clients. The runtime reads the row each turn, so no poke
+// is needed.
 func setConnectorOwner(c *httpapi.Call) (any, error) {
 	q, id := c.DB(), str(c, "id")
 	row, found, err := connectors.Get(q, id)
@@ -441,20 +476,21 @@ func setConnectorOwner(c *httpapi.Call) (any, error) {
 	if row.Kind != "tools" {
 		return nil, httpapi.Fail("Only tool connectors can belong to an agent.")
 	}
-	var agentID *string
-	if s, ok := mustGet(c.Obj(), "agentId").(string); ok {
-		agentID = &s
-	}
-	if agentID != nil && *agentID != "" {
-		list, err := agents.List(q, c.Now())
-		if err != nil {
-			return nil, err
+	var ids []string
+	if v, ok := present(c.Obj(), "agentIds"); ok {
+		ids = stringList(v)
+	} else if v, ok := present(c.Obj(), "agentId"); ok {
+		if s, ok := v.(string); ok {
+			ids = []string{s}
 		}
-		if !slices.ContainsFunc(list, func(a db.Agent) bool { return a.ID == *agentID }) {
-			return nil, httpapi.Fail("That agent doesn't exist anymore.")
-		}
+	} else {
+		return nil, httpapi.Fail("Send agentIds: the agents, or an empty list for every agent.")
 	}
-	if _, _, err := connectors.SetOwner(q, id, agentID, c.Now()); err != nil {
+	ids = connectors.CleanAgentIDs(ids)
+	if err := manage.AgentsExist(q, ids, c.Now()); err != nil {
+		return nil, httpapi.Fail("That agent doesn't exist anymore.")
+	}
+	if _, _, err := connectors.SetAgents(q, id, ids, c.Now()); err != nil {
 		return nil, err
 	}
 	return map[string]bool{"ok": true}, nil
@@ -514,6 +550,7 @@ func init() {
 	post("testConnectorFn", idInput(), testConnector)
 	post("connectorActionFn", zod.Object(zod.F("id", idZod()), zod.F("name", zod.String().Min(1).Max(64)), zod.F("input", zod.Record(zod.Unknown()).Optional())), connectorAction)
 	post("setWhatsAppOwnerFn", zod.Object(zod.F("phone", zod.String().Trim().Regex(phoneRe, `^\+?[\d\s-]{8,20}$`, "Use digits, like 0812 3456 7890 or +62 812 3456 7890."))), setWhatsAppOwner)
-	post("setConnectorOwnerFn", zod.Object(zod.F("id", idZod()), zod.F("agentId", zod.Nullable(zod.String().Min(1).Max(100)))), setConnectorOwner)
+	post("duplicateConnectorFn", idInput(), duplicateConnector)
+	post("setConnectorOwnerFn", zod.Object(zod.F("id", idZod()), zod.F("agentIds", agentIDsZod().Optional()), zod.F("agentId", zod.Nullable(zod.String().Min(1).Max(100)).Optional())), setConnectorOwner)
 	post("setConnectorDataFn", zod.Object(zod.F("id", idZod()), zod.F("noPrivateData", zod.Bool())), setConnectorData)
 }

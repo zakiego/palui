@@ -163,7 +163,7 @@ func TestAgentToolsListsTheServersMarkedAsHoldingNoPrivateData(t *testing.T) {
 	testutil.Must(t, err)
 	useFake(t, nil)
 	_, body := call(t, e, token, "getAgentToolsFn", `{"id":"`+chef.ID+`"}`)
-	if body != `{"tools":[],"error":null,"used":{},"scopes":{"mcp-notes":null,"mcp-prayer":null},"noPrivateData":["mcp-prayer"]}` {
+	if body != `{"tools":[],"error":null,"used":{},"scopes":{"mcp-notes":[],"mcp-prayer":[]},"noPrivateData":["mcp-prayer"]}` {
 		t.Fatal(body)
 	}
 }

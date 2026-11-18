@@ -318,7 +318,14 @@ func (k *Kit) MemberRules(agentID, memberID string) {
 
 // OwnConnector: the agent that owns a tool connector (an agent-scoped MCP server).
 func (k *Kit) OwnConnector(id, agentID string) {
-	k.exec("UPDATE connectors SET agent_id = ? WHERE id = ?", agentID, id)
+	k.exec("UPDATE connectors SET agent_id = ?, agent_ids = json_array(?) WHERE id = ?", agentID, agentID, id)
+}
+
+// ShareConnector: a tool connector several agents use (0023). agent_id is
+// the first, as the store writes it.
+func (k *Kit) ShareConnector(id string, agentIDs ...string) {
+	b, _ := jsonx.Marshal(agentIDs)
+	k.exec("UPDATE connectors SET agent_id = ?, agent_ids = ? WHERE id = ?", agentIDs[0], string(b), id)
 }
 
 // Assign: a chat answered by an agent (PLAN 19.2).

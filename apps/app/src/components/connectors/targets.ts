@@ -19,8 +19,8 @@ export type ConnectorTarget = {
   secrets: Record<string, string>
   secretsError: string | null
   trust: "own" | "external"
-  // The agent that owns it; null means global.
-  agentId: string | null
+  // The agents it serves; empty means every agent.
+  agentIds: string[]
 }
 
 export function toTarget(item: ConnectorItem): ConnectorTarget {
@@ -35,7 +35,7 @@ export function toTarget(item: ConnectorItem): ConnectorTarget {
     secrets: item.secrets,
     secretsError: item.secretsError,
     trust: item.trust,
-    agentId: item.agentId,
+    agentIds: item.agentIds,
   }
 }
 
@@ -66,7 +66,7 @@ export function draftTarget(m: ConnectorManifest, id: string, preset?: Preset, a
     secrets: {},
     secretsError: null,
     trust: preset?.trust ?? m.trust ?? "own",
-    // Added from an agent's page: that agent owns it.
-    agentId: agentId && m.kind === "tools" ? agentId : null,
+    // Added from an agent's page: only that agent gets it.
+    agentIds: agentId && m.kind === "tools" ? [agentId] : [],
   }
 }

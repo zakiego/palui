@@ -51,10 +51,10 @@
    "last": null
   },
   "connectors": {
-   "columns": ["id","type","kind","label","enabled","status","status_detail","trust","config","secrets","config_hash","error_since","alerted_at","sort_order","created_at","updated_at","agent_id"],
+   "columns": ["id","type","kind","label","enabled","status","status_detail","trust","config","secrets","config_hash","error_since","alerted_at","sort_order","created_at","updated_at","agent_id","agent_ids"],
    "count": 60,
-   "first": ["telegram","telegram","channel","Telegram",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null],
-   "last": ["mcp-server-49","mcp","tools","Widodo MCP 50",0,"paused",null,"external","{\"url\":\"https://mcp-49.example.com/mcp\"}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null]
+   "first": ["telegram","telegram","channel","Telegram",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
+   "last": ["mcp-server-49","mcp","tools","Widodo MCP 50",0,"paused",null,"external","{\"url\":\"https://mcp-49.example.com/mcp\"}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null]
   },
   "contacts": {
    "columns": ["id","agent_id","name","channel","address","chat_id","policy","note","created_at","updated_at","removed_at"],

@@ -83,10 +83,10 @@ type UpsertInput struct {
 	Secrets *jsonx.Map[string]
 	Trust   *string
 	Enabled *bool
-	// The agent that owns it (set AgentIDSet; a nil AgentID is global). Left
-	// unset, it's kept.
-	AgentID    *string
-	AgentIDSet bool
+	// The agents it serves (set AgentIDsSet; empty is every agent). Left
+	// unset, they're kept.
+	AgentIDs    []string
+	AgentIDsSet bool
 	// Config keys to drop after the merge (saveDraft: an emptied field becomes
 	// undefined and JSON.stringify leaves it out).
 	ClearConfig []string
@@ -164,8 +164,9 @@ func Upsert(q db.Q, in UpsertInput, masterKey string, now int64) (db.Connector, 
 		if in.Enabled != nil {
 			enabled = *in.Enabled
 		}
-		return db.ScanConnector(q.WQueryRow("INSERT INTO connectors (id, type, kind, label, enabled, status, trust, config, secrets, config_hash, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'not_set_up', ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.ConnectorCols,
-			in.ID, in.Manifest.ID, in.Manifest.Kind, label, db.Bool(enabled), trust, cfg, secretsBlob, hash, in.AgentID, now, now))
+		ids, first := agentCols(in.AgentIDs)
+		return db.ScanConnector(q.WQueryRow("INSERT INTO connectors (id, type, kind, label, enabled, status, trust, config, secrets, config_hash, agent_ids, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'not_set_up', ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.ConnectorCols,
+			in.ID, in.Manifest.ID, in.Manifest.Kind, label, db.Bool(enabled), trust, cfg, secretsBlob, hash, ids, first, now, now))
 	}
 	label := existing.Label
 	if in.Label != nil {
@@ -179,24 +180,52 @@ func Upsert(q db.Q, in UpsertInput, masterKey string, now int64) (db.Connector, 
 	if in.Enabled != nil {
 		enabled = *in.Enabled
 	}
-	agentID := existing.AgentID
-	if in.AgentIDSet {
-		agentID = in.AgentID
+	agentIDs := existing.AgentIDs
+	if in.AgentIDsSet {
+		agentIDs = in.AgentIDs
 	}
-	return db.ScanConnector(q.WQueryRow("UPDATE connectors SET label = ?, config = ?, secrets = ?, config_hash = ?, trust = ?, enabled = ?, agent_id = ?, updated_at = ? WHERE id = ? RETURNING "+db.ConnectorCols,
-		label, cfg, secretsBlob, hash, trust, db.Bool(enabled), agentID, now, in.ID))
+	ids, first := agentCols(agentIDs)
+	return db.ScanConnector(q.WQueryRow("UPDATE connectors SET label = ?, config = ?, secrets = ?, config_hash = ?, trust = ?, enabled = ?, agent_ids = ?, agent_id = ?, updated_at = ? WHERE id = ? RETURNING "+db.ConnectorCols,
+		label, cfg, secretsBlob, hash, trust, db.Bool(enabled), ids, first, now, in.ID))
 }
 
-// SetOwner makes a connector global (nil) or owned by one agent. The runtime
-// reads the row on every turn, so this applies from the next one.
-func SetOwner(q db.Q, id string, agentID *string, now int64) (db.Connector, bool, error) {
-	return db.One(q.WQueryRow("UPDATE connectors SET agent_id = ?, updated_at = ? WHERE id = ? RETURNING "+db.ConnectorCols, agentID, now, id), db.ScanConnector)
+// CleanAgentIDs drops blank and repeated ids, keeping the order.
+func CleanAgentIDs(ids []string) []string {
+	var out []string
+	for _, id := range ids {
+		if id != "" && !slices.Contains(out, id) {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
-// ServesAgent: a global connector serves everyone, an owned one only its owner.
-// A turn with no agent ("") gets globals only.
+// agentCols is what the two owner columns hold: agent_ids (NULL when global)
+// and agent_id, its first id, for a build from before migration 0023.
+func agentCols(ids []string) (db.NullJSON[[]string], *string) {
+	ids = CleanAgentIDs(ids)
+	if len(ids) == 0 {
+		return db.NullJSON[[]string]{}, nil
+	}
+	return db.SomeJSON(ids), &ids[0]
+}
+
+// SetAgents makes a connector global (no ids) or serve only the agents given.
+// The runtime reads the row on every turn, so this applies from the next one.
+func SetAgents(q db.Q, id string, agentIDs []string, now int64) (db.Connector, bool, error) {
+	ids, first := agentCols(agentIDs)
+	return db.One(q.WQueryRow("UPDATE connectors SET agent_ids = ?, agent_id = ?, updated_at = ? WHERE id = ? RETURNING "+db.ConnectorCols, ids, first, now, id), db.ScanConnector)
+}
+
+// ServesAgent: a global connector serves everyone, a scoped one only the
+// agents it lists. A turn with no agent ("") gets globals only.
 func ServesAgent(row db.Connector, agentID string) bool {
-	return row.AgentID == nil || *row.AgentID == "" || *row.AgentID == agentID
+	return len(row.AgentIDs) == 0 || slices.Contains(row.AgentIDs, agentID)
+}
+
+// OnlyAgent: the connector serves this one agent and no other.
+func OnlyAgent(row db.Connector, agentID string) bool {
+	return len(row.AgentIDs) == 1 && row.AgentIDs[0] == agentID
 }
 
 // NoPrivateDataKey is the MCP config key the owner sets on the agent's Tools
@@ -217,9 +246,10 @@ func NoPrivateData(row db.Connector) bool {
 // ResolveData is a tool's data scope on the server. A declared chat, agent,
 // shared or none stands as is. Anything else (no scope, or an unknown string)
 // is DataNone on an MCP server the owner marked as holding no private data
-// (NoPrivateData), and otherwise follows the connector: DataAgent when one
-// agent owns it, DataShared when it's global. Unknown never becomes chat, and
-// becomes none only through the owner's mark (fail closed).
+// (NoPrivateData), and otherwise follows the connector: DataAgent when it
+// serves one agent, DataShared when it's global or serves several (they all
+// see the same data). Unknown never becomes chat, and becomes none only
+// through the owner's mark (fail closed).
 func ResolveData(declared string, row db.Connector) string {
 	switch declared {
 	case DataChat, DataAgent, DataShared, DataNone:
@@ -228,7 +258,7 @@ func ResolveData(declared string, row db.Connector) string {
 	if NoPrivateData(row) {
 		return DataNone
 	}
-	if row.AgentID != nil && *row.AgentID != "" {
+	if len(row.AgentIDs) == 1 {
 		return DataAgent
 	}
 	return DataShared

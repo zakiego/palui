@@ -139,10 +139,10 @@ func Tools(deps Deps) *connectors.ToolSet {
 		clock = func() int64 { return time.Now().UnixMilli() }
 	}
 	data := connectors.DataShared
-	var owner *string
+	var owner []string
 	if deps.Own {
 		data = connectors.DataAgent
-		owner = &deps.AgentID
+		owner = []string{deps.AgentID}
 	}
 	set := connectors.NewToolSet()
 	set.Set("add_mcp_server", connectors.PaluiTool{
@@ -194,8 +194,8 @@ func Tools(deps Deps) *connectors.ToolSet {
 				label, trust, on := name, "external", true
 				if _, err := connectors.Upsert(d, connectors.UpsertInput{
 					ID: id, Manifest: mcpconn.Manifest.Row(), Label: &label, Trust: &trust, Enabled: &on,
-					Config:  kit.O("url", u.Href(), "authMode", "none", "toolPrefs", prefs, "addedFromChat", true),
-					AgentID: owner, AgentIDSet: owner != nil,
+					Config:   kit.O("url", u.Href(), "authMode", "none", "toolPrefs", prefs, "addedFromChat", true),
+					AgentIDs: owner, AgentIDsSet: owner != nil,
 				}, deps.MasterKey, now); err != nil {
 					return nil, err
 				}
@@ -247,8 +247,8 @@ func Tools(deps Deps) *connectors.ToolSet {
 				if !found || row.Type != "mcp" || !connectors.ServesAgent(row, deps.AgentID) {
 					return kit.Fail(fmt.Sprintf("Nggak ada server MCP %s. Panggil list_mcp_servers untuk lihat id-nya.", id)), nil
 				}
-				if deps.Own && (row.AgentID == nil || *row.AgentID != deps.AgentID) {
-					return kit.Fail(fmt.Sprintf("%s dipakai semua agent. Hapus dari halaman Connectors ya.", row.Label)), nil
+				if deps.Own && !connectors.OnlyAgent(row, deps.AgentID) {
+					return kit.Fail(fmt.Sprintf("%s dipakai agent lain juga. Hapus dari halaman Connectors ya.", row.Label)), nil
 				}
 				if !mcpconn.ConfigFrom(row.Config).AddedFromChat {
 					return kit.Fail(fmt.Sprintf("%s dipasang dari dashboard. Hapus dari halaman Connectors ya.", row.Label)), nil

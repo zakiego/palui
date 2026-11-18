@@ -28,7 +28,7 @@ function props(over: Partial<ToolsViewProps> = {}): ToolsViewProps {
     tools: [],
     groups: [],
     query: "",
-    ownerOf: () => null,
+    agentsOf: () => [],
     setScope: vi.fn(),
     noPrivate: () => false,
     setNoPrivate: vi.fn(),
@@ -48,10 +48,17 @@ test("an MCP server gets the no-private-data switch", async () => {
   expect(p.setNoPrivate).toHaveBeenCalledWith("mcp-times", true)
 })
 
-test("an owned server doesn't say it applies to every agent", () => {
-  render(<GroupActions head={item("mcp-times", "mcp")} props={props({ ownerOf: () => "agt_a", noPrivate: () => true })} />)
+test("a server only this agent has shows its scope and doesn't say it applies to every agent", () => {
+  render(<GroupActions head={item("mcp-times", "mcp")} props={props({ agentsOf: () => ["agt_a"], noPrivate: () => true, data: { tools: [], error: null, used: {}, scopes: { "mcp-times": ["agt_a"] } } })} />)
+  expect(screen.getByText("Only this agent")).toBeTruthy()
   expect(screen.getByRole("switch", { name: "Holds no private data" }).getAttribute("aria-checked")).toBe("true")
   expect(screen.queryByText(/Applies to every agent/)).toBeNull()
+})
+
+test("a server shared with other agents says how many", () => {
+  render(<GroupActions head={item("mcp-times", "mcp")} props={props({ agentsOf: () => ["agt_b", "agt_a", "agt_c"], data: { tools: [], error: null, used: {}, scopes: { "mcp-times": ["agt_b", "agt_a", "agt_c"] } } })} />)
+  expect(screen.getByText("This agent and 2 more")).toBeTruthy()
+  expect(screen.getByText(/Applies to every agent/)).toBeTruthy()
 })
 
 test("a built-in connector has no switch", () => {

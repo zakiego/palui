@@ -160,8 +160,8 @@ func TestListsOnlyTheConnectorsTheAgentCanCall(t *testing.T) {
 		testutil.Must(t, err)
 	}
 	other := "agt_other"
-	for id, owner := range map[string]*string{"mcp-mine": &a.ID, "mcp-theirs": &other} {
-		_, _, err := connectors.SetOwner(d, id, owner, 1)
+	for id, owner := range map[string]string{"mcp-mine": a.ID, "mcp-theirs": other} {
+		_, _, err := connectors.SetAgents(d, id, []string{owner}, 1)
 		testutil.Must(t, err)
 	}
 	ids := strings.Join(conntest.Call(t, tools(t, d, nil, a.ID), "get_settings", `{}`).Strs("connectors", "id"), ",")

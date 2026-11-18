@@ -332,7 +332,7 @@ func fakeEntries(list []*fakeConnector, log *callLog) []connectors.RunningEntry 
 		}
 		out = append(out, connectors.RunningEntry{
 			ID:  c.id,
-			Row: db.Connector{ID: c.id, Type: typ, Kind: "tools", Label: c.id, Trust: trust, AgentID: c.agentID},
+			Row: db.Connector{ID: c.id, Type: typ, Kind: "tools", Label: c.id, Trust: trust, AgentIDs: idList(c.agentID)},
 			Handle: &connectors.RunningConnector{Tools: func(_ context.Context, turn connectors.TurnInfo) (*connectors.ToolSet, error) {
 				set := connectors.NewToolSet()
 				for _, name := range c.names {
@@ -618,4 +618,12 @@ func field(v any, path string) any {
 
 func stepsOf(r *db.FlowRun) *jsonx.Object {
 	return flows.DecodeVars(r.Vars).Steps
+}
+
+// idList is a connector's agent list from one optional owner.
+func idList(id *string) []string {
+	if id == nil {
+		return nil
+	}
+	return []string{*id}
 }

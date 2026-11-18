@@ -579,8 +579,9 @@ func SetToolPermissions(q db.Q, id string, patch PermissionsPatch, now int64) (d
 	return db.ScanAgent(q.WQueryRow("UPDATE agents SET tool_permissions = ?, updated_at = ? WHERE id = ? RETURNING "+db.AgentCols, value, now, id))
 }
 
-// Delete is deleteAgent: its chats go back to the default agent, connectors it
-// owned pause (keeping the dead owner, so they serve nobody), its instructions
+// Delete is deleteAgent: its chats go back to the default agent, connectors
+// only it used pause (keeping the dead agent, so they serve nobody), connectors
+// it shared with other agents drop it from their list, its instructions
 // go, its contacts are removed, nothing waiting is sent on its behalf, and
 // members who were only in this agent are deleted.
 func Delete(q db.Q, id string, now int64) (bool, error) {
@@ -597,7 +598,12 @@ func Delete(q db.Q, id string, now int64) (bool, error) {
 			args []any
 		}{
 			{"UPDATE chats SET agent_id = NULL WHERE agent_id = ?", []any{id}},
-			{"UPDATE connectors SET enabled = 0 WHERE agent_id = ?", []any{id}},
+			{"UPDATE connectors SET enabled = 0 WHERE json_array_length(agent_ids) = 1 AND agent_ids ->> '$[0]' = ?", []any{id}},
+			// agent_id stays the first agent left, for a build before 0023.
+			{`UPDATE connectors SET
+				agent_ids = (SELECT json_group_array(value ORDER BY key) FROM json_each(connectors.agent_ids) WHERE value != ?),
+				agent_id = (SELECT value FROM json_each(connectors.agent_ids) WHERE value != ? ORDER BY key LIMIT 1)
+				WHERE json_array_length(agent_ids) > 1 AND EXISTS (SELECT 1 FROM json_each(connectors.agent_ids) WHERE value = ?)`, []any{id, id, id}},
 			{"DELETE FROM instructions WHERE agent_id = ?", []any{id}},
 			{"DELETE FROM chat_rules WHERE agent_id = ?", []any{id}},
 			{"DELETE FROM chat_rule_changes WHERE agent_id = ?", []any{id}},

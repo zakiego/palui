@@ -392,7 +392,7 @@ func TestAgentsOwnMCPServers(t *testing.T) {
 }
 
 func connectorsSetOwner(q db.Q, id, agentID string) (db.Connector, error) {
-	row, _, err := connectors.SetOwner(q, id, &agentID, 1)
+	row, _, err := connectors.SetAgents(q, id, []string{agentID}, 1)
 	return row, err
 }
 

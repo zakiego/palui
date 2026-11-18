@@ -171,18 +171,32 @@ func TestConfigHashAndPatchConfig(t *testing.T) {
 	if !connectors.ServesAgent(r, "agt_1") {
 		t.Fatal("global")
 	}
-	owned, _, _ := connectors.SetOwner(d, "telegram", testutil.Ptr("agt_2"), 3)
-	if connectors.ServesAgent(owned, "agt_1") || !connectors.ServesAgent(owned, "agt_2") {
+	owned, _, _ := connectors.SetAgents(d, "telegram", []string{"agt_2"}, 3)
+	if connectors.ServesAgent(owned, "agt_1") || !connectors.ServesAgent(owned, "agt_2") || owned.AgentIDs[0] != "agt_2" {
 		t.Fatal("owned")
+	}
+	// Several agents; an empty list is global again.
+	both, _, _ := connectors.SetAgents(d, "telegram", []string{"agt_2", "agt_3"}, 4)
+	if connectors.ServesAgent(both, "agt_1") || !connectors.ServesAgent(both, "agt_2") || !connectors.ServesAgent(both, "agt_3") || connectors.OnlyAgent(both, "agt_2") {
+		t.Fatal("both")
+	}
+	var first *string
+	testutil.Must(t, d.QueryRow("SELECT agent_id FROM connectors WHERE id = ?", "telegram").Scan(&first))
+	if first == nil || *first != "agt_2" {
+		t.Fatal("agent_id is the first agent for older builds")
+	}
+	global, _, _ := connectors.SetAgents(d, "telegram", []string{}, 5)
+	if !connectors.ServesAgent(global, "agt_1") || global.AgentIDs != nil {
+		t.Fatal("global")
 	}
 }
 
 func TestResolveData(t *testing.T) {
 	owner := "agt_sales"
-	empty := ""
 	global := db.Connector{ID: "g"}
-	blank := db.Connector{ID: "b", AgentID: &empty}
-	owned := db.Connector{ID: "o", AgentID: &owner}
+	blank := db.Connector{ID: "b", AgentIDs: []string{}}
+	owned := db.Connector{ID: "o", AgentIDs: []string{owner}}
+	several := db.Connector{ID: "s", AgentIDs: []string{owner, "agt_chef"}}
 	cases := []struct {
 		declared string
 		row      db.Connector
@@ -199,22 +213,28 @@ func TestResolveData(t *testing.T) {
 		{"", global, connectors.DataShared},
 		{"", blank, connectors.DataShared},
 		{"", owned, connectors.DataAgent},
+		{"", several, connectors.DataShared},
+		{connectors.DataAgent, several, connectors.DataAgent},
 		{"chats", global, connectors.DataShared},
 		{"None", owned, connectors.DataAgent},
 	}
 	for _, c := range cases {
 		if got := connectors.ResolveData(c.declared, c.row); got != c.want {
-			t.Errorf("ResolveData(%q, %v) = %q, want %q", c.declared, c.row.AgentID, got, c.want)
+			t.Errorf("ResolveData(%q, %v) = %q, want %q", c.declared, c.row.AgentIDs, got, c.want)
 		}
 	}
 
 	// The owner's mark on an MCP server: only the boolean true counts.
 	marked := func(typ string, agentID *string, v any, set bool) db.Connector {
+		var ids []string
+		if agentID != nil {
+			ids = []string{*agentID}
+		}
 		cfg := jsonx.NewMap[any]()
 		if set {
 			cfg.Set(connectors.NoPrivateDataKey, v)
 		}
-		return db.Connector{ID: "m", Type: typ, AgentID: agentID, Config: cfg}
+		return db.Connector{ID: "m", Type: typ, AgentIDs: ids, Config: cfg}
 	}
 	markCases := []struct {
 		name     string
@@ -268,5 +288,18 @@ func TestSetNoPrivateData(t *testing.T) {
 	}
 	if _, ok, err := connectors.SetNoPrivateData(d, "mcp-gone", true, 4); ok || err != nil {
 		t.Fatal(ok, err)
+	}
+}
+
+// A row only a build before 0023 wrote has agent_id and no agent_ids: it
+// serves that agent, never every agent.
+func TestOlderRowsKeepTheirOneAgent(t *testing.T) {
+	d := testutil.DB(t)
+	_, err := d.Exec("INSERT INTO connectors (id, type, kind, label, enabled, agent_id, created_at, updated_at) VALUES ('mcp-old', 'mcp', 'tools', 'Old', 1, 'agt_a', 1, 1)")
+	testutil.Must(t, err)
+	row, _, err := connectors.Get(d, "mcp-old")
+	testutil.Must(t, err)
+	if !connectors.ServesAgent(row, "agt_a") || connectors.ServesAgent(row, "agt_b") {
+		t.Fatal(row.AgentIDs)
 	}
 }
