@@ -4,7 +4,8 @@
 // since they can be long and are rarely what you want to paste.
 
 type ToolLine = { tool: string; status: string; class: string }
-type MessageLine = { role: "user" | "assistant"; source?: "hook" | null; text: string; createdAt: number; tools: ToolLine[] }
+type MediaLine = { kind: string; filename: string; status: string }
+type MessageLine = { role: "user" | "assistant"; source?: "hook" | null; text: string; createdAt: number; tools: ToolLine[]; media?: MediaLine[] }
 export type TranscriptForCopy = { chat: { id: string; channel: string; title: string }; messages: MessageLine[] }
 
 export function transcriptToMarkdown(t: TranscriptForCopy): string {
@@ -14,6 +15,10 @@ export function transcriptToMarkdown(t: TranscriptForCopy): string {
     const lines = [`## ${who} (${new Date(m.createdAt).toISOString()})`, ""]
     if (m.tools.length > 0) {
       for (const x of m.tools) lines.push(`- tool \`${x.tool}\` (${x.class}, ${x.status})`)
+      lines.push("")
+    }
+    if (m.media && m.media.length > 0) {
+      for (const x of m.media) lines.push(`- sent ${x.kind} \`${x.filename || "file"}\` (${x.status})`)
       lines.push("")
     }
     lines.push(m.text)

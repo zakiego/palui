@@ -39,4 +39,12 @@ describe("transcriptToMarkdown", () => {
   it("handles an empty chat", () => {
     expect(transcriptToMarkdown({ chat: { id: "c", channel: "telegram", title: "T" }, messages: [] })).toBe("# T\n\nChannel: telegram\nChat ID: c\n")
   })
+
+  it("lists files a reply sent under it", () => {
+    const md = transcriptToMarkdown({
+      chat: { id: "chat_1", channel: "web", title: "Palui (web)" },
+      messages: [{ role: "assistant", text: "Ini", createdAt: 0, tools: [], media: [{ kind: "image", filename: "inhaler.png", status: "sent" }, { kind: "voice", filename: "", status: "failed" }] }],
+    })
+    expect(md).toContain("- sent image `inhaler.png` (sent)\n- sent voice `file` (failed)\n\nIni")
+  })
 })
