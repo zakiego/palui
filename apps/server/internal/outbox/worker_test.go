@@ -16,6 +16,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/conntest"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/outbox"
+	"github.com/zakiego/palui/apps/server/internal/outmedia"
 	"github.com/zakiego/palui/apps/server/internal/owner"
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/testutil"
@@ -412,5 +413,56 @@ func TestStartWakesOnEnqueue(t *testing.T) {
 	}
 	if st, _ := outbox.ChannelState(h.db, "gone", nil); st != outbox.StateRemoved {
 		t.Fatal(st)
+	}
+}
+
+func TestMediaRowsCarryTheirBytesToTheChannel(t *testing.T) {
+	h := setup(t)
+	var loads []string
+	h.worker = outbox.NewWorker(outbox.WorkerOptions{DB: h.db, Channel: func(ch string) outbox.Channel { return h.handles[ch] }, Clock: func() int64 { return h.now.Load() },
+		LoadMedia: func(_ db.Q, id string) ([]byte, error) {
+			loads = append(loads, id)
+			if id == "med_gone" {
+				return nil, outmedia.ErrGone
+			}
+			return []byte("bytes of " + id), nil
+		}})
+	media := &db.OutboxMedia{ID: "med_1", Kind: db.MediaImage, MimeType: "image/jpeg", Filename: "a.jpg", Size: 10}
+	r, err := outbox.Enqueue(h.db, outbox.EnqueueInput{ChatID: h.tgChat.ID, Channel: "telegram", Payload: db.OutboxPayload{Text: "cap", Media: media}, Source: "media:run_1"}, h.now.Load())
+	testutil.Must(t, err)
+	gone, err := outbox.Enqueue(h.db, outbox.EnqueueInput{ChatID: h.tgChat.ID, Channel: "telegram", Payload: db.OutboxPayload{Media: &db.OutboxMedia{ID: "med_gone", Kind: db.MediaImage}}, Source: "media:run_1"}, h.now.Load())
+	testutil.Must(t, err)
+	h.worker.Tick()
+	sent := h.handles["telegram"].Sent()
+	if len(sent) != 1 || sent[0].Payload.Media == nil || string(sent[0].Payload.Media.Bytes) != "bytes of med_1" || sent[0].Payload.Text != "cap" {
+		t.Fatalf("%+v", sent)
+	}
+	if row := h.row(t, r.ID); row.Status != "sent" || row.Payload.Media.Bytes != nil {
+		t.Fatalf("%+v", row)
+	}
+	var raw string
+	testutil.Must(t, h.db.QueryRow("SELECT payload FROM outbox WHERE id = ?", r.ID).Scan(&raw))
+	if strings.Contains(raw, "bytes of") {
+		t.Fatal("bytes reached the stored payload")
+	}
+	// Gone for good: failed at once, no retry.
+	if row := h.row(t, gone.ID); row.Status != "failed" || row.Error == nil || *row.Error != "the media file is gone" {
+		t.Fatalf("%+v", row)
+	}
+	if !hasEvent(t, h.db, "outbox.failed", "media file is gone") {
+		t.Fatal("no event")
+	}
+}
+
+func TestMediaRowWithoutALoaderRetries(t *testing.T) {
+	h := setup(t)
+	r, err := outbox.Enqueue(h.db, outbox.EnqueueInput{ChatID: h.tgChat.ID, Channel: "telegram", Payload: db.OutboxPayload{Media: &db.OutboxMedia{ID: "med_1", Kind: db.MediaImage}}, Source: "media:run_1"}, h.now.Load())
+	testutil.Must(t, err)
+	h.worker.Tick()
+	if len(h.handles["telegram"].Sent()) != 0 {
+		t.Fatal("sent without bytes")
+	}
+	if row := h.row(t, r.ID); row.Status != "pending" || row.Attempts != 1 {
+		t.Fatalf("%+v", row)
 	}
 }

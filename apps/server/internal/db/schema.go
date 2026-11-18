@@ -383,6 +383,54 @@ type OutboxPayload struct {
 	ReplyToChannelMsgID string         `json:"replyToChannelMsgId,omitempty"`
 	// "plain" or "markdown".
 	Format string `json:"format,omitempty"`
+	// A photo, file, voice note, video or sticker; Text is then its caption.
+	// Rows written before outbound media have none.
+	Media *OutboxMedia `json:"media,omitempty"`
+}
+
+// Outbound media kinds (OutboxMedia.Kind): what the channel sends it as.
+const (
+	MediaImage    = "image"
+	MediaVideo    = "video"
+	MediaVoice    = "voice"
+	MediaAudio    = "audio"
+	MediaDocument = "document"
+	MediaSticker  = "sticker"
+)
+
+// OutboxMedia is outbox.payload.media: what to send and where its bytes are.
+type OutboxMedia struct {
+	// outbox_media.id
+	ID   string `json:"id"`
+	Kind string `json:"kind"`
+	// Normalized, without parameters.
+	MimeType string `json:"mimeType"`
+	Filename string `json:"filename,omitempty"`
+	Size     int64  `json:"size"`
+	// Filled by the outbox worker just before the send, never stored.
+	Bytes []byte `json:"-"`
+}
+
+// MediaBlob is an outbox_media row without `data`.
+type MediaBlob struct {
+	ID        string  `json:"id"`
+	ChatID    string  `json:"chatId"`
+	Kind      string  `json:"kind"`
+	MimeType  string  `json:"mimeType"`
+	Filename  *string `json:"filename"`
+	Size      int64   `json:"size"`
+	Sha256    string  `json:"sha256"`
+	Source    string  `json:"source"`
+	SourceRef *string `json:"sourceRef"`
+	CreatedAt int64   `json:"createdAt"`
+}
+
+const MediaBlobCols = "id, chat_id, kind, mime_type, filename, size, sha256, source, source_ref, created_at"
+
+func ScanMediaBlob(s Scanner) (MediaBlob, error) {
+	var m MediaBlob
+	err := s.Scan(&m.ID, &m.ChatID, &m.Kind, &m.MimeType, &m.Filename, &m.Size, &m.Sha256, &m.Source, &m.SourceRef, &m.CreatedAt)
+	return m, err
 }
 
 type Outbox struct {

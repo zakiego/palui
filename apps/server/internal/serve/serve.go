@@ -31,6 +31,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/logx"
 	"github.com/zakiego/palui/apps/server/internal/outbox"
+	"github.com/zakiego/palui/apps/server/internal/outmedia"
 	"github.com/zakiego/palui/apps/server/internal/secret"
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/tools"
@@ -273,6 +274,13 @@ func (a *App) buildRuntime(d *db.DB, key string, startedAt int64) {
 		},
 		Log: log.Child(logx.Fields{"component": "outbox"}), Clock: o.Clock,
 		OutboundFailed: deps.OutboundFailed(log),
+		LoadMedia: func(q db.Q, id string) ([]byte, error) {
+			key, err := config.MasterKey(config.Get())
+			if err != nil {
+				return nil, err
+			}
+			return outmedia.Load(q, id, key)
+		},
 	})
 	a.sup, a.engine, a.built, a.worker = sup, engine, built, worker
 	a.Runtime = &httpapi.Runtime{DB: d, Engine: engine, Sup: sup, Built: built, Bus: chat.DefaultBus, Log: log, StartedAt: startedAt, Clock: o.Clock}
