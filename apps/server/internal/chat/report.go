@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -243,14 +244,15 @@ func fit(head []string, sections []*reportSection, limit int) string {
 
 // CreateReport is createReport: builds the snapshot and stores it.
 func CreateReport(c *EngineCtx, chat db.Chat, note string, now int64) (db.Report, error) {
-	return createReport(c, chat, note, "", now)
+	return createReport(c, chat, note, nil, "", now)
 }
 
 // createReport leaves the message skipID out of the snapshot (the custom
-// command asking for it).
-func createReport(c *EngineCtx, chat db.Chat, note, skipID string, now int64) (db.Report, error) {
+// command asking for it). quote is the message the command replied to: the
+// owner pointing at the bad answer, which the report would otherwise lose.
+func createReport(c *EngineCtx, chat db.Chat, note string, quote *StoredQuote, skipID string, now int64) (db.Report, error) {
 	id := secret.NewID("rpt")
-	text, err := reportText(c, chat, id, note, skipID, now)
+	text, err := reportText(c, chat, id, note, quote, skipID, now)
 	if err != nil {
 		return db.Report{}, err
 	}
@@ -312,10 +314,29 @@ func joinDataDir(dir string) string {
 
 // ReportText is reportText.
 func ReportText(c *EngineCtx, chat db.Chat, id, note string, now int64) (string, error) {
-	return reportText(c, chat, id, note, "", now)
+	return reportText(c, chat, id, note, nil, "", now)
 }
 
-func reportText(c *EngineCtx, chat db.Chat, id, note, skipID string, now int64) (string, error) {
+// reportQuoteFrom names who wrote the quoted message, in the report's words.
+var reportQuoteFrom = map[string]string{"assistant": "the bot's reply", "user": "the owner's own message", "other": "someone else's message"}
+
+// reportQuote is the head line for the message the command replied to.
+func reportQuote(q *StoredQuote) string {
+	if q == nil {
+		return ""
+	}
+	body := strx.Trim(strings.Join(slices.DeleteFunc([]string{q.Media, q.Text}, func(s string) bool { return s == "" }), " "))
+	if body == "" {
+		return ""
+	}
+	from, ok := reportQuoteFrom[q.From]
+	if !ok {
+		from = "an earlier message"
+	}
+	return fmt.Sprintf("Owner replied to %s with this report, so that's most likely what went wrong: %s", from, clip(body, reportBotClip))
+}
+
+func reportText(c *EngineCtx, chat db.Chat, id, note string, quote *StoredQuote, skipID string, now int64) (string, error) {
 	q := c.DB
 	tz, err := settings.Timezone(q)
 	if err != nil {
@@ -345,6 +366,9 @@ func reportText(c *EngineCtx, chat db.Chat, id, note, skipID string, now int64) 
 	}
 	if note != "" {
 		head = append(head, "Owner says: "+clip(note, 500))
+	}
+	if line := reportQuote(quote); line != "" {
+		head = append(head, line)
 	}
 	via := ""
 	if chat.ConnectorID != "" {

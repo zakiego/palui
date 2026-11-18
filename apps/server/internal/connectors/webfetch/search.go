@@ -2,6 +2,7 @@ package webfetch
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"slices"
 	"strconv"
@@ -24,6 +25,28 @@ const SearchEndpoint = "https://html.duckduckgo.com/html/"
 
 // MaxSearchResults caps what one search hands the model.
 const MaxSearchResults = 8
+
+// DuckDuckGo answers in about a second. Now and then one request hangs, and
+// the same query sent again answers right away, so a hung try is cut short
+// and tried once more instead of costing the whole turn 15 seconds and the
+// answer.
+const (
+	SearchTimeoutMs = 7_000
+	SearchTries     = 2
+)
+
+// retrySearch: another try is worth it after a timeout, a dropped
+// connection or a 5xx, not after a refusal, a 4xx or the caller giving up.
+func retrySearch(ctx context.Context, res *safenet.Response, err error) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	if err != nil {
+		var se *safenet.Error
+		return errors.As(err, &se) && (se.Code == safenet.CodeTimeout || se.Code == safenet.CodeNetwork)
+	}
+	return res != nil && res.Status >= 500
+}
 
 // SearchResult is one organic hit.
 type SearchResult struct {
@@ -128,13 +151,22 @@ func SearchWeb(ctx context.Context, query string, fetcher Fetcher) *jsonx.Object
 	if fetcher == nil {
 		fetcher = safenet.Fetch
 	}
-	res, err := fetcher(ctx, SearchEndpoint+"?"+url.Values{"q": {query}}.Encode(), safenet.Options{
-		TimeoutMs:           15_000,
+	target := SearchEndpoint + "?" + url.Values{"q": {query}}.Encode()
+	opts := safenet.Options{
+		TimeoutMs:           SearchTimeoutMs,
 		MaxBytes:            maxBytes,
 		Truncate:            true,
 		AllowedContentTypes: htmlTypes,
 		Headers:             map[string]string{"accept": "text/html", "accept-language": "id,en;q=0.8"},
-	})
+	}
+	var res *safenet.Response
+	var err error
+	for try := 0; try < SearchTries; try++ {
+		res, err = fetcher(ctx, target, opts)
+		if !retrySearch(ctx, res, err) {
+			break
+		}
+	}
 	if err != nil {
 		return kit.O("ok", false, "query", query, "error", friendlyError(err))
 	}

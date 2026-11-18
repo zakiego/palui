@@ -21,6 +21,11 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 - The model chain editor is simpler. Each step has one search over every connector's models, so picking a model picks its connector too. Drag a step's handle (or use the arrow keys on it) to reorder, and press X to remove it.
 
+### Fixed
+
+- Web search no longer gives up after one slow try. When DuckDuckGo hangs, `search_web` stops waiting after 7 seconds and asks once more, instead of waiting 15 seconds and telling the agent the search took too long. Usually the second try answers in about a second.
+- A `/report` sent as a reply now says which message you replied to, so the coding agent knows what went wrong even without a note. The same goes for a custom command that attaches a report.
+
 ## 0.10.0 (2026-11-18)
 
 ### Added

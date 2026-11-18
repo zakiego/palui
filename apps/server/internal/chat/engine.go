@@ -402,7 +402,7 @@ func (e *Engine) dispatch(chat db.Chat, row db.Message) (*Route, error) {
 		if err := handled(c.DB, row.ID); err != nil {
 			return nil, err
 		}
-		msg := &CommandMessage{ID: row.ID, Text: row.Text, ReplyToChannelMsgID: reply}
+		msg := &CommandMessage{ID: row.ID, Text: row.Text, ReplyToChannelMsgID: reply, Quoted: content.Quoted}
 		cr, err := RunCommand(c, chat, r.Name, r.Args, msg)
 		if err != nil {
 			return nil, err

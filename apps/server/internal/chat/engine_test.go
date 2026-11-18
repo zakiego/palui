@@ -297,6 +297,20 @@ func TestCommands(t *testing.T) {
 		eq(t, len(allRuns(t, h.DB)), 1)
 	})
 
+	t.Run("/report sent as a reply names the message the owner pointed at", func(t *testing.T) {
+		h := basic(t, nil, extra{})
+		h.sendIdle("/report", func(m *connectors.InboundMessage) {
+			m.Quoted = &connectors.InboundQuote{From: "self", Text: "Aku nggak bisa bikin gambar.\nPencariannya kelamaan"}
+		})
+		saved := need(db.ScanReport(h.DB.QueryRow("SELECT " + db.ReportCols + " FROM reports")))
+		contains(t, saved.Text, "Owner replied to the bot's reply with this report, so that's most likely what went wrong: Aku nggak bisa bikin gambar. Pencariannya kelamaan\n")
+		notContains(t, saved.Text, "Owner says:")
+
+		h.sendIdle("/report")
+		latest := need(db.ScanReport(h.DB.QueryRow("SELECT " + db.ReportCols + " FROM reports ORDER BY created_at DESC, rowid DESC LIMIT 1")))
+		notContains(t, latest.Text, "Owner replied to")
+	})
+
 	t.Run("/report without a note asks for one next time, after the report", func(t *testing.T) {
 		h := basic(t, nil, extra{})
 		h.sendIdle("/report")
