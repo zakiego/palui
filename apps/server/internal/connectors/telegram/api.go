@@ -11,7 +11,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
+	"strings"
 	"time"
 
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
@@ -48,6 +51,71 @@ type HTTPError struct {
 func (e *HTTPError) Error() string { return fmt.Sprintf("Network request for '%s' failed!", e.Method) }
 func (e *HTTPError) Unwrap() error { return e.Err }
 
+// InputFile is a file uploaded with the call: a payload value of this type
+// makes the request multipart/form-data, with the file under its key.
+type InputFile struct {
+	Name     string
+	MimeType string
+	Bytes    []byte
+}
+
+// MarshalJSON keeps the bytes out of logs and recorded calls.
+func (f *InputFile) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"file": f.Name, "mimeType": f.MimeType, "size": len(f.Bytes)})
+}
+
+func hasFile(payload *jsonx.Object) bool {
+	for _, k := range payload.Keys() {
+		if v, _ := payload.Get(k); v != nil {
+			if _, ok := v.(*InputFile); ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
+// multipartBody is the payload as form fields: strings as they are, other
+// values as JSON (reply_markup, reply_parameters), files as file parts.
+func multipartBody(payload *jsonx.Object) (*bytes.Buffer, string, error) {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	for _, k := range payload.Keys() {
+		v, _ := payload.Get(k)
+		switch t := v.(type) {
+		case *InputFile:
+			h := make(textproto.MIMEHeader)
+			h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, quoteEscaper.Replace(k), quoteEscaper.Replace(t.Name)))
+			h.Set("Content-Type", t.MimeType)
+			part, err := w.CreatePart(h)
+			if err != nil {
+				return nil, "", err
+			}
+			if _, err := part.Write(t.Bytes); err != nil {
+				return nil, "", err
+			}
+		case string:
+			if err := w.WriteField(k, t); err != nil {
+				return nil, "", err
+			}
+		default:
+			raw, err := jsonx.Marshal(v)
+			if err != nil {
+				return nil, "", err
+			}
+			if err := w.WriteField(k, string(raw)); err != nil {
+				return nil, "", err
+			}
+		}
+	}
+	if err := w.Close(); err != nil {
+		return nil, "", err
+	}
+	return &buf, w.FormDataContentType(), nil
+}
+
 // HTTPTransport calls the real Bot API with POST <root>/bot<token>/<method>.
 type HTTPTransport struct {
 	Token  string
@@ -67,17 +135,28 @@ func (h *HTTPTransport) Call(ctx context.Context, method string, payload *jsonx.
 	if payload == nil {
 		payload = jsonx.NewMap[any]()
 	}
-	body, err := jsonx.Marshal(payload)
-	if err != nil {
-		return nil, &HTTPError{Method: method, Err: err}
+	var body io.Reader
+	contentType := "application/json"
+	if hasFile(payload) {
+		buf, ct, err := multipartBody(payload)
+		if err != nil {
+			return nil, &HTTPError{Method: method, Err: err}
+		}
+		body, contentType = buf, ct
+	} else {
+		raw, err := jsonx.Marshal(payload)
+		if err != nil {
+			return nil, &HTTPError{Method: method, Err: err}
+		}
+		body = bytes.NewReader(raw)
 	}
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, h.Root+"/bot"+h.Token+"/"+method, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, h.Root+"/bot"+h.Token+"/"+method, body)
 	if err != nil {
 		return nil, &HTTPError{Method: method, Err: err}
 	}
-	req.Header.Set("content-type", "application/json")
+	req.Header.Set("content-type", contentType)
 	res, err := h.Client.Do(req)
 	if err != nil {
 		return nil, &HTTPError{Method: method, Err: err}

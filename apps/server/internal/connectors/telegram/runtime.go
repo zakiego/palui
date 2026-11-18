@@ -21,6 +21,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/logx"
+	"github.com/zakiego/palui/apps/server/internal/outmedia"
 	"github.com/zakiego/palui/apps/server/internal/owner"
 	"github.com/zakiego/palui/apps/server/internal/secret"
 	"github.com/zakiego/palui/apps/server/internal/strx"
@@ -945,6 +946,9 @@ func (b *bot) Typing(_ context.Context, chatID string, on bool, _ connectors.Typ
 // Send splits, converts and sends one outbox payload; the keyboard rides on
 // the last chunk, the reply target on the first.
 func (b *bot) Send(ctx context.Context, chatID string, payload db.OutboxPayload) (connectors.SendResult, error) {
+	if payload.Media != nil {
+		return b.sendMedia(ctx, chatID, payload)
+	}
 	b.stopTyping(chatID)
 	var chunks []RenderedChunk
 	if payload.Format == "plain" {
@@ -998,6 +1002,86 @@ func (b *bot) Send(ctx context.Context, chatID string, payload db.OutboxPayload)
 		return connectors.SendResult{}, nil
 	}
 	return connectors.SendResult{ChannelMsgID: strconv.FormatInt(*lastID, 10)}, nil
+}
+
+// mediaMethods is the Bot API method and file field per media kind.
+var mediaMethods = map[string][2]string{
+	db.MediaImage:    {"sendPhoto", "photo"},
+	db.MediaVideo:    {"sendVideo", "video"},
+	db.MediaVoice:    {"sendVoice", "voice"},
+	db.MediaAudio:    {"sendAudio", "audio"},
+	db.MediaSticker:  {"sendSticker", "sticker"},
+	db.MediaDocument: {"sendDocument", "document"},
+}
+
+// sendMedia uploads one photo, file, voice note, video or sticker with its
+// caption. Typing stays on: media goes out mid-turn. When Telegram refuses a
+// file as its kind (a photo too wide, voice notes off for the user), it goes
+// again as a document.
+func (b *bot) sendMedia(ctx context.Context, chatID string, payload db.OutboxPayload) (connectors.SendResult, error) {
+	m := payload.Media
+	if len(m.Bytes) == 0 {
+		return connectors.SendResult{}, errors.New("media bytes missing")
+	}
+	kind := m.Kind
+	if _, ok := mediaMethods[kind]; !ok {
+		kind = db.MediaDocument
+	}
+	other := jsonx.NewMap[any]()
+	if payload.ReplyToChannelMsgID != "" {
+		if id := strx.Number(payload.ReplyToChannelMsgID); !math.IsNaN(id) && !math.IsInf(id, 0) && id == math.Trunc(id) {
+			other.Set("reply_parameters", obj("message_id", id, "allow_sending_without_reply", true))
+		}
+	}
+	if keyboard := BuildKeyboard(payload.Actions, func(id string) {
+		b.log.Warn("telegram button dropped: callback_data must be 1 to 64 bytes", map[string]any{"id": id})
+	}); keyboard != nil {
+		other.Set("reply_markup", keyboard)
+	}
+	plain := strx.Slice16(strx.Trim(payload.Text), outmedia.MaxCaption)
+	html := ""
+	if payload.Format != "plain" && plain != "" {
+		if chunks := RenderChunks(payload.Text, outmedia.MaxCaption); len(chunks) == 1 {
+			html = chunks[0].HTML
+		}
+	}
+	name := m.Filename
+	if name == "" {
+		name = "file"
+	}
+	file := &InputFile{Name: name, MimeType: m.MimeType, Bytes: m.Bytes}
+	send := func(kind string, caption string, asHTML bool) (Message, error) {
+		mm := mediaMethods[kind]
+		p := obj("chat_id", chatID, mm[1], file)
+		if caption != "" && kind != db.MediaSticker {
+			p.Set("caption", caption)
+			if asHTML {
+				p.Set("parse_mode", "HTML")
+			}
+		}
+		p.Assign(other)
+		return call[Message](ctx, b.api, mm[0], p)
+	}
+	try := func(kind string) (Message, error) {
+		if html != "" {
+			sent, err := send(kind, html, true)
+			if err == nil || !isParseError(err) {
+				return sent, err
+			}
+			b.log.Warn("telegram rejected the caption HTML, sending it plain", map[string]any{"err": DescribeError(err)})
+		}
+		return send(kind, plain, false)
+	}
+	sent, err := try(kind)
+	var api *APIError
+	if err != nil && kind != db.MediaDocument && errors.As(err, &api) && api.Code == 400 {
+		b.log.Warn("telegram refused the file as "+kind+", sending it as a document", map[string]any{"err": DescribeError(err)})
+		sent, err = try(db.MediaDocument)
+	}
+	if err != nil {
+		return connectors.SendResult{}, err
+	}
+	return connectors.SendResult{ChannelMsgID: strconv.FormatInt(sent.MessageID, 10)}, nil
 }
 
 func (b *bot) sendMessage(ctx context.Context, chatID, text string, other *jsonx.Object, html bool) (Message, error) {
