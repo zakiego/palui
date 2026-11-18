@@ -1641,6 +1641,7 @@
          "maximum": 180
         },
         "status": {
+         "description": "waiting only lists check-ins still open; a check-in that closed (answered or missed) is in a done run, so leave status out to find it.",
          "type": "string",
          "enum": [
           "queued",
