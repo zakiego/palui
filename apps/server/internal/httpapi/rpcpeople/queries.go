@@ -169,6 +169,20 @@ type transcriptMessage struct {
 	Status    string         `json:"status"`
 	CreatedAt int64          `json:"createdAt"`
 	Tools     []toolCallView `json:"tools"`
+	// Photos and files the run sent with send_media (assistant rows only).
+	Media []sentMediaView `json:"media"`
+}
+
+// sentMediaView is one media outbox row: what was sent, never the bytes.
+type sentMediaView struct {
+	ID       string  `json:"id"`
+	Kind     string  `json:"kind"`
+	MimeType string  `json:"mimeType"`
+	Filename string  `json:"filename"`
+	Size     int64   `json:"size"`
+	Caption  string  `json:"caption"`
+	Status   string  `json:"status"`
+	Error    *string `json:"error"`
 }
 
 type transcriptApproval struct {
@@ -229,14 +243,39 @@ func transcript(q db.Q, chatID string) (*transcriptView, error) {
 			byRun[c.RunID] = append(byRun[c.RunID], toolCallView{ID: c.ID, Tool: c.Tool, ConnectorID: c.ConnectorID, Class: c.Class, Status: c.Status, Ms: c.Ms, Args: argsText(c.Args), Result: c.ResultPreview})
 		}
 	}
+	mediaByRun := map[string][]sentMediaView{}
+	if len(runIDs) > 0 {
+		sources := make([]any, len(runIDs))
+		for i, id := range runIDs {
+			sources[i] = "media:" + id.(string)
+		}
+		marks := strings.TrimSuffix(strings.Repeat("?, ", len(sources)), ", ")
+		rows, err := q.Query("select "+db.OutboxCols+` from "outbox" where "outbox"."chat_id" = ? and "outbox"."source" in (`+marks+`) order by "outbox"."created_at" asc, "outbox"."id" asc`, append([]any{chatID}, sources...)...)
+		sent, err := db.All(rows, err, db.ScanOutbox)
+		if err != nil {
+			return nil, err
+		}
+		for _, o := range sent {
+			m := o.Payload.Media
+			if m == nil {
+				continue
+			}
+			run := strings.TrimPrefix(o.Source, "media:")
+			mediaByRun[run] = append(mediaByRun[run], sentMediaView{ID: o.ID, Kind: m.Kind, MimeType: m.MimeType, Filename: m.Filename, Size: m.Size, Caption: o.Payload.Text, Status: o.Status, Error: o.Error})
+		}
+	}
 	shown := map[string]bool{}
 	items := make([]transcriptMessage, 0, len(msgs))
 	for _, m := range msgs {
 		tools := []toolCallView{}
+		media := []sentMediaView{}
 		if m.Role == "assistant" && m.RunID != nil && *m.RunID != "" && !shown[*m.RunID] {
 			shown[*m.RunID] = true
 			if list := byRun[*m.RunID]; list != nil {
 				tools = list
+			}
+			if list := mediaByRun[*m.RunID]; list != nil {
+				media = list
 			}
 		}
 		// Inbound webhook events are stored as user messages; the UI shows them as events.
@@ -256,7 +295,7 @@ func transcript(q db.Q, chatID string) (*transcriptView, error) {
 			}
 			sender = &s
 		}
-		items = append(items, transcriptMessage{ID: m.ID, Role: m.Role, Source: source, Sender: sender, Text: m.Text, Status: m.Status, CreatedAt: m.CreatedAt, Tools: tools})
+		items = append(items, transcriptMessage{ID: m.ID, Role: m.Role, Source: source, Sender: sender, Text: m.Text, Status: m.Status, CreatedAt: m.CreatedAt, Tools: tools, Media: media})
 	}
 	rows, err = q.Query("select "+db.ApprovalCols+` from "pending_approvals" where ("pending_approvals"."chat_id" = ? and "pending_approvals"."status" = ?) order by "pending_approvals"."created_at" asc`, chatID, "pending")
 	pending, err := db.All(rows, err, db.ScanApproval)
