@@ -5,6 +5,7 @@ import (
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/chat"
+	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/customcmd"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/models"
@@ -46,6 +47,17 @@ func TestCustomCommands(t *testing.T) {
 		h.sendIdle("/report")
 		latest := need(db.ScanReport(h.DB.QueryRow("SELECT " + db.ReportCols + " FROM reports ORDER BY created_at DESC, rowid DESC LIMIT 1")))
 		notContains(t, latest.Text, "/report-fix")
+	})
+
+	t.Run("a report command sent as a reply keeps the quoted message in the report", func(t *testing.T) {
+		h := basic(t, []models.Step{models.Say("thread dimulai")}, extra{})
+		addCommand(t, h.DB, customcmd.Input{Name: "report-fix", Prompt: "Fix this. {{args}}", AttachReport: true})
+		h.sendIdle("/report-fix", func(m *connectors.InboundMessage) {
+			m.Quoted = &connectors.InboundQuote{From: "self", Text: "pencariannya kelamaan"}
+		})
+		saved := need(db.ScanReport(h.DB.QueryRow("SELECT " + db.ReportCols + " FROM reports")))
+		contains(t, saved.Text, "Owner replied to the bot's reply with this report, so that's most likely what went wrong: pencariannya kelamaan")
+		contains(t, prompt(h.m, -1), "most likely what went wrong: pencariannya kelamaan")
 	})
 
 	t.Run("an agent's own command beats a global one, an off one is a normal message", func(t *testing.T) {

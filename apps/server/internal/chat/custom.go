@@ -43,7 +43,7 @@ func startCustom(c *EngineCtx, chat db.Chat, row db.Message, cmd db.CustomComman
 			c.send(chat, fmt.Sprintf(CustomReportShared, cmd.Name), "system", SendExtra{})
 			return false, nil
 		}
-		r, err := createReport(c, chat, args, row.ID, now)
+		r, err := createReport(c, chat, args, ParseContent(row.Content).Quoted, row.ID, now)
 		if err != nil {
 			return false, err
 		}

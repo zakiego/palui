@@ -45,6 +45,8 @@ type CommandMessage struct {
 	ID                  string
 	Text                string
 	ReplyToChannelMsgID string
+	// The message it replied to, if any.
+	Quoted *StoredQuote
 }
 
 var statusLabels = map[string]string{"on": "nyala", "paused": "dijeda", "error": "error", "connecting": "nyambung...", "not_set_up": "belum disetup"}
@@ -94,7 +96,7 @@ func RunCommand(c *EngineCtx, chat db.Chat, name string, args []string, msg *Com
 	case "ack":
 		return cmdAck(c, chat, args)
 	case "report":
-		return cmdReport(c, chat, args)
+		return cmdReport(c, chat, args, msg)
 	}
 	return CommandReply{}, fmt.Errorf("unknown command %s", name)
 }
@@ -404,9 +406,13 @@ const ReportNoteTip = "Lain kali tulis juga apa yang salah, biar lebih gampang d
 
 // cmdReport: plain, so the channel sends exactly what `reports` holds. From a
 // shared chat the snapshot goes to the owner's DM (PLAN 19.4).
-func cmdReport(c *EngineCtx, chat db.Chat, args []string) (CommandReply, error) {
+func cmdReport(c *EngineCtx, chat db.Chat, args []string, msg *CommandMessage) (CommandReply, error) {
 	note := strx.Trim(strings.Join(args, " "))
-	report, err := CreateReport(c, chat, note, c.Clock())
+	var quote *StoredQuote
+	if msg != nil {
+		quote = msg.Quoted
+	}
+	report, err := createReport(c, chat, note, quote, "", c.Clock())
 	if err != nil {
 		return CommandReply{}, err
 	}
