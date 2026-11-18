@@ -1,0 +1,53 @@
+---
+title: Printer
+description: Print PDFs and photos from chat on your printer, through the print queue on your Mac.
+---
+
+Kind: `tools`. The printer connector lets Palui print files from a chat. Send a PDF or a photo and ask Palui to print it, or ask for a file you sent earlier or saved as an attachment. Palui sends it over IPP to a print queue, usually the one macOS already set up for your printer. You can add more than one printer.
+
+Point it at the Mac's CUPS queue, not at the printer's own address. Many home printers only take raster formats, so they can't read a PDF or a JPEG sent straight to them. CUPS converts the file first, the same way it does when you print from an app on the Mac.
+
+## Connect
+
+1. On the Mac, find the queue name of your printer:
+
+   ```bash
+   lpstat -p -d
+   ```
+
+2. On the Connectors page, add Printer and set the URL to `ipp://host.docker.internal:631/printers/<queue name>`, for example `ipp://host.docker.internal:631/printers/Office_Printer`.
+3. Press Test. Palui reads the queue and says which printer it found and which file types it prints.
+
+macOS stops CUPS when nothing has printed for a while, and only starts it again for apps on the Mac itself. If Test can't reach the printer after the Mac has been idle, turn on the CUPS web interface so it stays running:
+
+```bash
+cupsctl WebInterface=yes
+```
+
+## Settings
+
+| Field | Notes |
+|---|---|
+| Printer URL | The print queue as the runtime sees it: `ipp://`, `ipps://`, `http://` or `https://`. `ipp://` defaults to port 631. From Docker on the same Mac, use `host.docker.internal`. |
+
+## Tools
+
+| Tool | Class | What it does |
+|---|---|---|
+| `printer_status` | `read` | Shows the printer's state, any problem it reports (out of paper, jam), ink levels when it knows them, and the jobs still waiting. |
+| `print_file` | `write` | Prints a PDF, JPEG or PNG: the file in the current message, one from an earlier message in the last 24 hours, or a saved attachment. Options: copies (up to 20), color or gray, paper size (A4, A5, A6, Letter, Legal, 4x6), page ranges such as `1-3,5`, and fit to page. |
+
+`printer_status` reads the queue. A printer that's off or asleep can still show `idle` until a job reaches it, so a job that was sent but didn't print usually means the printer needs waking up.
+
+`write` tools run right away in your own chat. They ask first after [untrusted content](/docs/concepts/taint-rule) in the same turn, and in scheduled jobs and hooks.
+
+## Safety
+
+- Palui only prints files from the chat it's answering, or attachments saved in that chat.
+- Printing runs right away when you ask in your own chat. After untrusted content in the same turn, and in scheduled jobs and hooks, it asks for your approval first.
+- Guests in a shared chat can't print.
+- Nothing is stored. The file goes from the chat to the print queue and Palui keeps only the job id it got back.
+
+## Pause and remove
+
+Pausing hides the tools from the next turn. Jobs already sent keep printing. Removing deletes the connector from Palui. The printer and its queue on the Mac aren't touched.
