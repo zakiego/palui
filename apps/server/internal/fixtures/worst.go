@@ -642,6 +642,22 @@ func worst(k *Kit) {
 	})
 	k.Attachment(Attachment{ChatID: noTitleGroup.ID, Title: "Dokumen", Kind: "pdf", Filename: worstDeck, Size: ptr[int64](2048), SenderID: "98765432101234@lid", SentAt: ptr(now - 400*D), CreatedAt: ptr(now - 2*D)})
 	k.Attachment(Attachment{ChatID: cjk.ID, Title: "身份证 王秀英 正反面", Description: "身份证正反面照片，有效期至2036年。", Kind: "png", Filename: "身份证_王秀英.png", Size: ptr[int64](1536), CreatedAt: ptr(now - 12*D)})
+
+	// An HTTP API credential at every limit: the longest label, 20 domains, a
+	// long query parameter and a status detail at its limit. Last, so its rows
+	// don't shift any earlier event id.
+	httpDomains := []string{"api.northwind.example.com"}
+	for i := 1; i <= 19; i++ {
+		httpDomains = append(httpDomains, fmt.Sprintf("*.region-%02d.northwind-holdings.example.com", i))
+	}
+	k.Connector("http-northwind-industries-reporting", "http", ConnectorOpts{
+		Label:   ptr(within("Northwind Industries Holdings reporting API (every region, read and write)", L.connectorLabel)),
+		Status:  "error",
+		Trust:   ptr("external"),
+		Detail:  ptr(within(fill("A key needs named domains. * only works with auth none. ", L.statusDetail), L.statusDetail)),
+		Config:  obj("domains", strings.Join(httpDomains, ", "), "auth", "query", "queryParam", "northwind_holdings_reporting_service_access_token_for_every_region", "policy", "ask"),
+		Secrets: sec("value", "nw_0123456789abcdef0123456789abcdef"),
+	})
 }
 
 // worstFlows is worst.ts's flows block: the step and trigger caps, every run

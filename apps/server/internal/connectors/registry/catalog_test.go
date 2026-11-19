@@ -14,6 +14,7 @@ import (
 	flowsconn "github.com/zakiego/palui/apps/server/internal/connectors/flows"
 	gcalconn "github.com/zakiego/palui/apps/server/internal/connectors/gcal"
 	hooksconn "github.com/zakiego/palui/apps/server/internal/connectors/hooks"
+	"github.com/zakiego/palui/apps/server/internal/connectors/httpreq"
 	jobsconn "github.com/zakiego/palui/apps/server/internal/connectors/jobs"
 	notesconn "github.com/zakiego/palui/apps/server/internal/connectors/notes"
 	outboundconn "github.com/zakiego/palui/apps/server/internal/connectors/outbound"
@@ -77,7 +78,14 @@ func catalogBuilders(t *testing.T, e *catalogEnv) map[string]map[string]*connect
 		w := t3conn.NewWatcher(conntest.Ctx(t, e.db, "t3code", cfg, nil), nil, nil)
 		return t3conn.Tools(t3conn.ToolsInput{Client: nil, Config: t3conn.ParseConfig(cfg), Turn: e.owner, Watcher: w, Untrusted: untrusted})
 	}
+	httpCfg := func(policy string) httpreq.Config {
+		return httpreq.Config{Domains: []httpreq.Domain{{Host: "api.example.com"}}, Auth: "header", HeaderName: "Authorization", ValueTemplate: "Bearer {value}", Policy: policy}
+	}
 	return map[string]map[string]*connectors.ToolSet{
+		"http": {
+			"ask":   httpreq.Tools(httpCfg("ask"), "Example", "", httpreq.Options{}),
+			"allow": httpreq.Tools(httpCfg("allow"), "Example", "", httpreq.Options{}),
+		},
 		"attachments": {"default": attachmentsconn.Tools(e.db, e.owner, attachmentsconn.Options{Clock: clock})},
 		"chats":       {"default": must(chatsconn.Tools(e.db, e.owner, clock))},
 		"flows":       {"owner": owner, "flow": with("recap", flowsconn.RecapTool(e.db, flowTurn, clock))},

@@ -4,6 +4,7 @@ package flows_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -418,6 +419,21 @@ func TestPerRunApproval(t *testing.T) {
 		eq(t, pendingApprovals(t, h.db)[0].Tool, "mcp-github__add_comment", "tool")
 		all := texts(t, h.db)
 		contains(t, all[len(all)-1], "tool ini selalu minta izin", "reason")
+	})
+	t.Run("an every_run prompt shows the tool's own preview", func(t *testing.T) {
+		conns := exampleConnectors(nil)
+		for _, c := range conns {
+			if c.id == "mcp-github" {
+				c.tools["add_comment"].preview = func(raw json.RawMessage) string { return "COMMENT PREVIEW " + string(raw) }
+			}
+		}
+		h := newHarness(t, harnessOptions{connectors: conns})
+		flow := approvedFlow(t, h, `{"name":"Komen","steps":[{"id":"c","kind":"tool","tool":"mcp-github__add_comment","args":{"body":"ok"}}]}`)
+		h.start(flow.ID, "manual", "m1", "")
+		h.run(h.now())
+		eq(t, pendingApprovals(t, h.db)[0].ArgsPreview, `COMMENT PREVIEW {"body":"ok"}`, "args preview")
+		all := texts(t, h.db)
+		contains(t, all[len(all)-1], `COMMENT PREVIEW {"body":"ok"}`, "prompt")
 	})
 	t.Run("asks when a tool approved as read became write since", func(t *testing.T) {
 		h := newHarness(t, harnessOptions{})

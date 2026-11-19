@@ -10,6 +10,7 @@ import type { ConnectorManifest } from "@/shared/connectors/define"
 
 import { AppError } from "@/components/app-error"
 import { connectorIcon } from "@/components/connector-icon"
+import { NameDialog } from "@/components/connectors/name-dialog"
 import { CONNECTOR_GROUPS, ConnectorsBackLink } from "@/components/connectors/shared"
 import { newConnectorId } from "@/components/connectors/targets"
 import { PageHeader } from "@/components/page-header"
@@ -43,12 +44,16 @@ function NewConnectorPage() {
   const navigate = useNavigate()
   const { agent } = Route.useSearch()
   const [query, setQuery] = React.useState("")
+  const [naming, setNaming] = React.useState<ConnectorManifest | null>(null)
   const q = query.trim().toLowerCase()
+  const forAgent = (m: ConnectorManifest) => (m.kind === "tools" ? agent : undefined)
 
   const pick = (m: ConnectorManifest, preset?: Preset) => {
     const existing = !m.multiple ? data.items.find((i) => i.type === m.id) : undefined
     if (existing) return void navigate({ to: "/connectors/$id", params: { id: existing.id } })
-    void navigate({ to: "/connectors/$id", params: { id: newConnectorId(m, data.items, preset) }, search: { type: m.id, preset: preset?.id, agent: m.kind === "tools" ? agent : undefined } })
+    // Its id comes from its name, so ask for the name before the page opens.
+    if (m.multiple && !preset && !m.presets?.length) return setNaming(m)
+    void navigate({ to: "/connectors/$id", params: { id: newConnectorId(m, data.items, preset) }, search: { type: m.id, preset: preset?.id, agent: forAgent(m) } })
   }
   const isAdded = (m: ConnectorManifest) => !m.multiple && data.items.some((i) => i.type === m.id)
 
@@ -116,6 +121,14 @@ function NewConnectorPage() {
             <EmptyTitle>{t("command.empty")}</EmptyTitle>
           </EmptyHeader>
         </Empty>
+      )}
+      {naming && (
+        <NameDialog
+          manifest={naming}
+          existing={data.items}
+          onClose={() => setNaming(null)}
+          onSubmit={(label, id) => void navigate({ to: "/connectors/$id", params: { id }, search: { type: naming.id, label, agent: forAgent(naming) } })}
+        />
       )}
     </>
   )

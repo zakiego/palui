@@ -169,6 +169,10 @@ var builtinTools = map[string][]struct {
 		{tool: "printer_status", class: "read", title: "Check the printer"},
 		{tool: "print_file", class: "write", title: "Print a file"},
 	},
+	"http": {
+		{tool: "http_request", class: "read", title: "ElevenLabs: read", untrusted: true},
+		{tool: "http_request_write", class: "write", title: "ElevenLabs: send", untrusted: true},
+	},
 }
 
 // builtinData is each built-in skill's data scope, as the real tools declare it.
@@ -178,6 +182,7 @@ var builtinData = map[string]string{
 	"notes":     connectors.DataAgent,
 	"chats":     connectors.DataAgent,
 	"printer":   connectors.DataChat,
+	"http":      connectors.DataShared,
 }
 
 // demoToolSet is demo-runtime.ts's agentTools for one connector: the fake MCP

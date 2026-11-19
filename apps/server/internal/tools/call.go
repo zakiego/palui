@@ -135,6 +135,9 @@ func ConnectorToolCaller(running func() []connectors.RunningEntry, o CallerOptio
 			return nil, err
 		}
 		input, _ := jsonx.Marshal(args)
+		if AsksOnItsOwn(pt.NeedsApproval, input) {
+			return nil, &ToolCallError{what + " asks the owner before every call, so it can't feed a flow source. Set it to allow first."}
+		}
 		return withTimeout(ctx, timeout, what, func(ctx context.Context) (any, error) {
 			return pt.Tool.Execute(ctx, input, connectors.ToolCallInfo{ToolCallID: fmt.Sprintf("source_%d", now)})
 		})

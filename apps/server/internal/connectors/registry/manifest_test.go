@@ -7,6 +7,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/aigateway"
 	"github.com/zakiego/palui/apps/server/internal/connectors/cliproxy"
 	"github.com/zakiego/palui/apps/server/internal/connectors/gcal"
+	"github.com/zakiego/palui/apps/server/internal/connectors/httpreq"
 	"github.com/zakiego/palui/apps/server/internal/connectors/mcp"
 	"github.com/zakiego/palui/apps/server/internal/connectors/printer"
 	"github.com/zakiego/palui/apps/server/internal/connectors/recall"
@@ -28,6 +29,7 @@ var configSchemas = map[string]*zod.ObjectS{
 	"ai-gateway": cliproxy.GatewayConfigZod("http://host.docker.internal:8793"),
 	"recall":     recall.ConfigZod,
 	"mcp":        mcp.ConfigZod,
+	"http":       httpreq.ConfigZod,
 	"gcal":       gcal.ConfigZod,
 	"t3code":     t3code.ConfigZod,
 	"printer":    printer.ConfigZod,
@@ -41,6 +43,7 @@ var secretSchemas = map[string][]zod.Field{
 	"ai-gateway": aigateway.SecretZod,
 	"recall":     recall.SecretZod,
 	"mcp":        mcp.SecretZod,
+	"http":       httpreq.SecretZod,
 	"gcal":       gcal.SecretZod,
 	"t3code":     t3code.SecretZod,
 	"voice":      voice.SecretZod,

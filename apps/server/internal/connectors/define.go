@@ -395,6 +395,8 @@ type FlowToolInfo struct {
 	FlowApproval string          `json:"flowApproval,omitempty"`
 	Description  string          `json:"-"`
 	InputSchema  json.RawMessage `json:"-"`
+	// The tool's own approval text (PaluiTool.Preview), nil when it has none.
+	Preview func(json.RawMessage) string `json:"-"`
 }
 
 // Services the runtime gives every connector.

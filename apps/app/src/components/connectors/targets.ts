@@ -40,10 +40,12 @@ export function toTarget(item: ConnectorItem): ConnectorTarget {
 }
 
 // The id a new connector gets: the manifest id for a single one, else
-// `<type>-<preset or "server">`, numbered past any id already taken.
-export function newConnectorId(m: ConnectorManifest, existing: { id: string }[], preset?: Preset): string {
+// `<type>-<preset or name or "server">`, numbered past any id already taken.
+// A name-based id stays within 36 characters, so the numbered id still fits
+// slugify's 40 (isDraftId relies on it) and `<id>__<tool>` stays under 64.
+export function newConnectorId(m: ConnectorManifest, existing: { id: string }[], preset?: Preset, name?: string): string {
   if (!m.multiple) return m.id
-  const base = `${m.id}-${slugify(preset?.id ?? "server")}`
+  const base = !preset && name?.trim() ? `${m.id}-${slugify(name)}`.slice(0, 36).replace(/-+$/, "") : `${m.id}-${slugify(preset?.id ?? "server")}`
   let id = base
   for (let n = 2; existing.some((e) => e.id === id); n++) id = `${base}-${n}`
   return id
@@ -54,11 +56,11 @@ export function isDraftId(m: ConnectorManifest, id: string): boolean {
   return m.multiple ? id.startsWith(`${m.id}-`) && slugify(id) === id : id === m.id
 }
 
-export function draftTarget(m: ConnectorManifest, id: string, preset?: Preset, agentId?: string): ConnectorTarget {
+export function draftTarget(m: ConnectorManifest, id: string, preset?: Preset, agentId?: string, label?: string): ConnectorTarget {
   return {
     id,
     type: m.id,
-    label: m.multiple ? (preset?.label ?? "New server") : m.name,
+    label: m.multiple ? (preset?.label ?? (label?.trim() || "New server")) : m.name,
     isNew: true,
     status: "not_set_up",
     statusDetail: null,

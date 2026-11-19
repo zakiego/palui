@@ -7,6 +7,7 @@ import aiGateway from "./ai-gateway/manifest"
 import cliproxy from "./cliproxy/manifest"
 import gcal from "./gcal/manifest"
 import hooks from "./hooks/manifest"
+import http from "./http/manifest"
 import jobs from "./jobs/manifest"
 import mcp from "./mcp/manifest"
 import outbound from "./outbound/manifest"
@@ -35,6 +36,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   "ai-gateway": aiGateway,
   recall,
   mcp,
+  http,
   gcal,
   t3code,
   printer,

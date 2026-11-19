@@ -316,3 +316,32 @@ func TestHTTPTransport(t *testing.T) {
 		t.Fatal(text)
 	}
 }
+
+func TestManualRedirectsReturnsTheRedirect(t *testing.T) {
+	tr, seen := fakeTransport(map[string]route{
+		"https://a.test/": {status: 302, headers: map[string]string{"location": "https://b.test/"}},
+		"https://b.test/": {body: "followed"},
+	})
+	res, err := safenet.Fetch(context.Background(), "https://a.test/", safenet.Options{ManualRedirects: true, Transport: tr, Resolver: resolver(map[string][]string{"a.test": {PUBLIC}, "b.test": {PUBLIC}})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Status != 302 || res.OK || res.Header.Get("location") != "https://b.test/" || len(res.Redirects) != 0 || len(*seen) != 1 {
+		t.Fatalf("%+v, %d calls", res, len(*seen))
+	}
+}
+
+func TestPassesAnyMethodAndBodyThrough(t *testing.T) {
+	for _, method := range []string{"DELETE", "PATCH"} {
+		tr, seen := fakeTransport(map[string]route{"https://a.test/": {body: "ok"}})
+		body := `{"a":1}`
+		_, err := safenet.Fetch(context.Background(), "https://a.test/", safenet.Options{Method: method, Body: &body, Transport: tr, Resolver: resolver(map[string][]string{"a.test": {PUBLIC}})})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := (*seen)[0]
+		if got.Method != method || got.Body == nil || *got.Body != body {
+			t.Fatalf("%s: %+v", method, got)
+		}
+	}
+}

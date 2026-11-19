@@ -15,6 +15,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/flows"
 	"github.com/zakiego/palui/apps/server/internal/connectors/gcal"
 	"github.com/zakiego/palui/apps/server/internal/connectors/hooks"
+	"github.com/zakiego/palui/apps/server/internal/connectors/httpreq"
 	"github.com/zakiego/palui/apps/server/internal/connectors/jobs"
 	"github.com/zakiego/palui/apps/server/internal/connectors/mcp"
 	"github.com/zakiego/palui/apps/server/internal/connectors/notes"
@@ -50,6 +51,7 @@ func Catalog() []Entry {
 		{"ai-gateway", aigateway.Runtime},
 		{"recall", recall.Runtime},
 		{"mcp", mcp.Runtime},
+		{"http", httpreq.Runtime},
 		{"gcal", gcal.Runtime},
 		{"t3code", t3code.Runtime},
 		{"printer", printer.Runtime},

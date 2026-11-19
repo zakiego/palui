@@ -191,4 +191,12 @@ func demo(k *Kit) {
 	k.Contact(ibu, Contact{Name: "Ibu", Address: "6281111111111"},
 		[]Send{{Text: "Bu, Zaki pulang Jumat ya.", Status: "sent", At: now - 2*D}},
 		[]Scheduled{{Text: "Kabar mingguan dari Zaki.", FireAt: now + 2*D, RRule: ptr("FREQ=WEEKLY;BYDAY=FR")}})
+	// An HTTP API credential. Last, so its rows don't shift any earlier event id.
+	k.Connector("http-elevenlabs", "http", ConnectorOpts{
+		Label:   ptr("ElevenLabs"),
+		Status:  "on",
+		Trust:   ptr("external"),
+		Config:  obj("domains", "api.elevenlabs.io", "auth", "header", "headerName", "xi-api-key", "valueTemplate", "{value}", "policy", "allow"),
+		Secrets: sec("value", "sk_demo_not_a_real_key"),
+	})
 }

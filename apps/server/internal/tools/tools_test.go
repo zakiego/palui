@@ -650,10 +650,12 @@ func TestConnectorToolCaller(t *testing.T) {
 		}
 		return "late", nil
 	}}}
+	asksRan := false
+	asks := connectors.PaluiTool{Class: "read", NeedsApproval: func(json.RawMessage) bool { return true }, Tool: conntest.FnTool("a", func(*jsonx.Object) (any, error) { asksRan = true; return "x", nil })}
 	var seenTurn connectors.TurnInfo
 	viaTools := connectors.RunningEntry{ID: "src", Row: db.Connector{ID: "src"}, Handle: &connectors.RunningConnector{Tools: func(_ context.Context, turn connectors.TurnInfo) (*connectors.ToolSet, error) {
 		seenTurn = turn
-		return conntest.Tools("read", readTool, "write", writeTool, "slow", slow), nil
+		return conntest.Tools("read", readTool, "write", writeTool, "slow", slow, "asks", asks), nil
 	}}}
 	viaCall := connectors.RunningEntry{ID: "mcp", Row: db.Connector{ID: "mcp"}, Handle: &connectors.RunningConnector{CallTool: func(_ context.Context, name string, args *jsonx.Object) (connectors.ToolCallResult, error) {
 		if name == "drop" {
@@ -685,6 +687,7 @@ func TestConnectorToolCaller(t *testing.T) {
 		{errText(call(ctx, "mcp", "drop", nil, nil)), "mcp.drop is classified destructive; only read tools can feed a flow source. Mark it read on the Connectors page if it only reads."},
 		{errText(call(ctx, "off", "x", nil, nil)), "Connector off isn't running. Turn it on in Connectors."},
 		{errText(call(ctx, "bare", "x", nil, nil)), "Connector bare has no tools."},
+		{errText(call(ctx, "src", "asks", nil, nil)), "src.asks asks the owner before every call, so it can't feed a flow source. Set it to allow first."},
 	} {
 		if c.got != c.want {
 			t.Errorf("%q, want %q", c.got, c.want)
@@ -692,6 +695,9 @@ func TestConnectorToolCaller(t *testing.T) {
 	}
 	if out, err := call(ctx, "mcp", "deals", nil, nil); err != nil || jsonx.Stringify(out) != `{"name":"deals"}` {
 		t.Fatal(out, err)
+	}
+	if asksRan {
+		t.Fatal("a tool that asks on its own ran for a flow source")
 	}
 }
 

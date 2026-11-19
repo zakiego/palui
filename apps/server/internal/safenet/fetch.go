@@ -135,7 +135,7 @@ func HTTPTransport(req TransportRequest) (*TransportResponse, error) {
 // --- SafeFetch -------------------------------------------------------------------------
 
 type Options struct {
-	// "GET" (default), "HEAD" or "POST".
+	// "GET" (default), or any other HTTP method.
 	Method  string
 	Headers map[string]string
 	Body    *string
@@ -148,6 +148,8 @@ type Options struct {
 	Truncate bool
 	// Default 5.
 	MaxRedirects *int
+	// True: return a redirect answer (3xx with a Location) as the response instead of following it.
+	ManualRedirects bool
 	// Media types allowed on a 2xx answer: "text/html", "text/*",
 	// "application/json", "+json". Nil allows everything.
 	AllowedContentTypes []string
@@ -333,7 +335,7 @@ func Fetch(parent context.Context, input string, opts Options) (*Response, error
 		}
 
 		location := res.Header.Get("location")
-		if redirects[res.Status] && location != "" {
+		if redirects[res.Status] && location != "" && !opts.ManualRedirects {
 			res.Cancel()
 			if hop >= maxRedirects {
 				return nil, errf(CodeTooManyRedirects, "More than %d redirects", maxRedirects)

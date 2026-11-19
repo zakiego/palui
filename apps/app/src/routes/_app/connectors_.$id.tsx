@@ -23,6 +23,8 @@ export const Route = createFileRoute("/_app/connectors_/$id")({
     type: z.string().max(64).optional().catch(undefined),
     preset: z.string().max(64).optional().catch(undefined),
     agent: z.string().max(100).optional().catch(undefined),
+    // A new connector's name, asked before its page opens (see NameDialog).
+    label: z.string().max(80).optional().catch(undefined),
   }),
   loader: () => getConnectorsPage(),
   head: ({ loaderData, params }) => {
@@ -37,7 +39,7 @@ export const Route = createFileRoute("/_app/connectors_/$id")({
 function ConnectorPage() {
   const data = Route.useLoaderData()
   const { id } = Route.useParams()
-  const { type, preset, agent } = Route.useSearch()
+  const { type, preset, agent, label } = Route.useSearch()
   const router = useRouter()
   const t = useT()
 
@@ -45,7 +47,7 @@ function ConnectorPage() {
 
   const item = data.items.find((i) => i.id === id)
   const m = manifestFor(item?.type ?? type ?? "")
-  const target = item ? toTarget(item) : m && isDraftId(m, id) ? draftTarget(m, id, presetFor(m, preset), data.agents.some((a) => a.id === agent) ? agent : undefined) : null
+  const target = item ? toTarget(item) : m && isDraftId(m, id) ? draftTarget(m, id, presetFor(m, preset), data.agents.some((a) => a.id === agent) ? agent : undefined, label) : null
 
   if (!target || !m) {
     return (

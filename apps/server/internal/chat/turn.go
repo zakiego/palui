@@ -435,8 +435,11 @@ func SendApprovalPrompt(c *EngineCtx, chat db.Chat, row db.Approval, title strin
 		name = strings.Replace(row.Tool, "__", " › ", 1)
 	}
 	kind := "aksi yang mengubah data"
-	if row.ToolClass == "destructive" {
+	switch row.ToolClass {
+	case "destructive":
 		kind = "aksi destruktif"
+	case "read":
+		kind = "cuma baca data, gak ngubah apa-apa"
 	}
 	preview := ""
 	if row.ArgsPreview != nil {

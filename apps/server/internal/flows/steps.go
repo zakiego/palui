@@ -794,7 +794,7 @@ func (e *Engine) writeGate(c *runCtx, step *Step, info *ToolInfo, saved *WriteCa
 	if !ok {
 		return true, nil, c.onError(step, "The flow's chat no longer exists.", stepRow{Seq: seq, Status: "error", Input: some[any](input)}, false)
 	}
-	argsPreview := approvals.Preview(args, 300)
+	argsPreview := stepPreview(info, args)
 	ctxObj := obj("trigger", "flow", "originTrigger", "flow", "modelRole", "default", "deliver", false, "tainted", len(argTaint) > 0, "sessionId", nil, "system", "", "flowRunId", c.run.ID, "stepId", step.ID)
 	row := must(approvals.Create(q, approvals.CreateInput{RunID: c.run.ID, ChatID: chat.ID, ApprovalID: secret.NewID("fap"), ToolCallID: step.ID, Tool: info.Name, ToolClass: info.Class, ArgsPreview: argsPreview, ContextJSON: ctxObj}, now, 0))
 	text := fmt.Sprintf("Boleh aku jalanin %s? (aksi yang mengubah data)\nFlow \"%s\", langkah %s: %s.\n%s\n\nBalas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.", strings.Replace(info.Name, "__", " › ", 1), c.flow.Name, step.ID, strings.Join(reasons, "; "), argsPreview)
@@ -1023,4 +1023,27 @@ func (e *Engine) recoverStep(c *runCtx, step *Step) (transition, bool) {
 	}
 	interrupted("interrupted by a restart")
 	return transition{}, false
+}
+
+// stepPreview is the approval text for a flow step: the tool's own preview
+// when it has one (an HTTP call shows its request line, key and headers, which
+// raw args cut at 300 can hide), else the args cut to 300 like before.
+func stepPreview(info *ToolInfo, args *jsonx.Object) (s string) {
+	fallback := approvals.Preview(args, 300)
+	if info.Preview == nil {
+		return fallback
+	}
+	defer func() {
+		if recover() != nil {
+			s = fallback
+		}
+	}()
+	raw, err := jsonx.Marshal(args)
+	if err != nil {
+		return fallback
+	}
+	if p := info.Preview(raw); p != "" {
+		return p
+	}
+	return fallback
 }

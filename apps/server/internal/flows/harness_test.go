@@ -267,6 +267,8 @@ type fakeTool struct {
 	class     string
 	untrusted bool
 	approval  string
+	asks      bool // NeedsApproval answers true for every call
+	preview   func(json.RawMessage) string
 	validate  func(input json.RawMessage) error
 	run       runFn
 }
@@ -337,8 +339,12 @@ func fakeEntries(list []*fakeConnector, log *callLog) []connectors.RunningEntry 
 				set := connectors.NewToolSet()
 				for _, name := range c.names {
 					name, t := name, c.tools[name]
+					var needsApproval func(json.RawMessage) bool
+					if t.asks {
+						needsApproval = func(json.RawMessage) bool { return true }
+					}
 					set.Set(name, connectors.PaluiTool{
-						Class: t.class, Untrusted: t.untrusted, FlowApproval: t.approval,
+						Class: t.class, Untrusted: t.untrusted, FlowApproval: t.approval, NeedsApproval: needsApproval, Preview: t.preview,
 						Tool: connectors.Tool{
 							Description: name,
 							Validate:    t.validate,

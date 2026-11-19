@@ -450,7 +450,7 @@ func wrapTool(t connectors.Tool, meta *ToolMeta, opts CollectOptions) connectors
 		if opts.OnToolStart != nil {
 			opts.OnToolStart(call.ToolCallID)
 		}
-		if NoApprovals(opts.Audience) && meta.NeedsApproval != nil && asksOnItsOwn(meta.NeedsApproval, input) {
+		if NoApprovals(opts.Audience) && AsksOnItsOwn(meta.NeedsApproval, input) {
 			return nil, errors.New(OutsideApprovalError)
 		}
 		defer func() {
@@ -463,8 +463,12 @@ func wrapTool(t connectors.Tool, meta *ToolMeta, opts CollectOptions) connectors
 	return t
 }
 
-// asksOnItsOwn is the tool's NeedsApproval; a panic counts as asking.
-func asksOnItsOwn(fn func(json.RawMessage) bool, input json.RawMessage) (ask bool) {
+// AsksOnItsOwn is the tool's NeedsApproval: false when the tool has none, and
+// a panic counts as asking.
+func AsksOnItsOwn(fn func(json.RawMessage) bool, input json.RawMessage) (ask bool) {
+	if fn == nil {
+		return false
+	}
 	defer func() {
 		if recover() != nil {
 			ask = true

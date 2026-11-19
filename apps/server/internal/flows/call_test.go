@@ -44,6 +44,10 @@ func TestConnectorFlowCaller(t *testing.T) {
 			}},
 			"cancel_reminder": {class: "destructive", run: okRun},
 		}},
+		{id: "api", names: []string{"read", "send"}, tools: map[string]*fakeTool{
+			"read": {class: "read", asks: true, run: okRun},
+			"send": {class: "write", asks: true, run: okRun},
+		}},
 		{id: "mcp-x", trust: "external", names: []string{"get"}, tools: map[string]*fakeTool{"get": {class: "read", run: returns(`{"content":[{"type":"text","text":"{\"a\":1}"}]}`)}}},
 	}, log)
 	caller := flows.NewConnectorFlowCaller(func() []connectors.RunningEntry { return entries })
@@ -88,6 +92,25 @@ func TestConnectorFlowCaller(t *testing.T) {
 		_, err := caller.Call(ctx, info, jobj(`{"text":"x"}`), callTurn, 0)
 		if err == nil || !strings.Contains(err.Error(), "now classified write") {
 			t.Errorf("err %v", err)
+		}
+	})
+	t.Run("refuses a read tool that asks on its own", func(t *testing.T) {
+		info := resolve("api__read", "")
+		_, err := caller.Call(ctx, *info, jsonx.NewMap[any](), callTurn, 0)
+		if err == nil || !strings.Contains(err.Error(), "asks the owner") {
+			t.Errorf("err %v", err)
+		}
+		if len(log.of("read")) != 0 {
+			t.Error("ran it")
+		}
+	})
+	t.Run("leaves a write tool that asks on its own to the write gate", func(t *testing.T) {
+		info := resolve("api__send", "")
+		if _, err := caller.Call(ctx, *info, jsonx.NewMap[any](), callTurn, 0); err != nil {
+			t.Fatal(err)
+		}
+		if len(log.of("send")) != 1 {
+			t.Error("didn't run it")
 		}
 	})
 	t.Run("passes the flow's chat and id in the tool context", func(t *testing.T) {

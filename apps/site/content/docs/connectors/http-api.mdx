@@ -1,0 +1,65 @@
+---
+title: HTTP API
+description: Let the agent call an HTTP API with a key Palui keeps, limited to the domains you name.
+---
+
+Kind: `tools`. An HTTP API connector holds one key for one API and lets the agent call that API without ever seeing the key. Add one connector per API or per key. For example, an ElevenLabs connector answers "check my ElevenLabs quota" with `GET https://api.elevenlabs.io/v1/user/subscription`.
+
+## Connect
+
+1. On the Connectors page, choose Add connector, then HTTP API.
+2. Name it, for example `ElevenLabs`. The name becomes the connector's id, and the id is the first part of its tool names (`http-elevenlabs__http_request`). The id can't change later.
+3. Enter the allowed domains.
+4. Choose how the key is sent: in a header, in a query parameter, or no key at all.
+5. Paste the key.
+6. Choose the approval policy, then save.
+
+## Settings
+
+| Setting | Default | What it does |
+|---|---|---|
+| `domains` | none | Hosts this connector may call, separated by commas, at most 20. `*.example.com` covers every subdomain but not `example.com` itself. `*` (any public host) only works with auth `none`. |
+| `auth` | `header` | `header` sends the key in a request header, `query` in a URL parameter, `none` sends no key. |
+| `headerName` | `Authorization` | The header that carries the key, for auth `header`. |
+| `valueTemplate` | `Bearer {value}` | The header's value. `{value}` is replaced with the key. |
+| `queryParam` | none | The URL parameter that carries the key, for auth `query`. |
+| `policy` | `ask` | `ask` or `allow`. See [Safety](#safety). |
+
+Common header setups:
+
+- `Authorization` with `Bearer {value}`, for most APIs.
+- `xi-api-key` with `{value}`, for ElevenLabs.
+- `Authorization` with `Basic {value}`, with the base64 of `user:password` as the key.
+
+Keys are at least 8 characters, so the redaction described below never eats ordinary text.
+
+## Tools
+
+Two tools, both marked untrusted:
+
+- `http_request` sends a `GET` or `HEAD` request. Class `read`.
+- `http_request_write` sends a `POST`, `PUT`, `PATCH` or `DELETE` request, with a JSON or plain text body. Class `write`.
+
+Both return the status, a few useful headers (content type, rate limits, `location` and the like), the final URL and the body as text. A response that isn't 2xx still comes back with its body, so the agent can read the API's error. Binary responses aren't shown, only their type and size.
+
+Limits: the agent sees at most about 16,000 characters of the body, Palui reads at most 1 MiB, a request body is at most 256 KiB, and a call waits 20 seconds by default and 60 seconds at most.
+
+## Safety
+
+<Callout type="warn" title="Results taint the turn">
+  An API response is outside text, and it can contain text aimed at the model. Once a turn reads one, it's tainted: every `write` tool needs your approval for the rest of that turn, and recall auto-save skips it. See [The taint rule](/docs/concepts/taint-rule).
+</Callout>
+
+- The key goes only to the allowed domains, only over https, and only to the default port (443). A URL or redirect with another port is refused.
+- The key is removed from everything the model sees: the URL, the headers, the body and error messages. The agent never has it, so it can't paste it anywhere.
+- Reads follow redirects only while they stay inside the allowed domains. Writes never follow a redirect: the agent gets the redirect back as the answer.
+- The SSRF guard still applies, so a domain that points at a private address is refused.
+- With `ask`, every call waits for your yes, reads included. No tool permission on the agent skips that. The prompt shows the method, the URL, which key, any headers the agent set and the start of the body.
+- The agent can't set framing headers, `range`, or method overrides (`x-http-method-override`, `x-http-method`, `x-method-override`), so a read can't turn into a delete on servers that honor them.
+- With `allow`, reads run on their own. A write still asks, unless the agent's tool permission for `http_request_write` is allow.
+- A flow can't use an `ask` connector for a read, since nobody is there to say yes. A flow write step with an `ask` connector asks on every run.
+- Shared chats never get these tools: they hold your keys, so they're `shared` data. To give one agent a key and not the others, set "Which agents" on the connector.
+
+## Pause and remove
+
+Pausing applies from the next turn. Removing the connector deletes the key from Palui. The service itself isn't touched, so revoke the key there too if you no longer need it.

@@ -82,7 +82,8 @@
     ["mcp-jadwal-sholat","mcp","tools","jadwal-sholat",1,"on",null,"external","{\"url\":\"https://sholat.zakiego.com/mcp\",\"authMode\":\"none\",\"addedFromChat\":true,\"noPrivateData\":true}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["printer","printer","tools","Printer",1,"on",null,"own","{\"url\":\"ipp://host.docker.internal:631/printers/Office_Printer\"}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["attachments","attachments","skill","Attachments",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
-    ["voice","voice","skill","Voice notes",0,"not_set_up",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null]
+    ["voice","voice","skill","Voice notes",0,"not_set_up",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
+    ["http-elevenlabs","http","tools","ElevenLabs",1,"on",null,"external","{\"domains\":\"api.elevenlabs.io\",\"auth\":\"header\",\"headerName\":\"xi-api-key\",\"valueTemplate\":\"{value}\",\"policy\":\"allow\"}","{\"value\":\"sk_demo_not_a_real_key\"}","<config hash>",null,null,0,1794621600000,1794621600000,null,null]
    ]
   },
   "contacts": {
@@ -170,7 +171,8 @@
     [66,1794620400000,"info","whatsapp","status","status change 2",null],
     [67,1794619800000,"info","telegram","status","status change 3",null],
     [68,1794619200000,"warn","whatsapp","status","status change 4",null],
-    [69,1794618600000,"info","telegram","status","status change 5",null]
+    [69,1794618600000,"info","telegram","status","status change 5",null],
+    [70,1794621600000,"info","http-elevenlabs","status","on","{\"from\":\"not_set_up\",\"to\":\"on\"}"]
    ]
   },
   "flow_runs": {

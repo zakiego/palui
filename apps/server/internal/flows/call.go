@@ -78,6 +78,7 @@ func infoOf(e connectors.RunningEntry, name string, pt connectors.PaluiTool) Too
 		FlowApproval:  approval,
 		Description:   pt.Tool.Description,
 		InputSchema:   pt.Tool.InputSchema,
+		Preview:       pt.Preview,
 	}
 }
 
@@ -201,6 +202,9 @@ func (c *ConnectorFlowCaller) Call(ctx context.Context, info ToolInfo, args *jso
 		if err := v(input); err != nil {
 			return nil, &FlowToolError{fmt.Sprintf("%s: the args don't match the tool's input (%s).", what, strx.Slice16(oneLine(err.Error()), 300))}
 		}
+	}
+	if info.Class == "read" && tools.AsksOnItsOwn(hit.pt.NeedsApproval, input) {
+		return nil, &FlowToolError{what + " asks the owner before every call, and a flow has nobody to ask for a read. Call it from a chat, or set it to allow."}
 	}
 	exec := hit.pt.Tool.Execute
 	return WithTimeout(ctx, min(timeoutMs, MaxStepTimeoutMs), what, func(ctx context.Context) (any, error) {

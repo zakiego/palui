@@ -270,6 +270,7 @@ Budget
 - Reminders (section 6) and Jobs (section 7).
 - Voice-in: ElevenLabs Scribe, Indonesian (`id`) by default. Gemini audio through CLIProxyAPI is the fallback if the M0 spike shows it works. Transcription is a per-agent switch (`agents.transcribe_voice`), off by default because each note costs money; agents that existed while the voice connector was on keep it on after the upgrade. Only the owner's voice notes are transcribed.
 - Web fetch: fetch + readability behind the SSRF guard. Results taint the turn.
+- HTTP API (`http`, a `tools` connector, one per credential): `http_request` (GET, HEAD; `read`) and `http_request_write` (POST, PUT, PATCH, DELETE; `write`), both untrusted. The key is stored encrypted, sent only to the instance's allowed domains over https, and redacted from everything the model sees. Policy `ask` makes every call wait for the owner; `allow` lets reads run and leaves writes to the class rules and the agent's tool permissions. Data scope `shared`, so members and outside turns never get the tools.
 - Inbound webhooks: `POST /api/hooks/:slug` with an HMAC secret per hook. It forwards the event to me as text. The "summarize" option runs with zero tools.
 - Calendar: D7 decides whether a Google Calendar read connector is in v1.
 - Attachments: `save_attachment`, `list_attachments`, `get_attachment`, `share_attachment`, `unshare_attachment`, `delete_attachment`. The model keeps only files that matter (ID cards, receipts, tickets) from the message being answered. Allowlisted types, 10 MB cap, stored encrypted with MASTER_KEY in `saved_attachments`, listed, previewed and downloaded (signed in only) on the Attachments page. Temporary share links (`attachment_shares`, token sha256 only, 7 days max) at `/api/share/<token>`: public for anyone with the link, private for the signed-in owner.
@@ -379,7 +380,7 @@ The schema is handwritten SQL in `apps/server/internal/db/migrations` (one numbe
 
 - Dashboard: passkeys, no sign-up from the first boot. The owner comes from `docker compose exec app palui owner invite`, a single-use link valid for 15 minutes, which is also the recovery path for a lost passkey (recall's pattern). App routes are `noindex`.
 - Channel owner: claimed with a Telegram nonce link and a WhatsApp phone number plus learned LID (section 5.1). Everyone else is silently dropped and logged, except in chats the owner allowed and gave an agent (section 19).
-- Taint rule: a turn becomes tainted once it reads untrusted content (web fetch, a hook payload, results from an `external` MCP server). For the rest of that turn, every `write` tool needs approval too, and auto-save skips it. A label in the prompt isn't counted as a control.
+- Taint rule: a turn becomes tainted once it reads untrusted content (web fetch, a hook payload, results from an `external` MCP server, an HTTP API response). For the rest of that turn, every `write` tool needs approval too, and auto-save skips it. A label in the prompt isn't counted as a control.
 - recall auto-save stores only my messages and final replies, so tool output can't become a permanent injection through auto-recall.
 - Jobs and hooks: no `destructive` tools, `write` needs approval, and hook summaries run with zero tools.
 - Tool classes fail closed. Unknown means `destructive`.
@@ -620,7 +621,7 @@ Data scope is `PaluiTool.Data` from the connector contract: `none`, `chat`, `age
 | `none` (web search, web fetch, prayer times) | yes | yes | yes |
 | `chat` (reminders, attachments, flows in that chat) | yes | yes | yes |
 | `agent` (instructions, contacts, memory, jobs, the agent's own MCP servers) | yes | yes | no |
-| `shared` (settings, global MCP servers, the owner's accounts) | yes | no | no |
+| `shared` (settings, global MCP servers, the owner's accounts, HTTP API keys) | yes | no | no |
 
 `guest_tools: none` takes every tool away from `outside` turns.
 
