@@ -42,6 +42,7 @@ The response is JSON with the Palui version, the schema version, the runtime's s
 - `runtime` is `"unreachable"` when the runtime (channels, turns, schedulers) isn't running: when the database is newer than the code, or when the server was started with `--no-runtime`.
 - It fails when the database schema is newer than the code. That's what makes a bad rollback show up as failed. See [Upgrades](/docs/self-hosting/upgrades).
 - Runtime connector state is reported in the body, not in the status code. A WhatsApp outage shows as `error` in the JSON while `/health` itself stays healthy, so a channel problem never fails a deploy.
+- `connectors` is filled only for the signed-in owner and for direct loopback requests (the container healthcheck, a `curl` on the host). Everyone else gets an empty list, so the endpoint doesn't tell strangers which services you connected.
 
 ## POST /api/hooks/:slug
 

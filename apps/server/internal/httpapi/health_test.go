@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ func TestHealthIs200WithRuntimeAndConnectorStateInTheBody(t *testing.T) {
 	e = newEnv(t, func(o *httpapi.Options) { o.Runtime = &httpapi.Runtime{DB: o.DB} })
 	_, err := connectors.Upsert(e.d, connectors.UpsertInput{ID: "telegram", Manifest: connectors.RowManifest{ID: "telegram", Kind: "channel", Name: "Telegram"}}, testutil.TestKey, 1)
 	testutil.Must(t, err)
-	res := e.do("GET", "/health", "")
+	res := e.doFrom("127.0.0.1:5555", "GET", "/health")
 	if res.StatusCode != 200 || res.Header.Get("cache-control") != "no-store" {
 		t.Fatal(res.StatusCode)
 	}
@@ -29,6 +30,22 @@ func TestHealthIs200WithRuntimeAndConnectorStateInTheBody(t *testing.T) {
 	want := `{"ok":true,"version":"` + version.Version + `","schema":"` + last + `","runtime":{"ok":true,"schema":"` + last + `","version":"` + version.Version + `"},"connectors":[{"id":"telegram","status":"not_set_up"}]}`
 	if body != want {
 		t.Fatalf("\n got %s\nwant %s", body, want)
+	}
+}
+
+func TestHealthHidesConnectorsFromStrangers(t *testing.T) {
+	e := newEnv(t, nil)
+	_, err := connectors.Upsert(e.d, connectors.UpsertInput{ID: "telegram", Manifest: connectors.RowManifest{ID: "telegram", Kind: "channel", Name: "Telegram"}}, testutil.TestKey, 1)
+	testutil.Must(t, err)
+	count := func(res *http.Response) int { return len(decode(t, res)["connectors"].([]any)) }
+	if n := count(e.do("GET", "/health", "")); n != 0 {
+		t.Fatalf("remote stranger saw %d connectors", n)
+	}
+	if n := count(e.doFrom("127.0.0.1:5555", "GET", "/health", header("cf-connecting-ip", "198.51.100.7"))); n != 0 {
+		t.Fatalf("tunnelled stranger saw %d connectors", n)
+	}
+	if n := count(e.do("GET", "/health", "", cookie(e.signIn()))); n != 1 {
+		t.Fatalf("owner saw %d connectors", n)
 	}
 }
 
