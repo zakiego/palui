@@ -24,12 +24,14 @@ It keeps the 3 newest snapshots in `/data/backups/`. They're your quick way back
 `scripts/backup.sh` runs every night at 03:30. On a macOS Docker host, `ops/install-backup.sh` copies it out of the checkout and installs it as a launchd agent, and `scripts/pre-deploy.sh` reinstalls it whenever the script changes. Each run:
 
 1. Snapshots the database with `palui backup` inside the `app` container, copies it out and checks the gzip.
-2. Snapshots each WhatsApp store in `/data/wa/` with `palui snapshot` (a consistent copy, even while it's in use), then streams a tar of them out of the container straight into age, so the plaintext never lands on the host's disk. No store (WhatsApp not paired) means no archive, and that's fine.
+2. Snapshots each WhatsApp store in `/data/wa/` with `palui snapshot` (a consistent copy, even while it's in use), then streams a tar of them straight into age, so the plaintext never lands on the host's disk. No store (WhatsApp not paired) means no archive, and that's fine.
 3. Encrypts the database snapshot with [age](https://age-encryption.org) to your public key. The WhatsApp archive was already encrypted as it streamed.
 4. Uploads them to the R2 bucket `palui-backups` as `palui/<date>/palui-<timestamp>.db.gz.age` and `palui/<date>/wa-<timestamp>.tar.age`.
 5. Checks that each uploaded size matches the local file, then deletes every temp file.
 
 It refuses to run with under 500 MB free and logs every step to its own log file, trimmed once it passes 1 MB.
+
+The app image has no shell, so the plain file work (listing the stores, the tar, the cleanup) runs in a small pinned Alpine container that borrows the app's volume, as the same user and with no network. `palui-backup.sh --dry-run` does everything except the upload, so you can test it without R2 credentials.
 
 ### Setting up the key
 
@@ -63,7 +65,12 @@ You need the backup file, the age private key, and the same `MASTER_KEY` the bac
    ```
 
 2. Stop the server: `docker compose stop app`.
-3. Replace `/data/palui.db` on the volume with the restored file. Make sure no `palui.db-wal` or `palui.db-shm` from the old database is left next to it.
+3. Replace `/data/palui.db` on the volume with the restored file. Make sure no `palui.db-wal` or `palui.db-shm` from the old database is left next to it. The app image has no shell, so do it from a throwaway container, run from the folder that holds `palui.db`:
+
+   ```bash
+   docker run --rm --network none --volumes-from palui-app-1 -v "$PWD:/restore:ro" alpine:3.24.4 \
+     sh -c 'rm -f /data/palui.db-wal /data/palui.db-shm && cp /restore/palui.db /data/palui.db && chown 1000:1000 /data/palui.db'
+   ```
 4. If you're also restoring WhatsApp, decrypt the `wa-<timestamp>.tar.age` archive the same way, untar it, and unpack each store with `gunzip -c wa/<id>.db.gz > /data/wa/<id>.db` (no `-wal` or `-shm` file next to it). Otherwise, pair WhatsApp again after the restore. A backup made before Palui moved to one service holds a `wa-auth-<timestamp>.tar.gz.age` archive instead; current versions can't use it, so pair again.
 5. Start again with `docker compose up -d --wait` and check `/health`.
 

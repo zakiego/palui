@@ -16,7 +16,8 @@
 #      guard the container has no network at all (`network_mode: none`), so
 #      every check below runs inside it.
 #   4. wait for /health to answer 200 and check it reports the runtime off
-#      ("runtime": "unreachable"; anything else fails at once), then run
+#      ("runtime": "unreachable"; anything else fails at once; read with
+#      `palui healthcheck --print`, since the image has no shell or wget), then run
 #      `palui secrets-check --require-some`, which decrypts every connector
 #      and hook secret with MASTER_KEY and exits non-zero on any failure, or
 #      when there was nothing to decrypt (an empty DB proves nothing)
@@ -26,7 +27,9 @@
 #
 # Needs: docker, age, MASTER_KEY in the environment (the production key: the
 # point is to prove the backup and the key still go together), and the Go
-# image already built on this host (palui:latest, or PALUI_IMAGE).
+# image already built on this host (palui:latest, or PALUI_IMAGE), new enough
+# to have `palui healthcheck --print`. Copying the database into the volume
+# runs in a pinned alpine helper (the app image is distroless).
 set -euo pipefail
 
 BUCKET="${BACKUP_BUCKET:-palui-backups}"
@@ -36,6 +39,8 @@ IMAGE="${PALUI_IMAGE:-palui:latest}"
 PROJECT="palui-drill"
 HEALTH_TIMEOUT="${DRILL_HEALTH_TIMEOUT:-120}"
 LOOKBACK_DAYS=7
+# Same pin as scripts/backup.sh and scripts/pre-deploy.sh.
+HELPER_IMAGE="${PALUI_HELPER_IMAGE:-alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf}"
 
 export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
 for d in "$HOME"/.nvm/versions/node/*/bin; do
@@ -152,10 +157,12 @@ YAML
 
 log "restoring into volume ${PROJECT}_data"
 drill create app >/dev/null
-# Copy the file in as root, then hand it to whoever owns /data in the image.
-docker run --rm --user root --network none --entrypoint sh \
-  -v "${PROJECT}_data:/data" -v "$tmpdir:/restore:ro" "$IMAGE" \
-  -c 'cp /restore/palui.db /data/palui.db && chown "$(stat -c %u:%g /data)" /data/palui.db'
+# Copy the file in as root, then hand it to whoever owns /data (the new volume
+# took /data from the image, owner included).
+# shellcheck disable=SC2016 # expands inside the helper's shell
+docker run --rm --user root --network none \
+  -v "${PROJECT}_data:/data" -v "$tmpdir:/restore:ro" "$HELPER_IMAGE" \
+  sh -c 'cp /restore/palui.db /data/palui.db && chown "$(stat -c %u:%g /data)" /data/palui.db'
 
 log "starting the server with the runtime off (no network)"
 drill up -d app >/dev/null
@@ -171,7 +178,7 @@ until drill exec -T app palui healthcheck 2>/dev/null; do
   fi
   sleep 2
 done
-health=$(drill exec -T app wget -q -O - http://127.0.0.1:3000/health) || {
+health=$(drill exec -T app palui healthcheck --print) || {
   log "couldn't read /health"
   exit 1
 }

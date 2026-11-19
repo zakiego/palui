@@ -2,19 +2,31 @@
 # Nightly encrypted backup of Palui to Cloudflare R2 (Zakiego Lab).
 #
 #   1. snapshot /data/palui.db inside the running app container with the bundled
-#      admin CLI (`palui backup`: VACUUM INTO, gzipped), copy it out, check it,
-#      encrypt it
+#      admin CLI (`palui backup`: VACUUM INTO, gzipped), copy it out with
+#      `docker compose cp`, check it, encrypt it
 #   2. archive the WhatsApp sessions, whichever layout exists:
 #      - /data/wa/ (the Go server): one SQLite store per connector, <id>.db in
-#        WAL mode. Each is snapshotted with `palui snapshot` (VACUUM INTO, so
-#        the WAL is included and a write mid-copy can't tear it) into a staging
-#        dir in the volume, and that dir is tarred. Lock files are skipped.
+#        WAL mode. Each is snapshotted in the app container with `palui
+#        snapshot` (VACUUM INTO, so the WAL is included and a write mid-copy
+#        can't tear it) into a staging dir in the volume, and that dir is
+#        tarred. Lock files are skipped.
 #      - /data/wa-auth/ (the old Node runtime's Baileys files), tarred as is
-#      Both stream from the container straight into age, so no plaintext
-#      touches the host disk
+#      Both tars stream straight into age, so no plaintext touches the host disk
 #   3. upload everything to r2://palui-backups/palui/YYYY-MM-DD/ and check each size
-#   4. delete the snapshot and the staging dir in the container and every
-#      local temp file
+#   4. delete the snapshot and the staging dir in the volume and every local
+#      temp file
+#
+# The app image is distroless: no sh, tar, ls or rm, only `palui`. So `palui`
+# commands run in the app container (`docker compose exec`), and the plain file
+# work (does wa/ exist, list the stores, tar, cleanup) runs in a pinned alpine
+# helper that borrows the app container's /data mount (`--volumes-from`), as
+# uid 1000 like the app, with no network. The helper works the same with any
+# palui image running.
+#
+#   palui-backup.sh             the nightly run
+#   palui-backup.sh --dry-run   everything but the upload (no R2 credentials
+#                               needed); set BACKUP_DRY_RUN_DIR to keep the
+#                               encrypted files there for a look
 #
 # Every file is encrypted with age to the public key in
 # ~/.config/palui/age-recipient. The matching identity (private key) lives only
@@ -40,6 +52,15 @@ RECIPIENT_FILE="${AGE_RECIPIENT_FILE:-$HOME/.config/palui/age-recipient}"
 MIN_FREE_MB=500
 SNAPSHOT_ATTEMPTS=3
 SNAPSHOT_RETRY_DELAY="${SNAPSHOT_RETRY_DELAY:-60}"
+# Same pin as scripts/pre-deploy.sh and scripts/restore-drill.sh.
+HELPER_IMAGE="${PALUI_HELPER_IMAGE:-alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf}"
+DRY_RUN="${BACKUP_DRY_RUN:-0}"
+DRY_RUN_DIR="${BACKUP_DRY_RUN_DIR:-}"
+case "${1:-}" in
+  "") ;;
+  --dry-run) DRY_RUN=1 ;;
+  *) echo "usage: $0 [--dry-run]" >&2; exit 2 ;;
+esac
 
 # launchd starts with a bare PATH. docker lives in /usr/local/bin, age in
 # Homebrew, cf and its node in an nvm version dir.
@@ -73,12 +94,25 @@ remote="/data/backups/$db_name"
 # keeps it out of the dashboard's "latest backup" listing.
 stage="/data/backups/.wa-$ts"
 tmpdir=""
+# The app container, set once the snapshot worked; the helper mounts its volume.
+app_id=""
+
+# helper ro|rw <command...>: run a command in the alpine helper on the app's
+# /data, read-only or read-write.
+helper() {
+  local mode="$1"
+  shift
+  docker run --rm --network none --user 1000:1000 \
+    --volumes-from "$app_id:$mode" "$HELPER_IMAGE" "$@"
+}
 
 cleanup() {
   status=$?
   [ -n "$tmpdir" ] && rm -rf "$tmpdir"
-  # shellcheck disable=SC2016 # $1 and $2 expand inside the container's shell
-  (cd "$PALUI_DIR" && docker compose exec -T app sh -c 'rm -f "$1" "$1".tmp-*; rm -rf "$2"' _ "$remote" "$stage") >/dev/null 2>&1 || true
+  if [ -n "$app_id" ]; then
+    # shellcheck disable=SC2016 # $1 and $2 expand inside the helper's shell
+    helper rw sh -c 'rm -f "$1" "$1".tmp-*; rm -rf "$2"' _ "$remote" "$stage" >/dev/null 2>&1 || true
+  fi
   if [ "$status" -eq 0 ]; then log "done"; else log "FAILED (exit $status)"; fi
 }
 trap cleanup EXIT
@@ -86,8 +120,12 @@ trap cleanup EXIT
 log "start $day $ts"
 command -v docker >/dev/null || { log "docker not found"; exit 1; }
 command -v age >/dev/null || { log "age not found (brew install age)"; exit 1; }
-[ -x "$CF" ] || { log "cf wrapper not found at $CF"; exit 1; }
-command -v cf >/dev/null || { log "cf CLI not found (looked in ~/.nvm/versions/node/*/bin)"; exit 1; }
+if [ "$DRY_RUN" = 1 ]; then
+  log "dry run: everything but the upload"
+else
+  [ -x "$CF" ] || { log "cf wrapper not found at $CF"; exit 1; }
+  command -v cf >/dev/null || { log "cf CLI not found (looked in ~/.nvm/versions/node/*/bin)"; exit 1; }
+fi
 [ -s "$RECIPIENT_FILE" ] || { log "no age recipient at $RECIPIENT_FILE (one age1... public key per line)"; exit 1; }
 free_mb=$(df -m / | awk 'NR==2 {print $4}')
 [ "$free_mb" -ge "$MIN_FREE_MB" ] || { log "only ${free_mb} MB free, need ${MIN_FREE_MB}"; exit 1; }
@@ -111,6 +149,8 @@ until snapshot; do
   sleep "$SNAPSHOT_RETRY_DELAY"
   attempt=$((attempt + 1))
 done
+app_id=$(docker compose ps --all --quiet app | head -n 1)
+[ -n "$app_id" ] || { log "snapshot worked but the app container is gone"; exit 1; }
 
 tmpdir=$(mktemp -d /tmp/palui-backup.XXXXXX)
 chmod 700 "$tmpdir"
@@ -125,13 +165,14 @@ age -R "$RECIPIENT_FILE" -o "$db_file" "$plain"
 rm -f "$plain"
 
 # --- WhatsApp sessions ------------------------------------------------------
-# Read through the app container: it's up (the snapshot just worked) and
-# mounts the volume. Not paired yet (or WhatsApp removed): nothing to keep,
-# and that's fine. Any answer other than a clear yes or no fails the night.
+# The app is up (the snapshot just worked). Not paired yet (or WhatsApp
+# removed): nothing to keep, and that's fine. Any answer other than a clear
+# yes or no fails the night.
 wa_file=""
 wa_auth_file=""
-wa_dirs=$(docker compose exec -T app sh -c 'for d in wa wa-auth; do if [ -d "/data/$d" ]; then echo "$d=yes"; else echo "$d=no"; fi; done') || {
-  log "couldn't check /data/wa and /data/wa-auth through the app container"
+# shellcheck disable=SC2016 # expands inside the helper's shell
+wa_dirs=$(helper ro sh -c 'for d in wa wa-auth; do if [ -d "/data/$d" ]; then echo "$d=yes"; else echo "$d=no"; fi; done') || {
+  log "couldn't check /data/wa and /data/wa-auth through the helper container"
   exit 1
 }
 dir_answer() { printf '%s\n' "$wa_dirs" | tr -d '\r' | grep -E "^$1=(yes|no)\$" | cut -d= -f2 || true; }
@@ -143,41 +184,30 @@ if [ -z "$has_wa" ] || [ -z "$has_wa_auth" ]; then
 fi
 
 if [ "$has_wa" = yes ]; then
-  # `palui snapshot` is the Go image's. An older image (after a rollback to
-  # the Node image) never writes wa/, so there its files are at rest and a
-  # plain copy of each store with its -wal and -shm is consistent.
-  # shellcheck disable=SC2016 # $1 expands inside the container's shell
-  stores=$(docker compose exec -T app sh -c '
-    set -e
-    mkdir -p "$1/wa"
-    if palui snapshot 2>&1 | grep -q "usage: palui snapshot"; then
-      for f in /data/wa/*.db; do
-        [ -f "$f" ] || continue
-        palui snapshot "$f" "$1/wa/$(basename "$f").gz" >/dev/null
-        basename "$f"
-      done
-    else
-      for f in /data/wa/*.db; do
-        [ -f "$f" ] || continue
-        cp -p "$f" "$1/wa/"
-        for x in wal shm; do [ ! -f "$f-$x" ] || cp -p "$f-$x" "$1/wa/"; done
-        echo "$(basename "$f") (raw copy: this image has no palui snapshot)"
-      done
-    fi' _ "$stage") || {
-    log "couldn't snapshot the WhatsApp stores in /data/wa"
+  # shellcheck disable=SC2016
+  store_names=$(helper ro sh -c 'for f in /data/wa/*.db; do if [ -f "$f" ]; then basename "$f"; fi; done') || {
+    log "couldn't list the WhatsApp stores in /data/wa"
     exit 1
   }
-  stores=$(printf '%s' "$stores" | tr -d '\r' | tr '\n' ' ')
+  stores=""
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    # stdin from /dev/null, or exec would eat the rest of this loop's input.
+    docker compose exec -T app palui snapshot "/data/wa/$name" "$stage/wa/$name.gz" >/dev/null </dev/null || {
+      log "couldn't snapshot /data/wa/$name"
+      exit 1
+    }
+    stores="$stores $name"
+  done <<<"$(printf '%s' "$store_names" | tr -d '\r')"
   if [ -n "$stores" ]; then
     wa_file="$tmpdir/wa-$ts.tar.age"
     # The .gz snapshots are compressed already, so a plain tar.
-    docker compose exec -T app tar -cf - -C "$stage" wa | age -R "$RECIPIENT_FILE" -o "$wa_file"
-    log "WhatsApp stores: $stores"
+    helper ro tar -cf - -C "$stage" wa | age -R "$RECIPIENT_FILE" -o "$wa_file"
+    log "WhatsApp stores:$stores"
   else
     log "/data/wa has no store, skipping the WhatsApp archive"
   fi
-  # shellcheck disable=SC2016
-  docker compose exec -T app sh -c 'rm -rf "$1"' _ "$stage" || log "couldn't remove $stage (cleanup tries again)"
+  helper rw rm -rf "$stage" || log "couldn't remove $stage (cleanup tries again)"
 else
   log "no /data/wa in the volume, skipping the WhatsApp archive"
 fi
@@ -187,8 +217,21 @@ if [ "$has_wa_auth" = yes ]; then
   # restore re-syncs, so a fuzzy copy is acceptable. It stays until the owner
   # deletes /data/wa-auth after pairing WhatsApp again on the Go server.
   wa_auth_file="$tmpdir/wa-auth-$ts.tar.gz.age"
-  docker compose exec -T app tar -czf - -C /data wa-auth | age -R "$RECIPIENT_FILE" -o "$wa_auth_file"
+  helper ro tar -czf - -C /data wa-auth | age -R "$RECIPIENT_FILE" -o "$wa_auth_file"
   log "archived /data/wa-auth (the old Baileys session)"
+fi
+
+if [ "$DRY_RUN" = 1 ]; then
+  for f in "$db_file" "$wa_file" "$wa_auth_file"; do
+    [ -n "$f" ] || continue
+    log "dry run: would upload r2://$BUCKET/palui/$day/$(basename "$f") ($(stat -f %z "$f") bytes)"
+    if [ -n "$DRY_RUN_DIR" ]; then
+      mkdir -p "$DRY_RUN_DIR"
+      cp "$f" "$DRY_RUN_DIR/"
+    fi
+  done
+  [ -z "$DRY_RUN_DIR" ] || log "dry run: kept the encrypted files in $DRY_RUN_DIR"
+  exit 0
 fi
 
 # --- upload -----------------------------------------------------------------

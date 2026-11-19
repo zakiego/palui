@@ -3,9 +3,12 @@ package main
 // Commands the image and the ops scripts use, so neither needs Node, a shell
 // tool or the sqlite3 CLI:
 //
-//   palui healthcheck [--port P] [--timeout D]
+//   palui healthcheck [--port P] [--timeout D] [--print]
 //     the compose healthcheck: GET http://127.0.0.1:$PORT/health, exit 0 only
-//     on a 200 (any other status, a refused connection or a timeout is 1)
+//     on a 200 (any other status, a refused connection or a timeout is 1).
+//     --print writes the body to stdout, whatever the status: the image has no
+//     shell or wget, so this is how scripts/restore-drill.sh (and a person
+//     debugging) read /health from inside the container
 //   palui snapshot <sqlite-file> <dest.gz> [--json]
 //     a consistent gzipped copy of any SQLite file while it is being written
 //     (VACUUM INTO, like `palui backup`); scripts/backup.sh uses it for the
@@ -29,12 +32,13 @@ import (
 // healthcheckTimeout stays under compose's healthcheck timeout (5 s).
 const healthcheckTimeout = 4 * time.Second
 
-func runHealthcheck(args []string, getenv func(string) string, stderr io.Writer) int {
+func runHealthcheck(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("healthcheck", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	_, port := serve.ListenAddr(getenv)
 	p := fs.String("port", port, "port the server listens on (PORT)")
 	timeout := fs.Duration("timeout", healthcheckTimeout, "give up after this long")
+	printBody := fs.Bool("print", false, "write the /health body to stdout")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -54,7 +58,14 @@ func runHealthcheck(args []string, getenv func(string) string, stderr io.Writer)
 		return 1
 	}
 	defer res.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 1<<16))
+	body, err := io.ReadAll(io.LimitReader(res.Body, 1<<16))
+	if err != nil {
+		fmt.Fprintln(stderr, "healthcheck:", err)
+		return 1
+	}
+	if *printBody {
+		fmt.Fprintln(stdout, strings.TrimRight(string(body), "\n"))
+	}
 	if res.StatusCode != http.StatusOK {
 		fmt.Fprintf(stderr, "healthcheck: %s answered %d\n", url, res.StatusCode)
 		return 1

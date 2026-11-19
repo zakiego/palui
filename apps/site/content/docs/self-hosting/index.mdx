@@ -41,12 +41,18 @@ volumes:
 
 The rules behind it:
 
-- One service. The image is about 42 MB: a small Alpine base and the `palui` binary with the dashboard built in.
+- One service. The image is about 37 MB: a distroless base (CA certificates, no shell or package manager) and the `palui` binary with the dashboard built in.
 - The healthcheck is liveness only: `/health` answers 200 unless the database schema is newer than the code. Connector state goes in the `/health` body, never in the exit code, so a WhatsApp outage can't fail a deploy.
 - `stop_grace_period: 60s`. On SIGTERM the server drains: it stops taking new turns, finishes the current step and releases its outbox claims.
 - `app` is bound to `127.0.0.1`. Your tunnel is the only way in.
 
 The same binary is the admin CLI. Run any command with `docker compose exec app palui <command>`: `owner invite`, `connectors list`, `backup`, `secrets-check`, `version`.
+
+There's no shell in the container, so `docker compose exec app sh` doesn't work. To read `/health` from inside, run `docker compose exec app palui healthcheck --print`. For file work on the volume, start a throwaway container that borrows it:
+
+```bash
+docker run --rm -it --network none --user 1000:1000 --volumes-from palui-app-1 alpine:3.24.4 sh
+```
 
 ## Volume
 

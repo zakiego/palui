@@ -4,8 +4,8 @@
 #
 #   1. dashboard  Node + pnpm build the static SPA (apps/app/dist)
 #   2. server     Go builds one static binary with that dist embedded
-#   3. final      alpine (sh, tar and CA certificates for the ops scripts),
-#                 the binary as /usr/local/bin/palui, user 1000:1000
+#   3. final      distroless static (CA certificates, no shell or package
+#                 manager), the binary as /usr/local/bin/palui, user 1000:1000
 #
 # The context is the repo root, trimmed by .dockerignore: docs, the site and
 # the edge worker never enter it (the site and edge only send their
@@ -49,15 +49,18 @@ RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
     -ldflags "-s -w -X github.com/zakiego/palui/apps/server/internal/version.Version=$version" \
     -o /out/palui ./cmd/palui \
   && /out/palui version
+# The final stage has no mkdir: /data comes from here, empty.
+RUN mkdir -p /out/data
 
 # --- 3. final ----------------------------------------------------------------
-FROM alpine:3.24.4
+# No shell, no busybox, no apk: the binary is static (CGO_ENABLED=0, modernc
+# sqlite) and embeds the time zones. The ops scripts run plain file work in a
+# pinned alpine helper on the same volume, never inside this image.
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:aafe993665bf6200db38a02c11a9351e782a84b6a45e7f33b6695638c88e3931
 # The production volume was written by the old image's `node` user, 1000:1000.
-# Running as the same ids keeps it readable and writable without a chown.
-RUN addgroup -g 1000 palui \
-  && adduser -D -H -u 1000 -G palui -s /sbin/nologin palui \
-  && mkdir -p /data /app/build \
-  && chown 1000:1000 /data
+# Running as the same ids keeps it readable and writable without a chown. A new
+# volume copies this empty /data, owner included.
+COPY --from=server --chown=1000:1000 /out/data /data
 WORKDIR /app
 # NODE_ENV=production is the server's prod mode (MASTER_KEY required,
 # dev fixtures off). /data is the volume: palui.db (SQLite WAL), wa/ (the

@@ -148,7 +148,7 @@ Deploy:
 
 After it works:
 
-1. Delete the Baileys session: `docker compose exec app rm -r /data/wa-auth` (the nightly backup archives it while it exists). Unlink the old device on the phone if it is still listed. Then the `wa-auth` branch of `scripts/backup.sh` can go in a later PR.
+1. Delete the Baileys session: `docker run --rm --network none --user 1000:1000 --volumes-from palui-app-1 alpine:3.24.4 rm -r /data/wa-auth` (the image has no shell or `rm` since it moved to distroless; the nightly backup archives it while it exists). Unlink the old device on the phone if it is still listed. Then the `wa-auth` branch of `scripts/backup.sh` can go in a later PR.
 2. Remove `BETTER_AUTH_SECRET`, `RUNTIME_URL` and `CONTROL_PORT` from `.env`; nothing reads them.
 3. Keep `palui:prev` (the Node image) until you're sure; deploy.sh replaces it on the next deploy anyway.
 

@@ -105,7 +105,7 @@ The same binary is the admin CLI: `palui owner invite`, `palui connectors list|o
 | Layer | Choice |
 |---|---|
 | Repo | pnpm workspace plus a Go module: `apps/server` (Go), `apps/app` (dashboard), `apps/site`, `apps/edge`, `apps/host-bridge` |
-| Server | Go (version from `apps/server/go.mod`), one static binary, no cgo. The image is alpine plus the binary, about 42 MB |
+| Server | Go (version from `apps/server/go.mod`), one static binary, no cgo. The image is distroless static (no shell) plus the binary, about 37 MB |
 | Agent loop | Palui's own streaming clients: Anthropic Messages (`/v1/messages`, with cache breakpoints on system and tools) and OpenAI-compatible chat completions, both with a configurable base URL. The default role points at CLIProxyAPI. MCP clients use the official Go SDK (Streamable HTTP) |
 | WhatsApp | whatsmeow, with its session store in `$DATA_DIR/wa/<connectorId>.db` |
 | Telegram | Bot API long polling (a small in-house client) |

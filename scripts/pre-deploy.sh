@@ -10,6 +10,10 @@
 #      crash-looping app does it in a one-off container (`run --rm --no-deps`)
 #      from palui:latest, which is still the old image at this point. Any
 #      failure stops the deploy. Only a missing volume (first deploy) skips it.
+#      The app image has no shell (distroless), so the plain file work (does
+#      palui.db exist, prune old snapshots) runs in a pinned alpine helper
+#      that mounts the volume as uid 1000, with no network. That works the
+#      same whichever image is running, old or new.
 #   2. Stop and remove a leftover `runtime` container of this project. The
 #      Go server is one service; compose.yaml has no `runtime` any more, so
 #      `compose up` would leave the old Node runtime running next to it: two
@@ -33,6 +37,8 @@ INSTALL_BACKUP="${PALUI_INSTALL_BACKUP:-./ops/install-backup.sh}"
 PROJECT="${PALUI_COMPOSE_PROJECT:-palui}"
 # The old runtime drains for up to 50 s on SIGTERM (its stop_grace_period was 60 s).
 RUNTIME_STOP_TIMEOUT="${PALUI_RUNTIME_STOP_TIMEOUT:-60}"
+# Same pin as scripts/backup.sh and scripts/restore-drill.sh.
+HELPER_IMAGE="${PALUI_HELPER_IMAGE:-alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf}"
 
 log() { echo "[pre-deploy] $*"; }
 
@@ -58,11 +64,16 @@ else
   in_app() { docker compose run --rm --no-deps -T app "$@"; }
 fi
 
+# Plain file work on the data volume, as the app's uid, never as root.
+in_helper() {
+  docker run --rm --network none --user 1000:1000 -v "$DATA_VOLUME:/data" "$HELPER_IMAGE" "$@"
+}
+
 # A volume without a database (the app never got far enough to create it) has
 # nothing to lose. Anything other than a clear yes or no is an error.
 db_in_volume() {
   local answer
-  answer=$(in_app sh -c 'if [ -f /data/palui.db ]; then echo yes; else echo no; fi') || return 2
+  answer=$(in_helper sh -c 'if [ -f /data/palui.db ]; then echo yes; else echo no; fi') || return 2
   case "$answer" in
     *yes) return 0 ;;
     *no) return 1 ;;
@@ -80,7 +91,7 @@ backup() {
   fi
   # Timestamps sort by name, newest first; drop everything after the newest $KEEP.
   # shellcheck disable=SC2016 # $1 expands inside the container's shell
-  in_app sh -c 'ls -1 /data/backups/pre-deploy-*.db.gz 2>/dev/null | sort -r | tail -n +$(($1 + 1)) | xargs -r rm -f --' _ "$KEEP" ||
+  in_helper sh -c 'ls -1 /data/backups/pre-deploy-*.db.gz 2>/dev/null | sort -r | tail -n +$(($1 + 1)) | xargs -r rm -f --' _ "$KEEP" ||
     log "couldn't prune old pre-deploy backups (the new one is fine)"
 }
 

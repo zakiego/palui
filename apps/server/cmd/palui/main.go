@@ -115,7 +115,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		return serve.Run(o, nil)
 	case "healthcheck":
-		return runHealthcheck(args[1:], os.Getenv, stderr)
+		return runHealthcheck(args[1:], os.Getenv, stdout, stderr)
 	case "snapshot":
 		return runSnapshot(args[1:], stdout, stderr)
 	case "owner", "connectors", "backup", "secrets-check", "hook", "mcp", "help", "--help", "-h":

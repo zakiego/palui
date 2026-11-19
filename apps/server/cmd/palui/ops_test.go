@@ -45,7 +45,7 @@ func TestHealthcheckExitsZeroOnlyOn200(t *testing.T) {
 	}
 	var errOut bytes.Buffer
 	// PORT from the environment, as in the image.
-	if code := runHealthcheck(nil, env, &errOut); code != 0 {
+	if code := runHealthcheck(nil, env, io.Discard, &errOut); code != 0 {
 		t.Fatalf("200: %d %q", code, errOut.String())
 	}
 	if len(paths) != 1 || paths[0] != "/health" {
@@ -54,7 +54,7 @@ func TestHealthcheckExitsZeroOnlyOn200(t *testing.T) {
 	for _, s := range []int{http.StatusServiceUnavailable, http.StatusInternalServerError, http.StatusFound, http.StatusNoContent} {
 		status = s
 		errOut.Reset()
-		if code := runHealthcheck([]string{"--port", port}, func(string) string { return "" }, &errOut); code != 1 || !strings.Contains(errOut.String(), "answered") {
+		if code := runHealthcheck([]string{"--port", port}, func(string) string { return "" }, io.Discard, &errOut); code != 1 || !strings.Contains(errOut.String(), "answered") {
 			t.Fatalf("%d: %d %q", s, code, errOut.String())
 		}
 	}
@@ -62,6 +62,35 @@ func TestHealthcheckExitsZeroOnlyOn200(t *testing.T) {
 	status = http.StatusOK
 	if code := run([]string{"healthcheck", "--port", port}, io.Discard, io.Discard); code != 0 {
 		t.Fatal(code)
+	}
+}
+
+func TestHealthcheckPrintWritesTheBody(t *testing.T) {
+	status := http.StatusOK
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, `{"ok":true,"runtime":"unreachable"}`+"\n")
+	}))
+	defer srv.Close()
+	port := portOf(t, srv)
+	var out bytes.Buffer
+	if code := run([]string{"healthcheck", "--port", port, "--print"}, &out, io.Discard); code != 0 {
+		t.Fatal(code)
+	}
+	if out.String() != `{"ok":true,"runtime":"unreachable"}`+"\n" {
+		t.Fatalf("%q", out.String())
+	}
+	// A failing status still prints the body (it says why) and still exits 1.
+	status = http.StatusServiceUnavailable
+	out.Reset()
+	if code := runHealthcheck([]string{"--port", port, "--print"}, func(string) string { return "" }, &out, io.Discard); code != 1 || !strings.Contains(out.String(), "unreachable") {
+		t.Fatalf("%d %q", code, out.String())
+	}
+	// Without --print, stdout stays empty: the compose healthcheck logs nothing.
+	out.Reset()
+	status = http.StatusOK
+	if code := runHealthcheck([]string{"--port", port}, func(string) string { return "" }, &out, io.Discard); code != 0 || out.Len() != 0 {
+		t.Fatalf("%d %q", code, out.String())
 	}
 }
 
@@ -73,7 +102,7 @@ func TestHealthcheckFailsWhenNothingAnswers(t *testing.T) {
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
 	ln.Close() // nothing listens there now
 	var errOut bytes.Buffer
-	if code := runHealthcheck([]string{"--port", port}, func(string) string { return "" }, &errOut); code != 1 || errOut.Len() == 0 {
+	if code := runHealthcheck([]string{"--port", port}, func(string) string { return "" }, io.Discard, &errOut); code != 1 || errOut.Len() == 0 {
 		t.Fatalf("%d %q", code, errOut.String())
 	}
 }
@@ -89,13 +118,13 @@ func TestHealthcheckTimesOut(t *testing.T) {
 	defer srv.Close()
 	defer close(release)
 	start := time.Now()
-	if code := runHealthcheck([]string{"--port", portOf(t, srv), "--timeout", "200ms"}, func(string) string { return "" }, io.Discard); code != 1 {
+	if code := runHealthcheck([]string{"--port", portOf(t, srv), "--timeout", "200ms"}, func(string) string { return "" }, io.Discard, io.Discard); code != 1 {
 		t.Fatal(code)
 	}
 	if d := time.Since(start); d > 3*time.Second {
 		t.Fatalf("took %s", d)
 	}
-	if code := runHealthcheck([]string{"--nope"}, func(string) string { return "" }, io.Discard); code != 2 {
+	if code := runHealthcheck([]string{"--nope"}, func(string) string { return "" }, io.Discard, io.Discard); code != 2 {
 		t.Fatal(code)
 	}
 }
