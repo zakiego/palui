@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
-import { bumpVersion, checkChangelog, compareVersions, cutRelease, parseChangelog, suggestBump } from "./changelog"
+import { PR_URL, bumpVersion, checkChangelog, compareVersions, cutRelease, parseChangelog, suggestBump } from "./changelog"
 
 const CHANGELOG = readFileSync(new URL("../content/docs/changelog.mdx", import.meta.url), "utf8")
 const ROOT_PKG = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8")) as { version: string }
@@ -53,6 +53,14 @@ describe("checkChangelog", () => {
   it("wants entries under a category, except Breaking's sub-steps", () => {
     expect(checkChangelog(sample("- Loose."), "0.1.0").join()).toMatch(/isn't under a category/)
     expect(checkChangelog(sample("### Breaking\n\n- Do this.\n  - Step.\n\n### Chat\n\n- Added: Thing."), "0.1.0")).toEqual([])
+  })
+
+  it("wants entries short, not counting the type or the PR links", () => {
+    const words = (n: number) => Array.from({ length: n }, () => "word").join(" ")
+    const ok = `## 0.1.0 (2026-11-11)\n\n### Chat\n\n- Fixed: ${words(30)} ([#1](${PR_URL}1), [#2](${PR_URL}2))\n`
+    expect(checkChangelog(sample("Nothing yet.", ok), "0.1.0")).toEqual([])
+    const long = checkChangelog(sample(`### Chat\n\n- Fixed: ${words(31)}`), "0.1.0")
+    expect(long.join()).toMatch(/Unreleased entry is 31 words, keep it to 30/)
   })
 
   it("ignores headings inside code fences", () => {

@@ -27,7 +27,7 @@ No: refactors with no visible effect, tests, internal tooling, typo fixes in cod
    - `### Self-hosting`: deploy, upgrade, `/health`, backups, the CLI.
    - `### Site`: the landing page, these docs, the brand page.
 3. Start the bullet with its type: `Added: `, `Changed: ` or `Fixed: `. Inside a category, keep Added, then Changed, then Fixed. The type picks the version bump (`pnpm release suggest` reads it), so mark it honestly: a new feature marked Fixed would ship as a quiet patch. The docs page renders the type as a label.
-4. One bullet per change, kept short. One sentence of about 15 words, two short sentences at most. Written for the owner running Palui:
+4. One bullet per change, kept short. One sentence of about 15 words, two short sentences at most, and never over 30 words (the test fails past that). Written for the owner running Palui:
    - Say what they'll notice, not how it works. "Snoozed reminders fire in your time zone, not UTC." beats "fix(reminders): use tz in snooze", and it also beats a paragraph about why it broke.
    - The why, the limits and the edge cases go in the docs page and the PR body, not here. The PR link takes the reader there.
    - Name the surface: chat command, dashboard page, connector, `/health`, CLI.

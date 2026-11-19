@@ -24,6 +24,7 @@ export const CHANGE_TYPES = ["Added", "Changed", "Fixed"] as const
 export type ChangeType = (typeof CHANGE_TYPES)[number]
 const HEADINGS = ["Breaking", ...CATEGORIES] as string[]
 const TYPED_ENTRY = new RegExp(`^- (${CHANGE_TYPES.join("|")}): \\S`)
+const TYPED_PREFIX = new RegExp(`^(${CHANGE_TYPES.join("|")}): `)
 
 const RELEASE_HEADING = /^## (\d+\.\d+\.\d+) \((\d{4}-\d{2}-\d{2})\)$/
 // Anything that starts like a version but isn't the exact shape above.
@@ -34,6 +35,15 @@ const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/
 export const PR_URL = "https://github.com/zakiego/palui/pull/"
 const PR_REF = String.raw`\[#(\d+)\]\(https://github\.com/zakiego/palui/pull/\1\)`
 const PR_LINK_END = new RegExp(String.raw`\(${PR_REF}(?:, \[#(\d+)\]\(https://github\.com/zakiego/palui/pull/\2\))*\)$`)
+// An entry says what the owner will notice in a sentence or two. The why and
+// the edge cases go in the PR body and the docs, which the PR link points to.
+export const MAX_ENTRY_WORDS = 30
+const TRAILING_PR_LINKS = /\s*\((?:\[#\d+\]\([^)]*\)(?:, )?)+\)\s*$/
+
+function entryWords(line: string): number {
+  const text = line.slice(2).replace(TRAILING_PR_LINKS, "").replace(TYPED_PREFIX, "")
+  return text.split(/\s+/).filter(Boolean).length
+}
 
 type Section = { heading: string; body: string[]; line: number }
 
@@ -114,6 +124,9 @@ function checkGroups(s: Section, label: string): string[] {
       if (heading === null) problems.push(`${at}: ${label} entry isn't under a category like \`### Chat\``)
       else if (heading !== "Breaking" && !TYPED_ENTRY.test(l))
         problems.push(`${at}: ${label} entry should start with ${CHANGE_TYPES.map((t) => `"${t}: "`).join(", ")}`)
+      const words = entryWords(l)
+      if (words > MAX_ENTRY_WORDS)
+        problems.push(`${at}: ${label} entry is ${words} words, keep it to ${MAX_ENTRY_WORDS} (the details go in the PR body)`)
     }
   }
   return problems
