@@ -15,3 +15,12 @@ apps/site/out
 next-env.d.ts
 *.tsbuildinfo
 build-info.json
+
+# Local secrets and machine state that must never be committed
+*.pem
+*.key
+*.p12
+*.age
+.dev.vars
+.claude/settings.local.json
+.claude/worktrees

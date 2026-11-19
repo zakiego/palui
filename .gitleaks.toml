@@ -1,0 +1,15 @@
+# gitleaks config: the default rules, minus test vectors.
+# Every value in these paths is a fake key, a crypto golden derived from a test
+# master key, or WebAuthn test data. Real secrets never live in the repo: they
+# go in .env or, encrypted, in the database.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures and golden files"
+paths = [
+  '''apps/server/testdata/''',
+  '''_test\.go$''',
+  '''\.test\.ts$''',
+  '''apps/server/internal/fixtures/''',
+]
