@@ -14,12 +14,12 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Chat
 
-- Fixed: WhatsApp contact cards, locations, polls and captionless videos reach the agent as text, with the contact's number, instead of being dropped.
+- Fixed: WhatsApp contact cards, locations, polls and captionless videos reach the agent as text, with the contact's number, instead of being dropped. ([#149](https://github.com/zakiego/palui/pull/149))
 - Fixed: A message isn't dropped any more when the model can't be reached for a moment. When a turn fails for a temporary reason (network or TLS timeout, rate limit, an overloaded provider, or the model connector still starting after a restart), the agent keeps the message and tries again after 20 s, 1, 2 and 5 minutes, and right away when a connector comes back on. The first retry is silent, the second sends one "pesannya aku simpan" notice, and the answer quotes the original message in a group. A message that arrives in the meantime is answered in the same reply. It gives up with the usual notice after 4 retries or once the message is 15 minutes old, a message still waiting at a restart is answered after the restart, and permanent errors (bad request, auth, exhausted quota) or a turn that already changed data are never retried. ([#147](https://github.com/zakiego/palui/pull/147))
 
 ### Tools
 
-- Added: Chat history's `search_this_chat` lets an agent find something said earlier in the same chat, groups included, before saying it can't see it.
+- Added: Chat history's `search_this_chat` lets an agent find something said earlier in the same chat, groups included, before saying it can't see it. ([#149](https://github.com/zakiego/palui/pull/149))
 
 ## 0.11.0 (2026-11-19)
 
