@@ -19,7 +19,7 @@ PRs other than the release PR never bump the version, so parallel PRs can't figh
    git worktree add --detach /tmp/palui-release-$(date +%Y%m%d) origin/main
    cd /tmp/palui-release-$(date +%Y%m%d)
    ```
-2. Tag a release PR that merged since last night. It finds the first-parent commit on main that set the current version (merge or squash commit) and pushes `vX.Y.Z`. It's a no-op when the tag already exists:
+2. Tag a release PR that merged since last night. It finds the first-parent commit on main that set each version without a tag (merge or squash commit), back to the newest tagged one, and pushes `vX.Y.Z` for each, so a night that failed to tag catches up. It only checks that the release heading is there, since a merged release passed the changelog rules of its own day. It's a no-op when the current version is tagged:
    ```bash
    node scripts/release.ts tag-merged
    ```

@@ -4,8 +4,8 @@
 //   pnpm release open <patch|minor|major|X.Y.Z> [--date YYYY-MM-DD]
 //                                          on a clean checkout of origin/main: cut the release on
 //                                          release/vX.Y.Z, commit and push it (the PR comes next)
-//   pnpm release tag-merged                tag the commit on origin/main that set the current
-//                                          version and push the tag (no-op when it's tagged)
+//   pnpm release tag-merged                tag the commits on origin/main that set each untagged
+//                                          version and push the tags (no-op when it's tagged)
 //   pnpm release ship <bump> [--date]      cut, commit, push main, tag (only when the owner asks
 //                                          to skip the release PR)
 //   pnpm release check                     changelog and package.json agree
@@ -91,12 +91,15 @@ function assertOnFreshMain(): void {
 }
 
 // Annotated tag vX.Y.Z on `sha`, with that commit's release notes as the message.
-function createTag(sha: string, version: string, changelog: string): string {
+// `strict` runs today's changelog check. A release that already merged passed the rules
+// of its own day, which can be older than today's, so tag-merged only needs its heading.
+function createTag(sha: string, version: string, changelog: string, strict = true): string {
   const name = `v${version}`
   if (git("tag", "--list", name)) fail(`${name} already exists`)
-  const problems = checkChangelog(changelog, version)
+  const problems = strict ? checkChangelog(changelog, version) : []
   if (problems.length) fail(`changelog problems at ${sha.slice(0, 7)}:\n${problems.map((p) => `  - ${p}`).join("\n")}`)
-  const release = parseChangelog(changelog).releases[0]!
+  const release = parseChangelog(changelog).releases[0]
+  if (release?.version !== version) fail(`the newest changelog release at ${sha.slice(0, 7)} isn't ${version}`)
   git("tag", "--annotate", name, sha, "--message", `Palui Agent ${version} (${release.date})\n\n${release.body}`)
   return name
 }
@@ -127,27 +130,39 @@ const versionAt = (rev: string): string | undefined => {
   }
 }
 
-// Newest first-parent commit on origin/main whose package.json has `version` and whose parent's doesn't.
-function commitThatSet(version: string): string | undefined {
+// Every first-parent commit on origin/main that set a new package.json version (the merge or
+// squash commit of a release PR), newest first, down to the newest version that has a tag.
+// Returned oldest first, so a night that couldn't tag still gets its tag on a later run.
+function untaggedReleases(): { version: string; sha: string }[] {
   const shas = git("log", "--first-parent", "--format=%H", "origin/main", "--", "package.json").split("\n").filter(Boolean)
-  return shas.find((sha) => versionAt(sha) === version && versionAt(`${sha}^1`) !== version)
+  const found: { version: string; sha: string }[] = []
+  const seen = new Set<string>()
+  for (const sha of shas) {
+    const version = versionAt(sha)
+    if (!version || version === versionAt(`${sha}^1`) || seen.has(version)) continue
+    seen.add(version)
+    if (git("tag", "--list", `v${version}`)) break
+    found.push({ version, sha })
+  }
+  return found.reverse()
 }
 
-// After a release PR merges: tag the first-parent commit on origin/main that set package.json
-// to the current version (the merge or squash commit) and push the tag.
+// After a release PR merges: tag the commit on origin/main that set each untagged version
+// and push the tags. A no-op when the current version is tagged.
 function tagMerged(): void {
   git("fetch", "--quiet", "--tags", "origin", "main")
-  const version = versionAt("origin/main")!
-  const name = `v${version}`
-  if (git("tag", "--list", name)) {
-    console.log(`${name} already tagged`)
+  const current = versionAt("origin/main")!
+  const releases = untaggedReleases()
+  if (!releases.length) {
+    console.log(`v${current} already tagged`)
     return
   }
-  const sha = commitThatSet(version)
-  if (!sha) fail(`couldn't find the commit on origin/main that set ${version}`)
-  createTag(sha, version, git("show", `${sha}:apps/site/content/docs/changelog.mdx`))
-  git("push", "--quiet", "origin", name)
-  console.log(`tagged ${name} at ${sha.slice(0, 7)}`)
+  if (releases.at(-1)!.version !== current) fail(`couldn't find the commit on origin/main that set ${current}`)
+  for (const { version, sha } of releases) {
+    const name = createTag(sha, version, git("show", `${sha}:apps/site/content/docs/changelog.mdx`), false)
+    git("push", "--quiet", "origin", name)
+    console.log(`tagged ${name} at ${sha.slice(0, 7)}`)
+  }
 }
 
 function ship(target: string | undefined, date: string): void {
