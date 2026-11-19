@@ -1,4 +1,4 @@
-# zaki-selfhost compose file. deploy.sh runs `docker compose up -d --build --wait`,
+# Production compose file. Deploy with `docker compose up -d --build --wait`,
 # which waits on the healthcheck, so it must be cheap and honest.
 # One service: `palui serve` is the server, the dashboard and the runtime.
 # Secrets come from .env (MASTER_KEY, APP_URL; BETTER_AUTH_SECRET is no longer
@@ -13,9 +13,9 @@ x-logging: &logging           # caps logs at 30 MB per container
     max-file: "3"
 
 services:
-  app:                        # keep this name, deploy.sh looks for it
+  app:                        # keep this name, deploy scripts look for it
     build: .
-    image: palui:latest       # one tag, overwritten on every deploy; deploy.sh keeps palui:prev
+    image: palui:latest       # one tag, overwritten on every deploy
     restart: unless-stopped
     ports:
       - "127.0.0.1:4802:3000" # loopback only, the tunnel is the only way in
@@ -25,7 +25,7 @@ services:
     environment:
       DATA_DIR: /data
     extra_hosts:
-      # CLIProxyAPI :8317, ai-gateway :8793, recall :4800, T3 Code, host bridge :4893
+      # services on the host: model proxy, memory, host bridge (:4893)
       - "host.docker.internal:host-gateway"
     volumes:
       - data:/data
