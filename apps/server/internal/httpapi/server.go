@@ -135,6 +135,12 @@ func (s *Server) Handler() http.Handler {
 				writeJSON(w, 500, map[string]string{"error": "Internal error"})
 			}
 		}()
+		// Baseline headers for every response. Handlers that need stricter ones
+		// (attachments set no-referrer and their own CSP) overwrite them.
+		h := w.Header()
+		h.Set("x-content-type-options", "nosniff")
+		h.Set("x-frame-options", "SAMEORIGIN")
+		h.Set("referrer-policy", "strict-origin-when-cross-origin")
 		s.mux.ServeHTTP(w, r)
 	})
 }
