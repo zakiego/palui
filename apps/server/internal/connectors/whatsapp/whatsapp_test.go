@@ -542,6 +542,27 @@ func TestInbound(t *testing.T) {
 		eq(t, []string{in[1].ChatExternalID, in[1].ChatKind, in[1].SenderExternalID, in[1].SenderName}, []string{"120363@g.us", "group", "62811@s.whatsapp.net", "Budi"})
 		eq(t, in[2].Quoted.From, "self")
 	})
+	// A contact card in a group was dropped, so the agent couldn't find the
+	// number when someone asked for it later (rpt_0mwmwtby5l0zrpy3sgg).
+	t.Run("turns contact cards, locations and captionless videos into text", func(t *testing.T) {
+		e, _ := openRunning(t, opts{})
+		g := func(k *whatsapp.Key) { k.RemoteJID, k.Participant = "120363@g.us", "62811@s.whatsapp.net" }
+		vcard := "BEGIN:VCARD\nVERSION:3.0\nFN:Primadona\nTEL;type=CELL;waid=6281200001111:+62 812-0000-1111\nEND:VCARD"
+		e.sock().Message(dm("C1", &waE2E.Message{ContactMessage: &waE2E.ContactMessage{DisplayName: proto.String("Primadona ✂️"), Vcard: proto.String(vcard)}}, g), "")
+		e.sock().Message(dm("C2", &waE2E.Message{LocationMessage: &waE2E.LocationMessage{DegreesLatitude: proto.Float64(-3.5), DegreesLongitude: proto.Float64(114.5)}}, g), "")
+		e.sock().Message(dm("C3", &waE2E.Message{VideoMessage: &waE2E.VideoMessage{}}, g), "")
+		e.sock().Message(dm("C4", &waE2E.Message{VideoMessage: &waE2E.VideoMessage{Caption: proto.String("lucu")}}, g), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 4 })
+		in := e.ctx.Inbound()
+		eq(t, []string{in[0].Text, in[1].Text, in[2].Text, in[3].Text}, []string{
+			"[contact: Primadona ✂️, +62 812-0000-1111]",
+			"[location: -3.500000,114.500000, https://maps.google.com/?q=-3.500000,114.500000]",
+			"[video]",
+			"[video]\nlucu",
+		})
+		eq(t, in[0].Media, []connectors.InboundMedia(nil))
+		eq(t, e.sock().Downloads(), []string(nil))
+	})
 	t.Run("reads extended text with the quoted id", func(t *testing.T) {
 		e, _ := openRunning(t, opts{})
 		e.sock().Message(dm("IN4", &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String("yang ini"), ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String("OLD1")}}}, nil), "")

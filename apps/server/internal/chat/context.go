@@ -30,6 +30,8 @@ const (
 	// once, so its first message (and the cached prefix after it) holds for
 	// several turns.
 	HistoryStep = 10
+	// EarlierImage stands in for a photo whose bytes the model doesn't get.
+	EarlierImage = "[gambar dari sebelumnya]"
 )
 
 var zoneAbbrs = map[string]string{
@@ -184,7 +186,7 @@ type InboundInfo struct {
 func inboundLines(i SystemInput) []string {
 	var out []string
 	if i.Chat != nil && i.Chat.Kind == "group" && i.ReplyMode == "mention" {
-		out = append(out, "In this group you see every message, but you only answer when someone @mentions you or replies to one of your messages. Those messages are labeled \"to you\" after the sender's name, like [Name, to you]. Answer every message labeled \"to you\" since your last reply: when more than one person addressed you, answer each of them in the same reply, by name, and don't drop the earlier ones because newer talk came after them. The other messages are the group's talk, there as context: never answer them on their own, only use them to understand the messages addressed to you. A photo in that talk shows only as [gambar dari sebelumnya]: you see a photo when it comes with the message that mentions you or replies to you, so ask for it again that way. You only see what was said since you joined this group.")
+		out = append(out, "In this group you see every message, but you only answer when someone @mentions you or replies to one of your messages. Those messages are labeled \"to you\" after the sender's name, like [Name, to you]. Answer every message labeled \"to you\" since your last reply: when more than one person addressed you, answer each of them in the same reply, by name, and don't drop the earlier ones because newer talk came after them. The other messages are the group's talk, there as context: never answer them on their own, only use them to understand the messages addressed to you. A photo in that talk shows only as [gambar dari sebelumnya] (with its caption, when it had one): you see a photo when it comes with the message that mentions you or replies to you, so ask for it again that way. Contact cards show as [contact: name, number], locations as [location: ...] and polls as [poll: ...], so you can read those. You only see the recent talk here. When someone asks about something said or shared in this group earlier (a number, contact, address, link) and it isn't in front of you, search this chat's older messages with search_this_chat first, and only say you can't find it after that. You only see what was said since you joined this group.")
 	}
 	if i.Inbound != nil {
 		voice := "Voice notes reach you only as a note that they couldn't be transcribed, so you can't hear them."
@@ -793,6 +795,20 @@ func ToModelMessages(rows []db.Message, withImages map[string]bool, calls []Tool
 			}
 			body = strings.Join(bits, "\n\n")
 		}
+		// An image whose bytes aren't sent shows as a placeholder. A sticker's
+		// text already says it's a sticker, so it gets none. With no caption
+		// the placeholder is the body, so group talk still says who sent it.
+		placeholders := 0
+		sticker := strings.HasPrefix(own, "[sticker") || strings.HasPrefix(own, "[animated sticker")
+		for _, m := range c.Media {
+			if m.Kind == "image" && !sticker && !(withImages[r.ID] && m.Data != nil && *m.Data != "") {
+				placeholders++
+			}
+		}
+		if body == "" && placeholders > 0 && labelSenders {
+			body = strings.TrimSpace(strings.Repeat(EarlierImage+" ", placeholders))
+			placeholders = -1
+		}
 		text := body
 		if labelSenders && body != "" {
 			label := SenderLabel(r.FromOwner, r.SenderName, r.SenderID)
@@ -810,8 +826,8 @@ func ToModelMessages(rows []db.Message, withImages map[string]bool, calls []Tool
 			}
 			if withImages[r.ID] && m.Data != nil && *m.Data != "" {
 				parts = append(parts, models.ImagePart(*m.Data, m.MimeType))
-			} else {
-				parts = append(parts, models.TextPart("[gambar dari sebelumnya]"))
+			} else if placeholders > 0 {
+				parts = append(parts, models.TextPart(EarlierImage))
 			}
 		}
 		if len(parts) == 0 {

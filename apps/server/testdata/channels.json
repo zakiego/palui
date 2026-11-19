@@ -10994,7 +10994,7 @@
      "quoted": {
       "from": "unknown",
       "text": "",
-      "media": "[location]"
+      "media": "[location: 1.000000,0.000000, https://maps.google.com/?q=1.000000,0.000000]"
      }
     }
    ],
@@ -11041,7 +11041,7 @@
      "quoted": {
       "from": "unknown",
       "text": "",
-      "media": "[contact: Budi]"
+      "media": "[contact: Budi, tanpa nomor]"
      }
     }
    ],
@@ -11088,7 +11088,7 @@
      "quoted": {
       "from": "unknown",
       "text": "",
-      "media": "[contacts]"
+      "media": "[contacts: x]"
      }
     }
    ],
@@ -11135,7 +11135,7 @@
      "quoted": {
       "from": "unknown",
       "text": "",
-      "media": "[poll]"
+      "media": "[poll: pilih]"
      }
     }
    ],
@@ -11892,7 +11892,7 @@
    ]
   },
   {
-   "name": "video is caption only",
+   "name": "video is a label plus its caption",
    "msg": {
     "key": {
      "remoteJid": "628123456789@s.whatsapp.net",
@@ -11916,7 +11916,7 @@
      "chatExternalId": "628123456789@s.whatsapp.net",
      "chatKind": "dm",
      "senderExternalId": "628123456789@s.whatsapp.net",
-     "text": "klip",
+     "text": "[video]\nklip",
      "at": 1700000000000,
      "senderName": "Zaki",
      "chatTitle": "Zaki",
@@ -11926,7 +11926,7 @@
    "downloads": []
   },
   {
-   "name": "video without caption dropped",
+   "name": "video without caption is a label",
    "msg": {
     "key": {
      "remoteJid": "628123456789@s.whatsapp.net",
@@ -11942,7 +11942,20 @@
     "pushName": "Zaki"
    },
    "type": "notify",
-   "inbound": [],
+   "inbound": [
+    {
+     "channel": "whatsapp",
+     "connectorId": "whatsapp",
+     "chatExternalId": "628123456789@s.whatsapp.net",
+     "chatKind": "dm",
+     "senderExternalId": "628123456789@s.whatsapp.net",
+     "text": "[video]",
+     "at": 1700000000000,
+     "senderName": "Zaki",
+     "chatTitle": "Zaki",
+     "channelMsgId": "VID2"
+    }
+   ],
    "downloads": []
   },
   {

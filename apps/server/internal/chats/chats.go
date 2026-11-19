@@ -274,6 +274,9 @@ type MessageQuery struct {
 	Since *int64
 	// Case-insensitive substring of the message text.
 	Query string
+	// Query also matches the text or media label of the message a row
+	// quotes (a reply to a contact card names the contact).
+	Quotes bool
 	// Only messages older than this one, in read order (created_at, then id),
 	// for paging back without skipping messages that share a millisecond.
 	BeforeMessage *db.Message
@@ -302,8 +305,13 @@ func ReadMessages(q db.Q, chatID string, mq MessageQuery) ([]db.Message, error) 
 		args = append(args, m.CreatedAt, m.CreatedAt, m.ID)
 	}
 	if text := strx.Trim(mq.Query); text != "" {
-		where = append(where, `text like ? escape '\'`)
-		args = append(args, likeArg(text))
+		if mq.Quotes {
+			where = append(where, `(text like ? escape '\' or (json_valid(content) and (json_extract(content, '$.quoted.text') like ? escape '\' or json_extract(content, '$.quoted.media') like ? escape '\')))`)
+			args = append(args, likeArg(text), likeArg(text), likeArg(text))
+		} else {
+			where = append(where, `text like ? escape '\'`)
+			args = append(args, likeArg(text))
+		}
 	}
 	limit := ReadDefault
 	if mq.Limit != 0 {

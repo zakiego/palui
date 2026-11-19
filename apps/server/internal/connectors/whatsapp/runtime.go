@@ -845,7 +845,13 @@ func (w *wa) deliver(s Socket, m *Message) error {
 
 	text := TextOf(content)
 	info := MediaOf(content)
-	if text == "" && info == nil {
+	// A contact card, location, poll or video: its label is what the agent
+	// reads, now and in the stored history.
+	kind := ""
+	if info == nil {
+		kind = ContentLabel(content)
+	}
+	if text == "" && info == nil && kind == "" {
 		return nil
 	}
 
@@ -944,7 +950,7 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		}
 	}
 	var parts []string
-	for _, p := range []string{label, text, note} {
+	for _, p := range []string{label, kind, text, note} {
 		if p != "" {
 			parts = append(parts, p)
 		}

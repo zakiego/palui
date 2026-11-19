@@ -160,8 +160,6 @@ func MediaLabel(c *waE2E.Message) string {
 		return ""
 	case c.ImageMessage != nil:
 		return "[image]"
-	case c.VideoMessage != nil:
-		return "[video]"
 	case c.AudioMessage != nil:
 		if c.AudioMessage.GetPTT() {
 			return "[voice note]"
@@ -174,19 +172,10 @@ func MediaLabel(c *waE2E.Message) string {
 		return "[document]"
 	case c.StickerMessage != nil:
 		return "[sticker]"
-	case c.LocationMessage != nil || c.LiveLocationMessage != nil:
-		return "[location]"
-	case c.ContactMessage != nil:
-		if n := c.ContactMessage.GetDisplayName(); n != "" {
-			return "[contact: " + n + "]"
-		}
-		return "[contact]"
-	case c.ContactsArrayMessage != nil:
-		return "[contacts]"
-	case c.PollCreationMessage != nil || c.PollCreationMessageV3 != nil:
-		return "[poll]"
 	}
-	return ""
+	// Contacts keep their numbers and locations their coordinates, so a
+	// reply to one still says what it was.
+	return ContentLabel(c)
 }
 
 // QuoteInfo is the message a message quotes.

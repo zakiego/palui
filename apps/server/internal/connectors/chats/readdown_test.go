@@ -98,16 +98,16 @@ func TestReadDownToolsAreOfferedToPaluiInTheOwnersDMAndWebChatOnly(t *testing.T)
 		mut  func(*connectors.TurnInfo)
 		want string
 	}{
-		{"owner DM", func(*connectors.TurnInfo) {}, "search_chats,read_chat,list_agent_chats,read_agent_chat"},
-		{"web chat", func(x *connectors.TurnInfo) { x.ChatID, x.Channel = e.web.ID, "web" }, "search_chats,read_chat,list_agent_chats,read_agent_chat"},
-		{"owner's job", func(x *connectors.TurnInfo) { x.Trigger, x.Origin = "schedule", "schedule" }, "search_chats,read_chat,list_agent_chats,read_agent_chat"},
-		{"non-default agent", func(x *connectors.TurnInfo) { x.ChatID, x.Channel, x.AgentID = e.clubDM.ID, "telegram", e.club.ID }, "search_chats,read_chat"},
-		{"another agent's group", func(x *connectors.TurnInfo) { x.ChatID, x.AgentID, x.Mode = e.clubGroup.ID, e.club.ID, "outside" }, ""},
-		{"a group Palui answers in", func(x *connectors.TurnInfo) { x.ChatID = e.paluiGroup.ID }, ""},
-		{"a guest's DM", func(x *connectors.TurnInfo) { x.ChatID, x.Mode = e.guestDM.ID, "outside" }, "search_chats,read_chat"},
+		{"owner DM", func(*connectors.TurnInfo) {}, "search_chats,read_chat,search_this_chat,list_agent_chats,read_agent_chat"},
+		{"web chat", func(x *connectors.TurnInfo) { x.ChatID, x.Channel = e.web.ID, "web" }, "search_chats,read_chat,search_this_chat,list_agent_chats,read_agent_chat"},
+		{"owner's job", func(x *connectors.TurnInfo) { x.Trigger, x.Origin = "schedule", "schedule" }, "search_chats,read_chat,search_this_chat,list_agent_chats,read_agent_chat"},
+		{"non-default agent", func(x *connectors.TurnInfo) { x.ChatID, x.Channel, x.AgentID = e.clubDM.ID, "telegram", e.club.ID }, "search_chats,read_chat,search_this_chat"},
+		{"another agent's group", func(x *connectors.TurnInfo) { x.ChatID, x.AgentID, x.Mode = e.clubGroup.ID, e.club.ID, "outside" }, "search_this_chat"},
+		{"a group Palui answers in", func(x *connectors.TurnInfo) { x.ChatID = e.paluiGroup.ID }, "search_this_chat"},
+		{"a guest's DM", func(x *connectors.TurnInfo) { x.ChatID, x.Mode = e.guestDM.ID, "outside" }, "search_chats,read_chat,search_this_chat"},
 		{"hook", func(x *connectors.TurnInfo) { x.Trigger, x.Origin = "hook", "hook" }, ""},
-		{"flow", func(x *connectors.TurnInfo) { x.Trigger, x.Origin, x.FlowID = "flow", "flow", "flw_1" }, "search_chats,read_chat"},
-		{"outside mode", func(x *connectors.TurnInfo) { x.Mode = "outside" }, "search_chats,read_chat"},
+		{"flow", func(x *connectors.TurnInfo) { x.Trigger, x.Origin, x.FlowID = "flow", "flow", "flw_1" }, "search_chats,read_chat,search_this_chat"},
+		{"outside mode", func(x *connectors.TurnInfo) { x.Mode = "outside" }, "search_chats,read_chat,search_this_chat"},
 	}
 	for _, c := range cases {
 		turn := e.turn

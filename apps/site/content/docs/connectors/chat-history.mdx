@@ -20,13 +20,14 @@ Within its own chats, an agent only reads what was stored:
 - Webhook events, marked with the hook's name.
 - Photos, voice notes and documents show up as a marker (`[gambar]`, `[audio]`, `[dokumen: tiket.pdf]`), never the file.
 
-Messages other people send in a chat aren't stored, so they can't be read either. Tool calls and internal summaries are skipped.
+In a group with an agent, what everyone else said is stored too, with their names. WhatsApp contact cards are stored as `[contact: name, number]`, locations with their coordinates and polls with their options. Tool calls and internal summaries are skipped.
 
 ## Tools
 
 | Tool | Class | What it does |
 |---|---|---|
 | `search_chats` | `read` | Find this agent's chats by title, WhatsApp JID, Telegram chat id or chat id, with an optional channel (`whatsapp`, `telegram`, `web`) and kind (`dm`, `group`) filter. Newest conversation first, at most 20. Each result has its channel, external id, title, kind, last message time and message count. |
+| `search_this_chat` | `read` | Search older messages in the chat the turn is in, by a word or name. Matches message text, contact cards (`[contact: name, number]`), captions and the text of quoted messages, with who sent each one. The newest 20 matches by default (at most 50), optional `before` and `since`. Offered in every chat, groups too. |
 | `read_chat` | `read` | Read one of this agent's chats by its chat id or an exact external id. The newest 30 messages by default (at most 100), returned oldest first. Optional `before` and `since` times and a text search. Each message is clipped at 500 characters. |
 
 Times in and out are in your zone (Settings, default `Asia/Makassar`). Each tool's class decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
@@ -34,7 +35,8 @@ Times in and out are in your zone (Settings, default `Asia/Makassar`). Each tool
 ## Safety
 
 - Both tools are untrusted. Quoted text, group titles and webhook payloads come from other people, so reading them taints the turn and every `write` tool after it asks you first. See [The taint rule](/docs/concepts/taint-rule).
-- The tools are offered only in a private chat with Palui: a DM or the web chat. In a group they don't exist, so another chat's messages can't be posted where other people read them.
+- `search_chats` and `read_chat` are offered only in a private chat with Palui: a DM or the web chat. In a group they don't exist, so another chat's messages can't be posted where other people read them.
+- `search_this_chat` is offered in every chat, groups included, because it only reads the chat the turn is in. A number shared in a group only ever comes back to that group. Guests in a shared chat get it too, and its results taint the turn like the other two. Webhook turns never get it.
 - Webhook summaries run with zero tools, so they never get these.
 - Scheduled jobs do get them when the job's target chat is a DM or the web chat (a nightly "rangkum grup X" job works). Jobs already never get `destructive` tools and every `write` needs approval, and the result only goes to your own chat.
 

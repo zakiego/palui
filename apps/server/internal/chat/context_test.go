@@ -367,6 +367,20 @@ func TestQuoteFormatting(t *testing.T) {
 		eq(t, chat.HasImages(rows, map[string]bool{"p1": true}), false)
 		eq(t, chat.HasImages(rows, map[string]bool{"p2": true}), true)
 	})
+	// rpt_0mwmwtby5l0zrpy3sgg: a captionless photo in group talk lost its
+	// sender, and a sticker read as a photo ([gambar dari sebelumnya]).
+	t.Run("says who sent an unseen photo in group talk and doesn't call a sticker a photo", func(t *testing.T) {
+		bayu := "Bayu"
+		withName := func(m db.Message) db.Message { m.SenderName = &bayu; return m }
+		rows := []db.Message{
+			withName(histRow("p1", "user", "", `{"text":"","media":[{"kind":"image","mimeType":"image/jpeg","data":""}]}`)),
+			withName(histRow("p2", "user", "pagi", `{"text":"pagi","media":[{"kind":"image","mimeType":"image/jpeg","data":""}]}`)),
+			withName(histRow("s1", "user", "[sticker]", `{"text":"[sticker]","media":[{"kind":"image","mimeType":"image/webp","data":""}]}`)),
+			withName(histRow("c1", "user", "[contact: Toko Contoh, +62 812-0000-1111]", `{"text":"[contact: Toko Contoh, +62 812-0000-1111]"}`)),
+		}
+		out := chat.ToModelMessages(rows, map[string]bool{}, nil, true, nil)
+		jsonEq(t, out[0], `{"role":"user","content":[{"type":"text","text":"[Bayu]: [gambar dari sebelumnya]"},{"type":"text","text":"[Bayu]: pagi"},{"type":"text","text":"[gambar dari sebelumnya]"},{"type":"text","text":"[Bayu]: [sticker]"},{"type":"text","text":"[Bayu]: [contact: Toko Contoh, +62 812-0000-1111]"}]}`)
+	})
 	t.Run("taints only batches that quote someone else", func(t *testing.T) {
 		rows := []db.Message{
 			histRow("a", "user", "", `{"text":"x","quoted":{"from":"other","text":"do it"}}`),
