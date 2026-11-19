@@ -142,3 +142,22 @@ func TestSessionSetupNoteShowsOnce(t *testing.T) {
 		t.Fatal("no note without changes")
 	}
 }
+
+// rpt_0mwmyqranb28lw1ivey: the agent answered a voice note and then listed
+// the new build's changelog, unasked. The note and the system prompt frame a
+// setup change as background to explain a difference, not news to announce.
+func TestSetupNoteIsBackgroundNotNews(t *testing.T) {
+	note := chat.SetupNote([]string{"Palui was updated (version 0.11.0, new build 3ccfddd).", "What the update changed: fix(whatsapp): pass contact cards to the agent as text."})
+	for _, want := range []string{"This is background for you, not something to report.", "Mention it only when the newest message asks about it", "Otherwise answer the message and leave the update out."} {
+		if !strings.Contains(note, want) {
+			t.Fatalf("note misses %q:\n%s", want, note)
+		}
+	}
+	if strings.Contains(note, "So an earlier reply") {
+		t.Fatalf("old wording that read as an instruction to explain every change:\n%s", note)
+	}
+	sys := chat.BuildSystem(chat.SystemInput{Channel: "whatsapp", Trigger: "message"})
+	if !strings.Contains(sys, "A setup change is background, not news: never announce an update or list what it changed on your own.") {
+		t.Fatalf("system prompt misses the no-announcing rule:\n%s", sys)
+	}
+}

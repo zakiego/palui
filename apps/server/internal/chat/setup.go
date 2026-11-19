@@ -221,7 +221,7 @@ func SetupNote(changes []string) string {
 	for _, c := range changes {
 		lines = append(lines, "- "+c)
 	}
-	lines = append(lines, "So an earlier reply that doesn't match what you can do or see now was right for its time. Explain the difference as this change, not as your mistake.")
+	lines = append(lines, "This is background for you, not something to report. Mention it only when the newest message asks about it or about something it changed, or to explain an earlier reply that doesn't match what you can do or see now: that reply was right for its time, so explain the difference as this change, not as your mistake. Otherwise answer the message and leave the update out.")
 	return strings.Join(lines, "\n")
 }
 
