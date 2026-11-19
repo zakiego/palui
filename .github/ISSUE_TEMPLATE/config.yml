@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/zakiego/palui/security/advisories/new
+    about: Report it privately, not in a public issue.
+  - name: Documentation
+    url: https://palui.zakiego.com/docs
+    about: Setup, connectors, self-hosting and the API.
