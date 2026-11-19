@@ -90,7 +90,7 @@ func mediaMarker(kind, filename string) string {
 	return "[dokumen]"
 }
 
-func messageView(r db.Message, tz string) any {
+func messageView(r db.Message, tz string) *jsonx.Object {
 	var c storedContent
 	_ = r.Content.Decode(&c)
 	own := r.Text
@@ -335,6 +335,11 @@ func RuntimeTools(d *db.DB, turn connectors.TurnInfo, clock func() int64, appURL
 		}
 		set = own
 	}
+	// Searching the chat the turn is in is fine anywhere, groups included:
+	// the answer goes back to the same chat.
+	if pt, ok := ThisChatToolFor(d, turn); ok {
+		set.Set(ThisChatTool, pt)
+	}
 	down, err := agents.CanReadDown(d, turn, clock())
 	if err != nil {
 		return nil, err
@@ -375,5 +380,3 @@ var Runtime = &connectors.Runtime{
 		}, nil
 	},
 }
-
-var _ = jsonx.NewMap[any]
