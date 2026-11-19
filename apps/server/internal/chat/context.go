@@ -189,11 +189,13 @@ func inboundLines(i SystemInput) []string {
 		out = append(out, "In this group you see every message, but you only answer when someone @mentions you or replies to one of your messages. Those messages are labeled \"to you\" after the sender's name, like [Name, to you]. Answer every message labeled \"to you\" since your last reply: when more than one person addressed you, answer each of them in the same reply, by name, and don't drop the earlier ones because newer talk came after them. The other messages are the group's talk, there as context: never answer them on their own, only use them to understand the messages addressed to you. A photo in that talk shows only as [gambar dari sebelumnya] (with its caption, when it had one): you see a photo when it comes with the message that mentions you or replies to you, so ask for it again that way. Contact cards show as [contact: name, number], locations as [location: ...] and polls as [poll: ...], so you can read those. You only see the recent talk here. When someone asks about something said or shared in this group earlier (a number, contact, address, link) and it isn't in front of you, search this chat's older messages with search_this_chat first, and only say you can't find it after that. You only see what was said since you joined this group.")
 	}
 	if i.Inbound != nil {
-		voice := "Voice notes reach you only as a note that they couldn't be transcribed, so you can't hear them."
+		// A note that wasn't transcribed carries its own reason and fix.
+		why := " When one wasn't transcribed, its [voice] note says why, and for the owner it carries the dashboard link that fixes it: give them that reason and link as they are, never a reason of your own."
+		voice := "Voice notes aren't transcribed for you right now: each reaches you as a [voice] note instead of the words, so you can't hear it. Ask the sender to type it." + why
 		if i.Inbound.Voice {
-			voice = "Voice notes reach you as a transcript, marked [voice]."
+			voice = "Voice notes reach you as a transcript, marked [voice]." + why
 			if i.Shared != nil {
-				voice = "The owner's voice notes reach you as a transcript, marked [voice]. Anyone else's reach you only as a note that they weren't transcribed, so ask them to type it."
+				voice = "The owner's voice notes reach you as a transcript, marked [voice]. Anyone else's reach you only as a note that they weren't transcribed, so ask them to type it." + why
 			}
 		}
 		media := "Besides text, photos sent with a message are shown to you as images, and small text files (txt, csv, json, code and the like) are inlined as [file: name]. Other files reach you by name only. " + voice

@@ -26,6 +26,8 @@ const (
 	// Sent once, on the second failure, so a short blip stays silent.
 	RetryHoldText      = "Lagi ada gangguan koneksi. Pesannya aku simpan, nanti aku jawab sendiri begitu nyambung lagi."
 	RetryHoldOwnerText = "Model lagi gak bisa dihubungi (%s). Pesannya aku simpan, nanti aku coba lagi otomatis."
+	// Sent once, on the second failed transcription of the owner's voice note.
+	RetryVoiceHoldText = "Voice note-mu belum bisa ditranskrip (%s). Audionya aku simpan, nanti aku coba lagi otomatis."
 	// A retried message that outlived the window after a restart.
 	RetryExpiredText = "Maaf, pesan tadi gak sempat kejawab karena gangguan. Kirim ulang ya kalau masih perlu."
 )
@@ -240,11 +242,17 @@ func (e *Engine) fireRetry(chatID string) {
 // RetryNow runs every waiting retry at once: a connector just came back on.
 func (e *Engine) RetryNow() {
 	e.mu.Lock()
-	var chatIDs []string
+	var chatIDs, voiceIDs []string
 	for id := range e.retrying {
 		chatIDs = append(chatIDs, id)
 	}
+	for id := range e.mediaRetry {
+		voiceIDs = append(voiceIDs, id)
+	}
 	e.mu.Unlock()
+	for _, id := range voiceIDs {
+		e.fireMediaRetry(id)
+	}
 	if len(chatIDs) > 0 {
 		e.Ctx.Log.Info("connector back on; retrying failed turns now", logx.Fields{"chats": len(chatIDs)})
 	}
@@ -261,6 +269,9 @@ func (e *Engine) RetryWaiting() []string {
 	for _, w := range e.retrying {
 		out = append(out, w.ids...)
 	}
+	for id := range e.mediaRetry {
+		out = append(out, id)
+	}
 	slices.Sort(out)
 	return out
 }
@@ -274,6 +285,85 @@ func (e *Engine) stopRetries() {
 		}
 	}
 	e.retrying = nil
+	for _, w := range e.mediaRetry {
+		w.timer.Stop()
+	}
+	e.mediaRetry = nil
+}
+
+// --- voice notes -----------------------------------------------------------------------------
+//
+// An owner's voice note whose transcription failed for a temporary reason
+// gets the same backoff, cap and window as a turn. It waits apart from the
+// turn retries: it goes back through dispatch (PrepareMedia), never straight
+// into a turn, so a newer message can't pull it in untranscribed.
+
+type mediaWait struct {
+	chatID string
+	timer  *time.Timer
+}
+
+// retryTranscription queues the voice note for another try. False when the
+// retries are used up (or the note is too old), so the caller reports the
+// failure in the note instead.
+func (e *Engine) retryTranscription(chat db.Chat, row db.Message, cause *TranscribeLaterError) (bool, error) {
+	c := e.Ctx
+	ids := []string{row.ID}
+	plan, err := planRetry(c, ids, "", cause, true)
+	if err != nil {
+		return false, err
+	}
+	if !plan.ok {
+		c.Log.Warn("voice note not transcribed; not retried", logx.Fields{"message_id": row.ID, "reason": plan.reason, "error": cause.Cause})
+		c.event(events.Input{Kind: "turn.retry_exhausted", Level: "warn", Message: fmt.Sprintf("Voice note %s wasn't transcribed and wasn't retried: %s", row.ID, plan.reason), Data: obj("messageIds", ids)}, c.Clock())
+		return false, nil
+	}
+	if err := requeue(c, ids, "", plan, cause.Error()); err != nil {
+		return false, err
+	}
+	if plan.attempt == 2 {
+		c.send(chat, fmt.Sprintf(RetryVoiceHoldText, shortError(cause.Cause)), "system", SendExtra{})
+	}
+	e.scheduleMediaRetry(chat.ID, row.ID, plan.delayMs)
+	return true, nil
+}
+
+func (e *Engine) scheduleMediaRetry(chatID, messageID string, delayMs int64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.Ctx.Draining() {
+		return
+	}
+	if e.mediaRetry == nil {
+		e.mediaRetry = map[string]*mediaWait{}
+	}
+	if w := e.mediaRetry[messageID]; w != nil {
+		w.timer.Stop()
+	}
+	e.mediaRetry[messageID] = &mediaWait{chatID: chatID, timer: time.AfterFunc(time.Duration(delayMs)*time.Millisecond, func() { e.fireMediaRetry(messageID) })}
+}
+
+// fireMediaRetry routes the voice note again. While its last dispatch is
+// still winding down, it waits a moment, so the route isn't skipped.
+func (e *Engine) fireMediaRetry(messageID string) {
+	e.mu.Lock()
+	w := e.mediaRetry[messageID]
+	if w == nil {
+		e.mu.Unlock()
+		return
+	}
+	w.timer.Stop()
+	if e.routed[messageID] {
+		w.timer = time.AfterFunc(20*time.Millisecond, func() { e.fireMediaRetry(messageID) })
+		e.mu.Unlock()
+		return
+	}
+	delete(e.mediaRetry, messageID)
+	e.mu.Unlock()
+	if e.Ctx.Draining() {
+		return
+	}
+	e.routeInOrder(w.chatID, messageID)
 }
 
 // dropExpired drops retried messages that outlived the retry window (a

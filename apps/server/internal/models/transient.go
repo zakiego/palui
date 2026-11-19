@@ -50,6 +50,18 @@ func IsTransient(err error) bool {
 		}
 		return transientText.MatchString(se.Message+" "+se.Type) && !exhaustedText.MatchString(se.Message)
 	}
+	// Any other provider error that carries its HTTP status (the voice
+	// connector's), read the same way.
+	var hs interface{ HTTPStatus() int }
+	if errors.As(err, &hs) {
+		s := hs.HTTPStatus()
+		switch {
+		case s == 429 || s == 408 || s == 409 || s >= 500:
+			return !exhaustedText.MatchString(err.Error())
+		case s >= 400:
+			return false
+		}
+	}
 	var ne net.Error
 	if errors.As(err, &ne) {
 		return true

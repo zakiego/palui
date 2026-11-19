@@ -65,6 +65,10 @@ type Error struct {
 func (e *Error) Error() string  { return e.Message }
 func (e *Error) JSName() string { return "VoiceError" }
 
+// HTTPStatus is the provider's status (0 when the request never got one), so
+// callers can tell a rate limit or outage from a bad key.
+func (e *Error) HTTPStatus() int { return e.Status }
+
 var ext = map[string]string{
 	"audio/ogg": "ogg", "audio/opus": "opus", "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/x-m4a": "m4a",
 	"audio/aac": "aac", "audio/wav": "wav", "audio/x-wav": "wav", "audio/webm": "webm",

@@ -671,7 +671,7 @@ func TestBuildSystemInbound(t *testing.T) {
 		p := chat.BuildSystem(in)
 		contains(t, p, "photos sent with a message are shown to you as images")
 		contains(t, p, "small text files")
-		contains(t, p, "so you can't hear them")
+		contains(t, p, "so you can't hear it")
 		// Guests' media reaches the model too, so a shared chat says nothing else.
 		notContains(t, p, "Only the owner's photos")
 		notContains(t, p, "can't see what they sent")
