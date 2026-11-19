@@ -20,6 +20,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 - Changed: The image is distroless, 37 MB with no shell. Backup, pre-deploy and the restore drill do file work in a small Alpine helper container. ([#154](https://github.com/zakiego/palui/pull/154))
 - Changed: `/health` lists connectors only for the signed-in owner and local requests, and every response sets nosniff, frame and referrer headers.
+- Fixed: The image builds with Go 1.26.11, which patches 30 standard library security issues in the HTTP server, TLS and certificate checks.
 
 ## 0.12.0 (2026-11-20)
 
