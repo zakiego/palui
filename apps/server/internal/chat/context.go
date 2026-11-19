@@ -30,6 +30,8 @@ const (
 	// once, so its first message (and the cached prefix after it) holds for
 	// several turns.
 	HistoryStep = 10
+	// EarlierImage stands in for a photo whose bytes the model doesn't get.
+	EarlierImage = "[gambar dari sebelumnya]"
 )
 
 var zoneAbbrs = map[string]string{
@@ -793,6 +795,20 @@ func ToModelMessages(rows []db.Message, withImages map[string]bool, calls []Tool
 			}
 			body = strings.Join(bits, "\n\n")
 		}
+		// An image whose bytes aren't sent shows as a placeholder. A sticker's
+		// text already says it's a sticker, so it gets none. With no caption
+		// the placeholder is the body, so group talk still says who sent it.
+		placeholders := 0
+		sticker := strings.HasPrefix(own, "[sticker") || strings.HasPrefix(own, "[animated sticker")
+		for _, m := range c.Media {
+			if m.Kind == "image" && !sticker && !(withImages[r.ID] && m.Data != nil && *m.Data != "") {
+				placeholders++
+			}
+		}
+		if body == "" && placeholders > 0 && labelSenders {
+			body = strings.TrimSpace(strings.Repeat(EarlierImage+" ", placeholders))
+			placeholders = -1
+		}
 		text := body
 		if labelSenders && body != "" {
 			label := SenderLabel(r.FromOwner, r.SenderName, r.SenderID)
@@ -810,8 +826,8 @@ func ToModelMessages(rows []db.Message, withImages map[string]bool, calls []Tool
 			}
 			if withImages[r.ID] && m.Data != nil && *m.Data != "" {
 				parts = append(parts, models.ImagePart(*m.Data, m.MimeType))
-			} else {
-				parts = append(parts, models.TextPart("[gambar dari sebelumnya]"))
+			} else if placeholders > 0 {
+				parts = append(parts, models.TextPart(EarlierImage))
 			}
 		}
 		if len(parts) == 0 {
