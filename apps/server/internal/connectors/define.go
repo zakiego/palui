@@ -475,3 +475,7 @@ type LiveStatus struct {
 	Detail  *string       `json:"detail"`
 	Live    *jsonx.Object `json:"live"`
 }
+
+// TranscriberTypes are the connector types whose runtime can Transcribe
+// voice notes.
+var TranscriberTypes = []string{"voice"}

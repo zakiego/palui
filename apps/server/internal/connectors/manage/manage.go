@@ -224,6 +224,19 @@ func SaveDraft(q db.Q, in DraftInput, masterKey string, now int64) (db.Connector
 	if err != nil {
 		return row, err
 	}
+	// A new transcriber is for the owner's voice notes first: their own agent
+	// starts using it without a second switch to find.
+	if !found && slices.Contains(connectors.TranscriberTypes, m.ID) {
+		on, err := agents.TurnOnDefaultVoice(q, now)
+		if err != nil {
+			return row, err
+		}
+		if on {
+			if _, err := events.Log(q, events.Input{ConnectorID: &row.ID, Kind: "agent.voice", Message: "Voice notes turned on for the default agent"}, now); err != nil {
+				return row, err
+			}
+		}
+	}
 	// A draft can set or clear the no-private-data mark too (a changed URL
 	// clears it): leave the same trail setConnectorDataFn does.
 	if m.ID == "mcp" {
