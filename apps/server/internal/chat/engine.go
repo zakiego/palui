@@ -6,6 +6,7 @@ package chat
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -81,6 +82,8 @@ type Engine struct {
 	lastAutoPrune  int64
 	// Message turns waiting for a retry, by chat.
 	retrying map[string]*retryWait
+	// Voice notes waiting for another transcription try, by message id.
+	mediaRetry map[string]*mediaWait
 }
 
 // NewEngine is createEngine.
@@ -402,10 +405,24 @@ func (e *Engine) dispatch(chat db.Chat, row db.Message) (*Route, error) {
 	if err != nil {
 		return nil, err
 	}
-	row, err = PrepareMedia(context.Background(), c.DB, row, c.Host.Running(), agent.TranscribeVoice, c.Log)
+	voice := VoiceSetup{On: agent.TranscribeVoice, AppURL: c.AppURL, AgentSlug: agent.Slug}
+	prepared, err := PrepareMedia(context.Background(), c.DB, row, c.Host.Running(), voice, c.Log)
+	var later *TranscribeLaterError
+	if errors.As(err, &later) {
+		retried, rerr := e.retryTranscription(chat, row, later)
+		if rerr != nil {
+			return nil, rerr
+		}
+		if retried {
+			return nil, nil
+		}
+		voice.Final = true
+		prepared, err = PrepareMedia(context.Background(), c.DB, row, c.Host.Running(), voice, c.Log)
+	}
 	if err != nil {
 		return nil, err
 	}
+	row = prepared
 	content := ParseContent(row.Content)
 	reply := ""
 	if row.ReplyToChannelMsgID != nil {

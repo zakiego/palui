@@ -8,6 +8,7 @@ package chat
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/logx"
+	"github.com/zakiego/palui/apps/server/internal/models"
 	"github.com/zakiego/palui/apps/server/internal/secret"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 )
@@ -234,11 +236,65 @@ func mediaEntry(pairs ...any) *jsonx.Object {
 	return o
 }
 
+// VoiceSetup is what PrepareMedia knows about voice notes for the chat's agent.
+type VoiceSetup struct {
+	// On: the agent has voice notes on (agents.transcribe_voice).
+	On bool
+	// AppURL and AgentSlug build the dashboard links the note gives the owner
+	// ("" leaves them out).
+	AppURL    string
+	AgentSlug string
+	// Final: retries are used up, so a temporary failure is reported in the
+	// note instead of asking for another try.
+	Final bool
+}
+
+// TranscribeLaterError: an owner's voice note couldn't be transcribed for a
+// temporary reason (the provider down or rate limited, the voice connector
+// still starting). The row is left untouched, audio included, so dispatch
+// can try again.
+type TranscribeLaterError struct{ Cause string }
+
+func (e *TranscribeLaterError) Error() string {
+	return "voice note transcription failed for a temporary reason: " + e.Cause
+}
+
+// voiceNote is the text the model sees for a voice note that wasn't
+// transcribed: why, and what the owner can do about it.
+func voiceNote(why string) string { return "[voice] (pesan suara, gak ditranskrip: " + why + ")" }
+
+func (v VoiceSetup) link(path string) string {
+	if v.AppURL == "" {
+		return ""
+	}
+	return strings.TrimRight(v.AppURL, "/") + path
+}
+
+// statusCoder is an error that carries the provider's HTTP status
+// (voice.Error).
+type statusCoder interface{ HTTPStatus() int }
+
+// transcriberRow is the enabled-or-not transcriber connector, when one is set
+// up but isn't running.
+func transcriberRow(q db.Q) (db.Connector, bool, error) {
+	args := make([]any, len(connectors.TranscriberTypes))
+	for i, t := range connectors.TranscriberTypes {
+		args[i] = t
+	}
+	return db.One(q.QueryRow("SELECT "+db.ConnectorCols+" FROM connectors WHERE type IN ("+placeholders(len(args))+") ORDER BY enabled DESC, sort_order ASC, created_at ASC LIMIT 1", args...), db.ScanConnector)
+}
+
 // PrepareMedia is prepareMedia: audio becomes "[voice] ..." text through the
 // first running connector with Transcribe when the chat's agent has voice
-// notes on (transcribe), small text documents are inlined. Images stay as
-// base64 parts for the vision role. Updates the row.
-func PrepareMedia(ctx context.Context, q db.Q, row db.Message, running []connectors.RunningEntry, transcribe bool, log *logx.Logger) (db.Message, error) {
+// notes on, small text documents are inlined. Images stay as base64 parts for
+// the vision role. Updates the row.
+//
+// An owner's voice note that isn't transcribed says why (switched off for the
+// agent, no transcriber, the provider failed) with the dashboard link that
+// fixes it, and keeps its audio on the row so it can be transcribed later. A
+// temporary failure returns *TranscribeLaterError without touching the row,
+// unless voice.Final.
+func PrepareMedia(ctx context.Context, q db.Q, row db.Message, running []connectors.RunningEntry, voice VoiceSetup, log *logx.Logger) (db.Message, error) {
 	c := ParseContent(row.Content)
 	needs := false
 	for _, m := range c.Media {
@@ -277,21 +333,81 @@ func PrepareMedia(ctx context.Context, q db.Q, row db.Message, running []connect
 				kept = append(kept, mediaEntry("kind", "audio", "mimeType", m.MimeType, "note", "guest, not transcribed"))
 				continue
 			}
-			if !transcribe {
-				texts = append(texts, "[voice] (pesan suara, tapi transkripsi voice note lagi mati buat agent ini)")
-				kept = append(kept, mediaEntry("kind", "audio", "mimeType", m.MimeType, "note", "transcription off for this agent"))
+			// skip: not transcribed; the audio stays so it can be later.
+			skip := func(why, note string) {
+				texts = append(texts, voiceNote(why))
+				e := mediaEntry("kind", "audio", "mimeType", m.MimeType, "note", note)
+				if data != "" {
+					e.Set("data", data)
+				}
+				kept = append(kept, e)
+			}
+			if data == "" {
+				skip("audionya gagal diambil dari channel, jadi gak ada yang bisa ditranskrip. Minta kirim ulang", "audio missing")
 				continue
 			}
-			if transcriber == nil || data == "" {
-				texts = append(texts, "[voice] (pesan suara, tapi gak ada skill transkripsi yang nyala)")
-				kept = append(kept, mediaEntry("kind", "audio", "mimeType", m.MimeType, "note", "not transcribed"))
+			if !voice.On {
+				why := "transkripsi voice note dimatiin buat agent ini"
+				if l := voice.link("/app/agents/" + voice.AgentSlug + "?tab=settings"); l != "" && voice.AgentSlug != "" {
+					why += ". Nyalain lewat switch Voice notes di " + l
+				}
+				skip(why, "transcription off for this agent")
+				continue
+			}
+			if transcriber == nil {
+				conn, found, err := transcriberRow(q)
+				if err != nil {
+					return row, err
+				}
+				switch {
+				case !found:
+					why := "belum ada connector transkripsi suara (Voice)"
+					if l := voice.link("/app/connectors/new"); l != "" {
+						why += ". Tambahin di " + l
+					}
+					skip(why, "no transcriber set up")
+				case !conn.Enabled:
+					why := fmt.Sprintf("connector transkripsi suara (%s) lagi dimatiin", conn.Label)
+					if l := voice.link("/app/connectors/" + conn.ID); l != "" {
+						why += ". Nyalain di " + l
+					}
+					skip(why, "transcriber off")
+				case !voice.Final:
+					// On but not up yet (starting, restarting after an error).
+					return row, &TranscribeLaterError{Cause: fmt.Sprintf("%s is %s", conn.ID, conn.Status)}
+				default:
+					why := fmt.Sprintf("connector transkripsi suara (%s) lagi gak jalan (%s)", conn.Label, conn.Status)
+					if conn.StatusDetail != nil && *conn.StatusDetail != "" {
+						why += ": " + shortError(*conn.StatusDetail)
+					}
+					why += ". Audionya disimpan"
+					if l := voice.link("/app/connectors/" + conn.ID); l != "" {
+						why += ". Cek di " + l
+					}
+					skip(why, "transcriber not running")
+				}
 				continue
 			}
 			said, err := safeTranscribe(ctx, transcriber.Handle, connectors.InboundMedia{Kind: "audio", MimeType: m.MimeType, Data: data})
 			if err != nil {
-				log.Warn("transcription failed", logx.Fields{"connector_id": transcriber.ID, "error": err})
-				texts = append(texts, "[voice] (pesan suara, transkripsinya gagal)")
-				kept = append(kept, mediaEntry("kind", "audio", "mimeType", m.MimeType, "note", "transcription failed"))
+				log.Warn("transcription failed", logx.Fields{"connector_id": transcriber.ID, "message_id": row.ID, "error": err})
+				transient := models.IsTransient(err)
+				if transient && !voice.Final {
+					return row, &TranscribeLaterError{Cause: shortError(err.Error())}
+				}
+				var sc statusCoder
+				switch {
+				case errors.As(err, &sc) && sc.HTTPStatus() == 413:
+					skip("voice note-nya kepanjangan buat ditranskrip. Minta diketik atau dipecah jadi beberapa voice note", "too long")
+				case transient:
+					skip(fmt.Sprintf("transkripsinya gagal karena gangguan sementara (%s), udah dicoba ulang beberapa kali. Audionya disimpan", shortError(err.Error())), "transcription failed after retries")
+				default:
+					why := fmt.Sprintf("transkripsinya gagal (%s). Audionya disimpan", shortError(err.Error()))
+					if l := voice.link("/app/connectors/" + transcriber.ID); l != "" {
+						why += ". Cek connector-nya di " + l
+					}
+					skip(why, "transcription failed")
+				}
 				continue
 			}
 			texts = append(texts, "[voice] "+strx.Trim(said))

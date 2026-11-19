@@ -407,10 +407,11 @@ func TestInbox(t *testing.T) {
 		})))
 		h.Engine.Idle()
 		row := need(db.ScanMessage(d.QueryRow("SELECT " + db.MessageCols + " FROM messages WHERE role = 'user'")))
-		eq(t, row.Text, "[voice] (pesan suara, tapi transkripsi voice note lagi mati buat agent ini)")
+		contains(t, row.Text, "[voice] (pesan suara, gak ditranskrip: transkripsi voice note dimatiin buat agent ini. Nyalain lewat switch Voice notes di ")
+		contains(t, row.Text, "/app/agents/palui?tab=settings")
 		contains(t, string(row.Content), `"note":"transcription off for this agent"`)
 		eq(t, calls, 0)
-		contains(t, models.PromptText(m.Prompts[0]), "Voice notes reach you only as a note that they couldn't be transcribed")
+		contains(t, models.PromptText(m.Prompts[0]), "Voice notes aren't transcribed for you right now")
 		h.Engine.Stop(100)
 	})
 
@@ -658,14 +659,14 @@ func TestPrepareMediaGuestVoice(t *testing.T) {
 	audio := []connectors.InboundMedia{{Kind: "audio", MimeType: "audio/ogg", Data: base64.StdEncoding.EncodeToString([]byte("x"))}}
 	_, guest, err := chat.WriteInbound(d, tgMsg("", func(m *connectors.InboundMessage) { m.Media = audio }), 1, false)
 	testutil.Must(t, err)
-	row := need(chat.PrepareMedia(context.Background(), d, guest, running, true, nil))
+	row := need(chat.PrepareMedia(context.Background(), d, guest, running, chat.VoiceSetup{On: true}, nil))
 	eq(t, row.Text, "[voice] (pesan suara dari tamu, gak ditranskrip)")
 	eq(t, calls, 0)
 	contains(t, string(row.Content), `"note":"guest, not transcribed"`)
 
 	_, own, err := chat.WriteInbound(d, tgMsg("", func(m *connectors.InboundMessage) { m.Media = audio }), 2, true)
 	testutil.Must(t, err)
-	row = need(chat.PrepareMedia(context.Background(), d, own, running, true, nil))
+	row = need(chat.PrepareMedia(context.Background(), d, own, running, chat.VoiceSetup{On: true}, nil))
 	eq(t, row.Text, "[voice] halo")
 	eq(t, calls, 1)
 }

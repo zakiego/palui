@@ -75,6 +75,21 @@ func ForChat(q db.Q, chatAgentID *string, now int64) (db.Agent, error) {
 	return GetDefault(q, now)
 }
 
+// TurnOnDefaultVoice turns voice notes on for the default agent (the owner's
+// own) when a transcriber is first added, so adding one is enough to get the
+// owner's voice notes transcribed. Other agents stay as they are. True when
+// it changed something.
+func TurnOnDefaultVoice(q db.Q, now int64) (bool, error) {
+	a, err := GetDefault(q, now)
+	if err != nil || a.TranscribeVoice {
+		return false, err
+	}
+	if _, err := q.Exec("UPDATE agents SET transcribe_voice = 1, updated_at = ? WHERE id = ?", now, a.ID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // ServesChat is ForChat(...).ID == agentID.
 func ServesChat(q db.Q, agentID string, chatAgentID *string, now int64) (bool, error) {
 	a, err := ForChat(q, chatAgentID, now)

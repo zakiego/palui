@@ -61,7 +61,7 @@ func TestEndToEndOnTheSeededDatabase(t *testing.T) {
 	// /health on the TS-written database.
 	code, m := getJSON(t, base+"/health")
 	rt, _ := m["runtime"].(map[string]any)
-	if code != 200 || m["ok"] != true || m["schema"] != "0025_session_setup_snapshot" || rt["ok"] != true || len(m["connectors"].([]any)) < 30 {
+	if code != 200 || m["ok"] != true || m["schema"] != "0026_default_agent_voice_notes" || rt["ok"] != true || len(m["connectors"].([]any)) < 30 {
 		t.Fatalf("%d %v", code, m)
 	}
 

@@ -326,3 +326,36 @@ func TestDeletingAnAgentLeavesItsSharedConnectorsWithTheOthers(t *testing.T) {
 		t.Fatal("other", ids, on)
 	}
 }
+
+// rpt_0mwmyqranb28lw1ivey: a voice connector added after the per-agent switch
+// shipped left the owner's own agent off. Adding the first transcriber now
+// turns voice notes on for the default agent; other agents and later saves
+// leave the switch alone.
+func TestNewVoiceConnectorTurnsOnTheDefaultAgent(t *testing.T) {
+	d := testutil.DB(t)
+	def, err := agents.GetDefault(d, 1000)
+	testutil.Must(t, err)
+	other, err := agents.Create(d, agents.Input{Slug: "kebun", Name: ptr("Kebun"), Persona: ptr("Kamu agent kebun.")}, 1000)
+	testutil.Must(t, err)
+	if def.TranscribeVoice || other.TranscribeVoice {
+		t.Fatal("agents start off")
+	}
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "voice", Type: "voice", Secrets: secrets("elevenLabsKey", "sk_1234567890abcdef")}, testutil.TestKey, 2000)
+	testutil.Must(t, err)
+	def, _, _ = agents.Get(d, def.ID)
+	other, _, _ = agents.Get(d, other.ID)
+	if !def.TranscribeVoice || other.TranscribeVoice {
+		t.Fatalf("default %v (want on), other %v (want off)", def.TranscribeVoice, other.TranscribeVoice)
+	}
+	// The owner turns it off again; editing the connector keeps it off.
+	no := false
+	_, err = agents.Update(d, def.ID, agents.Input{TranscribeVoice: &no}, 3000)
+	testutil.Must(t, err)
+	_, err = manage.SaveDraft(d, manage.DraftInput{ID: "voice", Type: "voice", Config: config("language", "en")}, testutil.TestKey, 4000)
+	testutil.Must(t, err)
+	def, _, _ = agents.Get(d, def.ID)
+	if def.TranscribeVoice {
+		t.Fatal("a later save turned it back on")
+	}
+}
+func ptr[T any](v T) *T { return &v }
