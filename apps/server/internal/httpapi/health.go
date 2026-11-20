@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/zakiego/palui/apps/server/internal/auth"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/logx"
@@ -82,10 +83,14 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list := []healthConnector{}
+	// Anyone on the internet can read /health, and the connector list names
+	// every service the owner connected, so strangers get an empty list.
 	// A schema that's behind shows up in `schema` below; don't fail on it here.
-	if rows, err := connectors.List(s.o.DB); err == nil {
-		for _, c := range rows {
-			list = append(list, healthConnector{ID: c.ID, Status: c.Status})
+	if s.showConnectors(r) {
+		if rows, err := connectors.List(s.o.DB); err == nil {
+			for _, c := range rows {
+				list = append(list, healthConnector{ID: c.ID, Status: c.Status})
+			}
 		}
 	}
 	schema := st.Version
@@ -118,6 +123,16 @@ const AdminHeader = "x-palui-control"
 // RuntimeDown is runtime.ts RUNTIME_DOWN, for calls that need the runtime
 // while it isn't running.
 const RuntimeDown = "The runtime isn't reachable. Check docker compose logs runtime."
+
+// showConnectors: the caller is signed in, or is a direct loopback request
+// (the container healthcheck, a curl on the host) that no proxy forwarded.
+func (s *Server) showConnectors(r *http.Request) bool {
+	if loopback(r.RemoteAddr) && r.Header.Get("cf-connecting-ip") == "" && r.Header.Get("x-forwarded-for") == "" {
+		return true
+	}
+	f, err := auth.GetSession(s.o.DB, auth.TokenFrom(r), false, s.now())
+	return err == nil && f != nil
+}
 
 func loopback(remote string) bool {
 	host := remote

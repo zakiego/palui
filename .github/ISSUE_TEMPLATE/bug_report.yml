@@ -1,0 +1,49 @@
+name: Bug report
+description: Something in Palui doesn't work the way the docs say it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Found a security problem? Don't open an issue. See SECURITY.md for how to report it privately.
+        Remove tokens, phone numbers and chat content from anything you paste below.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add the Telegram connector
+        2. Send "/status"
+        3. ...
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`version` from `GET /health`, or `docker compose exec app palui version`."
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Chat or channels (WhatsApp, Telegram, web chat)
+        - Connectors or tools
+        - Reminders, jobs or flows
+        - Dashboard
+        - Self-hosting (Docker, backups, upgrades)
+        - Docs site
+        - Other
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant lines from `docker compose logs app`. Secrets are redacted in the logs, but check before you paste.
+      render: shell

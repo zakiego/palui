@@ -32,13 +32,18 @@ const VERSION_LIKE = /^## v?\d/
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/
 // Every released entry ends with the PR (or PRs) that made it:
 // ([#123](https://github.com/zakiego/palui/pull/123)), comma-separated for several.
+// PRs merged before the project moved to its public repository (#155 and
+// below) live in the old private one, so their entries cite them as plain
+// "old #N" instead of a link that would open an unrelated PR.
 export const PR_URL = "https://github.com/zakiego/palui/pull/"
-const PR_REF = String.raw`\[#(\d+)\]\(https://github\.com/zakiego/palui/pull/\1\)`
-const PR_LINK_END = new RegExp(String.raw`\(${PR_REF}(?:, \[#(\d+)\]\(https://github\.com/zakiego/palui/pull/\2\))*\)$`)
+const OLD_PR = String.raw`old #\d+`
+const PR_REF = String.raw`(?:\[#(\d+)\]\(https://github\.com/zakiego/palui/pull/\1\)|${OLD_PR})`
+const MORE_PR_REF = String.raw`(?:\[#(\d+)\]\(https://github\.com/zakiego/palui/pull/\2\)|${OLD_PR})`
+const PR_LINK_END = new RegExp(String.raw`\(${PR_REF}(?:, ${MORE_PR_REF})*\)$`)
 // An entry says what the owner will notice in a sentence or two. The why and
 // the edge cases go in the PR body and the docs, which the PR link points to.
 export const MAX_ENTRY_WORDS = 30
-const TRAILING_PR_LINKS = /\s*\((?:\[#\d+\]\([^)]*\)(?:, )?)+\)\s*$/
+const TRAILING_PR_LINKS = /\s*\((?:(?:\[#\d+\]\([^)]*\)|old #\d+)(?:, )?)+\)\s*$/
 
 function entryWords(line: string): number {
   const text = line.slice(2).replace(TRAILING_PR_LINKS, "").replace(TYPED_PREFIX, "")

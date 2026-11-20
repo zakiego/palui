@@ -31,7 +31,7 @@ RUN pnpm --filter @palui/app build
 
 # --- 2. server ---------------------------------------------------------------
 # The tag follows the `go` directive in apps/server/go.mod.
-FROM golang:1.26.0-alpine3.23 AS server
+FROM golang:1.26.11-alpine3.23 AS server
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local
 WORKDIR /src/apps/server
 COPY apps/server/go.mod apps/server/go.sum ./

@@ -43,6 +43,14 @@ describe("checkChangelog", () => {
     expect(problems.join("\n")).toMatch(/line 19: 0.1.0 entry doesn't end with its PR link/)
   })
 
+  it("accepts PRs from the old private repository as plain old #N", () => {
+    const words = (n: number) => Array.from({ length: n }, () => "word").join(" ")
+    const releases = `## 0.1.0 (2026-11-11)\n\n### Chat\n\n- Fixed: ${words(30)} (old #85, old #115)\n- Fixed: Mixed. (old #155, [#2](${PR_URL}2))\n- Fixed: Not old. (new #3)\n`
+    const problems = checkChangelog(sample("Nothing yet.", releases), "0.1.0")
+    expect(problems).toHaveLength(1)
+    expect(problems.join()).toMatch(/line 17: 0.1.0 entry doesn't end with its PR link/)
+  })
+
   it("wants category headings in order and a type on every entry", () => {
     const problems = checkChangelog(sample("### Tools\n\n- Added: One.\n\n### Chat\n\n- Two.\n\n### Misc\n\n- Fixed: Three."), "0.1.0").join("\n")
     expect(problems).toMatch(/"Chat" in Unreleased is out of order/)

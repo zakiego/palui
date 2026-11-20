@@ -1,6 +1,6 @@
 module github.com/zakiego/palui/apps/server
 
-go 1.26.0
+go 1.26.11
 
 require (
 	codeberg.org/readeck/go-readability/v2 v2.1.3
