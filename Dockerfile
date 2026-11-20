@@ -14,7 +14,7 @@
 # change doesn't rerun `go mod download`.
 
 # --- 1. dashboard ------------------------------------------------------------
-FROM node:24-bookworm-slim AS dashboard
+FROM node:26-bookworm-slim AS dashboard
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 WORKDIR /repo
