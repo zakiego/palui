@@ -1,0 +1,33 @@
+---
+title: Model gateway
+description: Use any OpenAI- or Anthropic-compatible endpoint as a model provider, like LiteLLM, OpenRouter or your own proxy. Add as many as you need.
+---
+
+Kind: `model`. A model gateway is any endpoint that speaks the OpenAI or Anthropic API: [LiteLLM](https://docs.litellm.ai/), [OpenRouter](https://openrouter.ai/), a provider's own API, or a proxy you run yourself. You can add several. Each one gets its own id, like `gateway-openrouter`, and each can sit in any role's failover chain.
+
+## Connect
+
+1. On the Connectors page, add a Model gateway and give it a name. The name becomes part of its id.
+2. Enter the base URL: the address before `/v1`, like `https://openrouter.ai/api` or `http://litellm:4000`.
+3. Paste the API key and pick a protocol per role.
+4. Press Test. It calls `GET /v1/models`, then makes a 1-token call for each role this gateway serves. A working connector shows the model list.
+
+## Settings
+
+| Field | Default | Notes |
+|---|---|---|
+| Base URL | | Required. Palui adds `/v1/models`, `/v1/messages` or `/v1/chat/completions`. |
+| API key | | Secret. Write-only, shown masked. Sent as `Authorization: Bearer` and as `x-api-key`. |
+| Protocol per role | `anthropic` | `anthropic` uses `/v1/messages`, `openai` uses `/v1/chat/completions`. |
+
+## Roles and failover
+
+Pick the gateway's models per role in Settings, under Models, the same way as for [CLIProxyAPI](/docs/connectors/cliproxy#roles). Each role has a chain of model connectors. On a 5xx, a 429 or a quota error, Palui tries the next one, so a second gateway makes a good fallback.
+
+## Tools
+
+None. A model connector provides models, not tools.
+
+## Pause and remove
+
+Pausing applies from the next turn and takes the gateway out of every chain. If it was your only model connector that's on, the router sends the fixed "Model lagi off" reply until you turn one back on. Removing deletes the stored API key.

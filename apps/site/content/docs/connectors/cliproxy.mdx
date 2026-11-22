@@ -32,7 +32,7 @@ Palui asks for a model by role, and you pick the model for each role in Settings
 
 ## Failover
 
-Each role has a chain of model connectors. On a 5xx, a 429 or a quota error, Palui tries the next connector in the chain. [ai-gateway](/docs/connectors/ai-gateway) is the usual fallback.
+Each role has a chain of model connectors. On a 5xx, a 429 or a quota error, Palui tries the next connector in the chain. A [Model gateway](/docs/connectors/model-gateway) makes a good fallback.
 
 Each step in a chain can set its own reasoning effort: Default, Off, Minimal, Low, Medium, High, Extra high or Max. Default leaves it to the provider. The effort applies to that step only, so a fallback can think less than the primary. Claude models get it as effort or a thinking budget, OpenAI-style models as `reasoning_effort`.
 

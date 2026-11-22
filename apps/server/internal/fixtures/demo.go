@@ -22,7 +22,7 @@ func demo(k *Kit) {
 	k.Connector("telegram", "telegram", ConnectorOpts{Status: "on", Secrets: sec("botToken", "123456789:AAbbccddeeffgghhiijjkkllmmnnooppqqrr")})
 	k.Connector("whatsapp", "whatsapp", ConnectorOpts{Status: "error", Detail: ptr("Connection closed (440): another session took over this linked device, so Palui paused instead of fighting it")})
 	k.Connector("cliproxy", "cliproxy", ConnectorOpts{Status: "on", Secrets: sec("apiKey", "sk-cliproxy-0123456789abcdef")})
-	k.Connector("ai-gateway", "ai-gateway", ConnectorOpts{Status: "paused", Secrets: sec("apiKey", "zkg_0123456789abcdef")})
+	k.Connector("gateway-litellm", "gateway", ConnectorOpts{Config: obj("baseUrl", "https://llm.example.com"), Status: "paused", Secrets: sec("apiKey", "sk-gateway-0123456789abcdef")})
 	k.Connector("recall", "recall", ConnectorOpts{Status: "connecting", Secrets: sec("apiKey", "rcl_0123456789a91f")})
 	k.Connector("t3code", "t3code", ConnectorOpts{Status: "on", Secrets: sec("pairingCode", "0123456789abcdef"), Config: obj("url", "http://host.docker.internal:3773")})
 	k.Connector("mcp-northwind", "mcp", ConnectorOpts{Label: ptr("Northwind pipeline and property listings for every kabupaten in Jawa Timur"), Status: "on", Config: obj("url", "https://northwind.example.com/mcp")})
@@ -71,7 +71,7 @@ func demo(k *Kit) {
 		var errText *string
 		if i == 3 {
 			status = "error"
-			errText = ptr("429 from CLIProxyAPI: all 4 Claude accounts are rate limited; failed over to ai-gateway which was paused")
+			errText = ptr("429 from CLIProxyAPI: all 4 Claude accounts are rate limited; failed over to gateway-litellm which was paused")
 		}
 		k.Run(Run{ChatID: &chat, Trigger: "message", Model: &model, TokensIn: ptr(4000 + i*1500), TokensOut: ptr(300 + i*40), Status: status, Error: errText, StartedAt: now - i*22*H, Ms: ptr(2000 + i*300)})
 	}

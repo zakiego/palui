@@ -3,8 +3,8 @@
 import type { ConnectorManifest } from "./define"
 import attachments from "./attachments/manifest"
 import chatHistory from "./chats/manifest"
-import aiGateway from "./ai-gateway/manifest"
 import cliproxy from "./cliproxy/manifest"
+import gateway from "./gateway/manifest"
 import gcal from "./gcal/manifest"
 import hooks from "./hooks/manifest"
 import http from "./http/manifest"
@@ -33,7 +33,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   whatsapp,
   web,
   cliproxy,
-  "ai-gateway": aiGateway,
+  gateway,
   recall,
   mcp,
   http,

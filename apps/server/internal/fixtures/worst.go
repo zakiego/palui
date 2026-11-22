@@ -115,10 +115,10 @@ func worst(k *Kit) {
 		return []any{
 			// A connector that was removed after the chain was saved: openrouter.
 			obj("connectorId", "cliproxy", "model", within(worstModelLong, L.model), "effort", "xhigh"),
-			obj("connectorId", "ai-gateway", "model", "claude-sonnet-4-6", "effort", "none"),
+			obj("connectorId", "gateway-litellm", "model", "claude-sonnet-4-6", "effort", "none"),
 			obj("connectorId", "openrouter", "model", "anthropic/claude-opus-4.1:thinking"),
 			obj("connectorId", "cliproxy", "model", "gemini-2.5-flash-preview-with-a-long-model-id"),
-			obj("connectorId", "ai-gateway", "model", "o"),
+			obj("connectorId", "gateway-litellm", "model", "o"),
 			obj("connectorId", "cliproxy", "model", "claude-haiku-4-5-20251001"),
 		}
 	}
@@ -132,7 +132,7 @@ func worst(k *Kit) {
 	k.Connector("web", "web", ConnectorOpts{Status: "on"})
 	k.Connector("cliproxy", "cliproxy", ConnectorOpts{Status: "on", Secrets: sec("apiKey", "sk-cliproxy-0123456789abcdef")})
 	// Enabled but paused: the owner wants it on and it isn't, so it needs attention.
-	k.Connector("ai-gateway", "ai-gateway", ConnectorOpts{Status: "paused", Enabled: ptr(true), Detail: ptr("Paused by the daily token cap (100,000,000 of 100,000,000 used)"), Secrets: sec("apiKey", "zkg_0123456789abcdef")})
+	k.Connector("gateway-litellm", "gateway", ConnectorOpts{Config: obj("baseUrl", "https://llm.example.com"), Status: "paused", Enabled: ptr(true), Detail: ptr("Paused by the daily token cap (100,000,000 of 100,000,000 used)"), Secrets: sec("apiKey", "sk-gateway-0123456789abcdef")})
 	k.Connector("recall", "recall", ConnectorOpts{Status: "connecting", Secrets: sec("apiKey", "rcl_0123456789a91f")})
 	k.Connector(within("mcp-northwind-industries-holdings-internal-knowledge-base-prod", L.connectorID), "mcp", ConnectorOpts{
 		Label:  ptr(within("Northwind Industries Holdings internal knowledge base (production, read-only)", L.connectorLabel)),
@@ -235,7 +235,7 @@ func worst(k *Kit) {
 		TranscribeVoice:      ptr(true),
 		TelegramConnectorID:  ptr("tgbot-arisan"),
 		// Its own six-step default chain (with the removed connector) and fast model; vision follows the global one.
-		ModelRoles: obj("default", sixSteps(), "fast", []any{obj("connectorId", "ai-gateway", "model", "claude-haiku-4-5-20251001")}),
+		ModelRoles: obj("default", sixSteps(), "fast", []any{obj("connectorId", "gateway-litellm", "model", "claude-haiku-4-5-20251001")}),
 	})
 	// An uploaded photo: a small gradient PNG, the shape a browser-resized photo has.
 	cs := k.Agent(Agent{Slug: "cs", Name: "CS", Persona: "Jawab pertanyaan pelanggan Northwind.", GuestTools: "none", AvatarImage: ptr(GradientAvatar48())})
@@ -546,7 +546,7 @@ func worst(k *Kit) {
 		{At: now - 14*MIN, Level: "info", ConnectorID: ptr("hooks"), Kind: "hook", Message: `{"event":"deployment.succeeded","repository":"northwind-industries-holdings/platform-infrastructure","sha":"9f8e7d6c5b4a4c3d8e2f1a0b9c8d7e6f9f8e7d6c","screenshot":"` + worstPastedBlob + `"}`},
 		{At: now + D, Level: "info", ConnectorID: ptr("jobs"), Kind: "job", Message: "Scheduled ahead of time by a host with the wrong clock"},
 		{At: now - 13*MIN, Level: "debug", ConnectorID: ptr("x"), Message: "y"},
-		{At: now - 12*MIN, Level: "warn", ConnectorID: ptr("ai-gateway"), Kind: "status", Message: "paused: Paused by the daily token cap (100,000,000 of 100,000,000 used)"},
+		{At: now - 12*MIN, Level: "warn", ConnectorID: ptr("gateway-litellm"), Kind: "status", Message: "paused: Paused by the daily token cap (100,000,000 of 100,000,000 used)"},
 		{At: now - 11*MIN, Level: "error", ConnectorID: ptr("mcp-northwind-industries-holdings-internal-knowledge-base-prod"), Kind: "status", Message: "error: " + fill(worstStack+"\n", 2000)},
 	} {
 		k.Event(e)

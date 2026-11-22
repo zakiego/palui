@@ -8,11 +8,11 @@ package registry
 
 import (
 	"github.com/zakiego/palui/apps/server/internal/connectors"
-	"github.com/zakiego/palui/apps/server/internal/connectors/aigateway"
 	"github.com/zakiego/palui/apps/server/internal/connectors/attachments"
 	"github.com/zakiego/palui/apps/server/internal/connectors/chats"
 	"github.com/zakiego/palui/apps/server/internal/connectors/cliproxy"
 	"github.com/zakiego/palui/apps/server/internal/connectors/flows"
+	"github.com/zakiego/palui/apps/server/internal/connectors/gateway"
 	"github.com/zakiego/palui/apps/server/internal/connectors/gcal"
 	"github.com/zakiego/palui/apps/server/internal/connectors/hooks"
 	"github.com/zakiego/palui/apps/server/internal/connectors/httpreq"
@@ -48,7 +48,7 @@ func Catalog() []Entry {
 		{"whatsapp", whatsapp.Runtime},
 		{"web", web.Runtime},
 		{"cliproxy", cliproxy.Runtime},
-		{"ai-gateway", aigateway.Runtime},
+		{"gateway", gateway.Runtime},
 		{"recall", recall.Runtime},
 		{"mcp", mcp.Runtime},
 		{"http", httpreq.Runtime},

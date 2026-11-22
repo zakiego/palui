@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/zakiego/palui/apps/server/internal/connectors/aigateway"
 	"github.com/zakiego/palui/apps/server/internal/connectors/cliproxy"
+	"github.com/zakiego/palui/apps/server/internal/connectors/gateway"
 	"github.com/zakiego/palui/apps/server/internal/connectors/gcal"
 	"github.com/zakiego/palui/apps/server/internal/connectors/httpreq"
 	"github.com/zakiego/palui/apps/server/internal/connectors/mcp"
@@ -22,31 +22,31 @@ import (
 )
 
 var configSchemas = map[string]*zod.ObjectS{
-	"telegram":   telegram.ConfigZod,
-	"tgbot":      telegram.ConfigZod,
-	"whatsapp":   whatsapp.ConfigZod,
-	"cliproxy":   cliproxy.GatewayConfigZod("http://host.docker.internal:8317"),
-	"ai-gateway": cliproxy.GatewayConfigZod("http://host.docker.internal:8793"),
-	"recall":     recall.ConfigZod,
-	"mcp":        mcp.ConfigZod,
-	"http":       httpreq.ConfigZod,
-	"gcal":       gcal.ConfigZod,
-	"t3code":     t3code.ConfigZod,
-	"printer":    printer.ConfigZod,
-	"voice":      voice.ConfigZod,
+	"telegram": telegram.ConfigZod,
+	"tgbot":    telegram.ConfigZod,
+	"whatsapp": whatsapp.ConfigZod,
+	"cliproxy": cliproxy.GatewayConfigZod("http://host.docker.internal:8317"),
+	"gateway":  gateway.ConfigZod,
+	"recall":   recall.ConfigZod,
+	"mcp":      mcp.ConfigZod,
+	"http":     httpreq.ConfigZod,
+	"gcal":     gcal.ConfigZod,
+	"t3code":   t3code.ConfigZod,
+	"printer":  printer.ConfigZod,
+	"voice":    voice.ConfigZod,
 }
 
 var secretSchemas = map[string][]zod.Field{
-	"telegram":   telegram.SecretZod,
-	"tgbot":      telegram.SecretZod,
-	"cliproxy":   cliproxy.SecretZod,
-	"ai-gateway": aigateway.SecretZod,
-	"recall":     recall.SecretZod,
-	"mcp":        mcp.SecretZod,
-	"http":       httpreq.SecretZod,
-	"gcal":       gcal.SecretZod,
-	"t3code":     t3code.SecretZod,
-	"voice":      voice.SecretZod,
+	"telegram": telegram.SecretZod,
+	"tgbot":    telegram.SecretZod,
+	"cliproxy": cliproxy.SecretZod,
+	"gateway":  gateway.SecretZod,
+	"recall":   recall.SecretZod,
+	"mcp":      mcp.SecretZod,
+	"http":     httpreq.SecretZod,
+	"gcal":     gcal.SecretZod,
+	"t3code":   t3code.SecretZod,
+	"voice":    voice.SecretZod,
 }
 
 func TestManifestsMatchTheTSBuildInCatalogOrder(t *testing.T) {
