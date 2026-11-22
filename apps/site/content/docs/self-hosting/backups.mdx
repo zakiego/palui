@@ -31,6 +31,28 @@ It keeps the 3 newest snapshots in `/data/backups/`. They're your quick way back
 
 It refuses to run with under 500 MB free and logs every step to its own log file, trimmed once it passes 1 MB.
 
+### Host settings
+
+The ops scripts (`backup.sh`, `pre-deploy.sh`, `restore-drill.sh` and the two installers) read their paths from the environment, then from `~/.config/palui/host.conf` (or the file in `PALUI_HOST_CONF`), then fall back to defaults. `host.conf` holds `KEY=value` lines and may use `$HOME`. Quote a value that has spaces.
+
+| Setting | Default | What it is |
+|---|---|---|
+| `PALUI_DIR` | `~/palui` | The checkout with `compose.yaml` |
+| `PALUI_HOST_DIR` | `~/.palui` | Where the installed scripts (`bin/`) and their logs live |
+| `PALUI_LAUNCHD_PREFIX` | `palui` | launchd labels become `<prefix>-backup` and `<prefix>-host-bridge` |
+| `CF_WRAPPER` | `cf` | The command the backup and the drill use for R2. Point it at a wrapper if `cf` alone doesn't log in to the right Cloudflare account. |
+| `BACKUP_BUCKET` | `palui-backups` | The R2 bucket |
+
+For example:
+
+```bash
+PALUI_DIR=$HOME/apps/palui
+PALUI_HOST_DIR=$HOME/apps
+CF_WRAPPER=$HOME/bin/cf-personal
+```
+
+Changing the prefix or the host directory installs a new agent next to the old one. Remove the old one with `launchctl bootout gui/$(id -u)/<old label>` and delete its plist from `~/Library/LaunchAgents`.
+
 The app image has no shell, so the plain file work (listing the stores, the tar, the cleanup) runs in a small pinned Alpine container that borrows the app's volume, as the same user and with no network. `palui-backup.sh --dry-run` does everything except the upload, so you can test it without R2 credentials.
 
 ### Setting up the key
@@ -38,7 +60,7 @@ The app image has no shell, so the plain file work (listing the stores, the tar,
 The backup only ever needs the public key, which the job reads from `~/.config/palui/age-recipient` in your own home directory (override it with `AGE_RECIPIENT_FILE`). The private key (the age identity) goes straight into the macOS Keychain, never into a file on the host or the repo:
 
 ```bash
-brew install age
+brew install age   # or your package manager
 mkdir -p ~/.config/palui
 security add-generic-password -s palui-backup-age-identity -a palui \
   -w "$(age-keygen 2>/dev/null | grep AGE-SECRET-KEY)"

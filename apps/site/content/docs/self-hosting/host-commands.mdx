@@ -19,9 +19,9 @@ ops/install-host-bridge.sh
 
 The script:
 
-1. Builds the bridge into one file, `~/selfhost/bin/palui-host-bridge.mjs`.
+1. Builds the bridge into one file, `~/.palui/bin/palui-host-bridge.mjs` (the folder is `PALUI_HOST_DIR`, see [host settings](/docs/self-hosting/backups#host-settings)).
 2. On the first run, writes `~/.config/palui/host-bridge.json` with a fresh token and two read-only starter commands. The token is printed, and it's always the `token` field in that file.
-3. Installs a LaunchAgent that keeps the bridge running on `127.0.0.1:4893`, then checks that it answers. The log is `~/selfhost/palui-host-bridge.log`.
+3. Installs a LaunchAgent that keeps the bridge running on `127.0.0.1:4893`, then checks that it answers. The log is `~/.palui/palui-host-bridge.log`.
 
 The bridge listens on loopback only. Docker Desktop and OrbStack route `host.docker.internal` to the host's loopback, so the Palui container still reaches it.
 
@@ -45,7 +45,7 @@ Each entry in `commands` becomes one tool:
   "commands": [
     {
       "name": "git_log",
-      "title": "Recent commits of a repo on the Mac mini",
+      "title": "Recent commits of a repo on the home server",
       "description": "Show recent commits of a repo in ~/Code.",
       "class": "read",
       "command": "/usr/bin/git",
@@ -132,13 +132,13 @@ You can keep allowlisted commands next to it. Narrow `read` tools still run with
 2. Check it. Errors name the command and the key.
 
    ```bash
-   node ~/selfhost/bin/palui-host-bridge.mjs check
+   node ~/.palui/bin/palui-host-bridge.mjs check
    ```
 
 3. Restart the bridge:
 
    ```bash
-   launchctl kickstart -k gui/$(id -u)/com.zakiego.palui-host-bridge
+   launchctl kickstart -k gui/$(id -u)/palui-host-bridge
    ```
 
 4. In Palui, open the connector and press Reload in the tool table. Check the new tool's class, then press Save tool settings.
@@ -148,7 +148,7 @@ You can keep allowlisted commands next to it. Narrow `read` tools still run with
 Read tools run right away. Write tools ask first when the turn is tainted, and destructive tools always ask, with the tool's `title` and its args:
 
 ```text
-Boleh aku jalanin Restart nginx on the Mac mini? (aksi destruktif)
+Boleh aku jalanin Restart nginx on the home server? (aksi destruktif)
 {"service":"nginx"}
 ```
 
@@ -167,8 +167,8 @@ An exit code outside `okExitCodes`, or a timeout, is reported as a tool error, s
 Start with:
 
 ```bash
-node ~/selfhost/bin/palui-host-bridge.mjs status
-tail -n 20 ~/selfhost/palui-host-bridge.log
+node ~/.palui/bin/palui-host-bridge.mjs status
+tail -n 20 ~/.palui/palui-host-bridge.log
 ```
 
 - Connection refused, or the connector shows a fetch error. The bridge isn't running. A config error makes it exit, and launchd retries every 30 s, so every host tool is down until you fix it. Run `check`, fix what it names, then restart.
