@@ -384,7 +384,24 @@ func SummarizePayload(name, rawBody string) string {
 	if body == "" {
 		body = "(empty body)"
 	}
-	text := "Webhook " + name + ":\n" + body
+	return capText("Webhook " + name + ":\n" + body)
+}
+
+// MessageText is the chat text for a hook event. A forward hook with a plain
+// text body sends that text as is, so a script can post a ready-made message.
+// JSON bodies, and every summarize hook, get SummarizePayload's header.
+func MessageText(mode, name, rawBody string) string {
+	if mode == "forward" {
+		if _, err := jsonx.Parse([]byte(rawBody)); err != nil {
+			if body := strx.Trim(rawBody); body != "" {
+				return capText(body)
+			}
+		}
+	}
+	return SummarizePayload(name, rawBody)
+}
+
+func capText(text string) string {
 	if strx.Len16(text) <= MaxTextChars {
 		return text
 	}
@@ -406,7 +423,7 @@ type Content struct {
 
 // Ingest inserts the event as a pending inbound message in the hook's chat.
 func Ingest(q db.Q, hook db.Hook, rawBody string, now int64) (db.Message, error) {
-	text := SummarizePayload(hook.Name, rawBody)
+	text := MessageText(hook.Mode, hook.Name, rawBody)
 	content, err := db.Raw(Content{Text: text, Hook: hookRef{ID: hook.ID, Name: hook.Name, Mode: hook.Mode}})
 	if err != nil {
 		return db.Message{}, err

@@ -294,3 +294,21 @@ func TestSummarizeRendersArraysOfObjects(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestForwardSendsPlainTextAsIs(t *testing.T) {
+	cases := []struct{ mode, body, want string }{
+		{"forward", "  ✅ Done - Deploy\n\n**v1.2.3** is live  ", "✅ Done - Deploy\n\n**v1.2.3** is live"},
+		{"forward", `{"status":"down"}`, "Webhook Uptime:\nstatus: down"},
+		{"forward", "   ", "Webhook Uptime:\n(empty body)"},
+		{"summarize", "server down", "Webhook Uptime:\nserver down"},
+	}
+	for _, c := range cases {
+		if got := hooks.MessageText(c.mode, "Uptime", c.body); got != c.want {
+			t.Errorf("%s %q: got %q", c.mode, c.body, got)
+		}
+	}
+	long := hooks.MessageText("forward", "x", strings.Repeat("a", hooks.MaxTextChars+10))
+	if strx.Len16(long) != hooks.MaxTextChars || !strings.HasSuffix(long, "[truncated]") {
+		t.Fatal(len(long))
+	}
+}
