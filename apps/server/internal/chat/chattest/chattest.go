@@ -158,16 +158,22 @@ func Model(id string, m models.LanguageModel) *connectors.Runtime {
 
 // Gate is a test gate: steps wait on it until Release (or the turn's context ends).
 type Gate struct {
-	once sync.Once
-	ch   chan struct{}
+	once        sync.Once
+	ch          chan struct{}
+	reachedOnce sync.Once
+	reached     chan struct{}
 }
 
-func NewGate() *Gate { return &Gate{ch: make(chan struct{})} }
+func NewGate() *Gate { return &Gate{ch: make(chan struct{}), reached: make(chan struct{})} }
 
 func (g *Gate) Release() { g.once.Do(func() { close(g.ch) }) }
 
+// Reached is closed once a step first waits on the gate.
+func (g *Gate) Reached() <-chan struct{} { return g.reached }
+
 // Wait blocks until Release; ok false when ctx ended first.
 func (g *Gate) Wait(ctx context.Context) bool {
+	g.reachedOnce.Do(func() { close(g.reached) })
 	select {
 	case <-g.ch:
 		return true
