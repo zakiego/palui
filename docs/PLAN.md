@@ -4,10 +4,10 @@ Status: v2, 2026-11-10. Draft v1 had a cold review (25 findings, 6 HIGH), and ev
 
 ## 0. Name
 
-- Display name: Palui Agent. Domain, CLI, package and repo are plain `palui` (`palui.zakiego.com`, `github.com/zakiego/palui`, private).
+- Display name: Palui Agent. Domain, CLI, package and repo are plain `palui` (`palui.zakiego.com`, `github.com/zakiego/palui`).
 - Named after Si Palui, the Banjar folk comic hero from Kalimantan Selatan: simple-looking but sharp. Pronounced PAH-loo-ee.
 - A web search found no AI product or GitHub repo named palui. That isn't a formal trademark check.
-- It doesn't clash with utusan or recall. Tool names are English (`set_reminder`, `list_flows`), like every other identifier. Indonesian is for bot-facing copy only.
+- It doesn't clash with Recall. Tool names are English (`set_reminder`, `list_flows`), like every other identifier. Indonesian is for bot-facing copy only.
 
 ## 1. What it is
 
@@ -24,7 +24,7 @@ For now only I can use it. Anyone else who messages the bot gets nothing.
 3. Scheduled agent jobs ("every day at 07:00, brief me").
 4. recall as long-term memory.
 5. Any HTTP MCP server as a tool source, with per-tool on/off.
-6. CLIProxyAPI (and the existing ai-gateway) as model providers, swappable, with failover.
+6. CLIProxyAPI and other model gateways as model providers, swappable, with failover.
 7. Connecting or disconnecting anything takes under a minute.
 8. Landing page and docs on Cloudflare Pages.
 
@@ -47,18 +47,17 @@ For now only I can use it. Anyone else who messages the bot gets nothing.
 
 ### Non-goals for v1
 
-Multi-user, sign-up, billing. Everything marked deferred above. Native app. Replacing utusan, which keeps running. Any migration is a separate decision later (D3).
+Multi-user, sign-up, billing. Everything marked deferred above. Native app. Replacing an older bot that keeps running. Any migration is a separate decision later (D3).
 
-## 2. What already exists and what we reuse
+## 2. What it builds on
 
-| Thing | Where | How Palui uses it |
-|---|---|---|
-| utusan | `~/Code/JS/Node/2026/utusan` | Ideas, not imported code. Reused: the adapter contract, router outcomes (`ignore` with a reason sentence), fail-closed tool classes (unmatched means `destructive`), hot reload with a last-good config, the SSRF guard, phone JID vs LID handling (`adapters/types.ts`), and Baileys 440/428/reconnect handling. Avoided: reminders deleted before the send, non-atomic `threads.json` writes, container hostname used as the session id. |
-| recall | `recall.zakiego.com`, `~/selfhost/recall` | Memory connector (MCP for tools, REST for auto-recall and auto-save). Also the original repo template (the server has since moved to Go): pnpm monorepo, Next 16 static Fumadocs site, edge Worker routing, passkeys with CLI-only users, SQLite, pre-deploy DB snapshot, shadcn `base-nova` (`baseColor: neutral`), Geist, oklch tokens. |
-| CLIProxyAPI | Homebrew `cliproxyapi`, `127.0.0.1:8317` on the mini | Model connector. Claude-format `/v1/messages`, OpenAI-format `/v1/chat/completions`, `/v1/models`. Accounts: Claude (4), Antigravity/Gemini, OpenRouter. It has no built-in usage stats since v6.10.0. |
-| ai-gateway | `127.0.0.1:8793` | Second model connector and the fallback. |
-| zaki-selfhost | skill | Docker in OrbStack, port 4800 to 4899, tunnel, `deploy.sh`, auto-deploy webhook, m4-alerts. |
-| Cloudflare Pages (Zakiego Lab) | `cf-zakiego-lab` | Landing and docs. |
+| Thing | How Palui uses it |
+|---|---|
+| An earlier WhatsApp bot | Ideas, not imported code. Reused: the adapter contract, router outcomes (`ignore` with a reason sentence), fail-closed tool classes (unmatched means `destructive`), hot reload with a last-good config, the SSRF guard, phone JID vs LID handling, and 440/428/reconnect handling. Avoided: reminders deleted before the send, non-atomic state writes, container hostname used as the session id. |
+| [Recall](https://github.com/zakiego/recall) | Memory connector (MCP for tools, REST for auto-recall and auto-save). Also the original repo template: pnpm monorepo, Next static Fumadocs site, edge Worker routing, passkeys with CLI-only users, SQLite, pre-deploy DB snapshot, shadcn `base-nova` (`baseColor: neutral`), Geist, oklch tokens. |
+| CLIProxyAPI | Model connector. Claude-format `/v1/messages`, OpenAI-format `/v1/chat/completions`, `/v1/models`. It has no built-in usage stats since v6.10.0. |
+| Any OpenAI- or Anthropic-compatible gateway | A Model gateway connector, usually the fallback. |
+| Docker on one host, a Cloudflare tunnel and Pages | Hosting, the landing and the docs. |
 
 ## 3. Architecture
 
@@ -80,7 +79,7 @@ Multi-user, sign-up, billing. Everything marked deferred above. Native app. Repl
   +-----------------------------------------------------------------+
         |  SQLite WAL on the volume
         |
-  CLIProxyAPI / ai-gateway (host)   recall (host :4800)   MCP servers
+  CLIProxyAPI / gateway (host)       recall (host :4800)   MCP servers
 ```
 
 ### 3.1 One service, one binary
@@ -120,7 +119,7 @@ The same binary is the admin CLI: `palui owner invite`, `palui connectors list|o
 
 - `palui.zakiego.com`: the edge Worker. `/app`, `/api`, `/api/auth` and `/health` go to the tunnel, everything else goes to Pages.
 - Tunnel: one rule to `127.0.0.1:4802`, which compose maps to the container's port 3000.
-- Inside OrbStack: CLIProxyAPI is `http://host.docker.internal:8317`, ai-gateway is `:8793`, recall is `:4800`, the host bridge is `:4893`. That skips the tunnel and Cloudflare's 100 s limit.
+- Inside Docker: CLIProxyAPI is `http://host.docker.internal:8317`, recall is `:4800`, the host bridge is `:4893`. That skips the tunnel and Cloudflare's 100 s limit.
 - Development: the dashboard's Vite server on 4890 proxies `/api` and `/health` to `palui serve` on 3000. The site runs on 4892.
 
 ## 4. Connectors
@@ -210,7 +209,7 @@ Telegram (the first channel built)
 WhatsApp
 - Connect: the wizard first asks for the owner's phone number. Then it pairs by phone-number code (8 chars, big Geist Mono, `ABCD-EFGH`, copy button), with QR as a fallback tab. Expiry is driven by the WhatsApp client's pairing events: a new QR code arrives on each rotation, and the pairing code is requested after the socket opens. A text label ("expires in about 2 min") isn't announced on every tick. The session lives in `/data/wa/<connectorId>.db` (whatsmeow's store).
 - Owner match: messages from the stored number are accepted. The LID is learned from the first DM whose `key.remoteJidAlt` (or the LID mapping) matches the number, and both are stored. Anything with `fromMe` is dropped.
-- Number: Palui's own number (D2), not utusan's. Nothing is shared with utusan, so there's no chat split and no utusan check. Every DM from the owner is answered. Groups and other people's DMs start outside the allowlist until they get an agent (section 19).
+- Number: Palui's own number (D2), not another bot's. Nothing is shared, so there's no chat split. Every DM from the owner is answered. Groups and other people's DMs start outside the allowlist until they get an agent (section 19).
 - Runtime: a lock file next to the session store, reconnect with exponential backoff, and 440 means "another session took over", so it pauses with that reason instead of fighting. A logout means `error: unlinked`.
 - DMs, plus groups with an agent (section 19). An ⏳ reaction while thinking, cleared on reply. Each chat can turn it off or pick another emoji (`chats.ack`, `chats.ack_emoji`; `/ack on|off|<emoji>`, the Chats page or an agent's Chats tab); typing still shows.
 - Risk: the WhatsApp client (whatsmeow) is unofficial. Keep volume low, use one owner, never broadcast. Telegram is the reliable channel.
@@ -229,11 +228,11 @@ CLIProxyAPI
 - Roles: `default` (turns), `fast` (titles, summaries, reminder parsing), `vision`.
 - Failover per role: on 5xx, 429 or a quota error, try the next connector in the chain.
 - Per agent: `agents.model_roles` holds an agent's own chain for any role. A role it leaves empty uses the global chain from Settings (then its own default, then the global default). `/model` in a chat edits the agent's chain when it has one for that role, else the global one.
-- Caching: with `routing.strategy: round-robin` across 4 Claude accounts, prompt caching mostly misses. D8 decides whether to change CLIProxyAPI's strategy (it's shared with other tools on the mini). M0 measures tokens per turn under both.
+- Caching: with `routing.strategy: round-robin` across 4 Claude accounts, prompt caching mostly misses. D8 decides whether to change CLIProxyAPI's strategy (it may be shared with other tools on the host). M0 measures tokens per turn under both.
 - Prompt cache layout: a provider reuses a prompt only up to its first changed byte, so a turn is built stable first. The system prompt holds no clock, recall or check-ins and repeats byte for byte between turns; the session summary is a second system block; the history window drops its oldest messages ten at a time. What changes every turn (now, setup changes since the session's last turn, open check-ins, recall) rides in a `[Palui context]` block at the end of the newest user message and is not stored (the setup note diffs against `sessions.setup_snapshot`, which each message turn rewrites, so it shows once). On the anthropic protocol three breakpoints are set: the stable system block and the newest user message (1 hour, since chat messages are often more than 5 minutes apart and a read restarts the clock), and the last tool result from a turn's second step on (5 minutes, it is only read seconds later). The openai protocol gets the same layout and no breakpoints. CLIProxyAPI moves the caller's system prompt behind the first user message, so the second turn of a new session misses once.
 
-ai-gateway
-- Same shape, `zkg_` key. The fallback in every chain.
+Model gateway
+- Same shape, any OpenAI- or Anthropic-compatible endpoint, several allowed. Usually the fallback.
 
 Budget
 - Per turn: 12 steps, 120 s wall clock, about 64 tools loaded up front. Past that, tool search takes over: tools loaded earlier in the session go first, then skills, memory and the rest, one slot goes to `palui__search_tools`, and every other enabled tool is named in the capability list and loaded on demand by keyword or exact name. Loaded tools join the active set from the next step and stay for the session (`sessions.loaded_tools`, 20 most recent).
@@ -256,7 +255,7 @@ Budget
 - A trust flag per server: `own` (my servers) or `external`. Results from `external` servers taint the turn (section 10).
 - Tools are namespaced `server__tool`.
 - `config.noPrivateData: true` is the owner's mark that the server holds no private data (section 19.4). Its tools without a declared scope resolve to `none`. Set from the agent's Tools tab (`setConnectorDataFn`); the owner's draft save and the CLI can write it too. Never from a chat tool or `/mcp`. Cleared when the URL changes. Every change logs an `mcp.data` event.
-- Presets for servers I already run (vorneo, keuangan, todomap, linear) ask only for the token.
+- Presets for well-known servers (Linear, host commands) ask only for the token.
 
 ### 5.4.1 Tools: T3 Code
 
@@ -317,7 +316,7 @@ Automations the agent builds from chat out of triggers and steps (`apps/server/i
 - A job is an RRULE, a zone, a prompt, a target chat, a tool scope and a model role.
 - Runs as a turn with `trigger = schedule`. History goes to `runs`.
 - Jobs can't use `destructive` tools, and every `write` tool needs approval (nobody's watching).
-- The daily briefing in v1 reads: reminders for today, recall profile, todomap tasks (MCP), vorneo pipeline (MCP), weather via web fetch. Calendar only if D7 is yes.
+- The daily briefing in v1 reads: reminders for today, recall profile, tasks and pipelines from MCP servers, weather via web fetch. Calendar only if D7 is yes.
 - Heartbeat preset: every 30 min from 08:00 to 22:00, reading reminders and MCP inboxes, and answering `NOTHING` when nothing matters (the runtime then sends nothing).
 - Dashboard: list, next run, last result, Run now, Pause.
 
@@ -496,24 +495,24 @@ Each one ends deployed on the mini and usable.
 
 | # | Scope | Done when | Estimate |
 |---|---|---|---|
-| M0 | Free disk to >10 GB. Spike: AI SDK tool calling through CLIProxyAPI for a Claude model (anthropic protocol) and a Gemini model, from an OrbStack container, with tokens per turn measured under round-robin vs sticky. Spike: Baileys pairing in a Linux container. Check the compose single build plus `pull_policy: never`. | Each model passes 5 tool-call round trips. Pairing works. Compose builds once. | ~1 day |
-| M1 | Monorepo, DB, CLI owner invite and passkey, connector framework (manifest/runtime split) and supervisor, CLIProxyAPI + ai-gateway connectors with failover and budgets, web chat in Chats, plaon the Connectors page list, deploy + tunnel + edge | I chat at `palui.zakiego.com/app`, pause the model and get the fixed reply, and a deploy doesn't lose a message | ~5 days |
+| M0 | Free disk to >10 GB. Spike: AI SDK tool calling through CLIProxyAPI for a Claude model (anthropic protocol) and a Gemini model, from a Docker container, with tokens per turn measured under round-robin vs sticky. Spike: Baileys pairing in a Linux container. Check the compose single build plus `pull_policy: never`. | Each model passes 5 tool-call round trips. Pairing works. Compose builds once. | ~1 day |
+| M1 | Monorepo, DB, CLI owner invite and passkey, connector framework (manifest/runtime split) and supervisor, CLIProxyAPI + gateway connectors with failover and budgets, web chat in Chats, plaon the Connectors page list, deploy + tunnel + edge | I chat at `palui.zakiego.com/app`, pause the model and get the fixed reply, and a deploy doesn't lose a message | ~5 days |
 | M2 | Telegram (nonce claim), inbox, outbox, reminders, `/connectors` `/stop` `/status`, scheduler tests, parse eval, encrypted backup + restore drill | A reminder set from Telegram fires after a deploy mid-wait, Snooze works, eval ≥95%, restore drill passes | ~4 days |
-| M3 | recall (MCP + auto-recall/save), MCP connectors with trust and classes, approvals that survive restarts, taint rule | A fact saved yesterday is recalled, a vorneo tool runs, a destructive tool asks first and still works after a restart | ~3 days |
+| M3 | recall (MCP + auto-recall/save), MCP connectors with trust and classes, approvals that survive restarts, taint rule | A fact saved yesterday is recalled, an MCP tool runs, a destructive tool asks first and still works after a restart | ~3 days |
 | M3.5 | Connectors page Explore (3 variants), the pick applied to Connectors and Home | Pick recorded in DESIGN.md | ~1.5 days |
 | M4 | WhatsApp (phone number owner, LID learning, pairing UI) | Pair, chat, a reminder delivered on WhatsApp, pause/resume without re-pairing | ~2.5 days |
 | M5 | Jobs, heartbeat, voice-in, media, Activity page, inbound hooks | The daily briefing arrives at 07:00 for 3 days straight with real content | ~2 days |
 | M6 | Landing + docs on Pages (can start after M1) | Lighthouse SEO 100, OG renders in a debugger, docs cover every v1 connector | ~2.5 days |
 
-About 21 days in total. Every UI milestone runs the full zaki-design-ui pipeline, which is included in the estimates.
+About 21 days in total. Every UI milestone includes a full design pass in the estimates.
 
 ## 15. Decisions I need from you
 
 | # | Question | Recommendation |
 |---|---|---|
 | D1 | Name | Decided: Palui Agent (`palui`) |
-| D2 | WhatsApp number | Decided (changed 2026-11-11): Palui's own number. It used to be utusan's number with chats split, which is gone |
-| D3 | Replace utusan? | Decided: yes, someday. Roadmap in section 18 |
+| D2 | WhatsApp number | Decided (changed 2026-11-11): Palui's own number. It used to share another bot's number with chats split, which is gone |
+| D3 | Replace the older bot? | Decided: yes, someday. Roadmap in section 18 |
 | D4 | Landing indexable now? | Decided: yes |
 | D5 | Open source? | Decided: private |
 | D6 | Bot's default language | Decided: casual Indonesian, English when I write English |
@@ -524,7 +523,7 @@ About 21 days in total. Every UI milestone runs the full zaki-design-ui pipeline
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Tool calling through CLIProxyAPI is flaky for some models | Medium | M0 spike, anthropic protocol for Claude, ai-gateway failover |
+| Tool calling through CLIProxyAPI is flaky for some models | Medium | M0 spike, anthropic protocol for Claude, gateway failover |
 | Subscription quota burn from loops or jobs | Medium | Budgets and caps in M1, `/stop`, cache-friendly routing (D8) |
 | Prompt injection through recall, MCP, fetch or hooks | Medium | Taint rule, approvals, auto-save without tool output |
 | WhatsApp ban or protocol break (whatsmeow) | Low/Medium | Low volume, Telegram primary, pinned version |
@@ -538,23 +537,11 @@ About 21 days in total. Every UI milestone runs the full zaki-design-ui pipeline
 - Integration: Telegram with a test transport, WhatsApp behind a fake socket, MCP against a local test server, a scripted mock model for approvals and resume. Golden files in `apps/server/testdata`, exported once from the TypeScript build the Go server replaced, pin byte-level behavior (prompts, tool schemas, stored JSON, RPC answers); they're frozen now.
 - Evals: the reminder parse set (60 phrases), plus a small injection set (a poisoned fetch result tries a write tool and must ask for approval).
 - Post-deploy smoke: a script sends a Telegram message from a test account to the dev bot and expects a reply. On prod, `/health` plus the m4-alerts probe.
-- Logs: JSON lines tagged with `run_id`, `chat_id` and `connector_id`, with secrets redacted, capped per zaki-selfhost.
+- Logs: JSON lines tagged with `run_id`, `chat_id` and `connector_id`, with secrets redacted, with a size cap.
 
-## 18. Roadmap: sunsetting utusan
+## 18. Roadmap: moving off an older bot
 
-Palui runs on its own WhatsApp number, so it never shares a chat with utusan. Replacing utusan means moving each use over to Palui's number (my DM, then groups, then notification sends), then switching utusan off. Same idea as utusan's ADR 0004: a parity checklist, then a parallel run.
-
-Order:
-
-| Phase | Chats | What Palui needs first |
-|---|---|---|
-| R1 (with M4) | My own DM with the bot | v1 WhatsApp |
-| R2 | My other personal chats (jurnal "15 minutes" group, code-notif) | A Jurnal skill (the 15-min ask, SQLite store, nightly recap that replaces the cloop `jurnal-ringkasan` job), plain notification sends for selfhost and m4-alerts |
-| R3 | Project groups (Vorneo and others) | Agents in groups with mention-only replies and their own memory (section 19). Still open: per-chat roles like utusan's IAM (guest/member/admin/owner) |
-| R4 | `vorneo.id/admin/chat` web bridge | A web channel with HMAC tickets (utusan's `src/lib/ticket.ts` design) |
-| R5 | Switch off utusan | Every item in utusan's skill and tool list has a Palui owner or is dropped on purpose: gws, skill reading, `kirim_file`, voice notes, `/approve` stub flow, dashboard. One week with utusan stopped but restorable (`launchctl bootout`, keep `~/.utusan`) |
-
-After R5: archive the utusan repo, remove its launchd plist, update the `utusan`, `notify-wa`, `jurnal-ringkasan` and `email-watcher` skills to send through Palui (a small `palui send` CLI or REST endpoint, added in R2).
+Palui runs on its own WhatsApp number, so it never shares a chat with another bot. Moving off an older bot means moving each use over to Palui's number (the owner's DM, then groups, then notification sends), then switching the old one off. Agents in groups (section 19) and a small send endpoint for notifications cover what that needs.
 
 ## 19. Agents
 
@@ -564,7 +551,7 @@ Palui stops being one persona for one person. An agent is a named persona with i
 
 | Field | Meaning |
 |---|---|
-| `slug` | Lowercase id used in `/agent <slug>` and on the Agents page (`chef`, `vorneo-cs`). Fixed after creation. |
+| `slug` | Lowercase id used in `/agent <slug>` and on the Agents page (`chef`, `shop-cs`). Fixed after creation. |
 | `name`, `persona` | Display name and the persona text that opens the system prompt (max 8000 chars). |
 | `recall_container` | Where its memory lives. Palui (the default agent) uses the recall connector's container. Every other agent gets `agent-<slug>`. |
 | `guest_tools` | `none` or `safe`: whether a chat with outsiders gets tools at all (19.4). |
@@ -662,7 +649,7 @@ Reading down: Palui can read other agents' chats and memory (new read tools on P
 
 ### 19.8 Not in this round
 
-Roles beyond owner and member (utusan IAM), sharing one agent's data with another agent, group messages kept as background context, agents talking to each other, per-chat caps.
+Roles beyond owner and member, sharing one agent's data with another agent, group messages kept as background context, agents talking to each other, per-chat caps.
 
 ### 19.9 Rollout
 

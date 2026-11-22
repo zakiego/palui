@@ -1,6 +1,6 @@
 # RFC: Flows
 
-Status: accepted and built, 2026-11-11. The open questions are resolved in section 12, with the long term in mind. Author: Palui agent session. Reviewer: Zaki.
+Status: accepted and built, 2026-11-11. The open questions are resolved in section 12, with the long term in mind. Author: Palui agent session. Reviewer: the maintainer.
 Scope: the design and its reasoning. The accepted behavior now lives in `docs/PLAN.md` section 6c, which wins where the two differ; this document keeps the why and the rejected alternatives.
 
 ## TL;DR
@@ -16,7 +16,7 @@ Scope: the design and its reasoning. The accepted behavior now lives in `docs/PL
 
 Goals
 
-1. Let Zaki describe an automation in chat ("tiap pagi kirim jadwal sholat, cuaca, sama pengingat hari ini") and have the agent build, test and fix it without a code change.
+1. Let the owner describe an automation in chat ("tiap pagi kirim jadwal sholat, cuaca, sama pengingat hari ini") and have the agent build, test and fix it without a code change.
 2. Keep behavior predictable and cheap: no model call unless a step asks for one, and every run explains itself step by step.
 3. Keep every existing routine working with the same timing, check-in behavior, log and recap.
 4. Reuse what exists: routine time sources, the scheduler timer, the outbox, server-side tool calls, approvals, taint, budgets, the run page.
@@ -280,7 +280,7 @@ Considered and left out: `switch` (chained `if` is enough at this size), `http` 
 ```jsonc
 { "id": "weather", "kind": "tool",
   "tool": "webfetch__fetch_page",         // or "connectorId" + "tool"
-  "args": { "url": "https://wttr.in/Banjarmasin?format=j1" },
+  "args": { "url": "https://wttr.in/Jakarta?format=j1" },
   "parse": { "field": "text", "as": "json" }, // optional
   "retry": { "max": 2, "backoffSec": 30 },    // optional
   "timeoutSec": 20 }
@@ -432,7 +432,7 @@ Semantics:
 - Evaluation is bounded: max 200 AST nodes, max 1000 evaluation steps, max string length 10k. Over that is a save-time error, or a `false` with a logged warning at run time.
 - `[path]` indexing is for things like `flow.paid[item.id]`. Keys are data, the result is still just a value.
 
-Why a string grammar and not JSON (like JSONLogic): the agent writes and reads these, and so does Zaki in the step log. `daysUntil(item.due) < 3` is easier to get right and to explain than three levels of nested objects. The cost is about 250 lines of parser with tests, and it's the only parser in the design.
+Why a string grammar and not JSON (like JSONLogic): the agent writes and reads these, and so does the owner in the step log. `daysUntil(item.due) < 3` is easier to get right and to explain than three levels of nested objects. The cost is about 250 lines of parser with tests, and it's the only parser in the design.
 
 ## 7. Runtime
 
@@ -574,9 +574,9 @@ Prayer times, weather and today's reminders, one message, no model.
   ],
   "steps": [
     { "id": "prayer", "kind": "tool", "tool": "mcp-jadwal-sholat__get_prayer_times",
-      "args": { "city": "Banjarmasin", "date": "{{now.date}}" }, "onError": "continue" },
+      "args": { "city": "Jakarta", "date": "{{now.date}}" }, "onError": "continue" },
     { "id": "weather", "kind": "tool", "tool": "webfetch__fetch_page",
-      "args": { "url": "https://wttr.in/Banjarmasin?format=j1" },
+      "args": { "url": "https://wttr.in/Jakarta?format=j1" },
       "parse": { "field": "text", "as": "json" }, "onError": "continue" },
     { "id": "reminders", "kind": "tool", "tool": "reminders__list_reminders",
       "args": { "filter": "upcoming", "limit": 20 } },
@@ -635,7 +635,7 @@ Daily check of a bills source; a check-in per bill due within 3 days, never aske
       "source": { "kind": "times", "times": [{ "time": "09:00", "label": "Cek tagihan" }] } }
   ],
   "steps": [
-    { "id": "bills", "kind": "tool", "tool": "mcp-keuangan__list_bills",
+    { "id": "bills", "kind": "tool", "tool": "mcp-bills__list_bills",
       "args": { "status": "unpaid" } },
     { "id": "per_bill", "kind": "each",
       "items": "steps.bills.data.items",
@@ -676,7 +676,7 @@ Today's routines can already do a simpler version of this (a `tool` source with 
       "when": "steps.recap.data.missed > 0 or number(steps.recap.data.byAnswer.not_yet) > 0",
       "then": "cheer", "else": "clean" },
     { "id": "cheer", "kind": "prompt",
-      "prompt": "Tulis pesan pendek (maks 4 kalimat), hangat dan nggak menggurui, buat Zaki tentang rekap sholatnya minggu ini. Sebut angkanya sekali, terus kasih semangat yang konkret buat minggu depan. Bahasa santai.",
+      "prompt": "Tulis pesan pendek (maks 4 kalimat), hangat dan nggak menggurui, buat pemilik tentang rekap sholatnya minggu ini. Sebut angkanya sekali, terus kasih semangat yang konkret buat minggu depan. Bahasa santai.",
       "input": { "recap": "{{steps.recap.data}}" },
       "tools": [], "model": "fast", "onError": "plain" },
     { "id": "send_cheer", "kind": "message", "text": "{{steps.cheer.text}}", "next": null },
@@ -702,7 +702,7 @@ This is what `routineToFlow` produces for the live routine. Trigger `main` is th
       "source": {
         "kind": "tool",
         "connectorId": "mcp-jadwal-sholat", "tool": "get_prayer_times",
-        "args": { "city": "Banjarmasin", "date": "{{date}}" },
+        "args": { "city": "Jakarta", "date": "{{date}}" },
         "refreshAt": "00:05",
         "items": [
           { "field": "times.fajr", "label": "Subuh", "offsetMin": 0 },
