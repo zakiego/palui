@@ -179,8 +179,8 @@ func demo(k *Kit) {
 		k.Event(Event{At: now - i*10*MIN, ConnectorID: &connector, Kind: "status", Level: level, Message: message})
 	}
 
-	k.Attachment(Attachment{ChatID: wa.ID, Title: "Tiket pesawat BDJ-CGK 12 Des", Description: "Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.", Kind: "pdf", Filename: "e-ticket-XKQ9PL.pdf", Size: ptr[int64](184_320), CreatedAt: ptr(now - 3*H)})
-	k.Attachment(Attachment{ChatID: tg.ID, Title: "KTP Zaki", Description: "Foto KTP, berlaku seumur hidup.", Kind: "png", Size: ptr[int64](412_000), CreatedAt: ptr(now - 26*H)})
+	k.Attachment(Attachment{ChatID: wa.ID, Title: "Tiket pesawat SUB-CGK 12 Des", Description: "Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.", Kind: "pdf", Filename: "e-ticket-XKQ9PL.pdf", Size: ptr[int64](184_320), CreatedAt: ptr(now - 3*H)})
+	k.Attachment(Attachment{ChatID: tg.ID, Title: "KTP Budi", Description: "Foto KTP, berlaku seumur hidup.", Kind: "png", Size: ptr[int64](412_000), CreatedAt: ptr(now - 26*H)})
 	k.Attachment(Attachment{ChatID: tg.ID, Title: "Struk servis motor", Description: "Bengkel resmi Banjarbaru, ganti oli dan kampas rem, Rp 385.000.", Kind: "pdf", Filename: "struk_servis_2026-11-01.pdf", Size: ptr[int64](96_000), CreatedAt: ptr(now - 9*D)})
 	// Outbound: one contact on Always allow, one on Always ask.
 	adik := k.Chat("whatsapp", "6282200001001@s.whatsapp.net", "Zaki", ChatOpts{Allowed: ptr(false)})

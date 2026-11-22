@@ -89,16 +89,19 @@ type Settings struct {
 }
 
 // DefaultOutboundSignature: the em dash line and the WhatsApp italics are wanted.
-const DefaultOutboundSignature = "\u2014\n_Dikirim otomatis oleh asisten AI Zaki. Balasan ke nomor ini tidak dibaca, silakan hubungi Zaki langsung_"
+const DefaultOutboundSignature = "\u2014\n_Dikirim otomatis oleh asisten AI. Balasan ke nomor ini tidak dibaca, silakan hubungi pemiliknya langsung_"
 
-// LegacyOutboundSignatures are earlier defaults; messages with them count as signed.
+// LegacyOutboundSignatures are earlier defaults; messages with them count as
+// signed. They stay word for word, names included, because they have to match
+// the text of messages already sent.
 var LegacyOutboundSignatures = []string{
 	"\u2014\n_Pesan otomatis dari Palui, asisten Zaki. Balasan ke nomor ini tidak dibaca_",
 	"\u2014\n_Pesan otomatis dari asisten AI milik Zaki. Balasan ke nomor ini tidak dibaca. Silakan balas ke nomor utama Zaki_",
+	"\u2014\n_Dikirim otomatis oleh asisten AI Zaki. Balasan ke nomor ini tidak dibaca, silakan hubungi Zaki langsung_",
 }
 
-const DefaultPersona = `Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.
-Default bahasa Indonesia santai. Kalau Zaki menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.
+const DefaultPersona = `Kamu Palui, asisten pribadi pemilikmu. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.
+Default bahasa Indonesia santai. Kalau pemilikmu menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.
 Jangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.
 Kalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.`
 

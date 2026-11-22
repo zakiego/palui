@@ -144,7 +144,7 @@ var (
 	saveInput = zod.Object(
 		zod.F("nomor", zod.Int().Min(1).Optional().Describe("Which file, 1-based. In the current message: in the order they were sent. With `earlier`: the number from the list, 1 being the most recent. Omit when there is only one.")),
 		zod.F("earlier", zod.Bool().Optional().Describe(fmt.Sprintf("Save from an earlier message in this chat instead of the current one: the last 24 hours, at most %d files, newest first.", attachments.RecentFilesMax))),
-		zod.F("title", zod.String().Min(1).Max(200).Describe(`Short title in the owner's language, e.g. "KTP Zaki" or "Tiket pesawat BDJ-CGK 12 Des".`)),
+		zod.F("title", zod.String().Min(1).Max(200).Describe(`Short title in the owner's language, e.g. "KTP Budi" or "Tiket pesawat SUB-CGK 12 Des".`)),
 		zod.F("description", zod.String().Max(1000).Optional().Describe("One sentence on what the file is and what's in it.")),
 	)
 	listInput = zod.Object(

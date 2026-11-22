@@ -213,7 +213,7 @@ function PreferencesCard({ data }: { data: Data }) {
           </Field>
           <Field data-invalid={!!errors.value}>
             <FieldLabel htmlFor="pref-value">{t("notes.field.value")}</FieldLabel>
-            <Input id="pref-value" autoComplete="off" placeholder="Banjarmasin" maxLength={VALUE_MAX} value={value} aria-invalid={!!errors.value} onChange={(e) => setValue(e.target.value)} />
+            <Input id="pref-value" autoComplete="off" placeholder="Jakarta" maxLength={VALUE_MAX} value={value} aria-invalid={!!errors.value} onChange={(e) => setValue(e.target.value)} />
             {errors.value && <FieldError>{errors.value}</FieldError>}
           </Field>
           <Button type="submit" variant="outline" className="@2xl/main:mt-7" disabled={busy}>

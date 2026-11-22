@@ -15,7 +15,7 @@ export default defineManifest({
   setup: [],
   pauseNote: "Pausing hides the tools. Saved instructions and preferences still go into the prompt; turn one off on the Notes page.",
   docs: {
-    commands: ["inget ya, kota default aku Banjarmasin", "simpan instruksi: kalau tanya jadwal sholat, pakai server jadwal-sholat"],
+    commands: ["inget ya, kota default aku Jakarta", "simpan instruksi: kalau tanya jadwal sholat, pakai server jadwal-sholat"],
     notes: [
       "Up to 20 instructions of 1000 characters, and 50 preferences of 300 characters.",
       "Preference keys are snake_case, like default_city or home_lat.",

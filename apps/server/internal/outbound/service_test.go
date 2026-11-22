@@ -327,7 +327,7 @@ func TestSignature(t *testing.T) {
 	}
 	t.Run("is on by default with the default text, after one blank line", func(t *testing.T) {
 		d, owner, c := setupContact(t)
-		if SIG != "\u2014\n_Dikirim otomatis oleh asisten AI Zaki. Balasan ke nomor ini tidak dibaca, silakan hubungi Zaki langsung_" {
+		if SIG != "\u2014\n_Dikirim otomatis oleh asisten AI. Balasan ke nomor ini tidak dibaca, silakan hubungi pemiliknya langsung_" {
 			t.Fatal(SIG)
 		}
 		r := send(t, d, c, "  otw  ", meta(owner), 0, NOW)

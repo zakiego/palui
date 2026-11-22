@@ -13,7 +13,7 @@
   "agents": {
    "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat","model_roles","transcribe_voice"],
    "rows": [
-    ["<agt#1>","palui","Palui","Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.\nDefault bahasa Indonesia santai. Kalau Zaki menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.\nJangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.\nKalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.",1,null,"off","safe",0,null,null,null,null,"<wall clock>","<wall clock>",null,null,0,null,0]
+    ["<agt#1>","palui","Palui","Kamu Palui, asisten pribadi pemilikmu. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.\nDefault bahasa Indonesia santai. Kalau pemilikmu menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.\nJangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.\nKalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.",1,null,"off","safe",0,null,null,null,null,"<wall clock>","<wall clock>",null,null,0,null,0]
    ]
   },
   "attachment_shares": {
@@ -402,8 +402,8 @@
   "saved_attachments": {
    "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at","origin","sender_id","sender_name","sent_at"],
    "rows": [
-    ["<att#1>","<chat#3>",null,null,"Tiket pesawat BDJ-CGK 12 Des","Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.","document","application/pdf","e-ticket-XKQ9PL.pdf",184320,"<sha256 of data>",{"bytes":184320,"sha256":"5b9035eb3f55e13a8fac419c08ab23620b264679b199b4e0dbd55a6e2233d310"},1794610800000,"tool",null,null,null],
-    ["<att#2>","<chat#2>",null,null,"KTP Zaki","Foto KTP, berlaku seumur hidup.","image","image/png",null,135032,"<sha256 of data>",{"bytes":135032,"sha256":"3645ad90546168ac687c954a6d1c58c6d7d0b2c1f42e22dde1cb85dd6c8b75be"},1794528000000,"tool",null,null,null],
+    ["<att#1>","<chat#3>",null,null,"Tiket pesawat SUB-CGK 12 Des","Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.","document","application/pdf","e-ticket-XKQ9PL.pdf",184320,"<sha256 of data>",{"bytes":184320,"sha256":"5b9035eb3f55e13a8fac419c08ab23620b264679b199b4e0dbd55a6e2233d310"},1794610800000,"tool",null,null,null],
+    ["<att#2>","<chat#2>",null,null,"KTP Budi","Foto KTP, berlaku seumur hidup.","image","image/png",null,135032,"<sha256 of data>",{"bytes":135032,"sha256":"3645ad90546168ac687c954a6d1c58c6d7d0b2c1f42e22dde1cb85dd6c8b75be"},1794528000000,"tool",null,null,null],
     ["<att#3>","<chat#2>",null,null,"Struk servis motor","Bengkel resmi Banjarbaru, ganti oli dan kampas rem, Rp 385.000.","document","application/pdf","struk_servis_2026-11-01.pdf",96000,"<sha256 of data>",{"bytes":96000,"sha256":"3dde18f3f56de6e3a148525d91ad33841163c40d6d0112492f350a6529fb517b"},1793844000000,"tool",null,null,null]
    ]
   },

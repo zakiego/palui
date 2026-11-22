@@ -839,7 +839,7 @@
    "pauseNote": "Pausing hides the tools. Saved instructions and preferences still go into the prompt; turn one off on the Notes page.",
    "docs": {
     "commands": [
-     "inget ya, kota default aku Banjarmasin",
+     "inget ya, kota default aku Jakarta",
      "simpan instruksi: kalau tanya jadwal sholat, pakai server jadwal-sholat"
     ],
     "notes": [
@@ -1312,7 +1312,7 @@
          "type": "string",
          "minLength": 1,
          "maxLength": 200,
-         "description": "Short title in the owner's language, e.g. \"KTP Zaki\" or \"Tiket pesawat BDJ-CGK 12 Des\"."
+         "description": "Short title in the owner's language, e.g. \"KTP Budi\" or \"Tiket pesawat SUB-CGK 12 Des\"."
         },
         "description": {
          "description": "One sentence on what the file is and what's in it.",
@@ -2297,7 +2297,7 @@
      {
       "name": "save_preference",
       "title": "Save a preference",
-      "description": "Save one of the owner's defaults as a key-value pair, e.g. default_city=Banjarmasin, home_lat=-3.3194, home_lng=114.5908, timezone=Asia/Makassar. Saving an existing key replaces it. Only for facts the owner told you about themselves.",
+      "description": "Save one of the owner's defaults as a key-value pair, e.g. default_city=Jakarta, home_lat=-6.2088, home_lng=106.8456, timezone=Asia/Jakarta. Saving an existing key replaces it. Only for facts the owner told you about themselves.",
       "class": "write",
       "untrusted": false,
       "guestSafe": false,

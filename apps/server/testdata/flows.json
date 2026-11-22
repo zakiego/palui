@@ -19352,7 +19352,7 @@
         "trigger_id": null,
         "trigger_kind": "webhook",
         "updated_at": 1794276000000,
-        "vars": "{\"steps\":{\"safe\":{\"text\":\"Halo dari flow\\n\\n—\\n_Dikirim otomatis oleh asisten AI Zaki. Balasan ke nomor ini tidak dibaca, silakan hubungi Zaki langsung_\",\"contact\":\"Zaki\",\"outboxId\":\"out#7\"},\"leak\":{\"ok\":false,\"error\":\"A message to a contact can't include data from tools or webhooks (tainted). Use fixed text.\"},\"own\":{\"text\":\"Isi: rahasia baris\",\"chatId\":\"chat#4\",\"outboxId\":\"out#8\"}},\"vars\":{}}",
+        "vars": "{\"steps\":{\"safe\":{\"text\":\"Halo dari flow\\n\\n—\\n_Dikirim otomatis oleh asisten AI. Balasan ke nomor ini tidak dibaca, silakan hubungi pemiliknya langsung_\",\"contact\":\"Zaki\",\"outboxId\":\"out#7\"},\"leak\":{\"ok\":false,\"error\":\"A message to a contact can't include data from tools or webhooks (tainted). Use fixed text.\"},\"own\":{\"text\":\"Isi: rahasia baris\",\"chatId\":\"chat#4\",\"outboxId\":\"out#8\"}},\"vars\":{}}",
         "version_id": "flv#3",
         "wait": null,
         "wake_at": null
@@ -19367,7 +19367,7 @@
         "input": "{\"contact\":\"Zaki\"}",
         "kind": "message",
         "ms": 0,
-        "output": "{\"text\":\"Halo dari flow\\n\\n—\\n_Dikirim otomatis oleh asisten AI Zaki. Balasan ke nomor ini tidak dibaca, silakan hubungi Zaki langsung_\",\"contact\":\"Zaki\",\"outboxId\":\"out#7\"}",
+        "output": "{\"text\":\"Halo dari flow\\n\\n—\\n_Dikirim otomatis oleh asisten AI. Balasan ke nomor ini tidak dibaca, silakan hubungi pemiliknya langsung_\",\"contact\":\"Zaki\",\"outboxId\":\"out#7\"}",
         "run_id": "flr#6",
         "seq": 1,
         "started_at": 1794276000000,
@@ -19467,7 +19467,7 @@
         "owner_chat_id": "chat#4",
         "rrule": null,
         "status": "done",
-        "text": "Halo dari flow\n\n—\n_Dikirim otomatis oleh asisten AI Zaki. Balasan ke nomor ini tidak dibaca, silakan hubungi Zaki langsung_",
+        "text": "Halo dari flow\n\n—\n_Dikirim otomatis oleh asisten AI. Balasan ke nomor ini tidak dibaca, silakan hubungi pemiliknya langsung_",
         "tz": "Asia/Makassar",
         "updated_at": 1794276000000
        }
@@ -19504,7 +19504,7 @@
         "fallback_from": null,
         "id": "out#7",
         "next_attempt_at": 1794276000000,
-        "payload": "{\"text\":\"Halo dari flow\\n\\n—\\n_Dikirim otomatis oleh asisten AI Zaki. Balasan ke nomor ini tidak dibaca, silakan hubungi Zaki langsung_\",\"format\":\"plain\"}",
+        "payload": "{\"text\":\"Halo dari flow\\n\\n—\\n_Dikirim otomatis oleh asisten AI. Balasan ke nomor ini tidak dibaca, silakan hubungi pemiliknya langsung_\",\"format\":\"plain\"}",
         "sent_at": null,
         "source": "outbound:obm#13",
         "status": "pending"

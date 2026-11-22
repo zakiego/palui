@@ -30,7 +30,7 @@ var Manifest = connectors.Manifest{
 	Setup:       []connectors.SetupStep{},
 	PauseNote:   "Pausing hides the tools. Saved instructions and preferences still go into the prompt; turn one off on the Notes page.",
 	Docs: &connectors.Docs{
-		Commands: []string{"inget ya, kota default aku Banjarmasin", "simpan instruksi: kalau tanya jadwal sholat, pakai server jadwal-sholat"},
+		Commands: []string{"inget ya, kota default aku Jakarta", "simpan instruksi: kalau tanya jadwal sholat, pakai server jadwal-sholat"},
 		Notes: []string{
 			"Up to 20 instructions of 1000 characters, and 50 preferences of 300 characters.",
 			"Preference keys are snake_case, like default_city or home_lat.",
@@ -196,7 +196,7 @@ func Tools(d *db.DB, clock func() int64, agentID string) (*connectors.ToolSet, e
 		Data:  connectors.DataAgent,
 		Class: "write",
 		Title: "Save a preference",
-		Tool: kit.Tool("Save one of the owner's defaults as a key-value pair, e.g. default_city=Banjarmasin, home_lat=-3.3194, home_lng=114.5908, timezone=Asia/Makassar. Saving an existing key replaces it. Only for facts the owner told you about themselves.", savePreferenceInput,
+		Tool: kit.Tool("Save one of the owner's defaults as a key-value pair, e.g. default_city=Jakarta, home_lat=-6.2088, home_lng=106.8456, timezone=Asia/Jakarta. Saving an existing key replaces it. Only for facts the owner told you about themselves.", savePreferenceInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				r, err := notes.SetPreference(d, in.S("key"), in.S("value"), clock())
 				if err != nil {
