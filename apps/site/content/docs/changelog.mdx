@@ -18,6 +18,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - The default persona and outbound signature no longer name the owner. Save your own in Settings first to keep them. ([#11](https://github.com/zakiego/palui/pull/11))
 - Default model roles use cliproxy only, without the ai-gateway fallback. Saved model roles don't change. ([#11](https://github.com/zakiego/palui/pull/11))
 - The ai-gateway connector is gone. Add your gateway again as a Model gateway, then pick it in your model roles.
+- The ops scripts take their paths, launchd labels and R2 command from `~/.config/palui/host.conf`, with new defaults. Set your old ones there before you deploy.
 
 ### Chat
 
