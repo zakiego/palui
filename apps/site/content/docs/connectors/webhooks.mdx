@@ -82,7 +82,7 @@ await fetch(url, {
 
 | Mode | What happens | Model |
 |---|---|---|
-| `forward` | The event text is sent to the chat as is | Not called |
+| `forward` | A plain text body is sent to the chat as is. A JSON body is sent as `key: value` lines under a `Webhook <name>:` header. | Not called |
 | `summarize` | One turn summarizes the event for you | Called, with zero tools. The turn is tainted. |
 | `flow` | The body starts every [flow](/docs/connectors/flows) whose webhook trigger names this hook, as `trigger.payload`. A redelivery with the same `x-palui-delivery` or `X-GitHub-Delivery` header starts nothing new. | Only if the flow has a prompt step. |
 
