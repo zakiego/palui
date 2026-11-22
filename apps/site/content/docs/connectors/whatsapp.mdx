@@ -45,7 +45,8 @@ The session lives in `/data/wa/<connector id>.db` on the data volume.
 
 ## How it behaves
 
-- DMs only in v1. Group chats are planned.
+- Reads DMs and groups. In a group, the agent answers when someone @mentions it or replies to it.
+- Mentions in groups: the agent can @mention people in the group, and they get a notification. It can only mention current members who have written in the group, at most 10 per message. Anyone else is written as a plain name.
 - Shows an hourglass reaction while thinking, cleared when the reply goes out.
 - Anything the bot sent itself (`fromMe`) is dropped, so it never answers its own messages.
 - Reconnects with exponential backoff.
