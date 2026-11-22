@@ -128,7 +128,7 @@ func (f *FakeSocket) Emit(u whatsapp.Update) {
 // OpenConn is open(userId): the account logs in.
 func (f *FakeSocket) OpenConn(userID string) {
 	if userID == "" {
-		userID = "628980001472:3@s.whatsapp.net"
+		userID = "628000001472:3@s.whatsapp.net"
 	}
 	f.mu.Lock()
 	f.user = &whatsapp.User{ID: userID, LID: "111222333:3@lid", Name: "Palui"}
