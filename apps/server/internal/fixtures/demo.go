@@ -25,7 +25,7 @@ func demo(k *Kit) {
 	k.Connector("ai-gateway", "ai-gateway", ConnectorOpts{Status: "paused", Secrets: sec("apiKey", "zkg_0123456789abcdef")})
 	k.Connector("recall", "recall", ConnectorOpts{Status: "connecting", Secrets: sec("apiKey", "rcl_0123456789a91f")})
 	k.Connector("t3code", "t3code", ConnectorOpts{Status: "on", Secrets: sec("pairingCode", "0123456789abcdef"), Config: obj("url", "http://host.docker.internal:3773")})
-	k.Connector("mcp-vorneo", "mcp", ConnectorOpts{Label: ptr("Vorneo pipeline and property listings for every kabupaten in Kalimantan Selatan"), Status: "on", Config: obj("url", "https://vorneo.id/mcp")})
+	k.Connector("mcp-northwind", "mcp", ConnectorOpts{Label: ptr("Northwind pipeline and property listings for every kabupaten in Jawa Timur"), Status: "on", Config: obj("url", "https://northwind.example.com/mcp")})
 	k.Connector("mcp-linear", "mcp", ConnectorOpts{Label: ptr("Linear 🚀"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://mcp.linear.app/mcp")})
 	k.Connector("reminders", "reminders", ConnectorOpts{Status: "on"})
 	k.Connector("jobs", "jobs", ConnectorOpts{Status: "paused"})
@@ -40,21 +40,21 @@ func demo(k *Kit) {
 	k.Instruction(Instruction{Title: "Jadwal sholat", Body: "Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai JSON API di https://sholat.zakiego.com/api/v1 lewat web fetch.", CreatedAt: ptr(now - 3*H)})
 	k.Instruction(Instruction{Title: "Ringkasan pagi", Body: "Mulai dengan cuaca, lalu agenda, lalu pengingat hari ini.", Enabled: ptr(false), CreatedAt: ptr(now - 2*H)})
 	k.CustomCommand(CustomCommand{Name: "report-fix", Description: "Debug report, lalu T3 Code yang perbaiki", Prompt: "Start a T3 Code thread in the palui project to find and fix the problem in the debug report below. Owner's note: {{args}}\n\nPut the whole report in the task. Reply with the thread link only.", AttachReport: true, CreatedAt: ptr(now - 2*H)})
-	k.CustomCommand(CustomCommand{Name: "pagi", Prompt: "Kasih ringkasan pagi: cuaca Banjarmasin, agenda hari ini, lalu pengingat.", Enabled: ptr(false), CreatedAt: ptr(now - H)})
-	k.Preference("default_city", "Banjarmasin")
+	k.CustomCommand(CustomCommand{Name: "pagi", Prompt: "Kasih ringkasan pagi: cuaca Surabaya, agenda hari ini, lalu pengingat.", Enabled: ptr(false), CreatedAt: ptr(now - H)})
+	k.Preference("default_city", "Surabaya")
 	k.Preference("timezone", "Asia/Makassar")
 	k.Connector("attachments", "attachments", ConnectorOpts{Status: "on"})
 	k.Connector("voice", "voice", ConnectorOpts{Status: "not_set_up"})
 
 	web := k.WebChat()
-	tg := k.Chat("telegram", "987654321", "Zaki 🌴 (Telegram DM with a rather long display name)", ChatOpts{})
+	tg := k.Chat("telegram", "987654321", "Rizky 🌴 (Telegram DM with a rather long display name)", ChatOpts{})
 	wa := k.Chat("whatsapp", "6281234567890@s.whatsapp.net", "", ChatOpts{})
 
 	runID := k.Run(Run{ChatID: &web.ID, Trigger: "message", Model: ptr("claude-sonnet-4-6"), TokensIn: ptr[int64](18234), TokensOut: ptr[int64](912), Status: "ok", StartedAt: now - 2*H, Ms: ptr[int64](8342)})
-	k.Message(web, "user", "ingetin bayar listrik besok jam 9, terus cek pipeline vorneo minggu ini ya", now-2*H)
-	k.Tool(Tool{RunID: runID, ConnectorID: ptr("mcp-vorneo"), Tool: "mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent", Class: "read", Args: obj("stage", "masuk", "week", "2026-W46"), ResultPreview: ptr(`[{"id":"deal_01","title":"Rumah 2 lantai di Banjarbaru"}]`), Status: "ok", Ms: ptr[int64](1240), CreatedAt: now - 2*H + 1000})
+	k.Message(web, "user", "ingetin bayar listrik besok jam 9, terus cek pipeline northwind minggu ini ya", now-2*H)
+	k.Tool(Tool{RunID: runID, ConnectorID: ptr("mcp-northwind"), Tool: "mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent", Class: "read", Args: obj("stage", "masuk", "week", "2026-W46"), ResultPreview: ptr(`[{"id":"deal_01","title":"Rumah 2 lantai di Malang"}]`), Status: "ok", Ms: ptr[int64](1240), CreatedAt: now - 2*H + 1000})
 	k.Tool(Tool{RunID: runID, ConnectorID: ptr("reminders"), Tool: "reminders__set_reminder", Class: "write", Args: obj("text", "bayar listrik", "when", "besok 09:00"), ResultPreview: ptr("Besok, Rabu 11 Nov, 09.00 WITA"), Status: "ok", Ms: ptr[int64](85), CreatedAt: now - 2*H + 2000})
-	k.Message(web, "assistant", "Siap. Pengingat: Besok, Rabu 11 Nov, 09.00 WITA.\nPipeline Vorneo minggu ini: 3 deal masuk, 1 survei.", now-2*H+9000, MsgExtra{RunID: &runID})
+	k.Message(web, "assistant", "Siap. Pengingat: Besok, Rabu 11 Nov, 09.00 WITA.\nPipeline Northwind minggu ini: 3 deal masuk, 1 survei.", now-2*H+9000, MsgExtra{RunID: &runID})
 	k.Approval(Approval{RunID: runID, ChatID: web.ID, Tool: "mcp-linear__delete_issue", ToolClass: "destructive", ArgsPreview: ptr(`{"id":"PAL-123"}`), ExpiresAt: now + 10*MIN, CreatedAt: now})
 	k.Message(tg, "user", "https://example.com/a/very/long/url/that/never/breaks/naturally/0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz", now-H)
 
@@ -76,7 +76,7 @@ func demo(k *Kit) {
 		k.Run(Run{ChatID: &chat, Trigger: "message", Model: &model, TokensIn: ptr(4000 + i*1500), TokensOut: ptr(300 + i*40), Status: status, Error: errText, StartedAt: now - i*22*H, Ms: ptr(2000 + i*300)})
 	}
 
-	jobID := k.Job(Job{Name: "Daily briefing", Kind: "briefing", RRule: "FREQ=DAILY;BYHOUR=7;BYMINUTE=0", TZ: "Asia/Makassar", Prompt: "Brief me.", ChatID: tg.ID, NextRunAt: ptr(now + 10*H), LastRunAt: ptr(now - 14*H), LastStatus: ptr("ok"), LastResult: ptr("Pagi! Hari ini 2 pengingat, 3 deal Vorneo masuk, cuaca Banjarbaru cerah berawan 31°C."), DailyTokenCap: ptr[int64](50_000)})
+	jobID := k.Job(Job{Name: "Daily briefing", Kind: "briefing", RRule: "FREQ=DAILY;BYHOUR=7;BYMINUTE=0", TZ: "Asia/Makassar", Prompt: "Brief me.", ChatID: tg.ID, NextRunAt: ptr(now + 10*H), LastRunAt: ptr(now - 14*H), LastStatus: ptr("ok"), LastResult: ptr("Pagi! Hari ini 2 pengingat, 3 deal Northwind masuk, cuaca Malang cerah berawan 31°C."), DailyTokenCap: ptr[int64](50_000)})
 	k.Job(Job{Name: "Heartbeat with a name long enough to wrap onto a second line on a phone", Kind: "heartbeat", RRule: "FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9,10,11,12,13,14,15,16,17,18,19,20,21,22", TZ: "Asia/Makassar", Prompt: "NOTHING unless it matters.", ChatID: tg.ID, Enabled: ptr(false), DailyTokenCap: ptr[int64](30_000)})
 	k.Run(Run{ChatID: &tg.ID, JobID: &jobID, Trigger: "schedule", Model: ptr("claude-sonnet-4-6"), TokensIn: ptr[int64](21000), TokensOut: ptr[int64](1400), Status: "ok", StartedAt: now - H, Ms: ptr[int64](15000)})
 
@@ -108,24 +108,24 @@ func demo(k *Kit) {
 		k.Reminder(Reminder{ChatID: tg.ID, Text: text, RRule: rrule, TZ: "Asia/Makassar", FireAt: now + inHours*H, Status: status})
 	}
 	rem("Bayar listrik", 15, nil, "pending")
-	rem("Kirim laporan mingguan ke tim Vorneo, lengkap dengan rekap deal yang masuk, survei yang sudah dijadwalkan, dan catatan follow up untuk setiap agen 📊", 40, nil, "pending")
+	rem("Kirim laporan mingguan ke tim Northwind, lengkap dengan rekap deal yang masuk, survei yang sudah dijadwalkan, dan catatan follow up untuk setiap agen 📊", 40, nil, "pending")
 	rem("Standup", 20, ptr("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"), "pending")
 	rem("Old one", -30, nil, "done")
 
 	// A reply with the Markdown the model actually sends (bold, lists, code, a link).
 	k.Message(web, "user", "rekap minggu ini dong", now-30*MIN)
 	k.Message(web, "assistant",
-		"**Rekap minggu ini** (W46):\n\n1. *3 deal* masuk di Vorneo, 1 survei dijadwalkan\n2. Pengingat `bayar listrik` besok jam 09.00\n3. Detail di https://vorneo.id/deals?week=2026-W46\n\n- Telegram: on\n- WhatsApp: **error 440**, perlu pairing ulang\n\n```\npalui connectors on whatsapp\n```\n\nLihat [dashboard Palui](https://palui.zakiego.com/app/connectors) untuk detail.",
+		"**Rekap minggu ini** (W46):\n\n1. *3 deal* masuk di Northwind, 1 survei dijadwalkan\n2. Pengingat `bayar listrik` besok jam 09.00\n3. Detail di https://northwind.example.com/deals?week=2026-W46\n\n- Telegram: on\n- WhatsApp: **error 440**, perlu pairing ulang\n\n```\npalui connectors on whatsapp\n```\n\nLihat [dashboard Palui](https://palui.zakiego.com/app/connectors) untuk detail.",
 		now-29*MIN)
 
-	titles := []string{"Keluarga besar 👨‍👩‍👧‍👦 Banjarmasin", "مجموعة العائلة", "東京出張チーム", "A", "Vorneo agents: Banjarbaru, Martapura, Pelaihari, Tanah Laut, Barito Kuala and Hulu Sungai", "🔥🔥🔥", "supercalifragilisticexpialidocious_channel_without_spaces_0123456789"}
+	titles := []string{"Keluarga besar 👨‍👩‍👧‍👦 Surabaya", "مجموعة العائلة", "東京出張チーム", "A", "Northwind agents: Malang, Sidoarjo, Batu, Pasuruan, Lumajang and Probolinggo", "🔥🔥🔥", "supercalifragilisticexpialidocious_channel_without_spaces_0123456789"}
 	for i := int64(0); i < 18; i++ {
 		channel := "whatsapp"
 		if i%2 != 0 {
 			channel = "telegram"
 		}
 		c := k.Chat(channel, fmt.Sprintf("demo-%d", i), titles[i%int64(len(titles))], ChatOpts{})
-		text := "Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru"
+		text := "Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang"
 		if i%3 != 0 {
 			text = "ok sip 👍"
 		}
@@ -147,7 +147,7 @@ func demo(k *Kit) {
 	for i := int64(0); i < 40; i++ {
 		connector, kind, level := "cliproxy", "status", "warn"
 		if i%3 != 0 {
-			connector = "mcp-vorneo"
+			connector = "mcp-northwind"
 		}
 		if i%4 != 0 {
 			kind = "tool"
@@ -157,7 +157,7 @@ func demo(k *Kit) {
 		}
 		message := "status change"
 		if i%4 != 0 {
-			message = fmt.Sprintf("mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in %d ms", 100+i*13)
+			message = fmt.Sprintf("mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in %d ms", 100+i*13)
 		}
 		k.Event(Event{At: now - (i+10)*15*MIN, ConnectorID: &connector, Kind: kind, Level: level, Message: message})
 	}
@@ -181,16 +181,16 @@ func demo(k *Kit) {
 
 	k.Attachment(Attachment{ChatID: wa.ID, Title: "Tiket pesawat SUB-CGK 12 Des", Description: "Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.", Kind: "pdf", Filename: "e-ticket-XKQ9PL.pdf", Size: ptr[int64](184_320), CreatedAt: ptr(now - 3*H)})
 	k.Attachment(Attachment{ChatID: tg.ID, Title: "KTP Budi", Description: "Foto KTP, berlaku seumur hidup.", Kind: "png", Size: ptr[int64](412_000), CreatedAt: ptr(now - 26*H)})
-	k.Attachment(Attachment{ChatID: tg.ID, Title: "Struk servis motor", Description: "Bengkel resmi Banjarbaru, ganti oli dan kampas rem, Rp 385.000.", Kind: "pdf", Filename: "struk_servis_2026-11-01.pdf", Size: ptr[int64](96_000), CreatedAt: ptr(now - 9*D)})
+	k.Attachment(Attachment{ChatID: tg.ID, Title: "Struk servis motor", Description: "Bengkel resmi Malang, ganti oli dan kampas rem, Rp 385.000.", Kind: "pdf", Filename: "struk_servis_2026-11-01.pdf", Size: ptr[int64](96_000), CreatedAt: ptr(now - 9*D)})
 	// Outbound: one contact on Always allow, one on Always ask.
-	adik := k.Chat("whatsapp", "6282200001001@s.whatsapp.net", "Zaki", ChatOpts{Allowed: ptr(false)})
-	k.Contact(adik, Contact{Name: "Zaki", Address: "6282200001001", Policy: "allow", Note: ptr("Adik")},
-		[]Send{{Text: "Halo, ini asisten Zaki. Zaki lagi otw ya.", Status: "sent", At: now - 40*MIN, ApprovedBy: "policy"}},
-		[]Scheduled{{Text: "Halo, ini asisten Zaki. Ingetin jemput jam 8 ya.", FireAt: now + 6*H}})
+	adik := k.Chat("whatsapp", "6282200001001@s.whatsapp.net", "Rizky", ChatOpts{Allowed: ptr(false)})
+	k.Contact(adik, Contact{Name: "Rizky", Address: "6282200001001", Policy: "allow", Note: ptr("Adik")},
+		[]Send{{Text: "Halo, ini asisten Rizky. Rizky lagi otw ya.", Status: "sent", At: now - 40*MIN, ApprovedBy: "policy"}},
+		[]Scheduled{{Text: "Halo, ini asisten Rizky. Ingetin jemput jam 8 ya.", FireAt: now + 6*H}})
 	ibu := k.Chat("whatsapp", "6281111111111@s.whatsapp.net", "Ibu", ChatOpts{Allowed: ptr(false)})
 	k.Contact(ibu, Contact{Name: "Ibu", Address: "6281111111111"},
-		[]Send{{Text: "Bu, Zaki pulang Jumat ya.", Status: "sent", At: now - 2*D}},
-		[]Scheduled{{Text: "Kabar mingguan dari Zaki.", FireAt: now + 2*D, RRule: ptr("FREQ=WEEKLY;BYDAY=FR")}})
+		[]Send{{Text: "Bu, Rizky pulang Jumat ya.", Status: "sent", At: now - 2*D}},
+		[]Scheduled{{Text: "Kabar mingguan dari Rizky.", FireAt: now + 2*D, RRule: ptr("FREQ=WEEKLY;BYDAY=FR")}})
 	// An HTTP API credential. Last, so its rows don't shift any earlier event id.
 	k.Connector("http-elevenlabs", "http", ConnectorOpts{
 		Label:   ptr("ElevenLabs"),

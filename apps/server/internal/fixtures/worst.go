@@ -34,7 +34,7 @@ const (
 	worstLongURL    = "https://example.com/workspaces/northwind-industries-holdings/projects/q3-launch/docs/9f8e7d6c5b4a?tab=comments&filter=unresolved&sort=newest"
 	worstEmail      = "bartholomew.fitzgerald@northwind-industries-holdings.example.com"
 	worstPastedBlob = "iVBORw0KGgoAAAANSUhEUgAAAoAAAAHgCAYAAAA10dzkAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH6AsLBAUNq0p8bwAAIABJREFUeJzs3XmYXFWd//H3ube6es2+dxKykLCEsIQl7CCLgCIqKuKCOm7jMuo4zjg6zvxmxnFmdHTUcR03VFxQEVBAZBVkX8KSQBISsu9Jd5LudHe6q+qe3x9V3el0upPuTnVXdefzep5+uurWrVun7r1V93vP8j0G"
-	worstParagraph  = "Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru dan Martapura. Kalau ada selisih lebih dari lima persen, catat penyebabnya dan kirim ringkasannya ke grup sebelum rapat Senin pagi. "
+	worstParagraph  = "Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang dan Sidoarjo. Kalau ada selisih lebih dari lima persen, catat penyebabnya dan kirim ringkasannya ke grup sebelum rapat Senin pagi. "
 	worstModelLong  = "accounts/fireworks/models/llama-v3p3-70b-instruct-turbo-preview-0925-extended-context-128k-northwind-finetune-2026-11"
 	worstTZLong     = "America/North_Dakota/New_Salem"
 	worstToolLong   = "mcp-northwind-kb__search_internal_knowledge_base_by_department_x"
@@ -69,8 +69,8 @@ var worstMarkdownStress = strings.Join([]string{
 	"",
 	"| Kabupaten | Deal masuk | Survei | Closing | Catatan |",
 	"| --- | --- | --- | --- | --- |",
-	"| Banjarbaru | 1,284 | 97 | 12 | menunggu KPR |",
-	"| Hulu Sungai Selatan | 0 | 0 | 0 | belum ada agen |",
+	"| Malang | 1,284 | 97 | 12 | menunggu KPR |",
+	"| Probolinggo | 0 | 0 | 0 | belum ada agen |",
 	"",
 	"Gambar yang kamu tempel tadi: `" + worstPastedBlob + "`",
 	"",
@@ -80,7 +80,7 @@ var worstMarkdownStress = strings.Join([]string{
 	"2. *Langkah kedua*",
 	"",
 	"```",
-	`curl -sS -X POST "` + worstLongURL + `" -H "authorization: Bearer $NORTHWIND_TOKEN" -H "content-type: application/json" --data '{"stage":"masuk","week":"2026-W46","agents":["banjarbaru","martapura","pelaihari"]}'`,
+	`curl -sS -X POST "` + worstLongURL + `" -H "authorization: Bearer $NORTHWIND_TOKEN" -H "content-type: application/json" --data '{"stage":"masuk","week":"2026-W46","agents":["malang","sidoarjo","batu"]}'`,
 	"```",
 	"",
 	"Selengkapnya di " + worstLongURL + " atau [buka dokumen " + worstDeck + "](" + worstLongURL + ").",
@@ -153,9 +153,9 @@ func worst(k *Kit) {
 	k.Connector("mcp-notion-2", "mcp", ConnectorOpts{Label: ptr("Notion"), Status: "error", Detail: ptr("ECONNREFUSED 127.0.0.1:8931"), Config: obj("url", "http://127.0.0.1:8931/mcp")})
 	k.Connector("mcp-vn", "mcp", ConnectorOpts{Label: ptr("Đặng Thị Ngọc Hân: lịch làm việc"), Status: "on", Config: obj("url", "https://vn.example.com/mcp")})
 	k.Connector("mcp-linear", "mcp", ConnectorOpts{Label: ptr("Linear"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://mcp.linear.app/mcp")})
-	k.Connector("mcp-vorneo", "mcp", ConnectorOpts{Label: ptr("Vorneo"), Status: "on", Config: obj("url", "https://vorneo.id/api/mcp/")})
-	k.Connector("mcp-keuangan", "mcp", ConnectorOpts{Label: ptr("Keuangan"), Status: "paused", Config: obj("url", "https://keuangan.example.com/mcp")})
-	k.Connector("mcp-todomap", "mcp", ConnectorOpts{Label: ptr("Todo Map"), Status: "on", Config: obj("url", "https://todo.example.com/api/mcp")})
+	k.Connector("mcp-northwind", "mcp", ConnectorOpts{Label: ptr("Northwind"), Status: "on", Config: obj("url", "https://northwind.example.com/api/mcp/")})
+	k.Connector("mcp-ledger", "mcp", ConnectorOpts{Label: ptr("Ledger"), Status: "paused", Config: obj("url", "https://ledger.example.com/mcp")})
+	k.Connector("mcp-tasks", "mcp", ConnectorOpts{Label: ptr("Task Board"), Status: "on", Config: obj("url", "https://todo.example.com/api/mcp")})
 	k.Connector("gcal", "gcal", ConnectorOpts{Status: "not_set_up"})
 	k.Connector("t3code", "t3code", ConnectorOpts{
 		Status:  "error",
@@ -178,12 +178,12 @@ func worst(k *Kit) {
 	// --- owner notes: at the limits, a URL that never breaks, mixed scripts -------
 	k.Instruction(Instruction{
 		Title:     within("Jadwal sholat untuk kota default, atau koordinat kalau sedang di luar Indonesia", L.instructionTitle),
-		Body:      fill("Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.zakiego.com/api/v1/jadwal?kota=banjarmasin&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\n\n", L.instructionBody),
+		Body:      fill("Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.zakiego.com/api/v1/jadwal?kota=surabaya&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\n\n", L.instructionBody),
 		CreatedAt: ptr(now - 40*D),
 	})
 	k.Instruction(Instruction{Title: "J", Body: "Selalu jawab singkat.", CreatedAt: ptr(now - 2*D)})
 	k.Instruction(Instruction{Title: "خادم الملفات: الملخص اليومي", Body: "Ringkas file baru di server berkas setiap pagi.", Enabled: ptr(false), CreatedAt: ptr(now - D)})
-	k.Preference(within("default_city_when_travelling_outside_kal", L.preferenceKey), "Banjarmasin")
+	k.Preference(within("default_city_when_travelling_outside_jtm", L.preferenceKey), "Surabaya")
 	k.Preference("home_coordinates", within(fill("-3.3194374, 114.5907765; ", L.preferenceValue), L.preferenceValue))
 	k.Preference("x", "y")
 	k.Preference("nama_panggilan", "Đặng Thị Ngọc Hân 🌴")
@@ -200,7 +200,7 @@ func worst(k *Kit) {
 	jo := k.Chat("telegram", "1000000001", "Jo", none)
 	say(jo, "ok", now+2*H)
 
-	family := k.Chat("telegram", "-1001234567890", "Keluarga Besar Bani H. Abdurrahman Siddiq 👨‍👩‍👧‍👦 Banjarmasin, Martapura, Banjarbaru, Pelaihari (arisan, haul, dan info acara)", ChatOpts{Kind: "group", ReplyMode: "all"})
+	family := k.Chat("telegram", "-1001234567890", "Keluarga Besar Bani H. Abdul Karim Hasan 👨‍👩‍👧‍👦 Surabaya, Sidoarjo, Malang, Batu (arisan, haul, dan info acara)", ChatOpts{Kind: "group", ReplyMode: "all"})
 	// Seven characters, then emoji: the list's 140-character preview cut lands in the middle of one.
 	say(family, "Wkwkwk "+strings.Repeat("😂", 80), now-50_000)
 
@@ -216,19 +216,19 @@ func worst(k *Kit) {
 	})
 	var readContainers []string
 	for i := 1; i <= 5; i++ {
-		readContainers = append(readContainers, fmt.Sprintf("kb-arisan-keluarga-bani-abdurrahman-siddiq-banjarmasin-catatan-%d", i))
+		readContainers = append(readContainers, fmt.Sprintf("kb-arisan-keluarga-bani-abdul-karim-hasan-surabaya-catatan-%d", i))
 	}
 	arisan := k.Agent(Agent{
 		Slug:        within("koordinator-arisan-haul-", L.agentSlug),
 		Name:        within("Koordinator Arisan & Haul Bani Abdurrahm", L.agentName),
-		Persona:     fill("Kamu koordinator arisan keluarga. Catat siapa yang sudah bayar, ingatkan jadwal haul, dan jawab sopan dalam bahasa Banjar kalau ditanya pakai bahasa Banjar. ", L.persona),
+		Persona:     fill("Kamu koordinator arisan keluarga. Catat siapa yang sudah bayar, ingatkan jadwal haul, dan jawab sopan dalam bahasa Jawa kalau ditanya pakai bahasa Jawa. ", L.persona),
 		AvatarIcon:  ptr("chef-hat"),
 		AvatarColor: ptr("violet"),
 		// Allow-all on, one tool of every other kind, so the Tools tab shows each select value and both group counts.
 		DailyTokenCap:   ptr[int64](250_000),
 		TokensToday:     312_481,
 		ToolPermissions: obj("allowAll", true, "tools", obj("mcp-files__restart_service", "ask", "mcp-files__send_email_to_a_customer_with_a_long_tool_name", "deny", "mcp-files__list_deals", "allow")),
-		RecallContainer: ptr("agent-arisan-keluarga-bani-abdurrahman-siddiq-banjarmasin-2026"),
+		RecallContainer: ptr("agent-arisan-keluarga-bani-abdul-karim-hasan-surabaya-2026"),
 		// Five shared containers at 64 characters each (MAX_READ_CONTAINERS, RECALL_CONTAINER).
 		RecallReadContainers: readContainers,
 		RecallPerChat:        ptr(true),
@@ -238,7 +238,7 @@ func worst(k *Kit) {
 		ModelRoles: obj("default", sixSteps(), "fast", []any{obj("connectorId", "ai-gateway", "model", "claude-haiku-4-5-20251001")}),
 	})
 	// An uploaded photo: a small gradient PNG, the shape a browser-resized photo has.
-	cs := k.Agent(Agent{Slug: "cs", Name: "CS", Persona: "Jawab pertanyaan pelanggan Vorneo.", GuestTools: "none", AvatarImage: ptr(GradientAvatar48())})
+	cs := k.Agent(Agent{Slug: "cs", Name: "CS", Persona: "Jawab pertanyaan pelanggan Northwind.", GuestTools: "none", AvatarImage: ptr(GradientAvatar48())})
 	k.Assign(family, arisan, true)
 	// Members (PLAN 19.4), made-up people and numbers. A name at the limit
 	// mixing scripts and an emoji, in two agents, with the most accounts: a
@@ -263,8 +263,8 @@ func worst(k *Kit) {
 	// Agent-scoped MCP: one owned by the agent with the longest name, one by CS,
 	// and one whose owner was deleted (serves nobody).
 	k.OwnConnector("mcp-files", arisan)
-	k.OwnConnector("mcp-vorneo", cs)
-	k.OwnConnector("mcp-keuangan", "agt_deleted")
+	k.OwnConnector("mcp-northwind", cs)
+	k.OwnConnector("mcp-ledger", "agt_deleted")
 	// Every agent but the default, plus one deleted since.
 	k.ShareConnector("mcp-linear", arisan, cs, "agt_deleted")
 	// The agent page (/agents/<slug>): instructions at the limits, and (below)
@@ -272,7 +272,7 @@ func worst(k *Kit) {
 	k.Instruction(Instruction{
 		AgentID:   &arisan,
 		Title:     within("Rekap setoran arisan tiap tanggal 25, urut dari yang paling lama belum bayar ya.", L.instructionTitle),
-		Body:      fill("Kalau ada yang tanya siapa yang belum bayar, sebut nama dan jumlahnya, jangan sebut nomor HP. Daftar lengkap ada di https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_arisan_bani_abdurrahman/edit#gid=0 dan jangan dibagikan ke grup. ", L.instructionBody),
+		Body:      fill("Kalau ada yang tanya siapa yang belum bayar, sebut nama dan jumlahnya, jangan sebut nomor HP. Daftar lengkap ada di https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_arisan_bani_abdul_karim/edit#gid=0 dan jangan dibagikan ke grup. ", L.instructionBody),
 		CreatedAt: ptr(now - 20*D),
 	})
 	k.Instruction(Instruction{AgentID: &arisan, Title: "Haul", Body: "Haul tahun ini hari Ahad.", Enabled: ptr(false), CreatedAt: ptr(now - 3*D)})
@@ -282,13 +282,13 @@ func worst(k *Kit) {
 		AgentID:      &arisan,
 		Name:         within("rekap-setoran-arisan-bani-abdurr", L.commandName),
 		Description:  within(fill("Rekap setoran arisan bulan ini, urut dari yang paling lama belum bayar, lalu kirim ke grup keluarga. ", L.commandDescription), L.commandDescription),
-		Prompt:       fill("Buat rekap setoran arisan dari https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_arisan_bani_abdurrahman/edit#gid=0 untuk {{args}}. ", L.commandPrompt),
+		Prompt:       fill("Buat rekap setoran arisan dari https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_arisan_bani_abdul_karim/edit#gid=0 untuk {{args}}. ", L.commandPrompt),
 		AttachReport: true,
 		CreatedAt:    ptr(now - 10*D),
 	})
 	k.CustomCommand(CustomCommand{Name: "rekap-setoran-arisan-bani-abdurr", Description: "Rekap untuk agent lain", Prompt: "Rekap setoran.", CreatedAt: ptr(now - 9*D)})
 	k.CustomCommand(CustomCommand{Name: "x", Prompt: "خلاصة اليوم 🌴", Enabled: ptr(false), CreatedAt: ptr(now - D)})
-	k.Message(family, "user", "@palui_bot siapa yang belum bayar arisan bulan ini?", now-40_000, MsgExtra{FromOwner: ptr(false), SenderName: ptr(ptr("Muhammad Fadhlurrahman Al-Banjari bin H. Abdurrahman Siddiq")), SenderID: ptr("1000000099")})
+	k.Message(family, "user", "@palui_bot siapa yang belum bayar arisan bulan ini?", now-40_000, MsgExtra{FromOwner: ptr(false), SenderName: ptr(ptr("Muhammad Fadhlurrahman Al-Farisi bin H. Abdul Karim Hasan")), SenderID: ptr("1000000099")})
 	k.Message(family, "user", "؟", now-30_000, MsgExtra{FromOwner: ptr(false), SenderName: ptr[*string](nil), SenderID: ptr("1000000100")})
 
 	// No title yet: the list falls back to the raw JID.
@@ -336,7 +336,7 @@ func worst(k *Kit) {
 	say(link, "first.last+billing-notifications@example.com", now-13*D)
 	k.Assign(link, arisan, false)
 	// A WhatsApp group the owner just added the bot to: off, no agent, one unanswered mention.
-	fresh := k.Chat("whatsapp", "120363049876543210987654@g.us", "Finansial Keluarga & Tabungan Haji Bani Abdurrahman 2027", ChatOpts{Kind: "group", Allowed: ptr(false)})
+	fresh := k.Chat("whatsapp", "120363049876543210987654@g.us", "Anggaran Keluarga & Tabungan Bersama Bani Abdul Karim 2027", ChatOpts{Kind: "group", Allowed: ptr(false)})
 	k.Message(fresh, "user", "Halo @Palui Agent", now-2*MIN)
 	// Not on the WhatsApp allowlist, and a chat that has never had a message.
 	k.Chat("whatsapp", "6281200000005@s.whatsapp.net", "Konstantin Oberhauser-Wettstein", ChatOpts{Allowed: ptr(false), CreatedAt: ptr(now - 14*D)})
@@ -435,7 +435,7 @@ func worst(k *Kit) {
 	}
 
 	cappedJob := job(Job{
-		Name:          within("daily_sales_recap_vorneo_banjarbaru_martapura_pelaihari_tanah_laut_q4_2026_final", L.jobName),
+		Name:          within("daily_sales_recap_northwind_malang_sidoarjo_batu_pasuruan_q4_2026_final", L.jobName),
 		Kind:          "job",
 		RRule:         within(worstRRuleLong, L.rrule),
 		TZ:            worstTZLong,
@@ -449,7 +449,7 @@ func worst(k *Kit) {
 		DailyTokenCap: ptr[int64](1000),
 	})
 	job(Job{Name: "J", Kind: "heartbeat", RRule: "FREQ=DAILY", TZ: "UTC", Prompt: "x", ChatID: jo.ID, Enabled: ptr(false), DailyTokenCap: ptr[int64](5_000_000)})
-	briefing := job(Job{Name: within("Rekap penjualan harian Vorneo untuk Banjarbaru, Martapura, Pelaihari dan sekitar", L.jobName), Kind: "briefing", RRule: "FREQ=DAILY;BYHOUR=7;BYMINUTE=0", TZ: "Asia/Makassar", Prompt: "Brief me.", ChatID: aleksandra.ID, NextRunAt: ptr(now + 10*H), LastRunAt: ptr(now - 14*H), LastStatus: ptr("ok"), LastResult: ptr("ok"), DailyTokenCap: ptr[int64](5_000_000)})
+	briefing := job(Job{Name: within("Rekap penjualan harian Northwind untuk Malang, Sidoarjo, Batu dan sekitar", L.jobName), Kind: "briefing", RRule: "FREQ=DAILY;BYHOUR=7;BYMINUTE=0", TZ: "Asia/Makassar", Prompt: "Brief me.", ChatID: aleksandra.ID, NextRunAt: ptr(now + 10*H), LastRunAt: ptr(now - 14*H), LastStatus: ptr("ok"), LastResult: ptr("ok"), DailyTokenCap: ptr[int64](5_000_000)})
 	// Ran, but the runtime never wrote a status.
 	job(Job{Name: "تذكير يومي بتقرير المبيعات", RRule: "FREQ=WEEKLY;BYDAY=MO", TZ: "Asia/Riyadh", Prompt: "x", ChatID: arabic.ID, NextRunAt: ptr(now + 3*D), LastRunAt: ptr(now - 4*D)})
 	// A status the dashboard has no tone for.
@@ -554,18 +554,18 @@ func worst(k *Kit) {
 
 	// --- outbound: the longest name, note and text, every send status, a removed contact ---
 	k.Setting("outbound", obj("enabled", true, "perContactPerDay", 50, "perDay", 200, "holdSeconds", 120, "signatureOn", true,
-		"signature", within("—\n_Dikirim otomatis oleh asisten AI Muhammad Zakiyuddin Munziri. Balasan ke nomor ini tidak dibaca, silakan hubungi beliau langsung di nomornya ya_", 150),
+		"signature", within("—\n_Dikirim otomatis oleh asisten AI Muhammad Rizky Pratama. Balasan ke nomor ini tidak dibaca, silakan hubungi beliau langsung di nomornya ya_", 150),
 		"pastSignatures", []any{}))
-	longName := within("Muhammad Fadhlurrahman Al-Banjari bin H. Abdurrahman Siddiq", L.contactName)
+	longName := within("Muhammad Fadhlurrahman Al-Farisi bin H. Abdul Karim Hasan", L.contactName)
 	longContact := k.Chat("whatsapp", "6282200001001@s.whatsapp.net", longName, ChatOpts{Allowed: ptr(false)})
 	k.Contact(longContact,
-		Contact{Name: longName, Address: "6282200001001", Policy: "allow", Note: ptr(within(fill("Adik ipar, kerja di Banjarbaru, jangan chat sebelum jam 7 pagi. ", L.contactNote), L.contactNote))},
+		Contact{Name: longName, Address: "6282200001001", Policy: "allow", Note: ptr(within(fill("Adik ipar, kerja di Malang, jangan chat sebelum jam 7 pagi. ", L.contactNote), L.contactNote))},
 		[]Send{
-			{Text: within(fill("Halo, ini asisten Zaki. "+worstParagraph+" ", L.outboundText), L.outboundText), Status: "pending", At: now - 5_000, Held: true, ApprovedBy: "policy"},
-			{Text: "Zaki otw ya", Status: "sent", At: now - 20_000, ApprovedBy: "policy"},
+			{Text: within(fill("Halo, ini asisten Rizky. "+worstParagraph+" ", L.outboundText), L.outboundText), Status: "pending", At: now - 5_000, Held: true, ApprovedBy: "policy"},
+			{Text: "Rizky otw ya", Status: "sent", At: now - 20_000, ApprovedBy: "policy"},
 			{Text: "Pengingat arisan besok jam 10", Status: "failed", At: now - 2*H, Error: ptr(within(fill(worstStackFirst+" ", 300), 300))},
 			{Text: "Dibatalin", Status: "cancelled", At: now - 3*D, Error: ptr("cancelled by the owner")},
-			{Text: "Zaki belum jawab check-in sholat Maghrib.", Status: "sending", At: now - 1000, ApprovedBy: "flow_version"},
+			{Text: "Rizky belum jawab check-in sholat Maghrib.", Status: "sending", At: now - 1000, ApprovedBy: "flow_version"},
 		},
 		[]Scheduled{
 			{Text: within(fill("Kabar mingguan: ", L.outboundText), L.outboundText), FireAt: now + 3*D, RRule: ptr(within(worstRRuleLong, L.rrule))},
@@ -600,7 +600,7 @@ func worst(k *Kit) {
 	k.Hook(Hook{Name: "J", ChatID: jo.ID})
 	k.Hook(Hook{Name: "تنبيهات النشر", ChatID: arabic.ID, LastAt: ptr(now - 3*365*D)})
 	// Its chat is gone, and it has been switched off.
-	k.Hook(Hook{Name: "Sentry alerts for the Vorneo production project (payments)", ChatID: worstRemoved, Mode: "summarize", Enabled: ptr(false), LastAt: ptr[int64](0)})
+	k.Hook(Hook{Name: "Sentry alerts for the Northwind production project (payments)", ChatID: worstRemoved, Mode: "summarize", Enabled: ptr(false), LastAt: ptr[int64](0)})
 	k.Hook(Hook{Name: "<b>Stripe</b> &amp; friends", ChatID: noTitleGroup.ID, LastAt: ptr(now + 2*H)})
 	k.Hook(Hook{Name: "Uptime", ChatID: aleksandra.ID, LastAt: ptr(now - 12*D)})
 
@@ -665,14 +665,14 @@ func worst(k *Kit) {
 func worstFlows(k *Kit, flowChat db.Chat) {
 	now := k.Now
 	L := limits
-	longName := within("Rekap-penjualan-harian-Vorneo-untuk-Banjarbaru-Martapura-dan-Hulu-Sungai-Selatan", L.flowName)
+	longName := within("Rekap-penjualan-harian-Northwind-untuk-Malang-Sidoarjo-dan-Probolinggo", L.flowName)
 	bigWhen := `len(steps.deals.data.items) > 3 and not empty(steps.deals.data.items) and steps.deals.data.items.0.stage == "masuk" or daysUntil(steps.deals.data.items.0.due) <= 3`
 	steps := func(lastText string) []any {
 		var out []any
 		for i := 0; i < L.flowSteps; i++ {
 			switch i {
 			case 0:
-				out = append(out, obj("id", "deals", "kind", "tool", "tool", worstToolLong, "args", obj("department", "penjualan-dan-pemasaran-wilayah-kalimantan-selatan", "week", "{{now.date}}", "url", worstLongURL)))
+				out = append(out, obj("id", "deals", "kind", "tool", "tool", worstToolLong, "args", obj("department", "penjualan-dan-pemasaran-wilayah-jawa-timur", "week", "{{now.date}}", "url", worstLongURL)))
 			case 1:
 				out = append(out, obj("id", "big_enough", "kind", "if", "when", bigWhen, "then", "s2", "else", nil))
 			default:
@@ -699,7 +699,7 @@ func worstFlows(k *Kit, flowChat db.Chat) {
 			obj("id", "weekly", "kind", "schedule", "start", "deals", "source", obj("kind", "rrule", "rrule", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=7,12,17;BYMINUTE=0,30", "start", "2026-11-02T07:00")),
 		}
 		for i := 0; i < L.flowTriggers-2; i++ {
-			out = append(out, obj("id", fmt.Sprintf("cmd%d", i), "kind", "chat", "command", fmt.Sprintf("/rekap_penjualan_%d_banjarbaru", i), "start", "deals"))
+			out = append(out, obj("id", fmt.Sprintf("cmd%d", i), "kind", "chat", "command", fmt.Sprintf("/rekap_penjualan_%d_malang", i), "start", "deals"))
 		}
 		return out
 	}
@@ -708,7 +708,7 @@ func worstFlows(k *Kit, flowChat db.Chat) {
 		notified = append(notified, fmt.Sprintf("pr-%d", 1000+i))
 	}
 	big := k.Flow(flowChat,
-		obj("name", longName, "description", within(fill("Ambil deal Vorneo, cek angka, kirim ringkasan ke grup keluarga dan tim. ", L.flowDescription), L.flowDescription), "triggers", triggers(), "steps", steps("")),
+		obj("name", longName, "description", within(fill("Ambil deal Northwind, cek angka, kirim ringkasan ke grup keluarga dan tim. ", L.flowDescription), L.flowDescription), "triggers", triggers(), "steps", steps("")),
 		FlowOpts{
 			Enabled:   ptr(false),
 			Failures:  5,
@@ -754,7 +754,7 @@ func worstFlows(k *Kit, flowChat db.Chat) {
 	)
 	k.FlowRun(rtl, FlowRun{Status: "cancelled", TriggerID: ptr("main"), StartedAt: now - D, Error: ptr("The owner didn't approve this version.")})
 
-	bills := k.Flow(flowChat, js(`{"name":"Tagihan","triggers":[{"id":"daily","kind":"schedule","start":"bills","source":{"kind":"times","times":[{"time":"09:00","label":"Cek tagihan"}]}}],"steps":[{"id":"bills","kind":"tool","tool":"mcp-keuangan__list_bills","args":{"status":"unpaid"}},{"id":"per_bill","kind":"each","items":"steps.bills.data.items","where":"daysUntil(item.due) <= 3","key":"{{item.id}}:{{item.due}}","max":50,"body":"ask","next":null},{"id":"ask","kind":"checkin","text":"Tagihan {{item.name | truncate(40)}} jatuh tempo {{item.due | date}}. Udah bayar?","deadline":{"kind":"after","minutes":4320},"next":null}]}`), FlowOpts{})
+	bills := k.Flow(flowChat, js(`{"name":"Tagihan","triggers":[{"id":"daily","kind":"schedule","start":"bills","source":{"kind":"times","times":[{"time":"09:00","label":"Cek tagihan"}]}}],"steps":[{"id":"bills","kind":"tool","tool":"mcp-ledger__list_bills","args":{"status":"unpaid"}},{"id":"per_bill","kind":"each","items":"steps.bills.data.items","where":"daysUntil(item.due) <= 3","key":"{{item.id}}:{{item.due}}","max":50,"body":"ask","next":null},{"id":"ask","kind":"checkin","text":"Tagihan {{item.name | truncate(40)}} jatuh tempo {{item.due | date}}. Udah bayar?","deadline":{"kind":"after","minutes":4320},"next":null}]}`), FlowOpts{})
 	parent := k.FlowRun(bills, FlowRun{Status: "done", TriggerID: ptr("daily"), StartedAt: now - 30*MIN, Steps: []FlowStep{
 		{StepID: "bills", Kind: "tool", Status: "ok"},
 		{StepID: "per_bill", Kind: "each", Status: "ok", Error: ptr("30 item(s) over max 50 were dropped."), Output: js(`{"count":80,"started":50,"deduped":0,"dropped":30}`)},

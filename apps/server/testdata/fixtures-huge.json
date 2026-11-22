@@ -150,7 +150,7 @@
    "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],
    "count": 3284,
    "first": ["<msg#1>","<chat#1>","<ses#1>","user","{\"text\":\"Follow up deal #1000\"}","Follow up deal #1000",null,null,null,"handled",null,null,1794501600000,null,1],
-   "last": ["<msg#2>","<chat#6>","<ses#3>","user","{\"text\":\"Kirim laporan mingguan ke tim Vorneo, Kartika Pratama\"}","Kirim laporan mingguan ke tim Vorneo, Kartika Pratama",null,null,null,"handled",null,null,1791773340000,null,1]
+   "last": ["<msg#2>","<chat#6>","<ses#3>","user","{\"text\":\"Kirim laporan mingguan ke tim Northwind, Kartika Pratama\"}","Kirim laporan mingguan ke tim Northwind, Kartika Pratama",null,null,null,"handled",null,null,1791773340000,null,1]
   },
   "oauth_clients": {
    "columns": ["id","name","client_uri","redirect_uris","auth_method","secret_hash","created_at"],
@@ -210,7 +210,7 @@
    "columns": ["id","chat_id","text","rrule","tz","local_start","fire_at","scheduled_for","status","last_fired_at","snoozed_until","smart_prompt","last_outbox_id","created_at","updated_at"],
    "count": 2868,
    "first": ["<rem#1>","<chat#3>","Follow up deal #1000",null,"Asia/Makassar","2026-11-11T09:00:00",1794622980000,1794622980000,"pending",null,null,null,null,1794621600000,1794621600000],
-   "last": ["<rem#2>","<chat#6>","Kirim laporan mingguan ke tim Vorneo #1283",null,"Asia/Makassar","2026-11-11T09:00:00",1789999200000,1789999200000,"done",null,null,null,null,1794621600000,1789999200000]
+   "last": ["<rem#2>","<chat#6>","Kirim laporan mingguan ke tim Northwind #1283",null,"Asia/Makassar","2026-11-11T09:00:00",1789999200000,1789999200000,"done",null,null,null,null,1794621600000,1789999200000]
   },
   "reports": {
    "columns": ["id","chat_id","session_id","note","text","created_at"],

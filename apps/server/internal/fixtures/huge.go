@@ -14,7 +14,7 @@ import (
 var (
 	hugeFirst = []string{"Aleksandra", "Budi", "Christopher", "Dewi", "Eka", "Fitri", "Gusti", "Hendra", "Indah", "Joko", "Kartika", "Lukman", "Maria", "Nur", "Oktaviani", "Putu", "Rahmat", "Siti", "Taufik", "Wulan"}
 	hugeLast  = []string{"Wiśniewska-Kowalczyk", "Santoso", "Montgomery", "Lestari", "Pratama", "Handayani", "Ngurah", "Gunawan", "Permatasari", "Widodo", "Sari", "Hakim", "Fernández", "Hidayah", "Putri", "Wijaya", "Hidayat", "Aminah", "Rahman", "Ningsih"}
-	hugeTasks = []string{"Follow up deal", "Telepon pak RT soal iuran keamanan", "Bayar listrik", "Kirim laporan mingguan ke tim Vorneo", "Standup", "Cek pipeline", "Perpanjang domain", "Transfer arisan"}
+	hugeTasks = []string{"Follow up deal", "Telepon pak RT soal iuran keamanan", "Bayar listrik", "Kirim laporan mingguan ke tim Northwind", "Standup", "Cek pipeline", "Perpanjang domain", "Transfer arisan"}
 )
 
 // Huge holds the huge fixture's sizes (HUGE in huge.ts).
