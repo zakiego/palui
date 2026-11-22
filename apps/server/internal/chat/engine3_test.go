@@ -121,9 +121,20 @@ func TestInterruptedRuns(t *testing.T) {
 		readRT := func() *connectors.Runtime { return toolsRT("alpha", tools("read", tool("read", ret(1)))) }
 		h := basic(t, []models.Step{gate.After(models.CallTool("alpha__read", objOf(), "r1"))}, extra{registry: map[string]*connectors.Runtime{"alpha": readRT()}, rows: alphaRow})
 		h.send("berapa saldo")
-		chattest.Wait(20 * time.Millisecond)
+		select {
+		case <-gate.Reached():
+		case <-time.After(5 * time.Second):
+			t.Fatal("the turn never reached the model call")
+		}
 		done := make(chan struct{})
 		go func() { h.Engine.Stop(2_000); close(done) }()
+		// Release only once the drain has started, or the turn can finish
+		// before Stop marks the engine as draining (seen on 1-CPU runners).
+		for deadline := time.Now().Add(5 * time.Second); !h.Engine.Ctx.Draining(); time.Sleep(time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatal("the engine never started draining")
+			}
+		}
 		gate.Release()
 		<-done
 		run := allRuns(t, h.DB)[0]
