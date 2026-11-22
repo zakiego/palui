@@ -81,6 +81,8 @@ func AutoUsage(q db.Q, chatID string) (chat, total int64, err error) {
 // either path) is Deduped and costs nothing. Refusals are *Error (type, size)
 // or wrap ErrQuota.
 func AutoSave(q db.Q, in AutoInput, masterKey string, now int64) (Saved, error) {
+	saveMu.Lock()
+	defer saveMu.Unlock()
 	if _, err := CheckFile(in.MimeType, in.Bytes); err != nil {
 		return Saved{}, err
 	}
@@ -111,7 +113,7 @@ func AutoSave(q db.Q, in AutoInput, masterKey string, now int64) (Saved, error) 
 	if in.Kind == "document" {
 		filename = in.Filename
 	}
-	return Save(q, SaveInput{
+	return save(q, SaveInput{
 		ChatID: in.ChatID, MessageID: messageID, Title: AutoTitle(in), Description: in.Caption,
 		MimeType: in.MimeType, Filename: filename, Bytes: in.Bytes,
 		Origin: OriginAuto, SenderID: in.SenderID, SenderName: in.SenderName, SentAt: in.SentAt,

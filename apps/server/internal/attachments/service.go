@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/secret"
@@ -262,7 +263,18 @@ type Saved struct {
 	Deduped bool              `json:"deduped"`
 }
 
+// saveMu makes the dedupe check and the insert one step. Without it two saves of
+// the same file at once (a re-sent photo, each auto-save in its own goroutine)
+// both miss the other and keep two copies.
+var saveMu sync.Mutex
+
 func Save(q db.Q, in SaveInput, masterKey string, now int64) (Saved, error) {
+	saveMu.Lock()
+	defer saveMu.Unlock()
+	return save(q, in, masterKey, now)
+}
+
+func save(q db.Q, in SaveInput, masterKey string, now int64) (Saved, error) {
 	kind, err := CheckFile(in.MimeType, in.Bytes)
 	if err != nil {
 		return Saved{}, err
