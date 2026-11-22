@@ -469,8 +469,10 @@ func TestLifecycle(t *testing.T) {
 	t.Run("stops when the connector context is cancelled", func(t *testing.T) {
 		e, r := openRunning(t, opts{})
 		e.ctx.Abort()
-		conntest.Until(t, func() bool { return !r.Channel.Reachable() && e.sock().Ended() })
-		eq(t, exists(whatsapp.LockPathFor(e.dataDir, "whatsapp")), false)
+		// The lock file goes after the socket ends, so wait for it too.
+		conntest.Until(t, func() bool {
+			return !r.Channel.Reachable() && e.sock().Ended() && !exists(whatsapp.LockPathFor(e.dataDir, "whatsapp"))
+		})
 	})
 }
 
