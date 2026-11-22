@@ -42,14 +42,6 @@ export default defineManifest({
     { action: "listTools", label: "Pick which tools Palui may use" },
   ],
   presets: [
-    { id: "vorneo", label: "Vorneo", config: { url: "https://vorneo.id/api/mcp/", authMode: "bearer" }, secretFields: ["token"] },
-    {
-      id: "keuangan",
-      label: "Keuangan",
-      config: { url: "https://keuangan-must-be-done.zakiego.workers.dev/api/mcp", authMode: "bearer" },
-      secretFields: ["token"],
-    },
-    { id: "todomap", label: "Todo Map", config: { url: "https://todo.zakiego.com/api/mcp", authMode: "bearer" }, secretFields: ["token"] },
     { id: "linear", label: "Linear", config: { url: "https://mcp.linear.app/mcp", authMode: "bearer" }, secretFields: ["token"] },
     // apps/host-bridge on the Docker host, installed by ops/install-host-bridge.sh.
     // Trust is own: the owner writes every command, and the output is their own machine's.
@@ -64,7 +56,7 @@ export default defineManifest({
   removeWarning: "This removes the token from Palui. The server isn't touched.",
   docs: {
     notes: [
-      "Tools are namespaced <connector id>__<tool>, for example mcp-vorneo__search_listings.",
+      "Tools are namespaced <connector id>__<tool>, for example mcp-linear__list_issues.",
       "Unknown or unclassified tools are treated as destructive and always ask first.",
     ],
   },

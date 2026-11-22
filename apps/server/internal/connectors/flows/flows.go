@@ -195,7 +195,7 @@ func Tools(d *db.DB, turn connectors.TurnInfo, deps Deps) *connectors.ToolSet {
 		}
 		msg := fmt.Sprintf("Flow \"%s\" %s.", r.Flow.Name, verb)
 		if r.NeedsApproval {
-			msg = fmt.Sprintf("Flow \"%s\" %s. Ada aksi yang mengubah data, jadi Zaki perlu setujui dulu (prompt udah dikirim). Bagian read-only tetap jalan.", r.Flow.Name, verb)
+			msg = fmt.Sprintf("Flow \"%s\" %s. Ada aksi yang mengubah data, jadi pemilik perlu setujui dulu (prompt udah dikirim). Bagian read-only tetap jalan.", r.Flow.Name, verb)
 		}
 		calls := make([]any, len(r.WriteCalls))
 		for i, w := range r.WriteCalls {

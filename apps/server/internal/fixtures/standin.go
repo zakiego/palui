@@ -132,7 +132,7 @@ func (s *standIns) start(c connectors.Context) (*connectors.RunningConnector, er
 				now := time.Now().UnixMilli()
 				return obj("containers", []any{
 					obj("container", "default", "memories", 1284, "documents", 12, "lastActivity", now-3*60_000),
-					obj("container", "agent-arisan-keluarga-bani-abdurrahman-siddiq-banjarmasin-2026", "memories", 9_876_543, "documents", 0, "lastActivity", now-400*D),
+					obj("container", "agent-arisan-keluarga-bani-abdul-karim-hasan-surabaya-2026", "memories", 9_876_543, "documents", 0, "lastActivity", now-400*D),
 				}), nil
 			}
 			return obj(), nil

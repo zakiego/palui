@@ -62,7 +62,7 @@ export type ConnectorManifest<C extends z.ZodType = z.ZodType, S extends Record<
   // report soft errors and recover on their own). A connector that reconnects
   // by itself and whose error states are final sets false.
   restartOnError?: boolean
-  // Presets for multiple-instance connectors (MCP: vorneo, keuangan...).
+  // Presets for multiple-instance connectors (MCP: linear, host...).
   presets?: { id: string; label: string; config: Record<string, unknown>; secretFields?: string[]; trust?: Trust }[]
   docs?: { commands?: string[]; notes?: string[] }
 }

@@ -51,7 +51,7 @@ func Settings(q db.Q) (settings.Outbound, error) { return settings.GetOutbound(q
 
 // --- Contacts ------------------------------------------------------------------------
 
-// ContactLabel is "Zaki (+62 822-0000-1001)" or "Budi (Telegram)".
+// ContactLabel is "Budi (+62 822-0000-1001)" or "Budi (Telegram)".
 func ContactLabel(name, channel, address string) string {
 	if channel == "whatsapp" {
 		return name + " (" + FormatPhone(address) + ")"

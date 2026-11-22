@@ -56,15 +56,12 @@ var Manifest = connectors.Manifest{
 		{Action: "listTools", Label: "Pick which tools Palui may use"},
 	},
 	Presets: []connectors.Preset{
-		{ID: "vorneo", Label: "Vorneo", Config: kit.O("url", "https://vorneo.id/api/mcp/", "authMode", "bearer"), SecretFields: []string{"token"}},
-		{ID: "keuangan", Label: "Keuangan", Config: kit.O("url", "https://keuangan-must-be-done.zakiego.workers.dev/api/mcp", "authMode", "bearer"), SecretFields: []string{"token"}},
-		{ID: "todomap", Label: "Todo Map", Config: kit.O("url", "https://todo.zakiego.com/api/mcp", "authMode", "bearer"), SecretFields: []string{"token"}},
 		{ID: "linear", Label: "Linear", Config: kit.O("url", "https://mcp.linear.app/mcp", "authMode", "bearer"), SecretFields: []string{"token"}},
 		{ID: "host", Label: "Host commands", Config: kit.O("url", "http://host.docker.internal:4893/mcp", "authMode", "bearer"), SecretFields: []string{"token"}, Trust: "own"},
 	},
 	RemoveWarning: "This removes the token from Palui. The server isn't touched.",
 	Docs: &connectors.Docs{Notes: []string{
-		"Tools are namespaced <connector id>__<tool>, for example mcp-vorneo__search_listings.",
+		"Tools are namespaced <connector id>__<tool>, for example mcp-linear__list_issues.",
 		"Unknown or unclassified tools are treated as destructive and always ask first.",
 	}},
 	SecretFields: kit.SecretNames(SecretZod),

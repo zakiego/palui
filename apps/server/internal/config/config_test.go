@@ -13,7 +13,7 @@ import (
 
 func TestDefaults(t *testing.T) {
 	c := config.FromMap(nil)
-	want := config.Config{DataDir: "./data", AppURL: "http://localhost:4890", DefaultTz: "Asia/Makassar", Mode: "dev"}
+	want := config.Config{DataDir: "./data", AppURL: "http://localhost:4890", DefaultTz: "UTC", Mode: "dev"}
 	if !reflect.DeepEqual(c, want) {
 		t.Fatalf("%+v", c)
 	}

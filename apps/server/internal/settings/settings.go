@@ -89,31 +89,42 @@ type Settings struct {
 }
 
 // DefaultOutboundSignature: the em dash line and the WhatsApp italics are wanted.
-const DefaultOutboundSignature = "\u2014\n_Dikirim otomatis oleh asisten AI Zaki. Balasan ke nomor ini tidak dibaca, silakan hubungi Zaki langsung_"
+const DefaultOutboundSignature = "\u2014\n_Dikirim otomatis oleh asisten AI. Balasan ke nomor ini tidak dibaca, silakan hubungi pemiliknya langsung_"
 
-// LegacyOutboundSignatures are earlier defaults; messages with them count as signed.
+// LegacyOutboundSignatures are earlier defaults; messages with them count as
+// signed. They stay word for word, names included, because they have to match
+// the text of messages already sent.
 var LegacyOutboundSignatures = []string{
 	"\u2014\n_Pesan otomatis dari Palui, asisten Zaki. Balasan ke nomor ini tidak dibaca_",
 	"\u2014\n_Pesan otomatis dari asisten AI milik Zaki. Balasan ke nomor ini tidak dibaca. Silakan balas ke nomor utama Zaki_",
+	"\u2014\n_Dikirim otomatis oleh asisten AI Zaki. Balasan ke nomor ini tidak dibaca, silakan hubungi Zaki langsung_",
 }
 
-const DefaultPersona = `Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.
-Default bahasa Indonesia santai. Kalau Zaki menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.
+const DefaultPersona = `Kamu Palui, asisten pribadi pemilikmu. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.
+Default bahasa Indonesia santai. Kalau pemilikmu menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.
 Jangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.
 Kalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.`
+
+// ShippedTimezone is the time zone a new install starts with, until the owner
+// picks one in Settings.
+const ShippedTimezone = "UTC"
+
+// DefaultTimezone is Defaults().Timezone. The tests pin it to Asia/Makassar
+// (testutil), the zone the frozen goldens were made in.
+var DefaultTimezone = ShippedTimezone
 
 // Defaults returns a fresh copy of DEFAULT_SETTINGS.
 func Defaults() Settings {
 	link := func(c, m string) ModelChainLink { return ModelChainLink{ConnectorID: c, Model: m} }
 	return Settings{
 		Persona:    DefaultPersona,
-		Timezone:   "Asia/Makassar",
+		Timezone:   DefaultTimezone,
 		Language:   "auto",
 		UILanguage: "en",
 		ModelRoles: ModelRoles{
-			Default: []ModelChainLink{link("cliproxy", "claude-sonnet-4-6"), link("ai-gateway", "claude-sonnet-4-6")},
-			Fast:    []ModelChainLink{link("cliproxy", "claude-haiku-4-5-20251001"), link("ai-gateway", "claude-haiku-4-5-20251001")},
-			Vision:  []ModelChainLink{link("cliproxy", "claude-sonnet-4-6"), link("ai-gateway", "claude-sonnet-4-6")},
+			Default: []ModelChainLink{link("cliproxy", "claude-sonnet-4-6")},
+			Fast:    []ModelChainLink{link("cliproxy", "claude-haiku-4-5-20251001")},
+			Vision:  []ModelChainLink{link("cliproxy", "claude-sonnet-4-6")},
 		},
 		Budgets: Budgets{
 			MaxSteps: 12,

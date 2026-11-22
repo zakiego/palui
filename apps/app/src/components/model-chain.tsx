@@ -251,7 +251,7 @@ export function ModelChain({
         disabled={chain.length >= MAX_CHAIN}
         onClick={() => {
           const last = chain.at(-1)
-          const [added] = newKey([{ connectorId: last && known.has(last.connectorId) ? last.connectorId : (options[0]?.value ?? "ai-gateway"), model: "", ...(last?.effort ? { effort: last.effort } : {}) }])
+          const [added] = newKey([{ connectorId: last && known.has(last.connectorId) ? last.connectorId : (options[0]?.value ?? "cliproxy"), model: "", ...(last?.effort ? { effort: last.effort } : {}) }])
           onChange([...chain, added!])
           focusLater(`[data-chain-model="${CSS.escape(added!.key)}"]`)
         }}

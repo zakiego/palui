@@ -74,7 +74,7 @@ Only two settings live in `.env`. Every other credential is entered in the dashb
 |---|---|---|---|
 | `MASTER_KEY` | In production | dev-only key | Encrypts every connector secret. Back it up: a restored database can't be decrypted without it |
 | `APP_URL` | Yes | `http://localhost:4890` | Public origin of the dashboard, used for cookies, the passkey domain and invite links |
-| `PALUI_TZ` | No | `Asia/Makassar` | Default time zone for reminders and schedules |
+| `PALUI_TZ` | No | `UTC` | Default time zone for reminders and schedules |
 | `LOG_LEVEL` | No | `info` | `debug`, `info`, `warn` or `error` |
 | `PALUI_PROD_TOKEN_HASHES` | No | empty | sha256 hashes of production channel tokens a dev server must refuse |
 | `DATA_DIR` | No | `./data` (`/data` in the image) | Where `palui.db`, WhatsApp sessions and backups live |

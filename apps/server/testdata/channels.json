@@ -10174,7 +10174,7 @@
       "text": "@bot halo",
       "contextInfo": {
        "mentionedJid": [
-        "628980001472:3@s.whatsapp.net"
+        "628000001472:3@s.whatsapp.net"
        ]
       }
      }
@@ -10252,7 +10252,7 @@
       "text": "lanjut",
       "contextInfo": {
        "stanzaId": "BOT9",
-       "participant": "628980001472:3@s.whatsapp.net",
+       "participant": "628000001472:3@s.whatsapp.net",
        "quotedMessage": {
         "conversation": "tadi"
        }
@@ -10390,7 +10390,7 @@
       "caption": "lihat",
       "contextInfo": {
        "mentionedJid": [
-        "628980001472:3@s.whatsapp.net"
+        "628000001472:3@s.whatsapp.net"
        ]
       }
      }
@@ -10528,7 +10528,7 @@
       "text": "Ini?",
       "contextInfo": {
        "stanzaId": "BOT1",
-       "participant": "628980001472@s.whatsapp.net",
+       "participant": "628000001472@s.whatsapp.net",
        "quotedMessage": {
         "conversation": "Jadwal besok jam 9"
        }

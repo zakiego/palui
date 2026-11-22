@@ -45,7 +45,7 @@ func TestMeowSocketOpensTheStoreWithoutConnecting(t *testing.T) {
 		t.Fatal(err)
 	}
 	dev := c.NewDevice()
-	jid := types.NewADJID("628980001472", 0, 3)
+	jid := types.NewADJID("628000001472", 0, 3)
 	dev.ID = &jid
 	dev.LID = types.NewADJID("111222333", 0, 3)
 	dev.LID.Server = types.HiddenUserServer
@@ -64,7 +64,7 @@ func TestMeowSocketOpensTheStoreWithoutConnecting(t *testing.T) {
 	}
 	defer s.End()
 	u := s.User()
-	if !s.Linked() || u == nil || u.ID != "628980001472:3@s.whatsapp.net" || u.LID != "111222333:3@lid" || u.Name != "Palui" {
+	if !s.Linked() || u == nil || u.ID != "628000001472:3@s.whatsapp.net" || u.LID != "111222333:3@lid" || u.Name != "Palui" {
 		t.Fatalf("%+v", u)
 	}
 	if _, err := os.Stat(path + "-wal"); err != nil {

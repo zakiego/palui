@@ -13,7 +13,7 @@
   "agents": {
    "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat","model_roles","transcribe_voice"],
    "rows": [
-    ["<agt#1>","palui","Palui","Kamu Palui, asisten pribadi Zaki. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.\nDefault bahasa Indonesia santai. Kalau Zaki menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.\nJangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.\nKalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.",1,null,"off","safe",0,null,null,null,null,"<wall clock>","<wall clock>",null,null,0,null,0]
+    ["<agt#1>","palui","Palui","Kamu Palui, asisten pribadi pemilikmu. Gayamu santai, singkat, dan to the point, seperti teman yang cerdas.\nDefault bahasa Indonesia santai. Kalau pemilikmu menulis dalam bahasa Inggris, jawab dalam bahasa Inggris.\nJangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.\nKalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.",1,null,"off","safe",0,null,null,null,null,"<wall clock>","<wall clock>",null,null,0,null,0]
    ]
   },
   "attachment_shares": {
@@ -32,27 +32,27 @@
    "columns": ["id","channel","external_id","title","kind","session_id","allowed","last_message_at","created_at","connector_id","agent_id","reply_mode","ack","ack_emoji","save_media","save_media_days"],
    "rows": [
     ["<chat#1>","web","web","Palui (web)","dm","<ses#1>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
-    ["<chat#2>","telegram","987654321","Zaki 🌴 (Telegram DM with a rather long display name)","dm","<ses#2>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#2>","telegram","987654321","Rizky 🌴 (Telegram DM with a rather long display name)","dm","<ses#2>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#3>","whatsapp","6281234567890@s.whatsapp.net","","dm","<ses#3>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
-    ["<chat#4>","whatsapp","demo-0","Keluarga besar 👨‍👩‍👧‍👦 Banjarmasin","dm","<ses#4>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#4>","whatsapp","demo-0","Keluarga besar 👨‍👩‍👧‍👦 Surabaya","dm","<ses#4>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#5>","telegram","demo-1","مجموعة العائلة","dm","<ses#5>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#6>","whatsapp","demo-2","東京出張チーム","dm","<ses#6>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#7>","telegram","demo-3","A","dm","<ses#7>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
-    ["<chat#8>","whatsapp","demo-4","Vorneo agents: Banjarbaru, Martapura, Pelaihari, Tanah Laut, Barito Kuala and Hulu Sungai","dm","<ses#8>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#8>","whatsapp","demo-4","Northwind agents: Malang, Sidoarjo, Batu, Pasuruan, Lumajang and Probolinggo","dm","<ses#8>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#9>","telegram","demo-5","🔥🔥🔥","dm","<ses#9>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#10>","whatsapp","demo-6","supercalifragilisticexpialidocious_channel_without_spaces_0123456789","dm","<ses#10>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
-    ["<chat#11>","telegram","demo-7","Keluarga besar 👨‍👩‍👧‍👦 Banjarmasin","dm","<ses#11>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#11>","telegram","demo-7","Keluarga besar 👨‍👩‍👧‍👦 Surabaya","dm","<ses#11>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#12>","whatsapp","demo-8","مجموعة العائلة","dm","<ses#12>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#13>","telegram","demo-9","東京出張チーム","dm","<ses#13>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#14>","whatsapp","demo-10","A","dm","<ses#14>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
-    ["<chat#15>","telegram","demo-11","Vorneo agents: Banjarbaru, Martapura, Pelaihari, Tanah Laut, Barito Kuala and Hulu Sungai","dm","<ses#15>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#15>","telegram","demo-11","Northwind agents: Malang, Sidoarjo, Batu, Pasuruan, Lumajang and Probolinggo","dm","<ses#15>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#16>","whatsapp","demo-12","🔥🔥🔥","dm","<ses#16>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#17>","telegram","demo-13","supercalifragilisticexpialidocious_channel_without_spaces_0123456789","dm","<ses#17>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
-    ["<chat#18>","whatsapp","demo-14","Keluarga besar 👨‍👩‍👧‍👦 Banjarmasin","dm","<ses#18>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#18>","whatsapp","demo-14","Keluarga besar 👨‍👩‍👧‍👦 Surabaya","dm","<ses#18>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#19>","telegram","demo-15","مجموعة العائلة","dm","<ses#19>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#20>","whatsapp","demo-16","東京出張チーム","dm","<ses#20>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#21>","telegram","demo-17","A","dm","<ses#21>",1,null,1794621600000,"",null,"mention",1,"⏳",0,30],
-    ["<chat#22>","whatsapp","6282200001001@s.whatsapp.net","Zaki","dm","<ses#22>",0,null,1794621600000,"",null,"mention",1,"⏳",0,30],
+    ["<chat#22>","whatsapp","6282200001001@s.whatsapp.net","Rizky","dm","<ses#22>",0,null,1794621600000,"",null,"mention",1,"⏳",0,30],
     ["<chat#23>","whatsapp","6281111111111@s.whatsapp.net","Ibu","dm","<ses#23>",0,null,1794621600000,"",null,"mention",1,"⏳",0,30]
    ]
   },
@@ -69,7 +69,7 @@
     ["ai-gateway","ai-gateway","model","ai-gateway",0,"paused",null,"own","{}","{\"apiKey\":\"zkg_0123456789abcdef\"}","<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["recall","recall","memory","recall",1,"connecting",null,"own","{}","{\"apiKey\":\"rcl_0123456789a91f\"}","<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["t3code","t3code","tools","T3 Code",1,"on",null,"own","{\"url\":\"http://host.docker.internal:3773\"}","{\"pairingCode\":\"0123456789abcdef\"}","<config hash>",null,null,0,1794621600000,1794621600000,null,null],
-    ["mcp-vorneo","mcp","tools","Vorneo pipeline and property listings for every kabupaten in Kalimantan Selatan",1,"on",null,"external","{\"url\":\"https://vorneo.id/mcp\"}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
+    ["mcp-northwind","mcp","tools","Northwind pipeline and property listings for every kabupaten in Jawa Timur",1,"on",null,"external","{\"url\":\"https://northwind.example.com/mcp\"}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["mcp-linear","mcp","tools","Linear 🚀",1,"on",null,"external","{\"url\":\"https://mcp.linear.app/mcp\"}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["reminders","reminders","skill","Reminders",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["jobs","jobs","skill","Scheduled jobs",0,"paused",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
@@ -89,7 +89,7 @@
   "contacts": {
    "columns": ["id","agent_id","name","channel","address","chat_id","policy","note","created_at","updated_at","removed_at"],
    "rows": [
-    ["<con#1>","<agt#1>","Zaki","whatsapp","6282200001001","<chat#22>","allow","Adik",1794621600000,1794621600000,null],
+    ["<con#1>","<agt#1>","Rizky","whatsapp","6282200001001","<chat#22>","allow","Adik",1794621600000,1794621600000,null],
     ["<con#2>","<agt#1>","Ibu","whatsapp","6281111111111","<chat#23>","ask",null,1794621600000,1794621600000,null]
    ]
   },
@@ -97,7 +97,7 @@
    "columns": ["id","agent_id","name","description","prompt","attach_report","enabled","created_at","updated_at"],
    "rows": [
     ["<cmd#1>",null,"report-fix","Debug report, lalu T3 Code yang perbaiki","Start a T3 Code thread in the palui project to find and fix the problem in the debug report below. Owner's note: {{args}}\n\nPut the whole report in the task. Reply with the thread link only.",1,1,1794614400000,1794614400000],
-    ["<cmd#2>",null,"pagi","","Kasih ringkasan pagi: cuaca Banjarmasin, agenda hari ini, lalu pengingat.",0,0,1794618000000,1794618000000]
+    ["<cmd#2>",null,"pagi","","Kasih ringkasan pagi: cuaca Surabaya, agenda hari ini, lalu pengingat.",0,0,1794618000000,1794618000000]
    ]
   },
   "events": {
@@ -109,7 +109,7 @@
     [4,1794621600000,"info","ai-gateway","status","paused","{\"from\":\"not_set_up\",\"to\":\"paused\"}"],
     [5,1794621600000,"info","recall","status","connecting","{\"from\":\"not_set_up\",\"to\":\"connecting\"}"],
     [6,1794621600000,"info","t3code","status","on","{\"from\":\"not_set_up\",\"to\":\"on\"}"],
-    [7,1794621600000,"info","mcp-vorneo","status","on","{\"from\":\"not_set_up\",\"to\":\"on\"}"],
+    [7,1794621600000,"info","mcp-northwind","status","on","{\"from\":\"not_set_up\",\"to\":\"on\"}"],
     [8,1794621600000,"info","mcp-linear","status","on","{\"from\":\"not_set_up\",\"to\":\"on\"}"],
     [9,1794621600000,"info","reminders","status","on","{\"from\":\"not_set_up\",\"to\":\"on\"}"],
     [10,1794621600000,"info","jobs","status","paused","{\"from\":\"not_set_up\",\"to\":\"paused\"}"],
@@ -127,45 +127,45 @@
     [22,1794535200000,"info",null,"flow.created","Flow \"Rekap sholat\" created (version 1).","{\"flowId\":\"<flw#3>\",\"versionId\":\"<flv#3>\"}"],
     [23,1794535260000,"info",null,"flow.updated","Flow \"Rekap sholat\" changed to version 2.","{\"flowId\":\"<flw#3>\",\"versionId\":\"<flv#4>\",\"n\":2}"],
     [24,1794612600000,"warn","cliproxy","status","status change",null],
-    [25,1794611700000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 113 ms",null],
-    [26,1794610800000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 126 ms",null],
-    [27,1794609900000,"info","cliproxy","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 139 ms",null],
-    [28,1794609000000,"info","mcp-vorneo","status","status change",null],
-    [29,1794608100000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 165 ms",null],
-    [30,1794607200000,"info","cliproxy","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 178 ms",null],
-    [31,1794606300000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 191 ms",null],
-    [32,1794605400000,"info","mcp-vorneo","status","status change",null],
-    [33,1794604500000,"warn","cliproxy","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 217 ms",null],
-    [34,1794603600000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 230 ms",null],
-    [35,1794602700000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 243 ms",null],
+    [25,1794611700000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 113 ms",null],
+    [26,1794610800000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 126 ms",null],
+    [27,1794609900000,"info","cliproxy","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 139 ms",null],
+    [28,1794609000000,"info","mcp-northwind","status","status change",null],
+    [29,1794608100000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 165 ms",null],
+    [30,1794607200000,"info","cliproxy","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 178 ms",null],
+    [31,1794606300000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 191 ms",null],
+    [32,1794605400000,"info","mcp-northwind","status","status change",null],
+    [33,1794604500000,"warn","cliproxy","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 217 ms",null],
+    [34,1794603600000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 230 ms",null],
+    [35,1794602700000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 243 ms",null],
     [36,1794601800000,"info","cliproxy","status","status change",null],
-    [37,1794600900000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 269 ms",null],
-    [38,1794600000000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 282 ms",null],
-    [39,1794599100000,"info","cliproxy","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 295 ms",null],
-    [40,1794598200000,"info","mcp-vorneo","status","status change",null],
-    [41,1794597300000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 321 ms",null],
-    [42,1794596400000,"warn","cliproxy","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 334 ms",null],
-    [43,1794595500000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 347 ms",null],
-    [44,1794594600000,"info","mcp-vorneo","status","status change",null],
-    [45,1794593700000,"info","cliproxy","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 373 ms",null],
-    [46,1794592800000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 386 ms",null],
-    [47,1794591900000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 399 ms",null],
+    [37,1794600900000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 269 ms",null],
+    [38,1794600000000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 282 ms",null],
+    [39,1794599100000,"info","cliproxy","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 295 ms",null],
+    [40,1794598200000,"info","mcp-northwind","status","status change",null],
+    [41,1794597300000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 321 ms",null],
+    [42,1794596400000,"warn","cliproxy","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 334 ms",null],
+    [43,1794595500000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 347 ms",null],
+    [44,1794594600000,"info","mcp-northwind","status","status change",null],
+    [45,1794593700000,"info","cliproxy","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 373 ms",null],
+    [46,1794592800000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 386 ms",null],
+    [47,1794591900000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 399 ms",null],
     [48,1794591000000,"info","cliproxy","status","status change",null],
-    [49,1794590100000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 425 ms",null],
-    [50,1794589200000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 438 ms",null],
-    [51,1794588300000,"warn","cliproxy","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 451 ms",null],
-    [52,1794587400000,"info","mcp-vorneo","status","status change",null],
-    [53,1794586500000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 477 ms",null],
-    [54,1794585600000,"info","cliproxy","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 490 ms",null],
-    [55,1794584700000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 503 ms",null],
-    [56,1794583800000,"info","mcp-vorneo","status","status change",null],
-    [57,1794582900000,"info","cliproxy","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 529 ms",null],
-    [58,1794582000000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 542 ms",null],
-    [59,1794581100000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 555 ms",null],
+    [49,1794590100000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 425 ms",null],
+    [50,1794589200000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 438 ms",null],
+    [51,1794588300000,"warn","cliproxy","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 451 ms",null],
+    [52,1794587400000,"info","mcp-northwind","status","status change",null],
+    [53,1794586500000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 477 ms",null],
+    [54,1794585600000,"info","cliproxy","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 490 ms",null],
+    [55,1794584700000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 503 ms",null],
+    [56,1794583800000,"info","mcp-northwind","status","status change",null],
+    [57,1794582900000,"info","cliproxy","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 529 ms",null],
+    [58,1794582000000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 542 ms",null],
+    [59,1794581100000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 555 ms",null],
     [60,1794580200000,"warn","cliproxy","status","status change",null],
-    [61,1794579300000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 581 ms",null],
-    [62,1794578400000,"info","mcp-vorneo","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 594 ms",null],
-    [63,1794577500000,"info","cliproxy","tool","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 607 ms",null],
+    [61,1794579300000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 581 ms",null],
+    [62,1794578400000,"info","mcp-northwind","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 594 ms",null],
+    [63,1794577500000,"info","cliproxy","tool","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent ok in 607 ms",null],
     [64,1794621600000,"info","whatsapp","status","status change 0",null],
     [65,1794621000000,"error","telegram","status","error: 401 Unauthorized from api.telegram.org (the bot token was revoked in @BotFather)",null],
     [66,1794620400000,"info","whatsapp","status","status change 2",null],
@@ -205,10 +205,10 @@
   "flow_versions": {
    "columns": ["id","flow_id","n","definition","hash","write_calls","created_by","note","approved_at","approved_via","created_at"],
    "rows": [
-    ["<flv#1>","<flw#1>",1,"{\"schema\":1,\"name\":\"Briefing pagi\",\"triggers\":[{\"id\":\"main\",\"start\":\"prayer\",\"kind\":\"schedule\",\"source\":{\"kind\":\"times\",\"times\":[{\"time\":\"06:00\",\"label\":\"Briefing\"}]}}],\"steps\":[{\"id\":\"prayer\",\"onError\":\"continue\",\"kind\":\"tool\",\"tool\":\"mcp-jadwal-sholat__get_prayer_times\",\"args\":{\"city\":\"Banjarmasin\",\"date\":\"{{now.date}}\"}},{\"id\":\"weather\",\"onError\":\"continue\",\"kind\":\"tool\",\"tool\":\"webfetch__fetch_page\",\"args\":{\"url\":\"https://wttr.in/Banjarmasin?format=j1\"},\"parse\":{\"field\":\"text\",\"as\":\"json\"}},{\"id\":\"reminders\",\"kind\":\"tool\",\"tool\":\"reminders__list_reminders\",\"args\":{\"filter\":\"upcoming\",\"limit\":20}},{\"id\":\"today\",\"kind\":\"set\",\"scope\":\"run\",\"values\":{\"count\":\"count(steps.reminders.data.reminders, \\\"date\\\", now.date)\"}},{\"id\":\"send\",\"kind\":\"message\",\"text\":\"Selamat pagi! {{now.date | date}}\\n\\nSholat: Subuh {{steps.prayer.data.times.fajr | default(\\\"-\\\")}}, Zuhur {{steps.prayer.data.times.dhuhr | default(\\\"-\\\")}}, Asar {{steps.prayer.data.times.asr | default(\\\"-\\\")}}, Magrib {{steps.prayer.data.times.maghrib | default(\\\"-\\\")}}, Isya {{steps.prayer.data.times.isha | default(\\\"-\\\")}}\\nCuaca: {{steps.weather.data.current_condition.0.temp_C | default(\\\"?\\\")}}°C, {{steps.weather.data.current_condition.0.weatherDesc.0.value | default(\\\"nggak kebaca\\\")}}\\n\\nPengingat hari ini ({{vars.count}}):\\n{{steps.reminders.data.reminders | lines(\\\"text\\\")}}\"}]}","a1a9dd2af3b9bec6dc92f1d640d5fdc73baee86db8b54b46b8fa4f2e8844a5a3","[]","agent:run_fixture",null,1794535200000,"no_writes",1794535200000],
-    ["<flv#2>","<flw#2>",1,"{\"schema\":1,\"name\":\"Sholat 5 waktu\",\"tz\":\"Asia/Makassar\",\"triggers\":[{\"id\":\"main\",\"start\":\"ask\",\"lateGraceMin\":60,\"kind\":\"schedule\",\"source\":{\"kind\":\"tool\",\"connectorId\":\"mcp-jadwal-sholat\",\"tool\":\"get_prayer_times\",\"args\":{\"city\":\"Banjarmasin\",\"date\":\"{{date}}\"},\"refreshAt\":\"00:05\",\"items\":[{\"field\":\"times.fajr\",\"label\":\"Subuh\",\"offsetMin\":0},{\"field\":\"times.dhuhr\",\"label\":\"Zuhur\",\"offsetMin\":0},{\"field\":\"times.asr\",\"label\":\"Asar\",\"offsetMin\":0},{\"field\":\"times.maghrib\",\"label\":\"Magrib\",\"offsetMin\":0},{\"field\":\"times.isha\",\"label\":\"Isya\",\"offsetMin\":0}]}},{\"id\":\"recap\",\"start\":\"recap_read\",\"kind\":\"schedule\",\"source\":{\"kind\":\"rrule\",\"rrule\":\"FREQ=WEEKLY;BYDAY=SU\",\"start\":\"2026-11-15T20:00\"}}],\"steps\":[{\"id\":\"ask\",\"next\":null,\"kind\":\"checkin\",\"text\":\"Udah sholat {{trigger.label}} ({{trigger.time}})?\",\"answers\":[{\"id\":\"done\",\"label\":\"Sudah\",\"words\":[\"udah\",\"udh\",\"dah\",\"done\",\"selesai\",\"beres\"],\"closes\":true},{\"id\":\"not_yet\",\"label\":\"Belum\",\"words\":[\"blm\",\"not yet\",\"nanti\"],\"closes\":false}],\"followUp\":{\"everyMin\":15,\"max\":4},\"deadline\":{\"kind\":\"next\"}},{\"id\":\"recap_read\",\"kind\":\"tool\",\"tool\":\"flows__recap\",\"args\":{\"flow\":\"self\",\"days\":7,\"trigger\":\"main\"}},{\"id\":\"recap_any\",\"kind\":\"if\",\"when\":\"steps.recap_read.data.total > 0\",\"then\":\"recap_send\",\"else\":null},{\"id\":\"recap_send\",\"kind\":\"message\",\"text\":\"{{steps.recap_read.data.text}}\"}]}","18a1ac22a714513bac12882dee08568e28df0ca1f69320782ad1c98d9223c136","[]","agent:run_fixture",null,1794535200000,"no_writes",1794535200000],
-    ["<flv#3>","<flw#3>",1,"{\"schema\":1,\"name\":\"Rekap sholat\",\"triggers\":[{\"id\":\"weekly\",\"start\":\"recap\",\"kind\":\"schedule\",\"source\":{\"kind\":\"rrule\",\"rrule\":\"FREQ=WEEKLY;BYDAY=SU\",\"start\":\"2026-11-15T20:00\"}}],\"steps\":[{\"id\":\"recap\",\"kind\":\"tool\",\"tool\":\"flows__recap\",\"args\":{\"flow\":\"Sholat 5 waktu\",\"days\":7}},{\"id\":\"any_missed\",\"kind\":\"if\",\"when\":\"steps.recap.data.missed > 0 or number(steps.recap.data.byAnswer.not_yet) > 0\",\"then\":\"cheer\",\"else\":\"clean\"},{\"id\":\"cheer\",\"onError\":\"plain\",\"kind\":\"prompt\",\"prompt\":\"Tulis pesan pendek (maks 4 kalimat), hangat dan nggak menggurui, buat Zaki tentang rekap sholatnya minggu ini. Sebut angkanya sekali, terus kasih semangat yang konkret buat minggu depan. Bahasa santai.\",\"input\":{\"recap\":\"{{steps.recap.data}}\"},\"tools\":[],\"send\":false,\"model\":\"fast\"},{\"id\":\"send_cheer\",\"next\":null,\"kind\":\"message\",\"text\":\"{{steps.cheer.text}}\"},{\"id\":\"plain\",\"next\":null,\"kind\":\"message\",\"text\":\"{{steps.recap.data.text}}\"},{\"id\":\"clean\",\"kind\":\"message\",\"text\":\"Minggu ini {{steps.recap.data.total}} sholat, semuanya kecatat sudah. Mantap, pertahankan! 🤲\"}]}","7a08e8b34806d3dd1aa41c60574764f10282cf121906908c0c79f8e5d27eed87","[]","agent:run_fixture",null,1794535200000,"no_writes",1794535200000],
-    ["<flv#4>","<flw#3>",2,"{\"schema\":1,\"name\":\"Rekap sholat\",\"description\":\"Rekap mingguan dengan semangat\",\"triggers\":[{\"id\":\"weekly\",\"start\":\"recap\",\"kind\":\"schedule\",\"source\":{\"kind\":\"rrule\",\"rrule\":\"FREQ=WEEKLY;BYDAY=SU\",\"start\":\"2026-11-15T20:00\"}}],\"steps\":[{\"id\":\"recap\",\"kind\":\"tool\",\"tool\":\"flows__recap\",\"args\":{\"flow\":\"Sholat 5 waktu\",\"days\":7}},{\"id\":\"any_missed\",\"kind\":\"if\",\"when\":\"steps.recap.data.missed > 0 or number(steps.recap.data.byAnswer.not_yet) > 0\",\"then\":\"cheer\",\"else\":\"clean\"},{\"id\":\"cheer\",\"onError\":\"plain\",\"kind\":\"prompt\",\"prompt\":\"Tulis pesan pendek (maks 4 kalimat), hangat dan nggak menggurui, buat Zaki tentang rekap sholatnya minggu ini. Sebut angkanya sekali, terus kasih semangat yang konkret buat minggu depan. Bahasa santai.\",\"input\":{\"recap\":\"{{steps.recap.data}}\"},\"tools\":[],\"send\":false,\"model\":\"fast\"},{\"id\":\"send_cheer\",\"next\":null,\"kind\":\"message\",\"text\":\"{{steps.cheer.text}}\"},{\"id\":\"plain\",\"next\":null,\"kind\":\"message\",\"text\":\"{{steps.recap.data.text}}\"},{\"id\":\"clean\",\"kind\":\"message\",\"text\":\"Minggu ini {{steps.recap.data.total}} sholat, semuanya kecatat sudah. Mantap, pertahankan! 🤲\"}]}","c6123ee47fd83e7b4071c2b1196805e416619e206acaa311923a6e591d0f0f68","[]","agent:run_fixture","tambah deskripsi",1794535260000,"no_writes",1794535260000]
+    ["<flv#1>","<flw#1>",1,"{\"schema\":1,\"name\":\"Briefing pagi\",\"triggers\":[{\"id\":\"main\",\"start\":\"prayer\",\"kind\":\"schedule\",\"source\":{\"kind\":\"times\",\"times\":[{\"time\":\"06:00\",\"label\":\"Briefing\"}]}}],\"steps\":[{\"id\":\"prayer\",\"onError\":\"continue\",\"kind\":\"tool\",\"tool\":\"mcp-jadwal-sholat__get_prayer_times\",\"args\":{\"city\":\"Surabaya\",\"date\":\"{{now.date}}\"}},{\"id\":\"weather\",\"onError\":\"continue\",\"kind\":\"tool\",\"tool\":\"webfetch__fetch_page\",\"args\":{\"url\":\"https://wttr.in/Surabaya?format=j1\"},\"parse\":{\"field\":\"text\",\"as\":\"json\"}},{\"id\":\"reminders\",\"kind\":\"tool\",\"tool\":\"reminders__list_reminders\",\"args\":{\"filter\":\"upcoming\",\"limit\":20}},{\"id\":\"today\",\"kind\":\"set\",\"scope\":\"run\",\"values\":{\"count\":\"count(steps.reminders.data.reminders, \\\"date\\\", now.date)\"}},{\"id\":\"send\",\"kind\":\"message\",\"text\":\"Selamat pagi! {{now.date | date}}\\n\\nSholat: Subuh {{steps.prayer.data.times.fajr | default(\\\"-\\\")}}, Zuhur {{steps.prayer.data.times.dhuhr | default(\\\"-\\\")}}, Asar {{steps.prayer.data.times.asr | default(\\\"-\\\")}}, Magrib {{steps.prayer.data.times.maghrib | default(\\\"-\\\")}}, Isya {{steps.prayer.data.times.isha | default(\\\"-\\\")}}\\nCuaca: {{steps.weather.data.current_condition.0.temp_C | default(\\\"?\\\")}}°C, {{steps.weather.data.current_condition.0.weatherDesc.0.value | default(\\\"nggak kebaca\\\")}}\\n\\nPengingat hari ini ({{vars.count}}):\\n{{steps.reminders.data.reminders | lines(\\\"text\\\")}}\"}]}","65c9b88ca3fe585be92edae75f693e96bf01090eb692de0c5cb0604a73fa05fa","[]","agent:run_fixture",null,1794535200000,"no_writes",1794535200000],
+    ["<flv#2>","<flw#2>",1,"{\"schema\":1,\"name\":\"Sholat 5 waktu\",\"tz\":\"Asia/Makassar\",\"triggers\":[{\"id\":\"main\",\"start\":\"ask\",\"lateGraceMin\":60,\"kind\":\"schedule\",\"source\":{\"kind\":\"tool\",\"connectorId\":\"mcp-jadwal-sholat\",\"tool\":\"get_prayer_times\",\"args\":{\"city\":\"Surabaya\",\"date\":\"{{date}}\"},\"refreshAt\":\"00:05\",\"items\":[{\"field\":\"times.fajr\",\"label\":\"Subuh\",\"offsetMin\":0},{\"field\":\"times.dhuhr\",\"label\":\"Zuhur\",\"offsetMin\":0},{\"field\":\"times.asr\",\"label\":\"Asar\",\"offsetMin\":0},{\"field\":\"times.maghrib\",\"label\":\"Magrib\",\"offsetMin\":0},{\"field\":\"times.isha\",\"label\":\"Isya\",\"offsetMin\":0}]}},{\"id\":\"recap\",\"start\":\"recap_read\",\"kind\":\"schedule\",\"source\":{\"kind\":\"rrule\",\"rrule\":\"FREQ=WEEKLY;BYDAY=SU\",\"start\":\"2026-11-15T20:00\"}}],\"steps\":[{\"id\":\"ask\",\"next\":null,\"kind\":\"checkin\",\"text\":\"Udah sholat {{trigger.label}} ({{trigger.time}})?\",\"answers\":[{\"id\":\"done\",\"label\":\"Sudah\",\"words\":[\"udah\",\"udh\",\"dah\",\"done\",\"selesai\",\"beres\"],\"closes\":true},{\"id\":\"not_yet\",\"label\":\"Belum\",\"words\":[\"blm\",\"not yet\",\"nanti\"],\"closes\":false}],\"followUp\":{\"everyMin\":15,\"max\":4},\"deadline\":{\"kind\":\"next\"}},{\"id\":\"recap_read\",\"kind\":\"tool\",\"tool\":\"flows__recap\",\"args\":{\"flow\":\"self\",\"days\":7,\"trigger\":\"main\"}},{\"id\":\"recap_any\",\"kind\":\"if\",\"when\":\"steps.recap_read.data.total > 0\",\"then\":\"recap_send\",\"else\":null},{\"id\":\"recap_send\",\"kind\":\"message\",\"text\":\"{{steps.recap_read.data.text}}\"}]}","e85f5a51fe7d89d91d162ff85a368c58315a5d174a62347834fe8dd98da5deb7","[]","agent:run_fixture",null,1794535200000,"no_writes",1794535200000],
+    ["<flv#3>","<flw#3>",1,"{\"schema\":1,\"name\":\"Rekap sholat\",\"triggers\":[{\"id\":\"weekly\",\"start\":\"recap\",\"kind\":\"schedule\",\"source\":{\"kind\":\"rrule\",\"rrule\":\"FREQ=WEEKLY;BYDAY=SU\",\"start\":\"2026-11-15T20:00\"}}],\"steps\":[{\"id\":\"recap\",\"kind\":\"tool\",\"tool\":\"flows__recap\",\"args\":{\"flow\":\"Sholat 5 waktu\",\"days\":7}},{\"id\":\"any_missed\",\"kind\":\"if\",\"when\":\"steps.recap.data.missed > 0 or number(steps.recap.data.byAnswer.not_yet) > 0\",\"then\":\"cheer\",\"else\":\"clean\"},{\"id\":\"cheer\",\"onError\":\"plain\",\"kind\":\"prompt\",\"prompt\":\"Tulis pesan pendek (maks 4 kalimat), hangat dan nggak menggurui, buat Rizky tentang rekap sholatnya minggu ini. Sebut angkanya sekali, terus kasih semangat yang konkret buat minggu depan. Bahasa santai.\",\"input\":{\"recap\":\"{{steps.recap.data}}\"},\"tools\":[],\"send\":false,\"model\":\"fast\"},{\"id\":\"send_cheer\",\"next\":null,\"kind\":\"message\",\"text\":\"{{steps.cheer.text}}\"},{\"id\":\"plain\",\"next\":null,\"kind\":\"message\",\"text\":\"{{steps.recap.data.text}}\"},{\"id\":\"clean\",\"kind\":\"message\",\"text\":\"Minggu ini {{steps.recap.data.total}} sholat, semuanya kecatat sudah. Mantap, pertahankan! 🤲\"}]}","ec29a4cb2490714f23b2beb2e9ee0fc3002eea9077b2027543e9de3e20d0f75d","[]","agent:run_fixture",null,1794535200000,"no_writes",1794535200000],
+    ["<flv#4>","<flw#3>",2,"{\"schema\":1,\"name\":\"Rekap sholat\",\"description\":\"Rekap mingguan dengan semangat\",\"triggers\":[{\"id\":\"weekly\",\"start\":\"recap\",\"kind\":\"schedule\",\"source\":{\"kind\":\"rrule\",\"rrule\":\"FREQ=WEEKLY;BYDAY=SU\",\"start\":\"2026-11-15T20:00\"}}],\"steps\":[{\"id\":\"recap\",\"kind\":\"tool\",\"tool\":\"flows__recap\",\"args\":{\"flow\":\"Sholat 5 waktu\",\"days\":7}},{\"id\":\"any_missed\",\"kind\":\"if\",\"when\":\"steps.recap.data.missed > 0 or number(steps.recap.data.byAnswer.not_yet) > 0\",\"then\":\"cheer\",\"else\":\"clean\"},{\"id\":\"cheer\",\"onError\":\"plain\",\"kind\":\"prompt\",\"prompt\":\"Tulis pesan pendek (maks 4 kalimat), hangat dan nggak menggurui, buat Rizky tentang rekap sholatnya minggu ini. Sebut angkanya sekali, terus kasih semangat yang konkret buat minggu depan. Bahasa santai.\",\"input\":{\"recap\":\"{{steps.recap.data}}\"},\"tools\":[],\"send\":false,\"model\":\"fast\"},{\"id\":\"send_cheer\",\"next\":null,\"kind\":\"message\",\"text\":\"{{steps.cheer.text}}\"},{\"id\":\"plain\",\"next\":null,\"kind\":\"message\",\"text\":\"{{steps.recap.data.text}}\"},{\"id\":\"clean\",\"kind\":\"message\",\"text\":\"Minggu ini {{steps.recap.data.total}} sholat, semuanya kecatat sudah. Mantap, pertahankan! 🤲\"}]}","bfaf1d6c40f0aa2434861d080348f06525636867aea8bea65419a0df0da54bf5","[]","agent:run_fixture","tambah deskripsi",1794535260000,"no_writes",1794535260000]
    ]
   },
   "flows": {
@@ -237,7 +237,7 @@
   "jobs": {
    "columns": ["id","name","kind","rrule","tz","local_start","prompt","chat_id","model_role","tool_scope","enabled","next_run_at","status","last_run_at","last_status","last_result","daily_token_cap","created_at","updated_at"],
    "rows": [
-    ["<job#1>","Daily briefing","briefing","FREQ=DAILY;BYHOUR=7;BYMINUTE=0","Asia/Makassar","2026-01-01T07:00:00","Brief me.","<chat#2>","default",null,1,1794657600000,"idle",1794571200000,"ok","Pagi! Hari ini 2 pengingat, 3 deal Vorneo masuk, cuaca Banjarbaru cerah berawan 31°C.",50000,1794621600000,1794621600000],
+    ["<job#1>","Daily briefing","briefing","FREQ=DAILY;BYHOUR=7;BYMINUTE=0","Asia/Makassar","2026-01-01T07:00:00","Brief me.","<chat#2>","default",null,1,1794657600000,"idle",1794571200000,"ok","Pagi! Hari ini 2 pengingat, 3 deal Northwind masuk, cuaca Malang cerah berawan 31°C.",50000,1794621600000,1794621600000],
     ["<job#2>","Heartbeat with a name long enough to wrap onto a second line on a phone","heartbeat","FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9,10,11,12,13,14,15,16,17,18,19,20,21,22","Asia/Makassar","2026-01-01T07:00:00","NOTHING unless it matters.","<chat#2>","default",null,0,null,"idle",null,null,null,30000,1794621600000,1794621600000]
    ]
   },
@@ -256,27 +256,27 @@
   "messages": {
    "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],
    "rows": [
-    ["<msg#1>","<chat#1>","<ses#1>","user","{\"text\":\"ingetin bayar listrik besok jam 9, terus cek pipeline vorneo minggu ini ya\"}","ingetin bayar listrik besok jam 9, terus cek pipeline vorneo minggu ini ya",null,null,null,"handled",null,null,1794614400000,null,1],
-    ["<msg#2>","<chat#1>","<ses#1>","assistant","{\"text\":\"Siap. Pengingat: Besok, Rabu 11 Nov, 09.00 WITA.\\nPipeline Vorneo minggu ini: 3 deal masuk, 1 survei.\"}","Siap. Pengingat: Besok, Rabu 11 Nov, 09.00 WITA.\nPipeline Vorneo minggu ini: 3 deal masuk, 1 survei.",null,null,null,"handled",null,"<run#1>",1794614409000,null,1],
+    ["<msg#1>","<chat#1>","<ses#1>","user","{\"text\":\"ingetin bayar listrik besok jam 9, terus cek pipeline northwind minggu ini ya\"}","ingetin bayar listrik besok jam 9, terus cek pipeline northwind minggu ini ya",null,null,null,"handled",null,null,1794614400000,null,1],
+    ["<msg#2>","<chat#1>","<ses#1>","assistant","{\"text\":\"Siap. Pengingat: Besok, Rabu 11 Nov, 09.00 WITA.\\nPipeline Northwind minggu ini: 3 deal masuk, 1 survei.\"}","Siap. Pengingat: Besok, Rabu 11 Nov, 09.00 WITA.\nPipeline Northwind minggu ini: 3 deal masuk, 1 survei.",null,null,null,"handled",null,"<run#1>",1794614409000,null,1],
     ["<msg#3>","<chat#2>","<ses#2>","user","{\"text\":\"https://example.com/a/very/long/url/that/never/breaks/naturally/0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz\"}","https://example.com/a/very/long/url/that/never/breaks/naturally/0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz",null,null,null,"handled",null,null,1794618000000,null,1],
     ["<msg#4>","<chat#1>","<ses#1>","user","{\"text\":\"rekap minggu ini dong\"}","rekap minggu ini dong",null,null,null,"handled",null,null,1794619800000,null,1],
-    ["<msg#5>","<chat#1>","<ses#1>","assistant","{\"text\":\"**Rekap minggu ini** (W46):\\n\\n1. *3 deal* masuk di Vorneo, 1 survei dijadwalkan\\n2. Pengingat `bayar listrik` besok jam 09.00\\n3. Detail di https://vorneo.id/deals?week=2026-W46\\n\\n- Telegram: on\\n- WhatsApp: **error 440**, perlu pairing ulang\\n\\n```\\npalui connectors on whatsapp\\n```\\n\\nLihat [dashboard Palui](https://palui.zakiego.com/app/connectors) untuk detail.\"}","**Rekap minggu ini** (W46):\n\n1. *3 deal* masuk di Vorneo, 1 survei dijadwalkan\n2. Pengingat `bayar listrik` besok jam 09.00\n3. Detail di https://vorneo.id/deals?week=2026-W46\n\n- Telegram: on\n- WhatsApp: **error 440**, perlu pairing ulang\n\n```\npalui connectors on whatsapp\n```\n\nLihat [dashboard Palui](https://palui.zakiego.com/app/connectors) untuk detail.",null,null,null,"handled",null,null,1794619860000,null,1],
-    ["<msg#6>","<chat#4>","<ses#4>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru",null,null,null,"handled",null,null,1794589200000,null,1],
+    ["<msg#5>","<chat#1>","<ses#1>","assistant","{\"text\":\"**Rekap minggu ini** (W46):\\n\\n1. *3 deal* masuk di Northwind, 1 survei dijadwalkan\\n2. Pengingat `bayar listrik` besok jam 09.00\\n3. Detail di https://northwind.example.com/deals?week=2026-W46\\n\\n- Telegram: on\\n- WhatsApp: **error 440**, perlu pairing ulang\\n\\n```\\npalui connectors on whatsapp\\n```\\n\\nLihat [dashboard Palui](https://palui.zakiego.com/app/connectors) untuk detail.\"}","**Rekap minggu ini** (W46):\n\n1. *3 deal* masuk di Northwind, 1 survei dijadwalkan\n2. Pengingat `bayar listrik` besok jam 09.00\n3. Detail di https://northwind.example.com/deals?week=2026-W46\n\n- Telegram: on\n- WhatsApp: **error 440**, perlu pairing ulang\n\n```\npalui connectors on whatsapp\n```\n\nLihat [dashboard Palui](https://palui.zakiego.com/app/connectors) untuk detail.",null,null,null,"handled",null,null,1794619860000,null,1],
+    ["<msg#6>","<chat#4>","<ses#4>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang",null,null,null,"handled",null,null,1794589200000,null,1],
     ["<msg#7>","<chat#5>","<ses#5>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794578400000,null,1],
     ["<msg#8>","<chat#6>","<ses#6>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794567600000,null,1],
-    ["<msg#9>","<chat#7>","<ses#7>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru",null,null,null,"handled",null,null,1794556800000,null,1],
+    ["<msg#9>","<chat#7>","<ses#7>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang",null,null,null,"handled",null,null,1794556800000,null,1],
     ["<msg#10>","<chat#8>","<ses#8>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794546000000,null,1],
     ["<msg#11>","<chat#9>","<ses#9>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794535200000,null,1],
-    ["<msg#12>","<chat#10>","<ses#10>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru",null,null,null,"handled",null,null,1794524400000,null,1],
+    ["<msg#12>","<chat#10>","<ses#10>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang",null,null,null,"handled",null,null,1794524400000,null,1],
     ["<msg#13>","<chat#11>","<ses#11>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794513600000,null,1],
     ["<msg#14>","<chat#12>","<ses#12>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794502800000,null,1],
-    ["<msg#15>","<chat#13>","<ses#13>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru",null,null,null,"handled",null,null,1794492000000,null,1],
+    ["<msg#15>","<chat#13>","<ses#13>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang",null,null,null,"handled",null,null,1794492000000,null,1],
     ["<msg#16>","<chat#14>","<ses#14>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794481200000,null,1],
     ["<msg#17>","<chat#15>","<ses#15>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794470400000,null,1],
-    ["<msg#18>","<chat#16>","<ses#16>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru",null,null,null,"handled",null,null,1794459600000,null,1],
+    ["<msg#18>","<chat#16>","<ses#16>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang",null,null,null,"handled",null,null,1794459600000,null,1],
     ["<msg#19>","<chat#17>","<ses#17>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794448800000,null,1],
     ["<msg#20>","<chat#18>","<ses#18>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794438000000,null,1],
-    ["<msg#21>","<chat#19>","<ses#19>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Banjarbaru",null,null,null,"handled",null,null,1794427200000,null,1],
+    ["<msg#21>","<chat#19>","<ses#19>","user","{\"text\":\"Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang\"}","Tolong cek lagi angka penjualan bulan ini dibandingkan bulan lalu, terutama untuk unit rumah tipe 36 di Malang",null,null,null,"handled",null,null,1794427200000,null,1],
     ["<msg#22>","<chat#20>","<ses#20>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794416400000,null,1],
     ["<msg#23>","<chat#21>","<ses#21>","user","{\"text\":\"ok sip 👍\"}","ok sip 👍",null,null,null,"handled",null,null,1794405600000,null,1]
    ]
@@ -292,17 +292,17 @@
   "outbound_messages": {
    "columns": ["id","agent_id","contact_id","text","origin","origin_ref","approved_by","owner_chat_id","rrule","tz","local_start","fire_at","status","last_outbox_id","created_at","updated_at"],
    "rows": [
-    ["<obm#1>","<agt#1>","<con#1>","Halo, ini asisten Zaki. Zaki lagi otw ya.","chat",null,"policy",null,null,"Asia/Makassar","2026-11-11T09:00",1794619200000,"done",null,1794619200000,1794619200000],
-    ["<obm#2>","<agt#1>","<con#1>","Halo, ini asisten Zaki. Ingetin jemput jam 8 ya.","chat",null,"owner",null,null,"Asia/Makassar","2026-11-11T09:00",1794643200000,"scheduled",null,1794621600000,1794621600000],
-    ["<obm#3>","<agt#1>","<con#2>","Bu, Zaki pulang Jumat ya.","chat",null,"owner",null,null,"Asia/Makassar","2026-11-11T09:00",1794448800000,"done",null,1794448800000,1794448800000],
-    ["<obm#4>","<agt#1>","<con#2>","Kabar mingguan dari Zaki.","chat",null,"owner",null,"FREQ=WEEKLY;BYDAY=FR","Asia/Makassar","2026-11-11T09:00",1794794400000,"scheduled",null,1794621600000,1794621600000]
+    ["<obm#1>","<agt#1>","<con#1>","Halo, ini asisten Rizky. Rizky lagi otw ya.","chat",null,"policy",null,null,"Asia/Makassar","2026-11-11T09:00",1794619200000,"done",null,1794619200000,1794619200000],
+    ["<obm#2>","<agt#1>","<con#1>","Halo, ini asisten Rizky. Ingetin jemput jam 8 ya.","chat",null,"owner",null,null,"Asia/Makassar","2026-11-11T09:00",1794643200000,"scheduled",null,1794621600000,1794621600000],
+    ["<obm#3>","<agt#1>","<con#2>","Bu, Rizky pulang Jumat ya.","chat",null,"owner",null,null,"Asia/Makassar","2026-11-11T09:00",1794448800000,"done",null,1794448800000,1794448800000],
+    ["<obm#4>","<agt#1>","<con#2>","Kabar mingguan dari Rizky.","chat",null,"owner",null,"FREQ=WEEKLY;BYDAY=FR","Asia/Makassar","2026-11-11T09:00",1794794400000,"scheduled",null,1794621600000,1794621600000]
    ]
   },
   "outbox": {
    "columns": ["id","chat_id","channel","payload","status","attempts","next_attempt_at","claimed_at","channel_msg_id","source","error","fallback_from","created_at","expires_at","sent_at","connector_id"],
    "rows": [
-    ["<out#1>","<chat#22>","whatsapp","{\"text\":\"Halo, ini asisten Zaki. Zaki lagi otw ya.\",\"format\":\"plain\"}","sent",0,1794619200000,null,null,"outbound:<obm#1>",null,null,1794619200000,null,1794619200000,null],
-    ["<out#2>","<chat#23>","whatsapp","{\"text\":\"Bu, Zaki pulang Jumat ya.\",\"format\":\"plain\"}","sent",0,1794448800000,null,null,"outbound:<obm#3>",null,null,1794448800000,null,1794448800000,null]
+    ["<out#1>","<chat#22>","whatsapp","{\"text\":\"Halo, ini asisten Rizky. Rizky lagi otw ya.\",\"format\":\"plain\"}","sent",0,1794619200000,null,null,"outbound:<obm#1>",null,null,1794619200000,null,1794619200000,null],
+    ["<out#2>","<chat#23>","whatsapp","{\"text\":\"Bu, Rizky pulang Jumat ya.\",\"format\":\"plain\"}","sent",0,1794448800000,null,null,"outbound:<obm#3>",null,null,1794448800000,null,1794448800000,null]
    ]
   },
   "outbox_media": {
@@ -328,7 +328,7 @@
   "preferences": {
    "columns": ["key","value","updated_at"],
    "rows": [
-    ["default_city","Banjarmasin",1794621600000],
+    ["default_city","Surabaya",1794621600000],
     ["timezone","Asia/Makassar",1794621600000]
    ]
   },
@@ -336,7 +336,7 @@
    "columns": ["id","chat_id","text","rrule","tz","local_start","fire_at","scheduled_for","status","last_fired_at","snoozed_until","smart_prompt","last_outbox_id","created_at","updated_at"],
    "rows": [
     ["<rem#1>","<chat#2>","Bayar listrik",null,"Asia/Makassar","2026-11-11T09:00:00",1794675600000,1794675600000,"pending",null,null,null,null,1794621600000,1794621600000],
-    ["<rem#2>","<chat#2>","Kirim laporan mingguan ke tim Vorneo, lengkap dengan rekap deal yang masuk, survei yang sudah dijadwalkan, dan catatan follow up untuk setiap agen 📊",null,"Asia/Makassar","2026-11-11T09:00:00",1794765600000,1794765600000,"pending",null,null,null,null,1794621600000,1794621600000],
+    ["<rem#2>","<chat#2>","Kirim laporan mingguan ke tim Northwind, lengkap dengan rekap deal yang masuk, survei yang sudah dijadwalkan, dan catatan follow up untuk setiap agen 📊",null,"Asia/Makassar","2026-11-11T09:00:00",1794765600000,1794765600000,"pending",null,null,null,null,1794621600000,1794621600000],
     ["<rem#3>","<chat#2>","Standup","FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR","Asia/Makassar","2026-11-11T09:00:00",1794693600000,1794693600000,"pending",null,null,null,null,1794621600000,1794621600000],
     ["<rem#4>","<chat#2>","Old one",null,"Asia/Makassar","2026-11-11T09:00:00",1794513600000,1794513600000,"done",null,null,null,null,1794621600000,1794621600000],
     ["<rem#5>","<chat#2>","Telepon pak RT soal iuran keamanan dan kebersihan bulan 1 🏠","FREQ=MONTHLY;BYMONTHDAY=1","Asia/Makassar","2026-11-11T09:00:00",1794801600000,1794801600000,"pending",null,null,null,null,1794621600000,1794621600000],
@@ -402,9 +402,9 @@
   "saved_attachments": {
    "columns": ["id","chat_id","message_id","run_id","title","description","kind","mime_type","filename","size","sha256","data","created_at","origin","sender_id","sender_name","sent_at"],
    "rows": [
-    ["<att#1>","<chat#3>",null,null,"Tiket pesawat BDJ-CGK 12 Des","Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.","document","application/pdf","e-ticket-XKQ9PL.pdf",184320,"<sha256 of data>",{"bytes":184320,"sha256":"5b9035eb3f55e13a8fac419c08ab23620b264679b199b4e0dbd55a6e2233d310"},1794610800000,"tool",null,null,null],
-    ["<att#2>","<chat#2>",null,null,"KTP Zaki","Foto KTP, berlaku seumur hidup.","image","image/png",null,135032,"<sha256 of data>",{"bytes":135032,"sha256":"3645ad90546168ac687c954a6d1c58c6d7d0b2c1f42e22dde1cb85dd6c8b75be"},1794528000000,"tool",null,null,null],
-    ["<att#3>","<chat#2>",null,null,"Struk servis motor","Bengkel resmi Banjarbaru, ganti oli dan kampas rem, Rp 385.000.","document","application/pdf","struk_servis_2026-11-01.pdf",96000,"<sha256 of data>",{"bytes":96000,"sha256":"3dde18f3f56de6e3a148525d91ad33841163c40d6d0112492f350a6529fb517b"},1793844000000,"tool",null,null,null]
+    ["<att#1>","<chat#3>",null,null,"Tiket pesawat SUB-CGK 12 Des","Lion Air JT-581, berangkat 12 Des 2026 06.10 WITA, kode booking XKQ9PL.","document","application/pdf","e-ticket-XKQ9PL.pdf",184320,"<sha256 of data>",{"bytes":184320,"sha256":"5b9035eb3f55e13a8fac419c08ab23620b264679b199b4e0dbd55a6e2233d310"},1794610800000,"tool",null,null,null],
+    ["<att#2>","<chat#2>",null,null,"KTP Budi","Foto KTP, berlaku seumur hidup.","image","image/png",null,135032,"<sha256 of data>",{"bytes":135032,"sha256":"3645ad90546168ac687c954a6d1c58c6d7d0b2c1f42e22dde1cb85dd6c8b75be"},1794528000000,"tool",null,null,null],
+    ["<att#3>","<chat#2>",null,null,"Struk servis motor","Bengkel resmi Malang, ganti oli dan kampas rem, Rp 385.000.","document","application/pdf","struk_servis_2026-11-01.pdf",96000,"<sha256 of data>",{"bytes":96000,"sha256":"3dde18f3f56de6e3a148525d91ad33841163c40d6d0112492f350a6529fb517b"},1793844000000,"tool",null,null,null]
    ]
   },
   "session": {
@@ -448,7 +448,7 @@
   "tool_calls": {
    "columns": ["id","run_id","connector_id","tool","class","args","result_preview","status","ms","created_at"],
    "rows": [
-    ["<tc#1>","<run#1>","mcp-vorneo","mcp-vorneo__list_deals_for_the_current_week_grouped_by_stage_and_agent","read","{\"stage\":\"masuk\",\"week\":\"2026-W46\"}","[{\"id\":\"deal_01\",\"title\":\"Rumah 2 lantai di Banjarbaru\"}]","ok",1240,1794614401000],
+    ["<tc#1>","<run#1>","mcp-northwind","mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent","read","{\"stage\":\"masuk\",\"week\":\"2026-W46\"}","[{\"id\":\"deal_01\",\"title\":\"Rumah 2 lantai di Malang\"}]","ok",1240,1794614401000],
     ["<tc#2>","<run#1>","reminders","reminders__set_reminder","write","{\"text\":\"bayar listrik\",\"when\":\"besok 09:00\"}","Besok, Rabu 11 Nov, 09.00 WITA","ok",85,1794614402000]
    ]
   },

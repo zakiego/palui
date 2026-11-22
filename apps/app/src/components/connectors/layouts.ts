@@ -1,5 +1,5 @@
 // The three Connectors page layouts from the PLAN 11.7 Explore, in picker order. The
-// default is Claude's pick until Zaki confirms it (DESIGN.md, Decisions); the
+// default is Claude's pick until the owner confirms it (DESIGN.md, Decisions); the
 // Home map follows the same pick.
 import { ConnectorBoard, ConnectorBoardSkeleton } from "./variants/board"
 import { ConnectorGrid, ConnectorGridSkeleton } from "./variants/grid"

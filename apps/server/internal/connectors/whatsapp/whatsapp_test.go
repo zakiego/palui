@@ -175,7 +175,7 @@ func writeStore(t *testing.T, path string, linked bool) {
 	testutil.Must(t, c.Upgrade(context.Background()))
 	if linked {
 		dev := c.NewDevice()
-		jid := types.NewADJID("628980001472", 0, 3)
+		jid := types.NewADJID("628000001472", 0, 3)
 		dev.ID = &jid
 		dev.Account = &waAdv.ADVSignedDeviceIdentity{Details: []byte{1}, AccountSignatureKey: make([]byte, 32), AccountSignature: make([]byte, 64), DeviceSignature: make([]byte, 64)}
 		testutil.Must(t, c.PutDevice(context.Background(), dev))
@@ -229,10 +229,10 @@ func TestPairing(t *testing.T) {
 		last = e.ctx.LastStatusFull()
 		eq(t, []any{last.Status, last.Detail == nil}, []any{"on", true})
 		l = live(r)
-		eq(t, []any{l["connection"], l["linked"], l["linkedNumber"], l["qr"], l["qrSvg"], l["pairingCode"], l["expiresHint"]}, []any{"open", true, "628980001472", nil, nil, nil, nil})
+		eq(t, []any{l["connection"], l["linked"], l["linkedNumber"], l["qr"], l["qrSvg"], l["pairingCode"], l["expiresHint"]}, []any{"open", true, "628000001472", nil, nil, nil, nil})
 		found := false
 		for _, p := range e.ctx.PatchList() {
-			found = found || jsonx.Stringify(p) == `{"linkedNumber":"628980001472"}`
+			found = found || jsonx.Stringify(p) == `{"linkedNumber":"628000001472"}`
 		}
 		eq(t, found, true)
 		eq(t, r.Channel.Reachable(), true)
@@ -579,7 +579,7 @@ func TestInbound(t *testing.T) {
 			}
 			return &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String(text), ContextInfo: ci}}
 		}
-		e.sock().Message(dm("IN5", quote("Ini?", "BOT1", "628980001472@s.whatsapp.net", &waE2E.Message{Conversation: proto.String("Jadwal besok jam 9")}), nil), "")
+		e.sock().Message(dm("IN5", quote("Ini?", "BOT1", "628000001472@s.whatsapp.net", &waE2E.Message{Conversation: proto.String("Jadwal besok jam 9")}), nil), "")
 		e.sock().Message(dm("IN6", quote("maksudnya", "OWN1", ownerLID, &waE2E.Message{ImageMessage: &waE2E.ImageMessage{Caption: proto.String("struk")}}), nil), "")
 		e.sock().Message(dm("IN7", quote("hilang?", "GONE1", "", nil), nil), "")
 		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 3 })
@@ -618,7 +618,7 @@ func TestInbound(t *testing.T) {
 			img := &waE2E.ImageMessage{Mimetype: proto.String("image/jpeg")}
 			if mention {
 				img.Caption = proto.String("@bot lihat")
-				img.ContextInfo = &waE2E.ContextInfo{MentionedJID: []string{"628980001472@s.whatsapp.net"}}
+				img.ContextInfo = &waE2E.ContextInfo{MentionedJID: []string{"628000001472@s.whatsapp.net"}}
 			}
 			return dm(id, &waE2E.Message{ImageMessage: img}, func(k *whatsapp.Key) {
 				k.RemoteJID, k.Participant = "120363@g.us", "62811@s.whatsapp.net"
@@ -720,7 +720,7 @@ func TestInbound(t *testing.T) {
 		quoting := func(text string, mention bool, quoted *waE2E.Message) *waE2E.Message {
 			ci := &waE2E.ContextInfo{StanzaID: proto.String("GST1"), Participant: proto.String("62822@s.whatsapp.net"), QuotedMessage: quoted}
 			if mention {
-				ci.MentionedJID = []string{"628980001472@s.whatsapp.net"}
+				ci.MentionedJID = []string{"628000001472@s.whatsapp.net"}
 			}
 			return &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String(text), ContextInfo: ci}}
 		}
@@ -783,7 +783,7 @@ func TestInbound(t *testing.T) {
 		eq(t, []any{in.Text, len(in.Media), in.Media[0].SaveOnly, in.Media[0].Caption, in.Media[0].Data != ""}, []any{"struk", 1, true, "struk", true})
 		// A 5 MB document someone asked about: saved, but too big for the model.
 		big := &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{FileName: proto.String("big.pdf"), FileLength: proto.Uint64(5 * 1024 * 1024), Mimetype: proto.String("application/pdf"), Caption: proto.String("@bot simpan"),
-			ContextInfo: &waE2E.ContextInfo{MentionedJID: []string{"628980001472@s.whatsapp.net"}}}}
+			ContextInfo: &waE2E.ContextInfo{MentionedJID: []string{"628000001472@s.whatsapp.net"}}}}
 		e.sock().Message(dm("AS2", big, inGroup), "")
 		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 2 })
 		in = e.ctx.Inbound()[1]
@@ -1120,12 +1120,12 @@ func TestTestAction(t *testing.T) {
 	e := setup(t, opts{config: cfg()})
 	tr, _ := e.rt.Test(e.ctx.Context)
 	eq(t, tr, connectors.TestResult{OK: false, Detail: "Enter the owner's phone number first."})
-	e = setup(t, opts{config: cfg("ownerPhone", "0812-3456-789", "linkedNumber", "628980001472")})
+	e = setup(t, opts{config: cfg("ownerPhone", "0812-3456-789", "linkedNumber", "628000001472")})
 	tr, _ = e.rt.Test(e.ctx.Context)
 	eq(t, tr, connectors.TestResult{OK: true, Detail: "Not paired yet. Start pairing to link the number.", Data: cfg("linked", false)})
 	writeStore(t, e.storePath(), true)
 	tr, _ = e.rt.Test(e.ctx.Context)
-	eq(t, tr, connectors.TestResult{OK: true, Detail: "Linked as +628980001472", Data: cfg("linked", true)})
+	eq(t, tr, connectors.TestResult{OK: true, Detail: "Linked as +628000001472", Data: cfg("linked", true)})
 }
 
 func TestQuotes(t *testing.T) {
@@ -1144,9 +1144,9 @@ func TestQuotes(t *testing.T) {
 		eq(t, wrapped.Text, "sementara")
 	})
 	t.Run("tells self, sender and others apart across device suffixes and LIDs", func(t *testing.T) {
-		self := []string{"628980001472:3@s.whatsapp.net", "111222333:3@lid"}
+		self := []string{"628000001472:3@s.whatsapp.net", "111222333:3@lid"}
 		sender := []string{ownerJID, ownerLID}
-		eq(t, whatsapp.QuoteAuthor("628980001472@s.whatsapp.net", self, sender, false), "self")
+		eq(t, whatsapp.QuoteAuthor("628000001472@s.whatsapp.net", self, sender, false), "self")
 		eq(t, whatsapp.QuoteAuthor("111222333@lid", self, sender, false), "self")
 		eq(t, whatsapp.QuoteAuthor("628123456789:7@s.whatsapp.net", self, sender, false), "sender")
 		eq(t, whatsapp.QuoteAuthor("620000000@s.whatsapp.net", self, sender, false), "other")
@@ -1177,7 +1177,7 @@ func TestGroupParticipants(t *testing.T) {
 	const (
 		grp     = "120363000000000001@g.us"
 		other   = "120363000000000002@g.us"
-		selfPN  = "628980001472@s.whatsapp.net"
+		selfPN  = "628000001472@s.whatsapp.net"
 		selfLID = "111222333@lid"
 		aniPN   = "6281200000001@s.whatsapp.net"
 		aniLID  = "100000000000001@lid"
@@ -1400,7 +1400,7 @@ func TestSendMentions(t *testing.T) {
 	)
 	members := func(s *watest.FakeSocket) {
 		s.GroupMembers[grp] = []whatsapp.GroupMember{
-			{ID: "111222333@lid", Alt: "628980001472@s.whatsapp.net"},
+			{ID: "111222333@lid", Alt: "628000001472@s.whatsapp.net"},
 			{ID: aniLID},
 			{ID: budiLID},
 			{ID: citaPN},
