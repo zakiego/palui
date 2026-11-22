@@ -77,6 +77,8 @@ type Content struct {
 	Text  string    `json:"text,omitempty"`
 	React *Reaction `json:"react,omitempty"`
 	Media *Media    `json:"media,omitempty"`
+	// JIDs to @mention (ContextInfo.MentionedJID); Text holds "@<user part>" for each.
+	Mentions []string `json:"mentions,omitempty"`
 }
 
 // Media is a file to upload and send: Kind is a db.Media* kind.

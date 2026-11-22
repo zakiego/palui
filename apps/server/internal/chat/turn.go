@@ -1177,6 +1177,13 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			if chat.Kind == "group" {
 				replyMode = chat.ReplyMode
 			}
+			// A hook summary is untrusted text: it gets nobody to mention.
+			var mentions *MentionInfo
+			if origin != "hook" {
+				if mentions, err = MentionsFor(c, chat); err != nil {
+					return err
+				}
+			}
 			summary := ""
 			if isMessage && session != nil && session.Summary != nil {
 				summary = *session.Summary
@@ -1195,6 +1202,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				Dashboard:    dashboard,
 				ReplyMode:    replyMode,
 				Inbound:      inbound,
+				Mentions:     mentions,
 			}), summary)
 			checkins := ""
 			// Flow check-ins are the owner's; a shared chat never sees them.
