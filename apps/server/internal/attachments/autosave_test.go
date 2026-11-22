@@ -2,6 +2,7 @@ package attachments_test
 
 import (
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/zakiego/palui/apps/server/internal/attachments"
@@ -163,5 +164,28 @@ func TestDeleteAutoRemovesOnlyThatChatsAutoSavedFiles(t *testing.T) {
 	}
 	if all, _ := attachments.Count(d); all != 2 {
 		t.Fatalf("%d files left", all)
+	}
+}
+
+// Channels deliver a forwarded album or a re-sent file as separate messages,
+// and each auto-save runs in its own goroutine.
+func TestAutoSaveKeepsOneCopyWhenTheSameFileArrivesAtOnce(t *testing.T) {
+	d := testutil.DB(t)
+	chatID := autoChat(t, d, "g1@g.us", 30)
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := attachments.AutoSave(d, attachments.AutoInput{ChatID: chatID, Kind: "document", MimeType: "application/pdf", Bytes: PDF}, KEY, NOW); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	n, _, err := attachments.AutoCount(d, chatID)
+	testutil.Must(t, err)
+	if n != 1 {
+		t.Fatalf("%d copies, want 1", n)
 	}
 }
