@@ -79,7 +79,7 @@
     ["notes","notes","skill","Instructions & preferences",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["settings","settings","skill","Settings",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["remote-mcp","remote-mcp","skill","Remote MCP setup",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
-    ["mcp-jadwal-sholat","mcp","tools","jadwal-sholat",1,"on",null,"external","{\"url\":\"https://sholat.zakiego.com/mcp\",\"authMode\":\"none\",\"addedFromChat\":true,\"noPrivateData\":true}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
+    ["mcp-jadwal-sholat","mcp","tools","jadwal-sholat",1,"on",null,"external","{\"url\":\"https://sholat.example.com/mcp\",\"authMode\":\"none\",\"addedFromChat\":true,\"noPrivateData\":true}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["printer","printer","tools","Printer",1,"on",null,"own","{\"url\":\"ipp://host.docker.internal:631/printers/Office_Printer\"}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["attachments","attachments","skill","Attachments",1,"on",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
     ["voice","voice","skill","Voice notes",0,"not_set_up",null,"own","{}",null,"<config hash>",null,null,0,1794621600000,1794621600000,null,null],
@@ -230,7 +230,7 @@
   "instructions": {
    "columns": ["id","title","body","enabled","created_at","updated_at","agent_id"],
    "rows": [
-    ["<ins#1>","Jadwal sholat","Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai JSON API di https://sholat.zakiego.com/api/v1 lewat web fetch.",1,1794610800000,1794610800000,"<agt#1>"],
+    ["<ins#1>","Jadwal sholat","Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai JSON API di https://sholat.example.com/api/v1 lewat web fetch.",1,1794610800000,1794610800000,"<agt#1>"],
     ["<ins#2>","Ringkasan pagi","Mulai dengan cuaca, lalu agenda, lalu pengingat hari ini.",0,1794614400000,1794614400000,"<agt#1>"]
    ]
   },

@@ -160,8 +160,7 @@
      "field": "apiKey",
      "label": "API key",
      "secret": true,
-     "help": "Run this on the CLIProxyAPI Mac, then paste a key.",
-     "command": "grep -A3 api-keys $(brew --prefix)/etc/cliproxyapi.conf"
+     "help": "Copy a key from the api-keys list in CLIProxyAPI's config file."
     }
    ],
    "docs": {
@@ -903,7 +902,7 @@
    "pauseNote": "Pausing hides the add, list and remove tools. Servers already added keep running.",
    "docs": {
     "commands": [
-     "tambahin MCP server jadwal-sholat, url https://sholat.zakiego.com/mcp"
+     "tambahin MCP server jadwal-sholat, url https://sholat.example.com/mcp"
     ],
     "notes": [
      "Adding and removing a server is destructive: it always asks first, and scheduled jobs can't do it.",
@@ -5684,7 +5683,7 @@
      "tool": "list_instructions",
      "kind": "call",
      "input": {},
-     "result": "{\"ok\":true,\"count\":3,\"instructions\":[{\"id\":\"ins#1\",\"title\":\"Jadwal sholat untuk kota default, atau koordinat kalau sedang di luar Indonesia\",\"body\":\"Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.zakiego.com/api/v1/jadwal?kota=banjarmasin&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\\n\\nUntuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.zakiego.com/api/v1/jadwal?kota=banjarmasin&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\\n\\nUntuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.zakiego.com/api/v1/jadwal?kota=banjarmasin&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\\n\\nUntuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.zakiego.com/api/v1/jadwal?kota=banjarmasin&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\\n\\nUntuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.zakiego.com/api/v1/jadwal?kota=banjar\",\"enabled\":true},{\"id\":\"ins#2\",\"title\":\"J\",\"body\":\"Selalu jawab singkat.\",\"enabled\":true},{\"id\":\"ins#3\",\"title\":\"خادم الملفات: الملخص اليومي\",\"body\":\"Ringkas file baru di server berkas setiap pagi.\",\"enabled\":false}]}"
+     "result": "{\"ok\":true,\"count\":3,\"instructions\":[{\"id\":\"ins#1\",\"title\":\"Jadwal sholat untuk kota default, atau koordinat kalau sedang di luar Indonesia\",\"body\":\"Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.example.com/api/v1/jadwal?kota=banjarmasin&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\\n\\nUntuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.example.com/api/v1/jadwal?kota=banjarmasin&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\\n\\nUntuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.example.com/api/v1/jadwal?kota=banjarmasin&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\\n\\nUntuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.example.com/api/v1/jadwal?kota=banjarmasin&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\\n\\nUntuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.example.com/api/v1/jadwal?kota=banjar\",\"enabled\":true},{\"id\":\"ins#2\",\"title\":\"J\",\"body\":\"Selalu jawab singkat.\",\"enabled\":true},{\"id\":\"ins#3\",\"title\":\"خادم الملفات: الملخص اليومي\",\"body\":\"Ringkas file baru di server berkas setiap pagi.\",\"enabled\":false}]}"
     },
     {
      "tool": "get_preferences",

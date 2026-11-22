@@ -59,7 +59,7 @@ const commandSchema = z
   .strictObject({
     name: z.string().regex(NAME, "lowercase letters, digits and _, starting with a letter"),
     // Shown in Palui's tool table, chat transcript and approval prompts. Say what
-    // it does and where, e.g. "Restart nginx on the Mac mini". Default: "Host: <name>".
+    // it does and where, e.g. "Restart nginx on the home server". Default: "Host: <name>".
     title: z.string().min(1).max(80).optional(),
     description: z.string().min(1),
     note: z.string().optional(),

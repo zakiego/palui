@@ -3,17 +3,17 @@ title: T3 Code
 description: Start coding threads in T3 Code from chat, follow them, and get a message when they finish.
 ---
 
-Kind: `tools`. T3 Code connects Palui to the T3 Code server on your Mac. Ask Palui in chat to work on something in one of your projects and it starts a T3 Code thread for it, in its own git worktree by default. When that thread finishes, Palui messages the same chat with the agent's reply and the thread link. It also tells you once if the thread stops to wait for your answer.
+Kind: `tools`. T3 Code connects Palui to your own [T3 Code](https://t3.codes) server. Ask Palui in chat to work on something in one of your projects and it starts a T3 Code thread for it, in its own git worktree by default. When that thread finishes, Palui messages the same chat with the agent's reply and the thread link. It also tells you once if the thread stops to wait for your answer.
 
 ## Connect
 
-1. On the Mac running T3 Code, make a pairing code:
+1. On the computer running T3 Code, make a pairing code:
 
    ```bash
    t3 auth pairing create --ttl 10m
    ```
 
-2. On the Connectors page, add T3 Code and paste the code. Keep the URL at `http://host.docker.internal:3773` when Palui runs in Docker on the same Mac.
+2. On the Connectors page, add T3 Code and paste the code. Keep the URL at `http://host.docker.internal:3773` when Palui runs in Docker on the same machine.
 3. Press Test. Palui trades the code for a token and lists your projects.
 
 The token is full access, so threads Palui starts run like the ones you start yourself. It lasts 30 days and T3 Code can't renew it. When it runs out, the connector goes to `error` and Palui tells you. Make a new pairing code and paste it.
@@ -45,7 +45,7 @@ A thread link looks like `…/threads/<environmentId>/<threadId>`. The first id 
 
 ## Safety
 
-- Threads run with full access on your Mac, like the ones you start yourself. Palui starts them only when you ask in your own chat. After untrusted content in the same turn, and in scheduled jobs and hooks, starting or messaging a thread asks for your approval first. Stopping a thread always asks.
+- Threads run with full access on the T3 Code machine, like the ones you start yourself. Palui starts them only when you ask in your own chat. After untrusted content in the same turn, and in scheduled jobs and hooks, starting or messaging a thread asks for your approval first. Stopping a thread always asks.
 - New threads get their own git worktree, so your checkout stays as it was unless you ask Palui to work in place.
 - The token is stored encrypted and never shown. The pairing code works once, so a leaked old code is useless.
 

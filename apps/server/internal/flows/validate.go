@@ -451,7 +451,7 @@ func ValidateDefinition(raw any, ctx ValidateContext) (out Validated) {
 	return out
 }
 
-// DescribeWriteCall is describeWriteCall: "keuangan.mark_paid(id: {{item.id}})".
+// DescribeWriteCall is describeWriteCall: "bills.mark_paid(id: {{item.id}})".
 func DescribeWriteCall(w WriteCall) string {
 	if w.Kind == "message" {
 		if !strings.HasPrefix(w.To, "contact:") {

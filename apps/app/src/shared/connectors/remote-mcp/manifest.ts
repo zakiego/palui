@@ -15,7 +15,7 @@ export default defineManifest({
   setup: [],
   pauseNote: "Pausing hides the add, list and remove tools. Servers already added keep running.",
   docs: {
-    commands: ["tambahin MCP server jadwal-sholat, url https://sholat.zakiego.com/mcp"],
+    commands: ["tambahin MCP server jadwal-sholat, url https://sholat.example.com/mcp"],
     notes: [
       "Adding and removing a server is destructive: it always asks first, and scheduled jobs can't do it.",
       "A server added from chat gets the id mcp-<name>, external trust, and its tools prefilled from their read-only and destructive hints. Change them on the Connectors page.",

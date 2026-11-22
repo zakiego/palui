@@ -16,7 +16,7 @@ export default defineManifest({
   secrets: { apiKey: z.string().min(1) },
   setup: [
     { field: "baseUrl", label: "Base URL", placeholder: "http://host.docker.internal:8317", optional: true },
-    { field: "apiKey", label: "API key", secret: true, help: "Run this on the CLIProxyAPI Mac, then paste a key.", command: "grep -A3 api-keys $(brew --prefix)/etc/cliproxyapi.conf" },
+    { field: "apiKey", label: "API key", secret: true, help: "Copy a key from the api-keys list in CLIProxyAPI's config file." },
   ],
   docs: { commands: ["/connectors on cliproxy", "/connectors off cliproxy"] },
 })

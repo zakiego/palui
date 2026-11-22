@@ -178,7 +178,7 @@ func worst(k *Kit) {
 	// --- owner notes: at the limits, a URL that never breaks, mixed scripts -------
 	k.Instruction(Instruction{
 		Title:     within("Jadwal sholat untuk kota default, atau koordinat kalau sedang di luar Indonesia", L.instructionTitle),
-		Body:      fill("Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.zakiego.com/api/v1/jadwal?kota=surabaya&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\n\n", L.instructionBody),
+		Body:      fill("Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai https://sholat.example.com/api/v1/jadwal?kota=surabaya&tanggal=2026-11-11&format=json&metode=kemenag lewat web fetch.\n\n", L.instructionBody),
 		CreatedAt: ptr(now - 40*D),
 	})
 	k.Instruction(Instruction{Title: "J", Body: "Selalu jawab singkat.", CreatedAt: ptr(now - 2*D)})

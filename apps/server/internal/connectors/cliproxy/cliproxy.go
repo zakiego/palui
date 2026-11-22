@@ -55,7 +55,7 @@ var Manifest = connectors.Manifest{
 	Summary: "Claude and Gemini through CLIProxyAPI on the host.",
 	Setup: []connectors.SetupStep{
 		{Field: "baseUrl", Label: "Base URL", Placeholder: "http://host.docker.internal:8317", Optional: true},
-		{Field: "apiKey", Label: "API key", Secret: true, Help: "Run this on the CLIProxyAPI Mac, then paste a key.", Command: "grep -A3 api-keys $(brew --prefix)/etc/cliproxyapi.conf"},
+		{Field: "apiKey", Label: "API key", Secret: true, Help: "Copy a key from the api-keys list in CLIProxyAPI's config file."},
 	},
 	Docs:         &connectors.Docs{Commands: []string{"/connectors on cliproxy", "/connectors off cliproxy"}},
 	SecretFields: kit.SecretNames(SecretZod),

@@ -5,8 +5,8 @@ export const DEFAULT_T3_URL = "http://host.docker.internal:3773"
 
 export const t3Config = z.object({
   // Where the T3 Code server answers, as seen from the runtime. From the Docker
-  // runtime that's the Mac host: host.docker.internal (OrbStack and Docker
-  // Desktop both forward it to the host's loopback).
+  // runtime that's the Docker host: host.docker.internal (Docker Desktop and
+  // OrbStack both forward it to the host's loopback).
   url: z.url({ protocol: /^https?$/ }).default(DEFAULT_T3_URL),
   // Base for a new thread's git worktree when the model doesn't name one.
   baseRef: z.string().trim().min(1).max(200).default("main"),
