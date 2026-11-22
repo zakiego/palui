@@ -12,7 +12,15 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
-Nothing yet.
+### Breaking
+
+- New installs default to UTC instead of `Asia/Makassar`. Pick your time zone in Settings before you upgrade if you never saved one.
+- The default persona and outbound signature no longer name the owner. Save your own in Settings first to keep them.
+- Default model roles use cliproxy only, without the ai-gateway fallback. Saved model roles don't change.
+
+### Tools
+
+- Changed: The MCP connector no longer offers Vorneo, Keuangan and Todo Map presets. Add them as custom servers.
 
 ## 0.14.0 (2026-11-23)
 

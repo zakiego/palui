@@ -30,7 +30,7 @@ In a group with an agent, what everyone else said is stored too, with their name
 | `search_this_chat` | `read` | Search older messages in the chat the turn is in, by a word or name. Matches message text, contact cards (`[contact: name, number]`), captions and the text of quoted messages, with who sent each one. The newest 20 matches by default (at most 50), optional `before` and `since`. Offered in every chat, groups too. |
 | `read_chat` | `read` | Read one of this agent's chats by its chat id or an exact external id. The newest 30 messages by default (at most 100), returned oldest first. Optional `before` and `since` times and a text search. Each message is clipped at 500 characters. |
 
-Times in and out are in your zone (Settings, default `Asia/Makassar`). Each tool's class decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
+Times in and out are in your zone (Settings, default `UTC`). Each tool's class decides when it needs approval. See [Tool classes](/docs/concepts/tool-classes).
 
 ## Safety
 
