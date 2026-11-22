@@ -17,8 +17,8 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - New installs default to UTC instead of `Asia/Makassar`. Pick your time zone in Settings before you upgrade if you never saved one. ([#11](https://github.com/zakiego/palui/pull/11))
 - The default persona and outbound signature no longer name the owner. Save your own in Settings first to keep them. ([#11](https://github.com/zakiego/palui/pull/11))
 - Default model roles use cliproxy only, without the ai-gateway fallback. Saved model roles don't change. ([#11](https://github.com/zakiego/palui/pull/11))
-- The ai-gateway connector is gone. Add your gateway again as a Model gateway, then pick it in your model roles.
-- The ops scripts take their paths, launchd labels and R2 command from `~/.config/palui/host.conf`, with new defaults. Set your old ones there before you deploy.
+- The ai-gateway connector is gone. Add your gateway again as a Model gateway, then pick it in your model roles. ([#14](https://github.com/zakiego/palui/pull/14))
+- The ops scripts take their paths, launchd labels and R2 command from `~/.config/palui/host.conf`, with new defaults. Set your old ones there before you deploy. ([#14](https://github.com/zakiego/palui/pull/14))
 
 ### Chat
 
@@ -27,7 +27,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 ### Tools
 
 - Changed: The MCP connector no longer offers Vorneo, Keuangan and Todo Map presets. Add them as custom servers. ([#11](https://github.com/zakiego/palui/pull/11))
-- Added: Model gateway, a model connector for any OpenAI- or Anthropic-compatible endpoint, like LiteLLM or OpenRouter. Add as many as you need.
+- Added: Model gateway, a model connector for any OpenAI- or Anthropic-compatible endpoint, like LiteLLM or OpenRouter. Add as many as you need. ([#14](https://github.com/zakiego/palui/pull/14))
 
 ## 0.14.0 (2026-11-23)
 
