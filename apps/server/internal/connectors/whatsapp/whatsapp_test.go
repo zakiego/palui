@@ -1387,3 +1387,80 @@ func TestGroupParticipants(t *testing.T) {
 		eq(t, s.GroupMemberCalls(), 4)
 	})
 }
+
+// Outgoing @mentions (ADR 0002). rpt_0mwrwosczfzc3p58slq: in a LID group the
+// agent couldn't tag anyone; now an "@<id>" of someone in the group goes out
+// as a real mention.
+func TestSendMentions(t *testing.T) {
+	const (
+		grp     = "120363000000000001@g.us"
+		aniLID  = "100000000000001@lid"
+		budiLID = "100000000000002@lid"
+		citaPN  = "6281200000003@s.whatsapp.net"
+	)
+	members := func(s *watest.FakeSocket) {
+		s.GroupMembers[grp] = []whatsapp.GroupMember{
+			{ID: "111222333@lid", Alt: "628980001472@s.whatsapp.net"},
+			{ID: aniLID},
+			{ID: budiLID},
+			{ID: citaPN},
+		}
+	}
+	ctx := context.Background()
+
+	t.Run("the reported case: tokens of people in a LID group become mentions", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		members(e.sock())
+		_, err := r.Channel.Send(ctx, grp, db.OutboxPayload{Text: "Siap, @100000000000001 sama @100000000000002 dicolek ya", Format: "markdown"})
+		testutil.Must(t, err)
+		s := lastSent(t, e.sock())
+		eq(t, s.Content.Text, "Siap, @100000000000001 sama @100000000000002 dicolek ya")
+		eq(t, s.Content.Mentions, []string{aniLID, budiLID})
+	})
+
+	t.Run("a name or an unknown id stays plain text", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		members(e.sock())
+		_, err := r.Channel.Send(ctx, grp, db.OutboxPayload{Text: "@Ani dan @100000000000009, sama @6281200000003", Format: "plain"})
+		testutil.Must(t, err)
+		eq(t, lastSent(t, e.sock()).Content.Mentions, []string{citaPN})
+	})
+
+	t.Run("each chunk of a long message carries only its own mentions", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		members(e.sock())
+		long := "@100000000000001 " + strings.Repeat("kata ", whatsapp.TextLimit/5) + "\n\n@100000000000002 selesai"
+		_, err := r.Channel.Send(ctx, grp, db.OutboxPayload{Text: long, Format: "plain"})
+		testutil.Must(t, err)
+		l := e.sock().SentList()
+		eq(t, len(l) >= 2, true)
+		eq(t, l[0].Content.Mentions, []string{aniLID})
+		eq(t, l[len(l)-1].Content.Mentions, []string{budiLID})
+	})
+
+	t.Run("a photo caption mentions too", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		members(e.sock())
+		_, err := r.Channel.Send(ctx, grp, db.OutboxPayload{Text: "buat @100000000000002", Format: "plain", Media: &db.OutboxMedia{Kind: db.MediaImage, MimeType: "image/png", Bytes: []byte{1}}})
+		testutil.Must(t, err)
+		eq(t, lastSent(t, e.sock()).Content.Mentions, []string{budiLID})
+	})
+
+	t.Run("no list, no mentions: the text still goes out", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		e.sock().GroupMembersErr[grp] = errors.New("boom")
+		_, err := r.Channel.Send(ctx, grp, db.OutboxPayload{Text: "@100000000000001 halo", Format: "plain"})
+		testutil.Must(t, err)
+		s := lastSent(t, e.sock())
+		eq(t, s.Content.Text, "@100000000000001 halo")
+		eq(t, len(s.Content.Mentions), 0)
+	})
+
+	t.Run("a DM never looks the group up", func(t *testing.T) {
+		e, r := openRunning(t, opts{})
+		_, err := r.Channel.Send(ctx, ownerJID, db.OutboxPayload{Text: "@628123456789 halo", Format: "plain"})
+		testutil.Must(t, err)
+		eq(t, len(lastSent(t, e.sock()).Content.Mentions), 0)
+		eq(t, e.sock().GroupMemberCalls(), 0)
+	})
+}

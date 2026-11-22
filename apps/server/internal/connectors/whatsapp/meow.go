@@ -345,13 +345,12 @@ func (s *meowSocket) SendMessage(ctx context.Context, jid string, content Conten
 		if msg, err = s.mediaMessage(ctx, content, quoted); err != nil {
 			return nil, err
 		}
-	case quoted != nil:
-		msg = &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{
-			Text:        proto.String(content.Text),
-			ContextInfo: s.quoteInfo(quoted),
-		}}
 	default:
-		msg = &waE2E.Message{Conversation: proto.String(content.Text)}
+		var ctxInfo *waE2E.ContextInfo
+		if quoted != nil {
+			ctxInfo = s.quoteInfo(quoted)
+		}
+		msg = buildTextMessage(content.Text, withMentions(ctxInfo, content.Mentions))
 	}
 	resp, err := s.cli.SendMessage(ctx, to, msg)
 	if err != nil {
@@ -396,7 +395,32 @@ func (s *meowSocket) mediaMessage(ctx context.Context, content Content, quoted *
 	if quoted != nil {
 		ctxInfo = s.quoteInfo(quoted)
 	}
-	return buildMediaMessage(m, content.Text, up, ctxInfo, time.Now().Unix()), nil
+	return buildMediaMessage(m, content.Text, up, withMentions(ctxInfo, content.Mentions), time.Now().Unix()), nil
+}
+
+// buildTextMessage is a plain Conversation, or an ExtendedTextMessage when it
+// quotes or mentions (only that one carries a ContextInfo).
+func buildTextMessage(text string, ctxInfo *waE2E.ContextInfo) *waE2E.Message {
+	if ctxInfo == nil {
+		return &waE2E.Message{Conversation: proto.String(text)}
+	}
+	return &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+		Text:        proto.String(text),
+		ContextInfo: ctxInfo,
+	}}
+}
+
+// withMentions adds the mentioned JIDs to ctxInfo, making one when needed.
+// No mentions leaves ctxInfo as it was.
+func withMentions(ctxInfo *waE2E.ContextInfo, mentions []string) *waE2E.ContextInfo {
+	if len(mentions) == 0 {
+		return ctxInfo
+	}
+	if ctxInfo == nil {
+		ctxInfo = &waE2E.ContextInfo{}
+	}
+	ctxInfo.MentionedJID = append([]string(nil), mentions...)
+	return ctxInfo
 }
 
 // buildMediaMessage is the message for an uploaded file of m's kind.

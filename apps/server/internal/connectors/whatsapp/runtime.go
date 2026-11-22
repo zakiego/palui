@@ -1117,8 +1117,9 @@ func (w *wa) Send(ctx context.Context, jid string, payload db.OutboxPayload) (co
 		quoted = w.recent[payload.ReplyToChannelMsgID]
 		w.mu.Unlock()
 	}
+	mentions := w.mentionsFor(ctx, jid, full)
 	if m := payload.Media; m != nil {
-		return w.sendMedia(ctx, s, jid, *m, full, quoted)
+		return w.sendMedia(ctx, s, jid, *m, full, quoted, mentions)
 	}
 	if full == "" {
 		full = " "
@@ -1129,7 +1130,7 @@ func (w *wa) Send(ctx context.Context, jid string, payload db.OutboxPayload) (co
 		if i == 0 {
 			q = quoted
 		}
-		sent, err := s.SendMessage(ctx, jid, Content{Text: chunk}, q)
+		sent, err := s.SendMessage(ctx, jid, Content{Text: chunk, Mentions: MentionsIn(chunk, mentions)}, q)
 		if err != nil {
 			return connectors.SendResult{}, err
 		}
@@ -1144,10 +1145,31 @@ func (w *wa) Send(ctx context.Context, jid string, payload db.OutboxPayload) (co
 	return connectors.SendResult{ChannelMsgID: lastID}, nil
 }
 
+// mentionLookupTimeout bounds the participant lookup a send may wait on.
+const mentionLookupTimeout = 5 * time.Second
+
+// mentionsFor is the JIDs the "@<id>" tokens in a group message mention: only
+// people in the group right now, at most MaxMentions (ADR 0002). Any doubt
+// (not a group, no token, the list can't be read) sends no mentions, and the
+// tokens go out as plain text.
+func (w *wa) mentionsFor(ctx context.Context, jid, text string) []string {
+	if !IsGroupChat(jid) || len(MentionTokens(text)) == 0 {
+		return nil
+	}
+	lookup, cancel := context.WithTimeout(ctx, mentionLookupTimeout)
+	defer cancel()
+	people, err := w.GroupParticipants(lookup, jid)
+	if err != nil {
+		w.log.Info("mentions sent as plain text", map[string]any{"err": err.Error()})
+		return nil
+	}
+	return ResolveMentions(text, people, MaxMentions)
+}
+
 // sendMedia sends one photo, file, voice note, video or sticker with its
 // caption. It leaves the thinking reaction alone: media goes out mid-turn and
 // the text reply that ends the turn clears it.
-func (w *wa) sendMedia(ctx context.Context, s Socket, jid string, m db.OutboxMedia, caption string, quoted *Message) (connectors.SendResult, error) {
+func (w *wa) sendMedia(ctx context.Context, s Socket, jid string, m db.OutboxMedia, caption string, quoted *Message, mentions []string) (connectors.SendResult, error) {
 	if len(m.Bytes) == 0 {
 		return connectors.SendResult{}, errors.New("media bytes missing")
 	}
@@ -1156,7 +1178,7 @@ func (w *wa) sendMedia(ctx context.Context, s Socket, jid string, m db.OutboxMed
 		caption = ""
 	}
 	caption = strx.Slice16(caption, outmedia.MaxCaption)
-	sent, err := s.SendMessage(ctx, jid, Content{Text: caption, Media: &Media{Kind: m.Kind, MimeType: m.MimeType, Filename: m.Filename, Bytes: m.Bytes}}, quoted)
+	sent, err := s.SendMessage(ctx, jid, Content{Text: caption, Media: &Media{Kind: m.Kind, MimeType: m.MimeType, Filename: m.Filename, Bytes: m.Bytes}, Mentions: MentionsIn(caption, mentions)}, quoted)
 	if err != nil {
 		return connectors.SendResult{}, err
 	}
