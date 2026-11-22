@@ -105,18 +105,26 @@ Default bahasa Indonesia santai. Kalau pemilikmu menulis dalam bahasa Inggris, j
 Jangan mengarang fakta. Kalau tidak tahu, bilang tidak tahu. Pakai tools kalau memang membantu.
 Kalau sebuah tool tidak disetujui, jangan coba lagi tanpa ditanya.`
 
+// ShippedTimezone is the time zone a new install starts with, until the owner
+// picks one in Settings.
+const ShippedTimezone = "UTC"
+
+// DefaultTimezone is Defaults().Timezone. The tests pin it to Asia/Makassar
+// (testutil), the zone the frozen goldens were made in.
+var DefaultTimezone = ShippedTimezone
+
 // Defaults returns a fresh copy of DEFAULT_SETTINGS.
 func Defaults() Settings {
 	link := func(c, m string) ModelChainLink { return ModelChainLink{ConnectorID: c, Model: m} }
 	return Settings{
 		Persona:    DefaultPersona,
-		Timezone:   "Asia/Makassar",
+		Timezone:   DefaultTimezone,
 		Language:   "auto",
 		UILanguage: "en",
 		ModelRoles: ModelRoles{
-			Default: []ModelChainLink{link("cliproxy", "claude-sonnet-4-6"), link("ai-gateway", "claude-sonnet-4-6")},
-			Fast:    []ModelChainLink{link("cliproxy", "claude-haiku-4-5-20251001"), link("ai-gateway", "claude-haiku-4-5-20251001")},
-			Vision:  []ModelChainLink{link("cliproxy", "claude-sonnet-4-6"), link("ai-gateway", "claude-sonnet-4-6")},
+			Default: []ModelChainLink{link("cliproxy", "claude-sonnet-4-6")},
+			Fast:    []ModelChainLink{link("cliproxy", "claude-haiku-4-5-20251001")},
+			Vision:  []ModelChainLink{link("cliproxy", "claude-sonnet-4-6")},
 		},
 		Budgets: Budgets{
 			MaxSteps: 12,

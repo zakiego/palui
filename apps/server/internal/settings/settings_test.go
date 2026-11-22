@@ -85,11 +85,18 @@ func TestAllAndUnknownKeys(t *testing.T) {
 	d := testutil.DB(t)
 	testutil.Must(t, settings.Set(d, "timezone", "UTC", NOW))
 	all, err := settings.All(d)
-	if err != nil || all.Timezone != "UTC" || all.Budgets.MaxSteps != 12 || len(all.ModelRoles.Default) != 2 {
+	if err != nil || all.Timezone != "UTC" || all.Budgets.MaxSteps != 12 || len(all.ModelRoles.Default) != 1 {
 		t.Fatalf("%+v %v", all, err)
 	}
 	if _, err := settings.Get[string](d, "nope"); !errors.Is(err, settings.ErrUnknownKey) {
 		t.Fatal(err)
+	}
+}
+
+func TestNewInstallsStartInUTC(t *testing.T) {
+	// testutil pins DefaultTimezone for the goldens; what ships is UTC.
+	if settings.ShippedTimezone != "UTC" {
+		t.Fatal(settings.ShippedTimezone)
 	}
 }
 

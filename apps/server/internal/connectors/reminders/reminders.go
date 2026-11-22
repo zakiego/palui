@@ -32,7 +32,7 @@ var Manifest = connectors.Manifest{
 	Docs: &connectors.Docs{
 		Commands: []string{"ingetin <apa> <kapan>", "remind me <when> to <what>"},
 		Notes: []string{
-			"Times are wall-clock times in the reminder's own zone (default from Settings, Asia/Makassar). A daily 08:00 reminder stays at 08:00 across DST changes.",
+			"Times are wall-clock times in the reminder's own zone (default from Settings). A daily 08:00 reminder stays at 08:00 across DST changes.",
 			"Repeats use RRULE. A monthly reminder on the 31st skips months that don't have one.",
 			"If Palui was down when a reminder was due, it fires once on start with \"(telat, harusnya 09.00)\".",
 		},

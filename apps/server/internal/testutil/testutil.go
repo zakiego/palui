@@ -10,6 +10,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
+	"github.com/zakiego/palui/apps/server/internal/settings"
 )
 
 // TestKey is TEST_KEY in chat/testing.ts.
@@ -23,6 +24,10 @@ const (
 	MIN  = int64(60_000)
 	HOUR = int64(3600_000)
 )
+
+// The goldens were made when new installs defaulted to Asia/Makassar, so every
+// test that uses testutil keeps that default (settings.ShippedTimezone is UTC).
+func init() { settings.DefaultTimezone = WITA }
 
 // DB is a migrated in-memory database closed when the test ends.
 func DB(t testing.TB) *db.DB {

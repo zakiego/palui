@@ -57,7 +57,7 @@ func Load(getenv func(string) string) Config {
 		DataDir:         or(getenv("DATA_DIR"), "./data"),
 		MasterKey:       getenv("MASTER_KEY"),
 		AppURL:          trimTrailingSlashes(or(getenv("APP_URL"), "http://localhost:4890")),
-		DefaultTz:       or(getenv("PALUI_TZ"), "Asia/Makassar"),
+		DefaultTz:       or(getenv("PALUI_TZ"), "UTC"),
 		Mode:            mode,
 		ProdTokenHashes: hashes,
 	}
