@@ -1070,7 +1070,7 @@
        },
        {
         "type": "text",
-        "text": "[Replying to an earlier message, which is no longer available]\n\nx"
+        "text": "[Replying to an earlier message. Its content didn't reach you, so you can't see what it said]\n\nx"
        }
       ]
      }
