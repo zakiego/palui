@@ -193,7 +193,7 @@ func TestStandInsKeepTheStoredStatus(t *testing.T) {
 	sup := connectors.NewSupervisor(connectors.SupervisorOptions{DB: d, Registry: reg, MasterKey: testutil.TestKey})
 	t.Cleanup(sup.Stop)
 	want := map[string]string{}
-	for _, id := range []string{"whatsapp", "ai-gateway", "telegram", "recall", "mcp-de"} {
+	for _, id := range []string{"whatsapp", "gateway-litellm", "telegram", "recall", "mcp-de"} {
 		s, _ := statusOf(t, d, id)
 		want[id] = s
 	}

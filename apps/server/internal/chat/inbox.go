@@ -58,7 +58,7 @@ func WriteInbound(q db.Q, msg connectors.InboundMessage, now int64, fromOwner bo
 	if err != nil {
 		return db.Chat{}, db.Message{}, err
 	}
-	// A DM left out by the old utusan chat split opens again on its next message.
+	// A DM left out by an older chat split opens again on its next message.
 	if ownerWaDm && !chat.Allowed {
 		if chat, err = db.ScanChat(q.WQueryRow("UPDATE chats SET allowed = 1 WHERE id = ? RETURNING "+db.ChatCols, chat.ID)); err != nil {
 			return db.Chat{}, db.Message{}, err

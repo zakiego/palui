@@ -1,5 +1,5 @@
 #!/bin/bash
-# Nightly encrypted backup of Palui to Cloudflare R2 (Zakiego Lab).
+# Nightly encrypted backup of Palui to Cloudflare R2.
 #
 #   1. snapshot /data/palui.db inside the running app container with the bundled
 #      admin CLI (`palui backup`: VACUUM INTO, gzipped), copy it out with
@@ -40,14 +40,32 @@
 # `gunzip -c wa/<id>.db.gz > /data/wa/<id>.db` (no -wal or -shm next to it,
 # owned by 1000:1000).
 #
-# R2 credentials come from the Keychain through the cf-zakiego-lab wrapper.
-# Run by launchd (ops/com.zakiego.palui-backup.plist), or by hand.
+# Uploads go through the `cf` CLI, or the command in CF_WRAPPER (for example a
+# wrapper that logs in to the right Cloudflare account).
+# Run by launchd (ops/palui-backup.plist, installed by ops/install-backup.sh),
+# or by hand.
 set -euo pipefail
 
-PALUI_DIR="${PALUI_DIR:-$HOME/selfhost/palui}"
-LOG="${BACKUP_LOG:-$HOME/selfhost/palui-backup.log}"
+# Host settings: the environment wins, then ~/.config/palui/host.conf
+# (PALUI_HOST_CONF), then the defaults below. host.conf holds KEY=value
+# lines and may use $HOME. See the backups docs page.
+load_host_conf() {
+  local f="${PALUI_HOST_CONF:-$HOME/.config/palui/host.conf}" line key
+  [ -f "$f" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in '' | \#*) continue ;; esac
+    key="${line%%=*}"
+    case "$key" in *[!A-Za-z0-9_]* | '') continue ;; esac
+    [ -n "${!key+x}" ] && continue
+    eval "export $line"
+  done <"$f"
+}
+load_host_conf
+PALUI_HOST_DIR="${PALUI_HOST_DIR:-$HOME/.palui}"
+PALUI_DIR="${PALUI_DIR:-$HOME/palui}"
+LOG="${BACKUP_LOG:-$PALUI_HOST_DIR/palui-backup.log}"
 BUCKET="${BACKUP_BUCKET:-palui-backups}"
-CF="${CF_WRAPPER:-$HOME/.agents/skills/cf-zakiego-lab/scripts/cf-zakiego-lab}"
+CF="${CF_WRAPPER:-cf}"
 RECIPIENT_FILE="${AGE_RECIPIENT_FILE:-$HOME/.config/palui/age-recipient}"
 MIN_FREE_MB=500
 SNAPSHOT_ATTEMPTS=3
@@ -123,8 +141,7 @@ command -v age >/dev/null || { log "age not found (brew install age)"; exit 1; }
 if [ "$DRY_RUN" = 1 ]; then
   log "dry run: everything but the upload"
 else
-  [ -x "$CF" ] || { log "cf wrapper not found at $CF"; exit 1; }
-  command -v cf >/dev/null || { log "cf CLI not found (looked in ~/.nvm/versions/node/*/bin)"; exit 1; }
+  command -v "$CF" >/dev/null || { log "upload command not found: $CF (set CF_WRAPPER, or put cf on the PATH)"; exit 1; }
 fi
 [ -s "$RECIPIENT_FILE" ] || { log "no age recipient at $RECIPIENT_FILE (one age1... public key per line)"; exit 1; }
 free_mb=$(df -m / | awk 'NR==2 {print $4}')

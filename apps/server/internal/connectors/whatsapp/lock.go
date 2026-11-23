@@ -1,8 +1,7 @@
 package whatsapp
 
 // One process per WhatsApp session store. Two sockets on the same credentials
-// make WhatsApp evict both with conflicts, forever (whatsapp/lock.ts, from
-// utusan).
+// make WhatsApp evict both with conflicts, forever (whatsapp/lock.ts).
 //
 // The lock file is created with O_EXCL and holds the pid plus a random nonce.
 // The holder touches the file's mtime every 30 s; a lock whose mtime is older

@@ -22,7 +22,7 @@ func demo(k *Kit) {
 	k.Connector("telegram", "telegram", ConnectorOpts{Status: "on", Secrets: sec("botToken", "123456789:AAbbccddeeffgghhiijjkkllmmnnooppqqrr")})
 	k.Connector("whatsapp", "whatsapp", ConnectorOpts{Status: "error", Detail: ptr("Connection closed (440): another session took over this linked device, so Palui paused instead of fighting it")})
 	k.Connector("cliproxy", "cliproxy", ConnectorOpts{Status: "on", Secrets: sec("apiKey", "sk-cliproxy-0123456789abcdef")})
-	k.Connector("ai-gateway", "ai-gateway", ConnectorOpts{Status: "paused", Secrets: sec("apiKey", "zkg_0123456789abcdef")})
+	k.Connector("gateway-litellm", "gateway", ConnectorOpts{Config: obj("baseUrl", "https://llm.example.com"), Status: "paused", Secrets: sec("apiKey", "sk-gateway-0123456789abcdef")})
 	k.Connector("recall", "recall", ConnectorOpts{Status: "connecting", Secrets: sec("apiKey", "rcl_0123456789a91f")})
 	k.Connector("t3code", "t3code", ConnectorOpts{Status: "on", Secrets: sec("pairingCode", "0123456789abcdef"), Config: obj("url", "http://host.docker.internal:3773")})
 	k.Connector("mcp-northwind", "mcp", ConnectorOpts{Label: ptr("Northwind pipeline and property listings for every kabupaten in Jawa Timur"), Status: "on", Config: obj("url", "https://northwind.example.com/mcp")})
@@ -35,9 +35,9 @@ func demo(k *Kit) {
 	k.Connector("notes", "notes", ConnectorOpts{Status: "on"})
 	k.Connector("settings", "settings", ConnectorOpts{Status: "on"})
 	k.Connector("remote-mcp", "remote-mcp", ConnectorOpts{Status: "on"})
-	k.Connector("mcp-jadwal-sholat", "mcp", ConnectorOpts{Label: ptr("jadwal-sholat"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://sholat.zakiego.com/mcp", "authMode", "none", "addedFromChat", true, "noPrivateData", true)})
+	k.Connector("mcp-jadwal-sholat", "mcp", ConnectorOpts{Label: ptr("jadwal-sholat"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://sholat.example.com/mcp", "authMode", "none", "addedFromChat", true, "noPrivateData", true)})
 	k.Connector("printer", "printer", ConnectorOpts{Status: "on", Config: obj("url", "ipp://host.docker.internal:631/printers/Office_Printer")})
-	k.Instruction(Instruction{Title: "Jadwal sholat", Body: "Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai JSON API di https://sholat.zakiego.com/api/v1 lewat web fetch.", CreatedAt: ptr(now - 3*H)})
+	k.Instruction(Instruction{Title: "Jadwal sholat", Body: "Untuk pertanyaan jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau server itu mati, pakai JSON API di https://sholat.example.com/api/v1 lewat web fetch.", CreatedAt: ptr(now - 3*H)})
 	k.Instruction(Instruction{Title: "Ringkasan pagi", Body: "Mulai dengan cuaca, lalu agenda, lalu pengingat hari ini.", Enabled: ptr(false), CreatedAt: ptr(now - 2*H)})
 	k.CustomCommand(CustomCommand{Name: "report-fix", Description: "Debug report, lalu T3 Code yang perbaiki", Prompt: "Start a T3 Code thread in the palui project to find and fix the problem in the debug report below. Owner's note: {{args}}\n\nPut the whole report in the task. Reply with the thread link only.", AttachReport: true, CreatedAt: ptr(now - 2*H)})
 	k.CustomCommand(CustomCommand{Name: "pagi", Prompt: "Kasih ringkasan pagi: cuaca Surabaya, agenda hari ini, lalu pengingat.", Enabled: ptr(false), CreatedAt: ptr(now - H)})
@@ -71,7 +71,7 @@ func demo(k *Kit) {
 		var errText *string
 		if i == 3 {
 			status = "error"
-			errText = ptr("429 from CLIProxyAPI: all 4 Claude accounts are rate limited; failed over to ai-gateway which was paused")
+			errText = ptr("429 from CLIProxyAPI: all 4 Claude accounts are rate limited; failed over to gateway-litellm which was paused")
 		}
 		k.Run(Run{ChatID: &chat, Trigger: "message", Model: &model, TokensIn: ptr(4000 + i*1500), TokensOut: ptr(300 + i*40), Status: status, Error: errText, StartedAt: now - i*22*H, Ms: ptr(2000 + i*300)})
 	}

@@ -37,7 +37,7 @@ var Manifest = connectors.Manifest{
 	Setup:       []connectors.SetupStep{},
 	PauseNote:   "Pausing hides the add, list and remove tools. Servers already added keep running.",
 	Docs: &connectors.Docs{
-		Commands: []string{"tambahin MCP server jadwal-sholat, url https://sholat.zakiego.com/mcp"},
+		Commands: []string{"tambahin MCP server jadwal-sholat, url https://sholat.example.com/mcp"},
 		Notes: []string{
 			"Adding and removing a server is destructive: it always asks first, and scheduled jobs can't do it.",
 			"A server added from chat gets the id mcp-<name>, external trust, and its tools prefilled from their read-only and destructive hints. Change them on the Connectors page.",

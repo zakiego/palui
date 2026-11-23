@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run by the zaki-selfhost deploy script from the checkout dir, after `git pull`
+# Run by your deploy script from the checkout dir, after `git pull`
 # and before `docker compose up`. A non-zero exit stops the deploy.
 #
 #   1. If the data volume exists, snapshot the database with the bundled CLI
@@ -21,7 +21,7 @@
 #      Only acts when compose.yaml has no runtime service and such a container
 #      exists (the first Go deploy); every later deploy finds none.
 #   3. If scripts/backup.sh changed, reinstall the nightly backup agent so the
-#      installed copy in ~/selfhost/bin doesn't drift from the repo.
+#      installed copy in $PALUI_HOST_DIR/bin doesn't drift from the repo.
 #   4. Write build-info.json (the commit being deployed and the subjects before
 #      it) for the Dockerfile to copy into the image. The server reads it on
 #      start and tells the owner about a new commit. A failure only warns: the
@@ -29,9 +29,25 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+# Host settings: the environment wins, then ~/.config/palui/host.conf
+# (PALUI_HOST_CONF), then the defaults below. host.conf holds KEY=value
+# lines and may use $HOME. See the backups docs page.
+load_host_conf() {
+  local f="${PALUI_HOST_CONF:-$HOME/.config/palui/host.conf}" line key
+  [ -f "$f" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in '' | \#*) continue ;; esac
+    key="${line%%=*}"
+    case "$key" in *[!A-Za-z0-9_]* | '') continue ;; esac
+    [ -n "${!key+x}" ] && continue
+    eval "export $line"
+  done <"$f"
+}
+load_host_conf
+PALUI_HOST_DIR="${PALUI_HOST_DIR:-$HOME/.palui}"
 KEEP=3
 # Both overridable so tests never touch the real launchd agent.
-INSTALLED_BACKUP="${PALUI_INSTALLED_BACKUP:-$HOME/selfhost/bin/palui-backup.sh}"
+INSTALLED_BACKUP="${PALUI_INSTALLED_BACKUP:-$PALUI_HOST_DIR/bin/palui-backup.sh}"
 INSTALL_BACKUP="${PALUI_INSTALL_BACKUP:-./ops/install-backup.sh}"
 # compose.yaml `name:`; overridable so tests run against a scratch project.
 PROJECT="${PALUI_COMPOSE_PROJECT:-palui}"

@@ -1,6 +1,6 @@
 # Design: outbound messages (Palui messages someone on the owner's behalf)
 
-Status: reviewed and built, 2026-11-13. Author: Palui agent session. Reviewer: Zaki.
+Status: reviewed and built, 2026-11-13. Author: Palui agent session. Reviewer: the maintainer.
 
 ## TL;DR
 
@@ -25,8 +25,8 @@ The WhatsApp connector is a linked device of `pairPhone` (saved as `linkedNumber
 
 What that means:
 
-- The recipient sees a number they may not have saved. The text has to say who it's from ("Halo, ini asisten Zaki. Zaki lagi otw ya"). The tool tells the model so, and Palui appends the owner's signature to every message (section 12).
-- No impersonation of Zaki's own account is possible, which is good.
+- The recipient sees a number they may not have saved. The text has to say who it's from ("Halo, ini asisten Budi. Budi lagi otw ya"). The tool tells the model so, and Palui appends the owner's signature to every message (section 12).
+- No impersonation of the owner's own account is possible, which is good.
 - A brand new number messaging strangers is the classic WhatsApp ban pattern. Low limits and the allowlist matter for that, not only for safety.
 - A recipient's reply goes to Palui's number. Their chat is not allowed, so the router drops it. Forwarding contact replies to the owner is a follow-up (section 10).
 
@@ -34,7 +34,7 @@ What that means:
 
 The draft holds up. Changes and additions:
 
-1. **One tool, yes. Add contacts inline instead of a separate "add contact" step.** "chat Zaki (082200001001) sekarang" should be one approval, not two. `send_message` accepts a number plus a name. When the number isn't saved, the call always needs approval, and the prompt says "kontak baru". Approving saves the contact (policy `ask`) and sends. Contacts can also be added on the dashboard.
+1. **One tool, yes. Add contacts inline instead of a separate "add contact" step.** "chat Budi (082200001001) sekarang" should be one approval, not two. `send_message` accepts a number plus a name. When the number isn't saved, the call always needs approval, and the prompt says "kontak baru". Approving saves the contact (policy `ask`) and sends. Contacts can also be added on the dashboard.
 2. **"Owner-origin only" needs a precise rule.** A turn started by the owner can still read a web page mid-turn. The rule in code:
    - The tool is offered only when the turn's origin is an owner message (`trigger` message, or an approval resume of one) in an owner-mode chat. Schedule, reminder, flow, hook and guest/shared turns don't get it, and `execute` refuses again if called anyway.
    - A tainted turn always asks, whatever the contact's policy. The prompt shows the exact text, so injected content can't send without the owner reading it.
@@ -54,7 +54,7 @@ The draft holds up. Changes and additions:
 - **Reuse the `reminders` table for scheduled sends.** The time and RRULE code is the valuable part, and it's reused as functions. The table carries owner semantics everywhere: the list and snooze tools, Done/Tunda buttons, the "telat" note, channel fallback to the owner. Every one of those would need a branch, and a missed branch sends a contact's message to the wrong place. A separate table with a 60-line sweep is less code and fails safer.
 - **Do everything with flows.** "tiap Jumat jam 11 kabarin X" could be a one-step flow. Flows need a definition, validation and a version approval, which is a lot for "send this at 8". Flows stay the tool for conditions.
 - **A separate queue/worker for outbound.** The outbox already has claims, retries, acks, timeouts and pause handling. A parallel worker would duplicate all of it. The only additions are three small checks in the existing worker.
-- **Per-message approval only, no `allow`.** Simplest and safest. Zaki decided on per-contact levels, and the guards above keep `allow` narrow.
+- **Per-message approval only, no `allow`.** Simplest and safest. The owner decided on per-contact levels, and the guards above keep `allow` narrow.
 
 ## 4. Data model
 
@@ -63,7 +63,7 @@ The draft holds up. Changes and additions:
 contacts {
   id            text pk           // "con_..."
   agentId       text              // the agent whose list it's on (null = default agent)
-  name          text not null     // "Zaki", unique among the agent's active contacts (case-insensitive)
+  name          text not null     // "Budi", unique among the agent's active contacts (case-insensitive)
   channel       "whatsapp" | "telegram"
   address       text not null     // WhatsApp digits "6282200001001", or the Telegram chat's external id
   chatId        text not null     // the chat row outbox sends to (created with allowed=false for a new number)
@@ -202,11 +202,11 @@ Built on branch `feat/outbound-messages` following section 9, plus per-agent sco
 - "Now" sends get the undo window even after an explicit approval. It's cheap and catches a wrong tap.
 - A one-off time that already passed today is refused instead of rolling to tomorrow, unlike reminders.
 
-## 11. Open questions for Zaki
+## 11. Open questions for the owner
 
 1. Rate limits: 5 per contact and 20 total per day OK?
 2. Signature: decided, see section 12.
-3. Replies from contacts are dropped today. Forward them to you ("Zaki bales: ...")?
+3. Replies from contacts are dropped today. Forward them to you ("Budi bales: ...")?
 4. Quiet hours for flow-triggered sends?
 5. Telegram contacts only from existing chats. Fine?
 

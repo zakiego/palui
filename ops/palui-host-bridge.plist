@@ -3,23 +3,31 @@
 <!--
   Palui host bridge: an MCP server on 127.0.0.1:4893 that runs an allowlist of
   host commands for the Palui app container. Template: ops/install-host-bridge.sh
-  replaces __HOME__ and __NODE__ and installs it into ~/Library/LaunchAgents.
+  replaces __LABEL__, __HOST_DIR__ and __NODE__ and installs it into
+  ~/Library/LaunchAgents.
   The allowlist lives in ~/.config/palui/host-bridge.json.
 -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.zakiego.palui-host-bridge</string>
+  <string>__LABEL__</string>
   <key>ProgramArguments</key>
   <array>
     <string>__NODE__</string>
-    <string>__HOME__/selfhost/bin/palui-host-bridge.mjs</string>
+    <string>__HOST_DIR__/bin/palui-host-bridge.mjs</string>
     <string>serve</string>
   </array>
   <key>StandardOutPath</key>
-  <string>__HOME__/selfhost/palui-host-bridge.log</string>
+  <string>__HOST_DIR__/palui-host-bridge.log</string>
   <key>StandardErrorPath</key>
-  <string>__HOME__/selfhost/palui-host-bridge.log</string>
+  <string>__HOST_DIR__/palui-host-bridge.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PALUI_HOST_BRIDGE_LABEL</key>
+    <string>__LABEL__</string>
+    <key>PALUI_HOST_DIR</key>
+    <string>__HOST_DIR__</string>
+  </dict>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>

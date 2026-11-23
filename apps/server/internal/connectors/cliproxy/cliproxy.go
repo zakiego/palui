@@ -1,5 +1,5 @@
 // Package cliproxy is the CLIProxyAPI model connector (connectors/src/cliproxy)
-// and the gateway runtime it shares with ai-gateway: per role, the anthropic
+// and the gateway runtime it shares with the generic model gateway: per role, the anthropic
 // protocol uses /v1/messages and openai uses /v1/chat/completions (PLAN 5.2),
 // on the M2 provider clients.
 package cliproxy
@@ -35,6 +35,16 @@ func GatewayConfigZod(defaultBaseURL string) *zod.ObjectS {
 	)
 }
 
+// RequiredGatewayConfigZod is a gateway config with no default base URL, for
+// a gateway the owner points at themselves.
+func RequiredGatewayConfigZod() *zod.ObjectS {
+	proto := zod.Default(zod.Enum("anthropic", "openai"), "anthropic")
+	return zod.Object(
+		zod.F("baseUrl", zod.String().URL(nil)),
+		zod.F("protocols", zod.Default(zod.Object(zod.F("default", proto), zod.F("fast", proto), zod.F("vision", proto)).Partial(), jsonx.NewMap[any]())),
+	)
+}
+
 var SecretZod = []zod.Field{zod.F("apiKey", zod.String().Min(1))}
 
 var Manifest = connectors.Manifest{
@@ -45,7 +55,7 @@ var Manifest = connectors.Manifest{
 	Summary: "Claude and Gemini through CLIProxyAPI on the host.",
 	Setup: []connectors.SetupStep{
 		{Field: "baseUrl", Label: "Base URL", Placeholder: "http://host.docker.internal:8317", Optional: true},
-		{Field: "apiKey", Label: "API key", Secret: true, Help: "Run this on the CLIProxyAPI Mac, then paste a key.", Command: "grep -A3 api-keys $(brew --prefix)/etc/cliproxyapi.conf"},
+		{Field: "apiKey", Label: "API key", Secret: true, Help: "Copy a key from the api-keys list in CLIProxyAPI's config file."},
 	},
 	Docs:         &connectors.Docs{Commands: []string{"/connectors on cliproxy", "/connectors off cliproxy"}},
 	SecretFields: kit.SecretNames(SecretZod),

@@ -67,7 +67,7 @@ export function ArchitectureDiagram({ children }: Props) {
         <Node icon={HardDrive} title="Data volume" detail="/data: palui.db, wa/, backups/" />
       </Group>
       <Fork labels={["models", "memory", "tools"]}>
-        <Node stack icon={CpuIcon} title="CLIProxyAPI, ai-gateway" />
+        <Node stack icon={CpuIcon} title="CLIProxyAPI, Model gateway" />
         <Node stack icon={BrainIcon} title="recall" />
         <Node stack icon={PlugIcon} title="MCP servers" />
       </Fork>

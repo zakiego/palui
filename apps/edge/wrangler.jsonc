@@ -1,5 +1,5 @@
-// Edge router for palui.zakiego.com, on Zakiego Lab. See src/routing.ts for
-// which paths go where. Deploy with the cf-zakiego-lab Wrangler login:
+// Edge router for palui.zakiego.com. See src/routing.ts for which paths go
+// where. Deploy with a Wrangler login for the account that owns the zone:
 //   pnpm --filter @palui/edge deploy:preview   preview on workers.dev, no route
 //   pnpm --filter @palui/edge deploy           production: takes the route (cutover)
 {

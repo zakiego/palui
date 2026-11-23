@@ -33,15 +33,15 @@ None.
 
 Pausing hides the three tools. Servers already added keep running.
 
-## Example: Jadwal Sholat
+## Example: prayer times
 
-[Jadwal Sholat](https://sholat.zakiego.com) is a public prayer times service with an MCP endpoint (Streamable HTTP, stateless, no auth) and a JSON API.
+Say a prayer times service runs at `https://sholat.example.com`, with an MCP endpoint (Streamable HTTP, stateless, no auth) and a JSON API. Use any public MCP server you trust the same way.
 
 1. Add the server. In chat:
    ```text
-   tambahin MCP server jadwal-sholat, url https://sholat.zakiego.com/mcp
+   tambahin MCP server jadwal-sholat, url https://sholat.example.com/mcp
    ```
-   Approve the request. Palui saves it as `mcp-jadwal-sholat`. You can also add it yourself on the Connectors page: MCP server, URL `https://sholat.zakiego.com/mcp`, auth `none`.
+   Approve the request. Palui saves it as `mcp-jadwal-sholat`. You can also add it yourself on the Connectors page: MCP server, URL `https://sholat.example.com/mcp`, auth `none`.
 2. Save your default location as a preference, so Palui doesn't ask every time. Use your own city, or coordinates when you're outside Indonesia:
    ```text
    inget ya, kota default aku <kota kamu>
@@ -49,7 +49,7 @@ Pausing hides the three tools. Servers already added keep running.
    That sets `default_city`. Outside Indonesia, ask Palui to save `home_lat` and `home_lng` instead. You can also set them on the Notes page.
 3. Optionally save an instruction so the routing sticks:
    ```text
-   simpan instruksi: untuk jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau servernya mati, pakai https://sholat.zakiego.com/api/v1 lewat web fetch.
+   simpan instruksi: untuk jadwal sholat, pakai tools mcp-jadwal-sholat. Kalau servernya mati, pakai https://sholat.example.com/api/v1 lewat web fetch.
    ```
 4. Ask away:
    ```text

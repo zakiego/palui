@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Nightly Palui backup to R2. Template: ops/install-backup.sh replaces __HOME__
-  and installs it as ~/Library/LaunchAgents/com.zakiego.palui-backup.plist.
+  Nightly Palui backup to R2. Template: ops/install-backup.sh replaces
+  __LABEL__, __HOST_DIR__ and __PALUI_DIR__ and installs it into
+  ~/Library/LaunchAgents.
   A LaunchAgent runs in the login session, so the Keychain is unlocked. If the
   Mac is asleep at 03:30, launchd runs the job when it wakes.
 -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.zakiego.palui-backup</string>
+  <string>__LABEL__</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>__HOME__/selfhost/bin/palui-backup.sh</string>
+    <string>__HOST_DIR__/bin/palui-backup.sh</string>
   </array>
   <key>StartCalendarInterval</key>
   <dict>
@@ -25,13 +26,13 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>PALUI_DIR</key>
-    <string>__HOME__/selfhost/palui</string>
+    <string>__PALUI_DIR__</string>
   </dict>
   <!-- The script logs to this file itself; these catch anything before that. -->
   <key>StandardOutPath</key>
-  <string>__HOME__/selfhost/palui-backup.log</string>
+  <string>__HOST_DIR__/palui-backup.log</string>
   <key>StandardErrorPath</key>
-  <string>__HOME__/selfhost/palui-backup.log</string>
+  <string>__HOST_DIR__/palui-backup.log</string>
   <key>RunAtLoad</key>
   <false/>
   <key>LowPriorityIO</key>

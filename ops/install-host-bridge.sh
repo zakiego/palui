@@ -2,19 +2,38 @@
 # Install (or reinstall) the Palui host bridge on the Docker host. macOS only
 # (launchd).
 #   - builds apps/host-bridge into one file and copies it to
-#     ~/selfhost/bin/palui-host-bridge.mjs, so it doesn't depend on a checkout
+#     $PALUI_HOST_DIR/bin/palui-host-bridge.mjs, so it doesn't depend on a checkout
 #   - creates ~/.config/palui/host-bridge.json with a fresh token on first run
-#   - renders ops/com.zakiego.palui-host-bridge.plist into ~/Library/LaunchAgents,
+#   - renders ops/palui-host-bridge.plist into ~/Library/LaunchAgents as
+#     $PALUI_LAUNCHD_PREFIX-host-bridge,
 #     (re)loads it with launchctl and checks the bridge answers
 # Rerun after upgrading Node: the LaunchAgent pins the node binary found now.
 set -euo pipefail
 
+# Host settings: the environment wins, then ~/.config/palui/host.conf
+# (PALUI_HOST_CONF), then the defaults below. host.conf holds KEY=value
+# lines and may use $HOME. See the backups docs page.
+load_host_conf() {
+  local f="${PALUI_HOST_CONF:-$HOME/.config/palui/host.conf}" line key
+  [ -f "$f" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in '' | \#*) continue ;; esac
+    key="${line%%=*}"
+    case "$key" in *[!A-Za-z0-9_]* | '') continue ;; esac
+    [ -n "${!key+x}" ] && continue
+    eval "export $line"
+  done <"$f"
+}
+load_host_conf
+PALUI_HOST_DIR="${PALUI_HOST_DIR:-$HOME/.palui}"
+PALUI_LAUNCHD_PREFIX="${PALUI_LAUNCHD_PREFIX:-palui}"
+
 repo="$(cd "$(dirname "$0")/.." && pwd)"
-label=com.zakiego.palui-host-bridge
+label="$PALUI_LAUNCHD_PREFIX-host-bridge"
 plist="$HOME/Library/LaunchAgents/$label.plist"
-bundle="$HOME/selfhost/bin/palui-host-bridge.mjs"
+bundle="$PALUI_HOST_DIR/bin/palui-host-bridge.mjs"
 config="$HOME/.config/palui/host-bridge.json"
-log="$HOME/selfhost/palui-host-bridge.log"
+log="$PALUI_HOST_DIR/palui-host-bridge.log"
 domain="gui/$(id -u)"
 restart="launchctl kickstart -k $domain/$label"
 
@@ -29,7 +48,7 @@ if [ -z "$node_bin" ]; then
 fi
 
 (cd "$repo" && pnpm --filter @palui/host-bridge build >/dev/null)
-mkdir -p "$HOME/selfhost/bin" "$HOME/Library/LaunchAgents"
+mkdir -p "$PALUI_HOST_DIR/bin" "$HOME/Library/LaunchAgents"
 install -m 755 "$repo/apps/host-bridge/dist/index.mjs" "$bundle"
 
 if [ ! -f "$config" ]; then
@@ -37,7 +56,8 @@ if [ ! -f "$config" ]; then
   "$node_bin" "$bundle" init
   echo
 fi
-sed -e "s|__HOME__|$HOME|g" -e "s|__NODE__|$node_bin|g" "$repo/ops/$label.plist" > "$plist"
+sed -e "s|__LABEL__|$label|g" -e "s|__HOST_DIR__|$PALUI_HOST_DIR|g" -e "s|__NODE__|$node_bin|g" \
+  "$repo/ops/palui-host-bridge.plist" >"$plist"
 plutil -lint "$plist" >/dev/null
 
 launchctl bootout "$domain/$label" 2>/dev/null || true

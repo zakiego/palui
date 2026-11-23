@@ -3,7 +3,7 @@ title: Getting started
 description: Install Palui Agent with Docker Compose, create the owner account, connect a model and Telegram, and send the first message.
 ---
 
-You need a server with Docker and Docker Compose, a model provider (CLIProxyAPI or ai-gateway running on the Docker host), and a Telegram bot token. Plan on about 15 minutes.
+You need a server with Docker and Docker Compose, a model provider (CLIProxyAPI, or any OpenAI- or Anthropic-compatible endpoint), and a Telegram bot token. Plan on about 15 minutes.
 
 <Steps>
 <Step>
@@ -51,7 +51,7 @@ It prints a link that works once and expires after 15 minutes. Open it and regis
 
 ### Connect a model
 
-Open the Connectors page in the dashboard and add a model connector: [CLIProxyAPI](/docs/connectors/cliproxy) or [ai-gateway](/docs/connectors/ai-gateway). The base URL defaults to a service on the Docker host (`http://host.docker.internal:8317` for CLIProxyAPI). Paste the API key and press Test. A working connector shows its model list.
+Open the Connectors page in the dashboard and add a model connector: [CLIProxyAPI](/docs/connectors/cliproxy) or a [Model gateway](/docs/connectors/model-gateway) for any OpenAI- or Anthropic-compatible endpoint. CLIProxyAPI's base URL defaults to a service on the Docker host (`http://host.docker.internal:8317`). A model gateway needs its base URL. Paste the API key and press Test. A working connector shows its model list.
 
 </Step>
 <Step>

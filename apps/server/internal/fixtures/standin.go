@@ -146,7 +146,7 @@ const demoModels = `["claude-sonnet-5-5","claude-opus-5-5","claude-haiku-5-5","c
 var demoTools = []struct{ name, title, description, class string }{
 	{"disk_free", "Free disk space on the host", "Show free disk space on the host.", "read"},
 	{"uptime", "Host uptime and load", "Show how long the host has been up and its load average.", "read"},
-	{"restart_service", "Restart a service on the Mac mini", "Restart one of the allowlisted launchd services.", "destructive"},
+	{"restart_service", "Restart a service on the home server", "Restart one of the allowlisted launchd services.", "destructive"},
 	{"list_deals", "", "List deals in a stage, with no title from the server.", "write"},
 	{"send_email_to_a_customer_with_a_long_tool_name", "Send an email to a customer", "Sends an email from the sales inbox. Other people read it, so flows should ask every run.", "write"},
 }

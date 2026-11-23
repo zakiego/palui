@@ -40,7 +40,7 @@ recall auto-save stores only your messages and the final replies. It never store
 
 - Connector secrets are encrypted at rest with AES-256-GCM, keyed by `MASTER_KEY` from `.env`.
 - They're write-only. You can replace one, never read it back. The UI shows them masked, like `rcl_••••a91f`.
-- Logs redact API key patterns (such as `rcl_`, `zkg_` and `sk-` keys) and bot tokens.
+- Logs redact API key patterns (such as `rcl_` and `sk-` keys) and bot tokens.
 - `.env` holds only two keys: `MASTER_KEY` and `APP_URL`. Keep a copy of `MASTER_KEY` in your password manager.
 - Backups are encrypted with age before they leave the machine. See [Backups](/docs/self-hosting/backups).
 

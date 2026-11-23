@@ -13,9 +13,9 @@ import (
 
 	"github.com/zakiego/palui/apps/server/internal/chat"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
-	"github.com/zakiego/palui/apps/server/internal/connectors/aigateway"
 	"github.com/zakiego/palui/apps/server/internal/connectors/cliproxy"
 	"github.com/zakiego/palui/apps/server/internal/connectors/conntest"
+	"github.com/zakiego/palui/apps/server/internal/connectors/gateway"
 	"github.com/zakiego/palui/apps/server/internal/connectors/kit"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/models"
@@ -125,19 +125,22 @@ func TestTestListsModelsThenMakesA1TokenCallPerRoleItServes(t *testing.T) {
 	}
 }
 
-func TestReportsAnUnreachableGatewayAndAppliesTheDefaultBaseURL(t *testing.T) {
-	rt := cliproxy.GatewayRuntime(aigateway.Manifest, &http.Client{Transport: &fake{fail: true}})
-	r, err := rt.Test(ctx(t, "ai-gateway", `{}`, map[string]string{"apiKey": "zkg_x"}))
+func TestModelGatewayNeedsABaseURLAndReportsAnUnreachableOne(t *testing.T) {
+	if _, err := gateway.Manifest.ParseConfig(jsonx.NewMap[any]()); err == nil {
+		t.Fatal("a gateway without a base URL was accepted")
+	}
+	rt := cliproxy.GatewayRuntime(gateway.Manifest, &http.Client{Transport: &fake{fail: true}})
+	r, err := rt.Test(ctx(t, "gateway-llm", `{"baseUrl":"https://llm.example.com"}`, map[string]string{"apiKey": "sk-x"}))
 	testutil.Must(t, err)
-	if r.OK || !strings.Contains(r.Detail, "http://host.docker.internal:8793") {
+	if r.OK || !strings.Contains(r.Detail, "https://llm.example.com") {
 		t.Fatalf("%+v", r)
 	}
 	ok := func(k string) bool {
 		m := jsonx.NewMap[string]()
 		m.Set("apiKey", k)
-		return aigateway.Manifest.ParseSecrets(m) == nil
+		return gateway.Manifest.ParseSecrets(m) == nil
 	}
-	if ok("sk-nope") || !ok("zkg_abc") {
+	if ok("") || !ok("sk-anything") {
 		t.Fatal("key check")
 	}
 }

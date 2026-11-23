@@ -3,7 +3,7 @@ package whatsapp
 // WhatsApp channel runtime (whatsapp/runtime.ts, PLAN 5.1), as its own linked
 // device on whatsmeow.
 //
-// Lessons carried over from utusan:
+// Lessons from running an earlier WhatsApp bot:
 //   - One socket per session store, guarded by a lock file (lock.go).
 //   - One close per socket starts at most one replacement, or sockets multiply
 //     and evict each other.

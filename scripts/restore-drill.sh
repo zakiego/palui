@@ -32,8 +32,24 @@
 # runs in a pinned alpine helper (the app image is distroless).
 set -euo pipefail
 
+# Host settings: the environment wins, then ~/.config/palui/host.conf
+# (PALUI_HOST_CONF), then the defaults below. host.conf holds KEY=value
+# lines and may use $HOME. See the backups docs page.
+load_host_conf() {
+  local f="${PALUI_HOST_CONF:-$HOME/.config/palui/host.conf}" line key
+  [ -f "$f" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in '' | \#*) continue ;; esac
+    key="${line%%=*}"
+    case "$key" in *[!A-Za-z0-9_]* | '') continue ;; esac
+    [ -n "${!key+x}" ] && continue
+    eval "export $line"
+  done <"$f"
+}
+load_host_conf
+
 BUCKET="${BACKUP_BUCKET:-palui-backups}"
-CF="${CF_WRAPPER:-$HOME/.agents/skills/cf-zakiego-lab/scripts/cf-zakiego-lab}"
+CF="${CF_WRAPPER:-cf}"
 KEYCHAIN_SERVICE="${AGE_KEYCHAIN_SERVICE:-palui-backup-age-identity}"
 IMAGE="${PALUI_IMAGE:-palui:latest}"
 PROJECT="palui-drill"
@@ -83,7 +99,7 @@ if [ $# -ge 1 ]; then
   [ -f "$src" ] || { log "no such file: $src"; exit 1; }
   log "using local file $src"
 else
-  [ -x "$CF" ] || { log "cf wrapper not found at $CF"; exit 1; }
+  command -v "$CF" >/dev/null || { log "upload command not found: $CF (set CF_WRAPPER, or put cf on the PATH)"; exit 1; }
   command -v cf >/dev/null || { log "cf CLI not found"; exit 1; }
   key=""
   # Keys are palui/YYYY-MM-DD/palui-<ts>.db.gz.age, so walking back day by day

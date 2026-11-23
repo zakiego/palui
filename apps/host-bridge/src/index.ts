@@ -50,7 +50,8 @@ function parseArgs(argv: string[]): { cmd: string; config: string } {
   return { cmd, config }
 }
 
-const LABEL = "com.zakiego.palui-host-bridge"
+// The launchd label ops/install-host-bridge.sh used; its plist passes it in.
+const LABEL = process.env.PALUI_HOST_BRIDGE_LABEL || "palui-host-bridge"
 const self = () => `node ${resolve(process.argv[1] ?? "palui-host-bridge.mjs")}`
 const restartHint = () => `launchctl kickstart -k gui/${process.getuid?.() ?? "$(id -u)"}/${LABEL}`
 
@@ -114,7 +115,7 @@ async function main(): Promise<void> {
       }
       await new Promise((r) => setTimeout(r, 500))
     }
-    fail(`not running on ${url}. See the log, ~/selfhost/palui-host-bridge.log when installed with launchd.`)
+    fail(`not running on ${url}. See the log, ${process.env.PALUI_HOST_DIR || "~/.palui"}/palui-host-bridge.log when installed with launchd.`)
   }
   const issues = problems(config)
 

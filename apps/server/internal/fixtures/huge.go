@@ -30,9 +30,10 @@ func huge(k *Kit) {
 		return at(hugeFirst, i) + " " + hugeLast[(i/int64(len(hugeFirst)))%int64(len(hugeLast))]
 	}
 
-	for _, t := range []string{"telegram", "whatsapp", "web", "cliproxy", "ai-gateway", "recall", "reminders", "jobs", "webfetch", "hooks"} {
+	for _, t := range []string{"telegram", "whatsapp", "web", "cliproxy", "recall", "reminders", "jobs", "webfetch", "hooks"} {
 		k.Connector(t, t, ConnectorOpts{Status: "on"})
 	}
+	k.Connector("gateway-litellm", "gateway", ConnectorOpts{Status: "on", Config: obj("baseUrl", "https://llm.example.com")})
 	// Every MCP server goes down together when the network does.
 	for i := int64(0); i < Huge.MCP; i++ {
 		status := "on"
