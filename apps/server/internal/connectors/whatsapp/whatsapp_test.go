@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"go.mau.fi/whatsmeow/proto/waAdv"
+	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
@@ -1464,5 +1465,69 @@ func TestSendMentions(t *testing.T) {
 		testutil.Must(t, err)
 		eq(t, len(lastSent(t, e.sock()).Content.Mentions), 0)
 		eq(t, e.sock().GroupMemberCalls(), 0)
+	})
+}
+
+// rpt_0mwsqf7y5vjh0reoc1a: a reply to a photo album quoted the album message,
+// which carries no text or media, and the album's photos were group talk
+// whose bytes were never fetched, so the agent saw nothing.
+func TestAlbumsAndKeptGroupPhotos(t *testing.T) {
+	const grp = "120363000000000009@g.us"
+	albumPhoto := func(id, parent string, caption string) *whatsapp.Message {
+		img := &waE2E.ImageMessage{Mimetype: proto.String("image/jpeg"), FileLength: proto.Uint64(2048)}
+		if caption != "" {
+			img.Caption = proto.String(caption)
+		}
+		msg := &waE2E.Message{ImageMessage: img}
+		if parent != "" {
+			msg.MessageContextInfo = &waE2E.MessageContextInfo{MessageAssociation: &waE2E.MessageAssociation{
+				AssociationType:  waE2E.MessageAssociation_MEDIA_ALBUM.Enum(),
+				ParentMessageKey: &waCommon.MessageKey{ID: proto.String(parent)},
+			}}
+		}
+		return dm(id, msg, func(k *whatsapp.Key) { k.RemoteJID, k.Participant = grp, "777000@lid" })
+	}
+
+	t.Run("AlbumOf reads the album id, also through a wrapper", func(t *testing.T) {
+		eq(t, whatsapp.AlbumOf(albumPhoto("A1", "ALB", "").Message), "ALB")
+		eq(t, whatsapp.AlbumOf(albumPhoto("A1", "", "").Message), "")
+		wrapped := &waE2E.Message{EphemeralMessage: &waE2E.FutureProofMessage{Message: albumPhoto("A1", "ALB2", "").Message}}
+		eq(t, whatsapp.AlbumOf(wrapped), "ALB2")
+	})
+
+	t.Run("a quoted album says it's an album", func(t *testing.T) {
+		q := whatsapp.QuoteOf(&waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String("in apa"), ContextInfo: &waE2E.ContextInfo{
+			StanzaID: proto.String("ALB"), Participant: proto.String("62811000777@s.whatsapp.net"),
+			QuotedMessage: &waE2E.Message{AlbumMessage: &waE2E.AlbumMessage{ExpectedImageCount: proto.Uint32(3)}},
+		}}})
+		eq(t, []string{q.ID, q.Text, q.Media}, []string{"ALB", "", "[album of 3]"})
+	})
+
+	t.Run("fetches a group talk photo the engine keeps and passes its album", func(t *testing.T) {
+		e, _ := openRunning(t, opts{})
+		e.ctx.Services.WantsMedia = func(connectors.InboundMessage) bool { return false }
+		e.ctx.Services.KeepsMedia = func(m connectors.InboundMessage) bool { return m.ChatKind == "group" }
+		e.sock().Message(albumPhoto("A1", "ALB", ""), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 1 })
+		in := e.ctx.Inbound()[0]
+		eq(t, []any{in.AlbumID, in.Text, in.Media}, []any{"ALB", "", []connectors.InboundMedia{{Kind: "image", MimeType: "image/jpeg", Data: base64.StdEncoding.EncodeToString([]byte("media:A1"))}}})
+		eq(t, e.sock().Downloads(), []string{"A1"})
+	})
+
+	t.Run("doesn't fetch group talk stickers, oversized photos, or anything the engine won't keep", func(t *testing.T) {
+		e, _ := openRunning(t, opts{})
+		e.ctx.Services.WantsMedia = func(connectors.InboundMessage) bool { return false }
+		keep := true
+		e.ctx.Services.KeepsMedia = func(connectors.InboundMessage) bool { return keep }
+		e.sock().Message(dm("ST1", &waE2E.Message{StickerMessage: &waE2E.StickerMessage{Mimetype: proto.String("image/webp")}}, func(k *whatsapp.Key) { k.RemoteJID, k.Participant = grp, "777000@lid" }), "")
+		big := albumPhoto("BIG", "", "")
+		big.Message.ImageMessage.FileLength = proto.Uint64(connectors.ContextPhotoMaxBytes + 1)
+		e.sock().Message(big, "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 2 })
+		keep = false
+		e.sock().Message(albumPhoto("OFF", "", ""), "")
+		conntest.Until(t, func() bool { return e.ctx.InboundCount() == 3 })
+		eq(t, e.sock().Downloads(), []string(nil))
+		eq(t, e.ctx.Inbound()[2].Media, []connectors.InboundMedia{{Kind: "image", MimeType: "image/jpeg"}})
 	})
 }

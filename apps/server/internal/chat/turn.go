@@ -797,13 +797,21 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 			history = append(history, extra...)
 		}
 	}
+	// The photo a batch message replies to, or the rest of its album, even
+	// when someone else sent it (ADR 0003, rpt_0mwsqf7y5vjh0reoc1a).
+	var attached map[string]AttachedImages
+	if isMessage && len(batch) > 0 {
+		if attached, err = AttachQuotedImages(q, chat.ID, history, batch); err != nil {
+			return TurnResult{}, err
+		}
+	}
 	role := input.ModelRole
 	if rs != nil && rs.Context.ModelRole != "" {
 		role = rs.Context.ModelRole
 	}
 	if role == "" {
 		role = "default"
-		if HasImages(history, batch) {
+		if HasImages(history, batch) || hasAttachedImages(attached) {
 			role = "vision"
 		}
 	}
@@ -1256,7 +1264,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				if chat.Kind == "group" && chat.ReplyMode == "mention" {
 					addressed = batch
 				}
-				base = ToModelMessages(history, batch, pastCalls, shared, addressed)
+				base = ToModelMessagesWith(history, batch, pastCalls, shared, addressed, attached)
 			} else {
 				base = []models.Message{models.User(input.Prompt)}
 			}

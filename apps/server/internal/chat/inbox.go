@@ -90,6 +90,9 @@ func WriteInbound(q db.Q, msg connectors.InboundMessage, now int64, fromOwner bo
 	if msg.Callback != nil {
 		content.Set("callback", msg.Callback)
 	}
+	if msg.AlbumID != "" {
+		content.Set("album", msg.AlbumID)
+	}
 	raw, err := db.Raw(content)
 	if err != nil {
 		return db.Chat{}, db.Message{}, err
@@ -151,6 +154,11 @@ func ResolveQuote(q db.Q, chatID string, msg connectors.InboundMessage) (*Stored
 			if t != "" || media != "" {
 				return &StoredQuote{From: storedQuoteFrom(role, senderID, msg), Text: t, Media: media}, nil
 			}
+		}
+		// A reply to a WhatsApp album quotes the album message, which has
+		// no text or media and isn't stored; its photos point back at it.
+		if q, err := albumQuote(q, chatID, id, msg); err != nil || q != nil {
+			return q, err
 		}
 		var payload db.JSON[db.OutboxPayload]
 		err = q.QueryRow("SELECT payload FROM outbox WHERE chat_id = ? AND channel_msg_id = ? ORDER BY created_at DESC LIMIT 1", chatID, id).Scan(&payload)

@@ -4,6 +4,7 @@ package whatsapp
 // on whatsmeow's waE2E protobufs instead of Baileys' WAProto. No socket, no IO.
 
 import (
+	"fmt"
 	"strings"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -172,10 +173,38 @@ func MediaLabel(c *waE2E.Message) string {
 		return "[document]"
 	case c.StickerMessage != nil:
 		return "[sticker]"
+	case c.AlbumMessage != nil:
+		// The album message carries only counts; its photos come after it,
+		// each as its own message pointing back here (AlbumOf).
+		if n := c.AlbumMessage.GetExpectedImageCount() + c.AlbumMessage.GetExpectedVideoCount(); n > 0 {
+			return fmt.Sprintf("[album of %d]", n)
+		}
+		return "[album]"
 	}
 	// Contacts keep their numbers and locations their coordinates, so a
 	// reply to one still says what it was.
 	return ContentLabel(c)
+}
+
+// AlbumOf is the id of the album a photo or video belongs to, "" when it's
+// on its own. WhatsApp sends an album as one empty album message, then each
+// item as a message whose messageAssociation points at the album's id. A
+// reply to the album quotes that first, empty message (rpt_0mwsqf7y5vjh0reoc1a).
+func AlbumOf(m *waE2E.Message) string {
+	for i := 0; i < 5 && m != nil; i++ {
+		a := m.GetMessageContextInfo().GetMessageAssociation()
+		if a.GetAssociationType() == waE2E.MessageAssociation_MEDIA_ALBUM {
+			if id := a.GetParentMessageKey().GetID(); id != "" {
+				return id
+			}
+		}
+		next := Unwrap(m)
+		if next == m {
+			break
+		}
+		m = next
+	}
+	return ""
 }
 
 // QuoteInfo is the message a message quotes.
