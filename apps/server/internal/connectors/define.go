@@ -244,6 +244,10 @@ type InboundMedia struct {
 	Caption string `json:"-"`
 }
 
+// ContextPhotoMaxBytes caps a photo kept from group talk (ADR 0003).
+// WhatsApp sends photos compressed, usually well under 1 MB.
+const ContextPhotoMaxBytes = 5 * 1024 * 1024
+
 // InboundQuote is the message an inbound one quotes, as the channel saw it.
 type InboundQuote struct {
 	// self, sender, other or unknown.
@@ -273,6 +277,9 @@ type InboundMessage struct {
 	Text                string           `json:"text"`
 	Media               []InboundMedia   `json:"media,omitempty"`
 	Callback            *InboundCallback `json:"callback,omitempty"`
+	// WhatsApp: the channel id of the album this photo belongs to (the album
+	// message's own id), so a reply to the album finds its photos.
+	AlbumID string `json:"albumId,omitempty"`
 	// Groups: the message mentions this account or replies to it.
 	Addressed bool  `json:"addressed,omitempty"`
 	FromMe    bool  `json:"fromMe,omitempty"`
@@ -416,6 +423,10 @@ type Services struct {
 	// photos and documents are worth downloading even when WantsMedia says no.
 	// Such media is marked SaveOnly unless the model wants it too. Optional.
 	SavesMedia func(msg InboundMessage) bool
+	// Whether a photo in group talk kept as context is worth downloading, so
+	// a later reply to it can show it to the model (ADR 0003). The engine
+	// keeps it only for a while (chat.ContextMediaKeepMs). Optional.
+	KeepsMedia func(msg InboundMessage) bool
 	// Reconcile now instead of on the next tick. Optional.
 	Reconcile func()
 	// Call a read-only tool of another running connector, server-side. Optional.

@@ -93,6 +93,21 @@ func MediaWanted(q db.Q, msg connectors.InboundMessage, now int64) (bool, error)
 	return v.OK && !v.Context, nil
 }
 
+// MediaKept: whether a channel should download a photo in group talk kept as
+// context. It's kept for ContextMediaKeepMs so a later reply to it, or a
+// mention in the same album, can show it to the model (ADR 0003). Only in a
+// group the sender check keeps as context (allowed, with an agent).
+func MediaKept(q db.Q, msg connectors.InboundMessage, now int64) (bool, error) {
+	if msg.ChatKind != "group" {
+		return false, nil
+	}
+	v, err := SenderCheck(q, msg, now)
+	if err != nil {
+		return false, err
+	}
+	return v.OK && v.Context, nil
+}
+
 // SenderCheck is senderCheck: checks that need only the inbound message and
 // the chat row, if any (PLAN 19.2). A stranger's message in a chat we've never
 // seen creates the chat row (not allowed), so the owner can set it up.

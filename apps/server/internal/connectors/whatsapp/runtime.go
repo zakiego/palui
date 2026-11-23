@@ -880,6 +880,7 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		msg.ChatTitle = m.PushName
 	}
 	msg.ChannelMsgID = key.ID
+	msg.AlbumID = AlbumOf(m.Message)
 	if q := QuoteOf(content); q != nil {
 		msg.ReplyToChannelMsgID = q.ID
 		msg.Quoted = &connectors.InboundQuote{From: QuoteAuthor(q.Participant, self, []string{sender, alt}, !group), Text: q.Text, Media: q.Media}
@@ -904,6 +905,12 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		return info != nil && !info.Sticker && (info.Kind == "image" || info.Kind == "document") &&
 			w.c.Services.SavesMedia != nil && w.c.Services.SavesMedia(msg)
 	}
+	// A photo in group talk kept as context, so a later reply to it (or a
+	// mention in the same album) can show it to the model (ADR 0003).
+	keeps := func() bool {
+		return info != nil && !info.Sticker && info.Kind == "image" && info.Bytes <= connectors.ContextPhotoMaxBytes &&
+			w.c.Services.KeepsMedia != nil && w.c.Services.KeepsMedia(msg)
+	}
 	note := ""
 	if info != nil {
 		// Without the bytes the row still says what was sent, so a photo
@@ -911,6 +918,15 @@ func (w *wa) deliver(s Socket, m *Message) error {
 		stub := connectors.InboundMedia{Kind: info.Kind, MimeType: info.MimeType, Filename: info.Filename, DurationSec: info.DurationSec}
 		forModel, save := wants(), saves()
 		switch {
+		case !forModel && !save && keeps():
+			media, _, _ := w.fetchMedia(s, m, info, label, false, false)
+			if media == nil || len(media.Data)*3/4 > connectors.ContextPhotoMaxBytes {
+				media = &stub
+			}
+			// Not SaveOnly: the engine decides what group talk keeps.
+			media.SaveOnly = false
+			media.Caption = text
+			msg.Media = []connectors.InboundMedia{*media}
 		case !forModel && !save:
 			// Dropped by the router or kept as context: don't download it.
 			msg.Media = []connectors.InboundMedia{stub}

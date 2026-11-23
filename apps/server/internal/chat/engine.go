@@ -80,6 +80,7 @@ type Engine struct {
 	sweepStop      chan struct{}
 	quotaWarned    map[string]int64
 	lastAutoPrune  int64
+	lastCtxPrune   int64
 	// Message turns waiting for a retry, by chat.
 	retrying map[string]*retryWait
 	// Voice notes waiting for another transcription try, by message id.
@@ -137,6 +138,10 @@ func NewEngine(o EngineOptions) *Engine {
 		},
 		SavesMedia: func(m connectors.InboundMessage) bool {
 			ok, err := MediaSaved(o.DB, m)
+			return ok && err == nil
+		},
+		KeepsMedia: func(m connectors.InboundMessage) bool {
+			ok, err := MediaKept(o.DB, m, e.Ctx.Clock())
 			return ok && err == nil
 		},
 	}
@@ -274,9 +279,12 @@ func (e *Engine) Inbound(msg connectors.InboundMessage) (*InboundResult, error) 
 		for _, m := range msg.Media {
 			switch {
 			case verdict.Context:
-				// Group talk is only ever shown as text later ("[gambar dari
-				// sebelumnya]"), so its media bytes aren't worth keeping.
-				m.Data = ""
+				// Group talk shows as text later ("[gambar dari sebelumnya]").
+				// Only a photo in a group keeps its bytes, for a while, so a
+				// reply to it can show it (ADR 0003, PruneContextMedia).
+				if !keepsContextPhoto(msg, m) {
+					m.Data = ""
+				}
 			case m.SaveOnly:
 				// Fetched only for auto-save (a document over the model's
 				// limit): the text already says it wasn't read.
@@ -934,6 +942,7 @@ func (e *Engine) Start() error {
 	}
 	e.ExpireApprovals(c.Clock())
 	e.PruneAutoSaved(c.Clock())
+	e.PruneContextMedia(c.Clock())
 	stop := make(chan struct{})
 	e.mu.Lock()
 	e.sweepStop = stop
@@ -954,6 +963,7 @@ func (e *Engine) Start() error {
 					}()
 					e.ExpireApprovals(c.Clock())
 					e.PruneAutoSaved(c.Clock())
+					e.PruneContextMedia(c.Clock())
 				}()
 			}
 		}
