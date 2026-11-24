@@ -543,6 +543,12 @@ func (e *Engine) tick(agentID string) {
 		return
 	}
 	e.failNotice(row, results, tz, now)
+	if okWA {
+		if err := e.triage(ctx, row, cfg, agent, tz, now, &tokens); err != nil {
+			tickErr = err
+			return
+		}
+	}
 	sent, tickErr = e.decideAndSend(ctx, row, cfg, agent, tz, now, &tokens)
 }
 
@@ -678,10 +684,16 @@ func reconcile(q db.Q, agentID string, cfg Config, cands []Candidate, okCal, okW
 				snap, _ = jsonx.Marshal(c.Snapshot)
 				_, err = q.Exec("UPDATE nudges SET status = ?, snapshot = ?, updated_at = ? WHERE id = ?", StatusPending, string(snap), now, ex.ID)
 			case ex.Status == StatusPending || ex.Status == StatusSent || ex.Status == StatusSnoozed:
-				// Keep the latest preview and count; the escalation mark stays.
-				c.Snapshot.Escalation = snapshotOf(ex).Escalation
+				// Keep the latest preview and count; the escalation mark and the
+				// triage verdict stay (a higher count makes triage look again).
+				prev := snapshotOf(ex)
+				c.Snapshot.Escalation, c.Snapshot.TriagedCount, c.Snapshot.Gist = prev.Escalation, prev.TriagedCount, prev.Gist
 				snap, _ = jsonx.Marshal(c.Snapshot)
 				_, err = q.Exec("UPDATE nudges SET snapshot = ? WHERE id = ?", string(snap), ex.ID)
+			case ex.Status == StatusDropped && ex.Reason != nil && strings.HasPrefix(*ex.Reason, ReasonClosed) && c.Snapshot.Count > snapshotOf(ex).Count:
+				// Judged finished, then they wrote again without a reply in
+				// between: judge it again.
+				_, err = q.Exec("UPDATE nudges SET status = ?, reason = NULL, snapshot = ?, updated_at = ? WHERE id = ?", StatusPending, string(snap), now, ex.ID)
 			}
 		}
 		if err != nil {
@@ -1024,17 +1036,27 @@ func (e *Engine) summaryFacts(ctx context.Context, r db.AgentProactive, cfg Conf
 			if err != nil {
 				facts = append(facts, "(WhatsApp nggak kebaca: "+Field(err.Error())+")")
 			} else {
-				waiting := WhatsAppCandidates(chats, *wa, now)
-				for i, c := range waiting {
-					if i == 3 {
-						facts = append(facts, fmt.Sprintf("- Dan %d chat lain yang belum kebales", len(waiting)-3))
-						break
-					}
+				// Muted chats and ones triage judged finished are left out.
+				var lines []string
+				for _, c := range WhatsAppCandidates(chats, *wa, now) {
 					if m, _ := muted(q, agentID, c.Subject); m {
 						continue
 					}
-					facts = append(facts, "- "+Field(c.Snapshot.Name)+" nunggu balasan dari "+when(c.Snapshot.AwaitingSince, tz, now))
+					line := "- " + Field(c.Snapshot.Name) + " nunggu balasan dari " + when(c.Snapshot.AwaitingSince, tz, now)
+					if n, ok, _ := nudgeByKey(q, agentID, c.Key); ok {
+						if n.Status == StatusDropped && n.Reason != nil && strings.HasPrefix(*n.Reason, ReasonClosed) {
+							continue
+						}
+						if g := snapshotOf(n).Gist; g != "" {
+							line += ": " + Field(g)
+						}
+					}
+					lines = append(lines, line)
 				}
+				if len(lines) > 3 {
+					lines = append(lines[:3], fmt.Sprintf("- Dan %d chat lain yang belum kebales", len(lines)-3))
+				}
+				facts = append(facts, lines...)
 			}
 		}
 	}
