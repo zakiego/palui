@@ -315,6 +315,8 @@ Automations the agent builds from chat out of triggers and steps (`apps/server/i
 
 An agent tells the owner what matters without being asked (`apps/server/internal/proactive`, tools in the `proactive` connector, the agent page's Proactive tab). Accepted from `docs/rfc/proactive.md`, which keeps the reasoning and the rejected alternatives; this section is the source of truth for behavior.
 
+Being replaced: `docs/rfc/proactive-prompt.md` (decided 2026-11-25) swaps the fixed calendar and wa-hub sources for an owner-written prompt with `@tool` mentions, plus proactive memory. This section is rewritten in the change that builds it; until then it describes what runs.
+
 - Per agent (`agent_proactive`, config JSON validated by `proactive.Config.Validate`), off for every agent until the owner turns it on. The target must be a chat whose audience is `owner`, checked at save and at every tick; a target that stops being one pauses proactive with `paused_reason`.
 - Sources: a gcal connector (its `events` action, now to 36 hours ahead) and a wa-hub MCP connector (`list_chats tab=unanswered since=<now - maxAgeDays>`, structured content only, the tool classified read). Each must be a connector the agent may use. A source failing 3 ticks in a row tells the owner once a day.
 - The tick (every `checkEveryMin`, default 30, a scheduler extension with a lease): collect without the model, reconcile into the `nudges` ledger (one row per key, unique per agent), then decide. The first tick only seeds chats already waiting. A tick with nothing pending costs no tokens.
