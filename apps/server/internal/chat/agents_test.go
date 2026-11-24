@@ -141,12 +141,12 @@ func TestAgentsWhoGetsAnswered(t *testing.T) {
 		eq(t, toGroup.Payload.Text, fmt.Sprintf("Report %s udah aku kirim ke chat pribadi kamu.", saved.ID))
 	})
 
-	t.Run("/report in a group without a note asks for one next time in the group reply", func(t *testing.T) {
+	t.Run("/report in a group without a note replies with just the report id", func(t *testing.T) {
 		h := agentsWorld(t, nil, extra{})
 		h.owner("/report")
 		h.Engine.Idle()
 		saved := need(db.ScanReport(h.DB.QueryRow("SELECT " + db.ReportCols + " FROM reports")))
-		eq(t, lastRow(t, h.DB).Payload.Text, fmt.Sprintf("Report %s udah aku kirim ke chat pribadi kamu.\n\nLain kali tulis juga apa yang salah, biar lebih gampang dilacak: /report <apa yang salah>", saved.ID))
+		eq(t, lastRow(t, h.DB).Payload.Text, fmt.Sprintf("Report %s udah aku kirim ke chat pribadi kamu.", saved.ID))
 	})
 
 	t.Run("treats a guest's ya, /new and button presses as plain text, never as owner actions", func(t *testing.T) {

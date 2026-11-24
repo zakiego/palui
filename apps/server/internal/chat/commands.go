@@ -402,9 +402,6 @@ func cmdAck(c *EngineCtx, chat db.Chat, args []string) (CommandReply, error) {
 	return CommandReply{Text: fmt.Sprintf("Oke, reaksinya sekarang %s.%s", emoji, only)}, nil
 }
 
-// ReportNoteTip is REPORT_NOTE_TIP.
-const ReportNoteTip = "Lain kali tulis juga apa yang salah, biar lebih gampang dilacak: /report <apa yang salah>"
-
 // cmdReport: plain, so the channel sends exactly what `reports` holds. From a
 // shared chat the snapshot goes to the owner's DM (PLAN 19.4).
 func cmdReport(c *EngineCtx, chat db.Chat, args []string, msg *CommandMessage) (CommandReply, error) {
@@ -417,27 +414,19 @@ func cmdReport(c *EngineCtx, chat db.Chat, args []string, msg *CommandMessage) (
 	if err != nil {
 		return CommandReply{}, err
 	}
-	tip := ""
-	if note == "" {
-		tip = "\n\n" + ReportNoteTip
-	}
 	shared, err := agents.IsSharedChat(c.DB, chat)
 	if err != nil {
 		return CommandReply{}, err
 	}
 	if !shared {
-		r := CommandReply{Text: report.Text, Format: "plain"}
-		if note == "" {
-			r.Later = &Later{Run: func() (string, error) { return ReportNoteTip, nil }}
-		}
-		return r, nil
+		return CommandReply{Text: report.Text, Format: "plain"}, nil
 	}
 	dm, ok := ownerChatFor(c, chat.Channel)
 	if !ok {
-		return CommandReply{Text: fmt.Sprintf("Report %s udah aku simpan.%s", report.ID, tip)}, nil
+		return CommandReply{Text: fmt.Sprintf("Report %s udah aku simpan.", report.ID)}, nil
 	}
 	c.send(dm, report.Text, "system", SendExtra{Format: "plain"})
-	return CommandReply{Text: fmt.Sprintf("Report %s udah aku kirim ke chat pribadi kamu.%s", report.ID, tip)}, nil
+	return CommandReply{Text: fmt.Sprintf("Report %s udah aku kirim ke chat pribadi kamu.", report.ID)}, nil
 }
 
 func cmdNew(c *EngineCtx, chat db.Chat) (CommandReply, error) {
