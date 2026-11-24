@@ -224,10 +224,11 @@ func worst(k *Kit) {
 		Persona:     fill("Kamu koordinator arisan keluarga. Catat siapa yang sudah bayar, ingatkan jadwal haul, dan jawab sopan dalam bahasa Jawa kalau ditanya pakai bahasa Jawa. ", L.persona),
 		AvatarIcon:  ptr("chef-hat"),
 		AvatarColor: ptr("violet"),
-		// Allow-all on, one tool of every other kind, so the Tools tab shows each select value and both group counts.
+		// Allow-all on, one tool of every other kind, so the Tools tab shows each select value and both group counts,
+		// plus a connector set to ask and a class set to off, so tools inherit from both levels.
 		DailyTokenCap:   ptr[int64](250_000),
 		TokensToday:     312_481,
-		ToolPermissions: obj("allowAll", true, "tools", obj("mcp-files__restart_service", "ask", "mcp-files__send_email_to_a_customer_with_a_long_tool_name", "deny", "mcp-files__list_deals", "allow")),
+		ToolPermissions: obj("allowAll", true, "tools", obj("mcp-files__restart_service", "ask", "mcp-files__send_email_to_a_customer_with_a_long_tool_name", "deny", "mcp-files__list_deals", "allow"), "connectors", obj("mcp-j", "ask"), "classes", obj("mcp-files:write", "deny")),
 		RecallContainer: ptr("agent-arisan-keluarga-bani-abdul-karim-hasan-surabaya-2026"),
 		// Five shared containers at 64 characters each (MAX_READ_CONTAINERS, RECALL_CONTAINER).
 		RecallReadContainers: readContainers,

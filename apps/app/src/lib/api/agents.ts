@@ -96,7 +96,13 @@ export type Person = { channel: MemberChannel; address: string; label: string; n
 export type AgentMembers = { members: MemberView[]; others: MemberView[]; people: Person[] }
 export type SaveMemberInput = { agentId: string; id?: string; name: string; accounts: { channel: MemberChannel; address: string }[] }
 
-export type ToolPermissionsInput = { id: string; allowAll?: boolean; tools?: { [tool: string]: ToolPermission | null } }
+export type ToolPermissionsInput = {
+  id: string
+  allowAll?: boolean
+  tools?: { [tool: string]: ToolPermission | null }
+  connectors?: { [connectorId: string]: ToolPermission | null }
+  classes?: { [key: string]: ToolPermission | null }
+}
 
 export const getAgentsPage = noInput<AgentsPage>("getAgentsPage", "GET")
 export const getAgentPage = withInput<{ slug: string }, AgentPage>("getAgentPage", "GET")

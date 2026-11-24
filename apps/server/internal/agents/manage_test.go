@@ -360,6 +360,39 @@ func TestToolPermissions(t *testing.T) {
 	}
 }
 
+func TestConnectorAndClassPermissions(t *testing.T) {
+	d := testutil.DB(t)
+	palui := def(t, d)
+	set := func(p agents.PermissionsPatch) string {
+		a, err := agents.SetToolPermissions(d, palui.ID, p, 2)
+		testutil.Must(t, err)
+		if !a.ToolPermissions.Valid {
+			return "null"
+		}
+		return jsonx.Stringify(a.ToolPermissions.V)
+	}
+	if got := set(agents.PermissionsPatch{Connectors: perms("reminders", "allow"), Classes: perms("reminders:write", "ask")}); got != `{"allowAll":false,"tools":{},"connectors":{"reminders":"allow"},"classes":{"reminders:write":"ask"}}` {
+		t.Fatal(got)
+	}
+	// A tool patch keeps the other levels.
+	if got := set(agents.PermissionsPatch{Tools: perms("reminders__set_reminder", "deny")}); got != `{"allowAll":false,"tools":{"reminders__set_reminder":"deny"},"connectors":{"reminders":"allow"},"classes":{"reminders:write":"ask"}}` {
+		t.Fatal(got)
+	}
+	if got := set(agents.PermissionsPatch{Connectors: perms("reminders", nil), Classes: perms("reminders:write", nil), Tools: perms("reminders__set_reminder", nil)}); got != "null" {
+		t.Fatal(got)
+	}
+	for _, p := range []agents.PermissionsPatch{
+		{Classes: perms("reminders:other", "allow")},
+		{Classes: perms("reminders", "allow")},
+		{Connectors: perms(" reminders", "allow")},
+		{Connectors: perms("reminders", "sure")},
+	} {
+		if _, err := agents.SetToolPermissions(d, palui.ID, p, 2); !isAgentErr(err) {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestSharedChatsAndServing(t *testing.T) {
 	d := testutil.DB(t)
 	palui := def(t, d)

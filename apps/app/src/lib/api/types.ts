@@ -24,7 +24,15 @@ export type ReplyMode = "mention" | "all"
 export type ChatKind = "dm" | "group"
 export type GuestTools = "none" | "safe"
 export type ToolPermission = "allow" | "ask" | "deny"
-export type ToolPermissions = { allowAll: boolean; tools: { [tool: string]: ToolPermission } }
+// A higher level locks the ones under it: the connector's entry, then its
+// class (classes, keyed "<connectorId>:<class>"), then the tool's own, then
+// allowAll as the fallback.
+export type ToolPermissions = {
+  allowAll: boolean
+  tools: { [tool: string]: ToolPermission }
+  connectors?: { [connectorId: string]: ToolPermission }
+  classes?: { [key: string]: ToolPermission }
+}
 export type JobKind = "job" | "heartbeat" | "briefing"
 export type ModelRole = "default" | "fast" | "vision"
 export type ReminderStatus = "pending" | "firing" | "done" | "cancelled"

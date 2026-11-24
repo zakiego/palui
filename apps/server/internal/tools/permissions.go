@@ -1,6 +1,7 @@
 // Package tools ports packages/core/src/tools. M1 has permissions.ts: per-agent
 // tool permissions. The owner can let an agent run every tool without asking,
-// or pick allow / ask / deny per tool. They only loosen turns the owner
+// or pick allow / ask / deny per connector, per class within a connector
+// (read, write, destructive) and per tool. They only loosen turns the owner
 // started. Jobs, flows and hooks keep the class rules. Shared chats have no
 // approvals: "ask" and "deny" tools are left out there (PLAN 19.4).
 package tools
@@ -9,6 +10,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
@@ -17,11 +19,34 @@ import (
 // Permissions are the values one tool can have.
 var Permissions = []string{"allow", "ask", "deny"}
 
-// MaxToolPermissions is the entries a policy keeps.
+// MaxToolPermissions is the entries a policy keeps (tools, classes and
+// connectors together).
 const MaxToolPermissions = 2000
 
 // ToolName is a namespaced tool name.
 var ToolName = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// Classes are the tool classes a connector's tools are grouped by.
+var Classes = []string{"read", "write", "destructive"}
+
+// MaxConnectorIDLen is the longest connector id a policy keeps.
+const MaxConnectorIDLen = 100
+
+// ValidConnectorKey is a connector id a policy can hold an entry for.
+func ValidConnectorKey(id string) bool {
+	return id != "" && len(id) <= MaxConnectorIDLen && strings.TrimSpace(id) == id
+}
+
+// ClassKey is the Classes key for one class of one connector.
+func ClassKey(connectorID, class string) string {
+	return connectorID + ":" + class
+}
+
+// ValidClassKey is "<connectorId>:<class>" with a known class.
+func ValidClassKey(key string) bool {
+	i := strings.LastIndex(key, ":")
+	return i > 0 && ValidConnectorKey(key[:i]) && slices.Contains(Classes, key[i+1:])
+}
 
 // NoPermissions is the empty policy.
 func NoPermissions() db.ToolPermissions {
@@ -42,18 +67,34 @@ func ReadPermissions(raw []byte) db.ToolPermissions {
 	if v, ok := obj.Get("allowAll"); ok && v == true {
 		out.AllowAll = true
 	}
-	if t, ok := obj.Get("tools"); ok {
-		if tools, ok := t.(*jsonx.Object); ok {
-			for _, name := range tools.Keys() {
-				p, _ := tools.Get(name)
-				ps, isString := p.(string)
-				if ToolName.MatchString(name) && isString && slices.Contains(Permissions, ps) {
-					out.Tools.Set(name, ps)
+	read := func(field string, valid func(string) bool) *jsonx.Map[string] {
+		m := jsonx.NewMap[string]()
+		if t, ok := obj.Get(field); ok {
+			if entries, ok := t.(*jsonx.Object); ok {
+				for _, k := range entries.Keys() {
+					p, _ := entries.Get(k)
+					ps, isString := p.(string)
+					if valid(k) && isString && slices.Contains(Permissions, ps) {
+						m.Set(k, ps)
+					}
 				}
 			}
 		}
+		return m
+	}
+	out.Tools = read("tools", ToolName.MatchString)
+	if m := read("connectors", ValidConnectorKey); m.Len() > 0 {
+		out.Connectors = m
+	}
+	if m := read("classes", ValidClassKey); m.Len() > 0 {
+		out.Classes = m
 	}
 	return out
+}
+
+// Entries is how many entries a policy holds across its three maps.
+func Entries(p db.ToolPermissions) int {
+	return p.Tools.Len() + p.Connectors.Len() + p.Classes.Len()
 }
 
 // ReadPermissionsValue is ReadPermissions for an already decoded value.
@@ -65,11 +106,21 @@ func ReadPermissionsValue(v any) db.ToolPermissions {
 	return ReadPermissions(b)
 }
 
-// PermissionFor is what the owner picked for one tool: its own entry, else
-// "allow" when AllowAll is on, else "" (the class rule decides).
-func PermissionFor(p *db.ToolPermissions, name string) string {
+// PermissionFor is what the owner picked for one tool. A higher level locks
+// the ones under it: its connector's entry, then its class in that
+// connector, then the tool's own, else "allow" when AllowAll is on, else ""
+// (the class rule decides). class is the tool's class.
+func PermissionFor(p *db.ToolPermissions, name, connectorID, class string) string {
 	if p == nil {
 		return ""
+	}
+	if connectorID != "" {
+		if v, ok := p.Connectors.Get(connectorID); ok && v != "" {
+			return v
+		}
+		if v, ok := p.Classes.Get(ClassKey(connectorID, NormalizeClass(class))); ok && v != "" {
+			return v
+		}
 	}
 	if own, ok := p.Tools.Get(name); ok && own != "" {
 		return own
@@ -80,33 +131,16 @@ func PermissionFor(p *db.ToolPermissions, name string) string {
 	return ""
 }
 
-// DeniedTools are the names hidden from the agent in every turn.
-func DeniedTools(p *db.ToolPermissions) []string {
-	out := []string{}
-	if p == nil {
-		return out
+// Hidden says whether a tool is left out of a turn: the owner turned it off,
+// or set it to ask in a turn that has no approvals (open).
+func Hidden(p *db.ToolPermissions, name, connectorID, class string, open bool) bool {
+	switch PermissionFor(p, name, connectorID, class) {
+	case "deny":
+		return true
+	case "ask":
+		return open
 	}
-	for _, k := range p.Tools.Keys() {
-		if v, _ := p.Tools.Get(k); v == "deny" {
-			out = append(out, k)
-		}
-	}
-	return out
-}
-
-// AskTools are the names the owner set to "ask". An outside turn leaves them
-// out: it has no approvals, and the owner wanted a say on these.
-func AskTools(p *db.ToolPermissions) []string {
-	out := []string{}
-	if p == nil {
-		return out
-	}
-	for _, k := range p.Tools.Keys() {
-		if v, _ := p.Tools.Get(k); v == "ask" {
-			out = append(out, k)
-		}
-	}
-	return out
+	return false
 }
 
 type ApprovalInput struct {

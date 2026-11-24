@@ -1,7 +1,6 @@
 package tools_test
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/zakiego/palui/apps/server/internal/db"
@@ -29,22 +28,84 @@ func TestReadsAStoredValueAndDropsWhatItDoesntKnow(t *testing.T) {
 	}
 }
 
+func TestReadsConnectorAndClassEntries(t *testing.T) {
+	got := tools.ReadPermissions([]byte(`{"allowAll":false,"tools":{},"connectors":{"a":"allow"," b":"allow","c":"maybe"},"classes":{"a:write":"ask","a:other":"deny",":read":"deny","x:y:read":"deny"}}`))
+	if jsonx.Stringify(got) != `{"allowAll":false,"tools":{},"connectors":{"a":"allow"},"classes":{"a:write":"ask","x:y:read":"deny"}}` {
+		t.Fatal(jsonx.Stringify(got))
+	}
+	// Nothing at those levels keeps the old shape.
+	if got := jsonx.Stringify(tools.ReadPermissions([]byte(`{"allowAll":true,"tools":{},"connectors":{},"classes":{"a:bad":"deny"}}`))); got != `{"allowAll":true,"tools":{}}` {
+		t.Fatal(got)
+	}
+}
+
 func TestAToolsOwnEntryWinsOverAllowAll(t *testing.T) {
 	p := perms(true, "a__x", "ask")
-	if tools.PermissionFor(p, "a__x") != "ask" || tools.PermissionFor(p, "a__y") != "allow" {
+	if tools.PermissionFor(p, "a__x", "a", "read") != "ask" || tools.PermissionFor(p, "a__y", "a", "read") != "allow" {
 		t.Fatal("allowAll")
 	}
-	if tools.PermissionFor(perms(false), "a__y") != "" || tools.PermissionFor(nil, "a__y") != "" {
+	if tools.PermissionFor(perms(false), "a__y", "a", "read") != "" || tools.PermissionFor(nil, "a__y", "a", "read") != "" {
 		t.Fatal("none")
 	}
 }
 
-func TestListsDeniedTools(t *testing.T) {
-	if got := tools.DeniedTools(perms(false, "a__x", "deny", "a__y", "allow")); !reflect.DeepEqual(got, []string{"a__x"}) {
+func TestAHigherLevelLocksTheOnesUnderIt(t *testing.T) {
+	p := perms(false, "a__x", "allow", "b__x", "deny", "b__y", "allow")
+	p.Connectors = jsonx.NewMap[string]()
+	p.Connectors.Set("a", "deny")
+	p.Classes = jsonx.NewMap[string]()
+	p.Classes.Set("a:write", "ask")
+	p.Classes.Set("b:write", "ask")
+	p.Classes.Set("b:destructive", "allow")
+	cases := []struct {
+		name, tool, connector, class, want string
+	}{
+		{"connector over tool", "a__x", "a", "write", "deny"},
+		{"connector over class", "a__y", "a", "write", "deny"},
+		{"class over tool", "b__x", "b", "write", "ask"},
+		{"unclassified is destructive", "b__z", "b", "", "allow"},
+		{"tool when nothing above", "b__y", "b", "read", "allow"},
+		{"nothing set", "c__r", "c", "write", ""},
+		{"no connector id", "b__x", "", "write", "deny"},
+	}
+	for _, c := range cases {
+		if got := tools.PermissionFor(p, c.tool, c.connector, c.class); got != c.want {
+			t.Errorf("%s: %q", c.name, got)
+		}
+	}
+	// AllowAll is only the fallback.
+	p.AllowAll = true
+	if got := tools.PermissionFor(p, "a__r", "a", "read"); got != "deny" {
 		t.Fatal(got)
 	}
-	if got := tools.DeniedTools(nil); len(got) != 0 {
+	if got := tools.PermissionFor(p, "c__r", "c", "read"); got != "allow" {
 		t.Fatal(got)
+	}
+}
+
+func TestHidesOffToolsAndAskToolsWithoutApprovals(t *testing.T) {
+	p := perms(true, "a__x", "deny", "a__y", "ask", "a__z", "allow")
+	p.Classes = jsonx.NewMap[string]()
+	p.Classes.Set("b:write", "ask")
+	cases := []struct {
+		tool, connector, class string
+		open, want             bool
+	}{
+		{"a__x", "a", "read", false, true},
+		{"a__y", "a", "read", false, false},
+		{"a__y", "a", "read", true, true},
+		{"a__z", "a", "read", true, false},
+		{"b__w", "b", "write", true, true},
+		{"b__w", "b", "write", false, false},
+		{"b__r", "b", "read", true, false},
+	}
+	for _, c := range cases {
+		if got := tools.Hidden(p, c.tool, c.connector, c.class, c.open); got != c.want {
+			t.Errorf("%+v: %v", c, got)
+		}
+	}
+	if tools.Hidden(nil, "a__x", "a", "read", true) {
+		t.Fatal("nil")
 	}
 }
 
@@ -112,14 +173,5 @@ func TestAnOwnerReplyIgnoresOnlyReplayTaintInAnOwnerTurn(t *testing.T) {
 		if got := tools.NeedsApproval(c.in(w)); got != c.want {
 			t.Errorf("%s: %v", c.name, got)
 		}
-	}
-}
-
-func TestListsAskTools(t *testing.T) {
-	if got := tools.AskTools(perms(true, "a__x", "deny", "a__y", "ask", "a__z", "allow", "a__w", "ask")); !reflect.DeepEqual(got, []string{"a__y", "a__w"}) {
-		t.Fatal(got)
-	}
-	if got := tools.AskTools(nil); len(got) != 0 {
-		t.Fatal(got)
 	}
 }

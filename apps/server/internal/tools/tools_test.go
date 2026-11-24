@@ -130,8 +130,23 @@ func TestCollectFilters(t *testing.T) {
 	}
 	o = opts(64, nil)
 	o.Scope = []string{"g"}
-	o.Deny = []string{"g__unsafe"}
+	o.Permissions = &db.ToolPermissions{Tools: jsonx.NewMap[string]()}
+	o.Permissions.Tools.Set("g__unsafe", "deny")
 	if got := names(o); got != "g__safe" {
+		t.Fatal(got)
+	}
+	// A class or connector set to off hides its tools; ask hides them only
+	// in a turn without approvals. The connector's ask locks g__safe's allow.
+	o = opts(64, nil)
+	o.Permissions = &db.ToolPermissions{Tools: jsonx.NewMap[string](), Connectors: jsonx.NewMap[string](), Classes: jsonx.NewMap[string]()}
+	o.Permissions.Classes.Set("alpha:destructive", "deny")
+	o.Permissions.Connectors.Set("g", "ask")
+	o.Permissions.Tools.Set("g__safe", "allow")
+	if got := names(o); got != "alpha__read,alpha__note,g__safe,g__unsafe" {
+		t.Fatal(got)
+	}
+	o.HideAsk = true
+	if got := names(o); got != "alpha__read,alpha__note" {
 		t.Fatal(got)
 	}
 	o = opts(64, nil)

@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"github.com/zakiego/palui/apps/server/internal/connectors"
+	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/logx"
 	"github.com/zakiego/palui/apps/server/internal/zod"
@@ -172,8 +173,10 @@ type CollectOptions struct {
 	Only []string
 	// Jobs and hooks never get destructive tools.
 	ExcludeDestructive bool
-	// Namespaced names the agent's owner turned off.
-	Deny []string
+	// The agent's tool permissions: tools they turn off are left out.
+	Permissions *db.ToolPermissions
+	// Also leave out the tools they set to ask (a turn with no approvals).
+	HideAsk bool
 	// Names loaded earlier in the session, most recent first.
 	Sticky []string
 	// Called with the names a search just loaded.
@@ -244,7 +247,7 @@ func Collect(ctx context.Context, running []connectors.RunningEntry, opts Collec
 			if opts.Only != nil && !contains(opts.Only, "*") && !contains(opts.Only, name) {
 				continue
 			}
-			if contains(opts.Deny, name) {
+			if Hidden(opts.Permissions, name, e.ID, cls, opts.HideAsk) {
 				continue
 			}
 			meta := &ToolMeta{Name: name, ConnectorID: e.ID, Tool: toolName, Class: cls, Untrusted: pt.Untrusted || pt.OthersWrote || e.Row.Trust == "external", OthersWrote: pt.OthersWrote, Title: pt.Title, Label: e.Row.Label, GuestSafe: pt.GuestSafe, Data: pt.Data, Scope: connectors.ResolveData(pt.Data, e.Row), NeedsApproval: pt.NeedsApproval, Preview: pt.Preview, OwnerReply: pt.OwnerReply}

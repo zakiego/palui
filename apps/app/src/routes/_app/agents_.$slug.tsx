@@ -17,7 +17,7 @@ import { AvatarPicker } from "@/components/agents/avatar-picker"
 import { AppError } from "@/components/app-error"
 import { ConnectorStatusBadge } from "@/components/connector-status"
 import { ToolsByScope } from "@/components/agent-tools/by-scope"
-import { groupTools, inMemberChats, inSharedChats, type Permission } from "@/components/agent-tools/shared"
+import { groupTools, inMemberChats, inSharedChats, type Permission, type PermissionLevel } from "@/components/agent-tools/shared"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
@@ -939,7 +939,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
   // Tool permissions save at once, like the scope. Rolled back when the save fails.
   const router = useRouter()
   const [permissions, setPermissions] = React.useState(agent.toolPermissions)
-  const savePermissions = async (patch: { allowAll?: boolean; tools?: Record<string, Permission | null> }, next: typeof permissions) => {
+  const savePermissions = async (patch: Partial<Record<PermissionLevel, Record<string, Permission | null>>> & { allowAll?: boolean }, next: typeof permissions) => {
     const before = permissions
     setPermissions(next)
     try {
@@ -952,11 +952,11 @@ function ToolsTab({ agent }: { agent: Agent }) {
     }
   }
   const setAllowAll = (allowAll: boolean) => void savePermissions({ allowAll }, { ...permissions, allowAll })
-  const setPermission = (name: string, p: Permission | null) => {
-    const tools = { ...permissions.tools }
-    if (p) tools[name] = p
-    else delete tools[name]
-    void savePermissions({ tools: { [name]: p } }, { ...permissions, tools })
+  const setPermission = (level: PermissionLevel, key: string, p: Permission | null) => {
+    const entries: Record<string, Permission> = { ...permissions[level] }
+    if (p) entries[key] = p
+    else delete entries[key]
+    void savePermissions({ [level]: { [key]: p } }, { ...permissions, [level]: entries })
   }
 
   const tools = data?.tools ?? null
