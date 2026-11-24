@@ -208,9 +208,9 @@ Proactive has no source code anymore. Whatever a connector exposes as a read too
 |---|---|---|---|
 | Google Calendar | `gcal` (exists) | Google Calendar API, owner's OAuth client | `get_calendar` (add the video link and the owner's response to its output) |
 | Any calendar | `ics` (new) | iCalendar feed URL (RFC 5545), secret link from Google, Outlook, iCloud, Fastmail, Nextcloud | `get_events` from, to |
-| Personal WhatsApp | `whatsapp` inbox mode (new type, on whatsmeow) | WhatsApp multi-device, linked as a companion | `waiting_chats` since, `get_chat` id |
+| Personal WhatsApp | `wa-inbox` (new type, on the whatsmeow runtime of the channel, read only) | WhatsApp multi-device, linked as a companion | `waiting_chats`, `list_chats` |
 
-WhatsApp inbox is a separate connector type, not a flag on the channel connector, so no code path can make it answer in the owner's personal chats. It keeps per chat only the id, name, kind, the time of the last message in, the owner's last reply, and a 200-character preview, never full bodies.
+WhatsApp inbox is a separate connector type, not a flag on the channel connector, so no code path can make it answer in the owner's personal chats: it reuses the channel's runtime with `ReadOnly` (no owner identity written, nothing routed, no channel handle for the outbox) and an observer that sees the owner's own messages too. It keeps per chat only the id, name, kind, the time of the last message in, the owner's last reply, how many messages wait and a 200-character preview (`wa_inbox_chats`, one migration), never full bodies. It starts empty: there's no history sync.
 
 Removed: the calendar MCP path (`CalendarSource.Tool`, `ParseMCPEvents`, `calendarToolRe`), the wa-hub path (`WhatsAppSource`, `ParseWaiting`, `whatsAppToolRe`, wa-hub triage from #28), `CalendarCandidates`, `WhatsAppCandidates`, the decide call, the v1 templates, and the docs that name wa-hub or MCP Hub.
 

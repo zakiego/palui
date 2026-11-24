@@ -390,6 +390,7 @@ Example: `/report-fix` with the report attached and a prompt telling the agent t
 | `nudges` | id, agent_id, key (unique per agent), kind, subject, status, wake_at, sent_at, escalated_at (schema 1 only), snapshot json, reason, outbox_id |
 | `proactive_mutes` | agent_id, subject, label |
 | `proactive_notes` | id, agent_id, text, source (owner or model), expires_at |
+| `wa_inbox_chats` | connector_id, chat_jid, kind, name, last_in_at, last_out_at, waiting_since, unanswered, preview (WhatsApp inbox, 30 days) |
 | `proactive_ticks` | id, agent_id, started_at, finished_at, sources json (mentions, calls, skip), found, sent, tokens, error (30 days) |
 | `events` | id, at, level, connector_id, kind, message |
 | `reports` | id, chat_id, session_id, note, text, created_at (one row per `/report`, kept until deleted) |
