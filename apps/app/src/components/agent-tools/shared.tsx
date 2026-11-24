@@ -115,11 +115,14 @@ export function DataScopeText({ scope }: { scope: DataScope }) {
 }
 
 // Whether a shared chat (a group, or someone else's DM) gets this tool: the
-// server says it may, the agent offers tools there, and the owner didn't set
-// it to ask first or off (shared chats never ask, so those stay out).
+// server says it may (guest-safe, or member-safe when guests get what members
+// get), and the owner didn't set it to ask first or off (shared chats never
+// ask, so those stay out).
 export function inSharedChats(x: ToolItem, guestTools: string, permissions: ToolsViewProps["permissions"]) {
   const p = permissionFor(x, permissions)
-  return x.guestSafe && guestTools === "safe" && p !== "ask" && p !== "deny"
+  if (p === "ask" || p === "deny") return false
+  if (guestTools === "members") return x.guestSafe || x.memberSafe === true
+  return x.guestSafe && guestTools === "safe"
 }
 
 // Whether a members chat (PLAN 19.4) gets this tool: the server marks it
