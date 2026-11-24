@@ -1,13 +1,17 @@
 // The bridge's HTTP server: GET /health without auth, and a stateless
 // Streamable HTTP MCP endpoint at /mcp behind a bearer token. Each allowlisted
 // command becomes one MCP tool with annotations matching its class.
+//
+// /mcp speaks both protocol eras: legacy clients (spec 2025-11-25 and earlier)
+// open with initialize, spec 2026-07-28 clients send the version in every
+// request's _meta. isLegacyRequest picks the path; both get the same tools.
 import { createHash, timingSafeEqual } from "node:crypto"
 import http from "node:http"
 import type { AddressInfo } from "node:net"
 import { homedir } from "node:os"
 import { isAbsolute, join, resolve } from "node:path"
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
+import { toNodeHandler } from "@modelcontextprotocol/node"
+import { createMcpHandler, isLegacyRequest, McpServer, WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server"
 import { createLogger, type Logger } from "./log.ts"
 import { z } from "zod"
 import { ArgError, buildArgv, SHELL_TOOL, type BridgeConfig, type CommandSpec, type DangerousSpec, type ParamSpec } from "./config.ts"
@@ -20,7 +24,7 @@ export type Bridge = {
 
 type ToolDef = {
   name: string
-  config: { title: string; description: string; inputSchema: Record<string, z.ZodType>; annotations: { readOnlyHint: boolean; destructiveHint: boolean } }
+  config: { title: string; description: string; inputSchema: z.ZodObject<Record<string, z.ZodType>>; annotations: { readOnlyHint: boolean; destructiveHint: boolean } }
   run: (input: Record<string, unknown>) => Promise<{ content: { type: "text"; text: string }[]; isError: boolean }>
 }
 
@@ -29,6 +33,28 @@ export async function startBridge(config: BridgeConfig, log: Logger = createLogg
   // Built once. Only the McpServer is per request: the SDK binds one to one transport.
   const tools = config.commands.map((spec) => toolDef(spec, log))
   if (config.dangerouslyAllowAnyCommand) tools.push(shellToolDef(config.dangerouslyAllowAnyCommand, log))
+  const buildServer = () => {
+    const mcp = new McpServer({ name: "palui-host-bridge", version: "1.0.0" })
+    for (const t of tools) mcp.registerTool(t.name, t.config, t.run)
+    return mcp
+  }
+  // Spec 2026-07-28: no handshake, no session, a fresh server per request.
+  const modern = createMcpHandler(buildServer, { legacy: "reject", onerror: (err) => log.error("request failed", { err }) })
+  // 2025-era clients keep the stateless JSON transport they had before.
+  const legacy = async (request: Request) => {
+    const mcp = buildServer()
+    const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
+    try {
+      await mcp.connect(transport)
+      return await transport.handleRequest(request)
+    } finally {
+      void mcp.close()
+    }
+  }
+  const serveMcp = toNodeHandler(
+    { fetch: async (request) => ((await isLegacyRequest(request)) ? legacy(request) : modern.fetch(request)) },
+    { onerror: (err) => log.error("request failed", { err }) },
+  )
   const server = http.createServer(async (req, res) => {
     const pathname = new URL(req.url ?? "/", "http://x").pathname
     if (pathname === "/health" && req.method === "GET") {
@@ -45,18 +71,12 @@ export async function startBridge(config: BridgeConfig, log: Logger = createLogg
       res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32001, message: "missing or invalid token" }, id: null }))
       return
     }
-    const mcp = new McpServer({ name: "palui-host-bridge", version: "1.0.0" })
-    for (const t of tools) mcp.registerTool(t.name, t.config, t.run)
-    // The transport reads and parses the body itself (1 MB cap by default).
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
+    // The adapter reads the body itself (4 MiB cap by default).
     try {
-      await mcp.connect(transport)
-      await transport.handleRequest(req, res)
+      await serveMcp(req, res)
     } catch (err) {
       log.error("request failed", { err })
       if (!res.headersSent) res.writeHead(500).end()
-    } finally {
-      void mcp.close()
     }
   })
   await new Promise<void>((resolve, reject) => {
@@ -66,11 +86,13 @@ export async function startBridge(config: BridgeConfig, log: Logger = createLogg
   const { port } = server.address() as AddressInfo
   return {
     url: `http://${config.host}:${port}/mcp`,
-    close: () =>
-      new Promise<void>((r) => {
+    close: async () => {
+      await modern.close()
+      await new Promise<void>((r) => {
         server.closeAllConnections()
         server.close(() => r())
-      }),
+      })
+    },
   }
 }
 
@@ -119,10 +141,10 @@ function shellToolDef(d: DangerousSpec, log: Logger): ToolDef {
     config: {
       title: "Run any shell command on the host",
       description: `Run a command line on the host with ${d.shell} -lc, as the owner's user, with full access. Pipes, redirects and multi-line scripts work. Default working directory ${d.cwd}. Times out after ${Math.round(d.timeoutMs / 1000)} s. Prefer a dedicated tool when one fits.`,
-      inputSchema: {
+      inputSchema: z.object({
         command: z.string().min(1).describe("The command line to run, e.g. `ls -la ~/Downloads | head`"),
         cwd: z.string().min(1).optional().describe("Working directory. Absolute, ~/..., or relative to the default"),
-      },
+      }),
       annotations: annotationsFor("destructive"),
     },
     async run(input) {
@@ -148,7 +170,7 @@ function annotationsFor(cls: CommandSpec["class"]): { readOnlyHint: boolean; des
 
 // The JSON schema the model sees. buildArgv re-checks everything, since this is
 // only as strict as JSON schema can say.
-function inputShape(spec: CommandSpec): Record<string, z.ZodType> {
+function inputShape(spec: CommandSpec): z.ZodObject<Record<string, z.ZodType>> {
   const shape: Record<string, z.ZodType> = {}
   for (const [name, p] of Object.entries(spec.params)) {
     const one = valueSchema(p)
@@ -156,7 +178,7 @@ function inputShape(spec: CommandSpec): Record<string, z.ZodType> {
     if (p.description) s = s.describe(p.description)
     shape[name] = p.optional ? s.optional() : s
   }
-  return shape
+  return z.object(shape)
 }
 
 function valueSchema(p: ParamSpec): z.ZodType {
