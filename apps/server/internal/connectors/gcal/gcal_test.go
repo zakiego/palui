@@ -493,3 +493,27 @@ func TestActionAuthURLUsesAppURLAndSignsTheStateForThisConnector(t *testing.T) {
 		t.Fatal(nonce)
 	}
 }
+
+func TestEventsActionReturnsIDsVideoLinksAndSkipsNothingTheEngineNeeds(t *testing.T) {
+	g := &google{events: []any{
+		map[string]any{"id": "m1", "summary": "Call", "start": map[string]any{"dateTime": "2026-11-10T13:00:00+08:00"}, "end": map[string]any{"dateTime": "2026-11-10T14:00:00+08:00"}, "hangoutLink": "https://meet.google.com/abc-defg-hij"},
+		map[string]any{"id": "z1", "summary": "Zoom", "start": map[string]any{"dateTime": "2026-11-10T15:00:00+08:00"}, "end": map[string]any{"dateTime": "2026-11-10T16:00:00+08:00"}, "conferenceData": map[string]any{"entryPoints": []any{map[string]any{"entryPointType": "phone", "uri": "tel:+1"}, map[string]any{"entryPointType": "video", "uri": "https://zoom.us/j/1"}}}},
+		map[string]any{"id": "d1", "summary": "Declined", "start": map[string]any{"dateTime": "2026-11-10T17:00:00+08:00"}, "end": map[string]any{"dateTime": "2026-11-10T18:00:00+08:00"}, "attendees": []any{map[string]any{"self": true, "responseStatus": "declined"}}},
+	}}
+	running, err := gcal.New(gcal.Options{Client: g.client(), Clock: func() int64 { return NOW }}).Start(conntest.Ctx(t, nil, "gcal", cfg(t), with(map[string]string{"refreshToken": "1//r"})))
+	testutil.Must(t, err)
+	in := jsonx.NewMap[any]()
+	in.Set("from", NOW)
+	in.Set("to", NOW+24*3600_000)
+	out, err := running.Action(context.Background(), gcal.EventsAction, in)
+	testutil.Must(t, err)
+	got := jsonx.Stringify(out)
+	for _, want := range []string{`"id":"m1"`, `"meetLink":"https://meet.google.com/abc-defg-hij"`, `"meetLink":"https://zoom.us/j/1"`, `"id":"d1"`, `"declined":true`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %s in %s", want, got)
+		}
+	}
+	if _, err := running.Action(context.Background(), gcal.EventsAction, jsonx.NewMap[any]()); err == nil {
+		t.Fatal("events needs a range")
+	}
+}

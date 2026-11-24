@@ -31,6 +31,11 @@ type Event struct {
 	Location   string
 	Status     string
 	Link       string
+	// MeetLink is the video call's join URL (Meet or another conference
+	// added to the event); "" when there is none.
+	MeetLink string
+	// Declined: the owner said no to this invite.
+	Declined bool
 }
 
 // JSON is the CalendarEvent object.
@@ -45,6 +50,12 @@ func (e Event) JSON() *jsonx.Object {
 	if e.Link != "" {
 		o.Set("link", e.Link)
 	}
+	if e.MeetLink != "" {
+		o.Set("meetLink", e.MeetLink)
+	}
+	if e.Declined {
+		o.Set("declined", true)
+	}
 	return o
 }
 
@@ -56,6 +67,42 @@ type rawEvent struct {
 	HTMLLink string  `json:"htmlLink"`
 	Start    *evTime `json:"start"`
 	End      *evTime `json:"end"`
+	// HangoutLink is the Meet URL; ConferenceData covers other providers.
+	HangoutLink    string `json:"hangoutLink"`
+	ConferenceData *struct {
+		EntryPoints []struct {
+			EntryPointType string `json:"entryPointType"`
+			URI            string `json:"uri"`
+		} `json:"entryPoints"`
+	} `json:"conferenceData"`
+	Attendees []struct {
+		Self           bool   `json:"self"`
+		ResponseStatus string `json:"responseStatus"`
+	} `json:"attendees"`
+}
+
+// meetLink is the event's video entry point, if any.
+func (e rawEvent) meetLink() string {
+	if e.HangoutLink != "" {
+		return e.HangoutLink
+	}
+	if e.ConferenceData != nil {
+		for _, p := range e.ConferenceData.EntryPoints {
+			if p.EntryPointType == "video" && p.URI != "" {
+				return p.URI
+			}
+		}
+	}
+	return ""
+}
+
+func (e rawEvent) declined() bool {
+	for _, a := range e.Attendees {
+		if a.Self && a.ResponseStatus == "declined" {
+			return true
+		}
+	}
+	return false
 }
 
 type evTime struct {
@@ -141,7 +188,7 @@ func ListEvents(ctx context.Context, in ListEventsInput, hc *http.Client) ([]Eve
 			}
 			return t.Date
 		}
-		out = append(out, Event{ID: e.ID, CalendarID: in.CalendarID, Title: title, Start: pick(e.Start), End: pick(e.End), AllDay: e.Start == nil || e.Start.DateTime == "", Location: e.Location, Status: e.Status, Link: e.HTMLLink})
+		out = append(out, Event{ID: e.ID, CalendarID: in.CalendarID, Title: title, Start: pick(e.Start), End: pick(e.End), AllDay: e.Start == nil || e.Start.DateTime == "", Location: e.Location, Status: e.Status, Link: e.HTMLLink, MeetLink: e.meetLink(), Declined: e.declined()})
 	}
 	return out, nil
 }

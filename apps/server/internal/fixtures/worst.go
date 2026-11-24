@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/zakiego/palui/apps/server/internal/db"
+	"github.com/zakiego/palui/apps/server/internal/proactive"
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 )
@@ -660,6 +661,7 @@ func worst(k *Kit) {
 		Config:  obj("domains", strings.Join(httpDomains, ", "), "auth", "query", "queryParam", "northwind_holdings_reporting_service_access_token_for_every_region", "policy", "ask"),
 		Secrets: sec("value", "nw_0123456789abcdef0123456789abcdef"),
 	})
+	worstProactive(k, web)
 }
 
 // worstFlows is worst.ts's flows block: the step and trigger caps, every run
@@ -772,5 +774,51 @@ func worstFlows(k *Kit, flowChat db.Chat) {
 		}
 		v.Steps = []FlowStep{step}
 		k.FlowRun(bills, v)
+	}
+}
+
+// worstProactive: Palui's proactive on, every nudge kind and status with the
+// longest labels and reasons, a long mute list and a day of 40 ticks whose
+// last one failed to read WhatsApp.
+func worstProactive(k *Kit, web db.Chat) {
+	now := k.Now
+	agentID := k.defaultAgentID()
+	cfg := proactive.Defaults()
+	cfg.Calendar = proactive.DefaultCalendar("gcal")
+	cfg.WhatsApp = proactive.DefaultWhatsApp("mcp-j")
+	cfg.WhatsApp.Account = "northwind-holdings-pe"
+	cfg.Contacts = []proactive.Contact{
+		{Subject: "wa:chat:101", Label: "Bartholomew Fitzgerald-Montgomery (Northwind Industries Holdings, Procurement)"},
+		{Subject: "wa:chat:102", Label: "أم خالد"},
+		{Subject: "wa:chat:103", Label: "🦊"},
+	}
+	raw := must(proactive.MarshalConfig(cfg))
+	k.insert("agent_proactive", col{"agent_id", agentID}, col{"enabled", true}, col{"chat_id", web.ID}, col{"config", string(raw)},
+		col{"next_tick_at", now + 20*MIN}, col{"last_tick_at", now - 10*MIN}, col{"created_at", now - 7*D}, col{"updated_at", now - D})
+	nudge := func(key, kind, subject, status string, at int64, snap string, extra ...col) {
+		cols := []col{{"id", "ndg_" + strings.NewReplacer(":", "_", " ", "_").Replace(key)}, {"agent_id", agentID}, {"key", key}, {"kind", kind}, {"subject", subject}, {"status", status}, {"snapshot", snap}, {"created_at", at}, {"updated_at", at}}
+		k.insert("nudges", append(cols, extra...)...)
+	}
+	long := within("Bartholomew Fitzgerald-Montgomery (Northwind Industries Holdings, Procurement)", 80)
+	nudge("sum:morning:x", proactive.KindSumMorning, "summary", proactive.StatusSent, now-3*H, `{"date":"x"}`, col{"sent_at", now - 3*H}, col{"outbox_id", "out_fx_sum"})
+	nudge("wa:101:1", proactive.KindWAWaiting, "wa:chat:101", proactive.StatusSent, now-2*H, `{"chatId":"101","name":"`+long+`","awaitingSince":`+fmt.Sprint(now-5*H)+`,"count":12,"preview":"`+strx.Slice16(worstParagraph, 199)+"…"+`"}`, col{"sent_at", now - 2*H}, col{"escalated_at", now - 20*MIN}, col{"outbox_id", "out_fx_wa"})
+	nudge("wa:102:1", proactive.KindWAWaiting, "wa:chat:102", proactive.StatusSnoozed, now-90*MIN, `{"chatId":"102","name":"أم خالد","awaitingSince":`+fmt.Sprint(now-4*H)+`,"count":1}`, col{"wake_at", now + 90*MIN})
+	nudge("wa:104:1", proactive.KindWAWaiting, "wa:chat:104", proactive.StatusDropped, now-80*MIN, `{"chatId":"104","name":"Toko Sepatu Promo Akhir Tahun Diskon 90% Semua Item","count":3}`, col{"reason", "model: " + "promo broadcast from a store that repeats every week"})
+	nudge("wa:105:1", proactive.KindWAWaiting, "wa:chat:105", proactive.StatusPending, now-40*MIN, `{"chatId":"105","name":"`+worstEmail+`","count":1}`)
+	nudge("wa:106:1", proactive.KindWAWaiting, "wa:chat:106", proactive.StatusDone, now-30*MIN, `{"chatId":"106","name":"x","count":1}`, col{"sent_at", now - 70*MIN})
+	nudge("cal:e1:depart", proactive.KindCalDepart, "cal:event:e1", proactive.StatusScheduled, now-20*MIN, `{"eventId":"e1","title":"`+within(worstDeck, 80)+`","location":"`+worstLongURL+`"}`, col{"wake_at", now + 3*H})
+	nudge("cal:e2:start", proactive.KindCalStart, "cal:event:e2", proactive.StatusSent, now-15*MIN, `{"eventId":"e2","title":"Standup"}`, col{"sent_at", now - 15*MIN}, col{"outbox_id", "out_fx_e2"})
+	nudge("cal:e3:changed:1:x", proactive.KindCalChanged, "cal:event:e3", proactive.StatusSent, now-10*MIN, `{"eventId":"e3","title":"اجتماع مجلس الإدارة (Q3 report)"}`, col{"sent_at", now - 10*MIN}, col{"outbox_id", "out_fx_e3"})
+	nudge("cal:e4:depart", proactive.KindCalDepart, "cal:event:e4", proactive.StatusExpired, now-5*MIN, `{"eventId":"e4","title":"🦊"}`, col{"reason", "the event already started"})
+	for i, label := range []string{within("Grup Alumni SMA Negeri 1 Banjarmasin Angkatan 2009 (resmi, jangan keluar)", 120), "J", "خادم الملفات", "🦊", worstEmail} {
+		k.insert("proactive_mutes", col{"agent_id", agentID}, col{"subject", fmt.Sprintf("wa:chat:%d", 200+i)}, col{"label", label}, col{"created_at", now - int64(i+1)*D})
+	}
+	for i := 0; i < 40; i++ {
+		at := now - int64(i)*15*MIN
+		sources, errText := `{"calendar":{"ok":true,"count":7},"whatsapp":{"ok":true,"count":31}}`, any(nil)
+		if i == 0 {
+			sources = `{"calendar":{"ok":true,"count":7},"whatsapp":{"ok":false,"count":0,"error":"` + within("wa-hub didn't send structured chats. Update wa-hub to a version whose list_chats returns structuredContent. (401 Unauthorized from "+worstLongURL+")", 300) + `"}}`
+		}
+		k.insert("proactive_ticks", col{"id", fmt.Sprintf("ptk_%02d", i)}, col{"agent_id", agentID}, col{"started_at", at}, col{"finished_at", at + 1800}, col{"sources", sources}, col{"found", 3}, col{"sent", i % 3}, col{"tokens", 12_345 + i}, col{"error", errText})
 	}
 }

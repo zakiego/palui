@@ -108,6 +108,12 @@ func MCPTools() []MCPTool {
 		{Name: "set_command_enabled", RPC: "setCommandEnabledFn", Title: "Enable or disable custom command", Description: "Turn a custom chat command on or off.", Idempotent: true},
 		{Name: "delete_command", RPC: "deleteCommandFn", Title: "Delete custom command", Description: "Delete a custom chat command.", Destructive: true},
 
+		// Proactive
+		{Name: "get_proactive", RPC: "getProactiveFn", Title: "Get proactive settings", Description: "An agent's proactive settings: on or off, target chat, rhythm, quiet hours, calendar and WhatsApp sources, muted subjects and today's activity."},
+		{Name: "save_proactive", RPC: "saveProactiveFn", Title: "Save proactive settings", Description: "Turn an agent's proactive on or off, pick its target chat (the owner's DM or web chat), or change its config with a JSON merge patch.", Idempotent: true},
+		{Name: "unmute_proactive", RPC: "unmuteProactiveFn", Title: "Unmute proactive subject", Description: "Let proactive remind about a muted chat or event again.", Idempotent: true},
+		{Name: "check_proactive_now", RPC: "checkProactiveNowFn", Title: "Check proactive now", Description: "Run an agent's proactive check right away instead of waiting for the next one."},
+
 		// Jobs, flows, reminders
 		{Name: "list_jobs", RPC: "getJobs", Title: "List jobs", Description: "Scheduled jobs (including the daily briefing and heartbeat) with their schedule, chat, next run and last result."},
 		{Name: "get_job_preset", RPC: "getJobPreset", Title: "Get job preset", Description: "A ready-made job (dailyBriefing or heartbeat) for a chat, to pass to save_job."},

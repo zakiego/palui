@@ -21,6 +21,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/notes"
 	"github.com/zakiego/palui/apps/server/internal/connectors/outbound"
 	"github.com/zakiego/palui/apps/server/internal/connectors/printer"
+	"github.com/zakiego/palui/apps/server/internal/connectors/proactive"
 	"github.com/zakiego/palui/apps/server/internal/connectors/recall"
 	"github.com/zakiego/palui/apps/server/internal/connectors/reminders"
 	"github.com/zakiego/palui/apps/server/internal/connectors/remotemcp"
@@ -59,6 +60,7 @@ func Catalog() []Entry {
 		{"outbound", outbound.Runtime},
 		{"flows", flows.Runtime},
 		{"jobs", jobs.Runtime},
+		{"proactive", proactive.Runtime},
 		{"chats", chats.Runtime},
 		{"notes", notes.Runtime},
 		{"settings", settings.Runtime},

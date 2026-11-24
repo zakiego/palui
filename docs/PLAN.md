@@ -311,6 +311,20 @@ Automations the agent builds from chat out of triggers and steps (`apps/server/i
 - Tools: `create_flow`, `update_flow` (a full definition or a merge patch, `steps`/`triggers` patchable by id), `check_flow`, `test_flow`, `list_flows`, `get_flow`, `pause_flow`, `delete_flow`, `run_flow`, `flow_history`, `get_run`, `explain_flow`, `answer_checkin`, `cancel_run`, and `flows__recap` (the recap as data, usable as a step). Offered only in owner turns in the owner's DMs and the web chat. `palui__search_tools` hits carry `class` and `untrusted`, and leave destructive tools out with `for: "flow"`.
 - Dashboard: a read-only Flows page and a flow page (triggers, steps with branches, write calls, versions with their diffs, recent runs); a flow run opens its step log on the run page.
 
+## 6d. Proactive
+
+An agent tells the owner what matters without being asked (`apps/server/internal/proactive`, tools in the `proactive` connector, the agent page's Proactive tab). Accepted from `docs/rfc/proactive.md`, which keeps the reasoning and the rejected alternatives; this section is the source of truth for behavior.
+
+- Per agent (`agent_proactive`, config JSON validated by `proactive.Config.Validate`), off for every agent until the owner turns it on. The target must be a chat whose audience is `owner`, checked at save and at every tick; a target that stops being one pauses proactive with `paused_reason`.
+- Sources: a gcal connector (its `events` action, now to 36 hours ahead) and a wa-hub MCP connector (`list_chats tab=unanswered since=<now - maxAgeDays>`, structured content only, the tool classified read). Each must be a connector the agent may use. A source failing 3 ticks in a row tells the owner once a day.
+- The tick (every `checkEveryMin`, default 30, a scheduler extension with a lease): collect without the model, reconcile into the `nudges` ledger (one row per key, unique per agent), then decide. The first tick only seeds chats already waiting. A tick with nothing pending costs no tokens.
+- Calendar: an event with a physical location gets a `cal_depart` nudge at start minus `departLeadMin`; one with a video link a `cal_start` nudge at start minus `onlineLeadMin`. These are timed: sent at their minute from a template, never by the model, and expired instead of sent late. A moved event (start or location) gets one `cal_changed` nudge and its timed nudges follow. Declined, cancelled and all-day events get no timed nudge.
+- WhatsApp: one wait is one nudge (`wa:<chatId>:<awaitingSince>`); groups skipped by default, waits shorter than `waitHours` or older than `maxAgeDays` ignored. A chat no longer waiting closes its nudge. One escalation after `escalateHours`, never a second.
+- Decide: one call on the agent's `modelRole` (default `fast`) with zero tools, the turn tainted, every source field in `<untrusted>`, JSON out (`send`, `drop` with a reason, `text`). Contacts in `contacts`, `cal_changed` and escalations are always told; a nudge the model keeps skipping goes out from its template after 2 ticks. With `contactsAuto` the call gets the agent's memory profile, read once a day. Tokens count toward the global and the agent's daily cap; over a cap, only must-tell nudges go out, from templates.
+- Delivery: quiet hours hold everything except a change to an event within 3 hours (when `urgentPasses`); `maxPerHour` caps messages, extra ones wait and merge. Morning and evening summaries (07:00 and 20:00 by default) always go out, at most 2 hours late; the morning one carries what quiet hours held. Messages go through the outbox with `source = proactive:<agentId>`, plain text, capped at 700 characters, expiring after 6 hours.
+- Owner actions: `ndg:done:<id>`, `ndg:snooze:<id>:<1h|3h|tomorrow>`, `ndg:mute:<id>` buttons, or a WhatsApp reply quoting the message ("done", "tunda 3 jam", "jangan ingetin"). An action applies to every nudge in that message. A mute (`proactive_mutes`) drops every open and future nudge on that subject.
+- Retention: nudges and `proactive_ticks` 30 days (open nudges stay).
+
 ## 7. Scheduled jobs
 
 - A job is an RRULE, a zone, a prompt, a target chat, a tool scope and a model role.
@@ -369,6 +383,10 @@ Example: `/report-fix` with the report attached and a prompt telling the agent t
 | `flow_runs` | id, flow_id, version_id, chat_id, trigger_id, trigger_kind, run_key (unique per flow), parent_run_id, item_index, status, skip_reason, trigger json, vars json, taint json, cursor, wait json, wake_at, lease_until, steps_done, messages_sent, scheduled_at, started_at, ended_at, error, legacy_occurrence_id (retired, unused), dry_run |
 | `flow_step_runs` | id, run_id, seq, step_id, kind, attempt, status, input, output, tainted, branch, tool_call_id, turn_run_id, error, started_at, ms |
 | `outbox` | id, chat_id, connector_id, payload, status, attempts, next_attempt_at, claimed_at, channel_msg_id, source |
+| `agent_proactive` | agent_id, enabled, chat_id, config json, next_tick_at, last_tick_at, tick_lease_until, paused_reason |
+| `nudges` | id, agent_id, key (unique per agent), kind, subject, status, wake_at, sent_at, escalated_at, snapshot json, reason, outbox_id |
+| `proactive_mutes` | agent_id, subject, label |
+| `proactive_ticks` | id, agent_id, started_at, finished_at, sources json, found, sent, tokens, error (30 days) |
 | `events` | id, at, level, connector_id, kind, message |
 | `reports` | id, chat_id, session_id, note, text, created_at (one row per `/report`, kept until deleted) |
 | `settings` | key, value |

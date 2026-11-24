@@ -32,6 +32,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/logx"
 	"github.com/zakiego/palui/apps/server/internal/outbox"
 	"github.com/zakiego/palui/apps/server/internal/outmedia"
+	"github.com/zakiego/palui/apps/server/internal/proactive"
 	"github.com/zakiego/palui/apps/server/internal/secret"
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/tools"
@@ -248,11 +249,25 @@ func (a *App) buildRuntime(d *db.DB, key string, startedAt int64) {
 			}
 		},
 	})
+	tzOf := func() string {
+		tz, err := settings.Timezone(d)
+		if err != nil {
+			return "UTC"
+		}
+		return tz
+	}
+	pro := proactive.New(proactive.Options{
+		DB: d, Log: log.Child(logx.Fields{"component": "proactive"}), Clock: o.Clock,
+		Sources: proactive.LiveSources{Running: sup.Running, CallTool: tools.ConnectorToolCaller(sup.Running, tools.CallerOptions{Clock: o.Clock, TZ: tzOf})},
+		Models:  sup,
+		Profile: proactive.MemoryProfile(sup.Running),
+	})
 	built := deps.Build(deps.Options{
 		DB: d, Log: log,
-		RunTurn: func(t chat.TurnOptions) (chat.TurnResult, error) { return engine.RunTurn(t) },
-		Clock:   o.Clock,
-		Running: sup.Running,
+		RunTurn:   func(t chat.TurnOptions) (chat.TurnResult, error) { return engine.RunTurn(t) },
+		Clock:     o.Clock,
+		Running:   sup.Running,
+		Proactive: pro,
 	})
 	engine = chat.NewEngine(chat.EngineOptions{DB: d, Host: sup, Log: log.Child(logx.Fields{"component": "engine"}), Clock: o.Clock, Bus: chat.DefaultBus, Deps: built.Deps, AppURL: cfg.AppURL, DataDir: cfg.DataDir, MasterKey: key})
 	*services = *engine.Services

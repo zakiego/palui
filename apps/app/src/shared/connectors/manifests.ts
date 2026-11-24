@@ -9,6 +9,7 @@ import gcal from "./gcal/manifest"
 import hooks from "./hooks/manifest"
 import http from "./http/manifest"
 import jobs from "./jobs/manifest"
+import proactive from "./proactive/manifest"
 import mcp from "./mcp/manifest"
 import outbound from "./outbound/manifest"
 import printer from "./printer/manifest"
@@ -44,6 +45,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   outbound,
   flows,
   jobs,
+  proactive,
   chats: chatHistory,
   notes,
   settings,

@@ -26,6 +26,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/logx"
 	"github.com/zakiego/palui/apps/server/internal/models"
 	"github.com/zakiego/palui/apps/server/internal/outbound"
+	"github.com/zakiego/palui/apps/server/internal/proactive"
 	"github.com/zakiego/palui/apps/server/internal/reminders"
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/strx"
@@ -95,6 +96,9 @@ type Options struct {
 	Running func() []connectors.RunningEntry
 	// FlowsSerial runs flow work in sweep order (tests).
 	FlowsSerial bool
+	// Proactive is the proactive engine (docs/rfc/proactive.md), swept after
+	// the flow engine. Nil leaves proactive out.
+	Proactive *proactive.Engine
 }
 
 type Built struct {
@@ -106,6 +110,8 @@ type Built struct {
 	// run_flow, DryRunFlow's engine, and the flow tool caller it uses.
 	Flows     *flows.Engine
 	FlowTools *flows.ConnectorFlowCaller
+	// Proactive is Options.Proactive (CheckNow for the dashboard and tools).
+	Proactive *proactive.Engine
 }
 
 func Build(o Options) *Built {
@@ -148,7 +154,11 @@ func Build(o Options) *Built {
 		}
 	}
 	fe := flows.NewEngine(fo)
-	exts := append(append([]reminders.Extension{fe}, o.Extensions...), ob)
+	exts := []reminders.Extension{fe}
+	if o.Proactive != nil {
+		exts = append(exts, o.Proactive)
+	}
+	exts = append(append(exts, o.Extensions...), ob)
 	sched := reminders.NewScheduler(reminders.SchedulerOptions{
 		DB:     o.DB,
 		Log:    log.Child(logx.Fields{"component": "scheduler"}),
@@ -163,11 +173,15 @@ func Build(o Options) *Built {
 		Extensions:      exts,
 	})
 	clock := o.Clock
-	b := &Built{Scheduler: sched, Runner: runner, Outbound: ob, Flows: fe, FlowTools: flowTools}
+	b := &Built{Scheduler: sched, Runner: runner, Outbound: ob, Flows: fe, FlowTools: flowTools, Proactive: o.Proactive}
+	if o.Proactive != nil {
+		o.Proactive.OnPoke(sched.Poke)
+	}
 	b.Deps = chat.Deps{
-		ReminderActions: reminders.Actions{},
-		FlowActions:     flows.Actions{},
-		Flows:           flows.Router{},
+		ReminderActions:  reminders.Actions{},
+		FlowActions:      flows.Actions{},
+		ProactiveActions: proactive.Actions{},
+		Flows:            flows.Router{},
 		// Parse tokens count toward the daily cap like a turn's.
 		ParseReminder: func(ctx context.Context, text, tz string, now int64, model models.LanguageModel) (chat.ParsedReminder, error) {
 			return reminders.ParseReminder(ctx, text, tz, now, models.MeterToBudget(o.DB, model, clock), reminders.ParseOptions{}), nil

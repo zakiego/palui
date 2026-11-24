@@ -2,6 +2,7 @@ package gcal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"regexp"
@@ -220,6 +221,9 @@ func New(opts Options) *connectors.Runtime {
 					return kit.O("email", email, "calendars", ids)
 				},
 				Action: func(ctx context.Context, name string, input *jsonx.Object) (*jsonx.Object, error) {
+					if name == EventsAction {
+						return eventsAction(ctx, tokens, cfg, input, opts.Client, clock)
+					}
 					if name != "authUrl" {
 						return nil, errors.New("Unknown action " + name)
 					}
@@ -246,3 +250,61 @@ func New(opts Options) *connectors.Runtime {
 
 // Runtime is the gcal connector runtime.
 var Runtime = New(Options{})
+
+// EventsAction is the server-side read the proactive engine makes: every
+// event (with its id, video link and whether the owner declined) of every
+// picked calendar between "from" and "to" (Unix ms). Not a model tool: the
+// model reads the calendar through get_calendar.
+const EventsAction = "events"
+
+func eventsAction(ctx context.Context, tokens *TokenCache, cfg Config, input *jsonx.Object, hc *http.Client, clock func() int64) (*jsonx.Object, error) {
+	num := func(k string) (int64, bool) {
+		if input == nil {
+			return 0, false
+		}
+		v, ok := input.Get(k)
+		if !ok {
+			return 0, false
+		}
+		switch n := v.(type) {
+		case float64:
+			return int64(n), true
+		case int64:
+			return n, true
+		case int:
+			return int64(n), true
+		case json.Number:
+			i, err := n.Int64()
+			return i, err == nil
+		}
+		return 0, false
+	}
+	from, ok1 := num("from")
+	to, ok2 := num("to")
+	if !ok1 || !ok2 || to <= from {
+		return nil, errors.New("events needs from and to (Unix ms), to after from")
+	}
+	token, err := tokens.Get(ctx, clock())
+	if err != nil {
+		return nil, errors.New(explain(err))
+	}
+	ids := cfg.CalendarIDs
+	if len(ids) == 0 {
+		ids = []string{"primary"}
+	}
+	list := []any{}
+	for _, id := range ids {
+		evs, err := ListEvents(ctx, ListEventsInput{AccessToken: token, CalendarID: id, TimeMin: UTCISO(from), TimeMax: UTCISO(to), MaxResults: 100}, hc)
+		if err != nil {
+			var ge *GoogleError
+			if errors.As(err, &ge) && ge.Status == 401 {
+				tokens.Clear()
+			}
+			return nil, errors.New(explain(err))
+		}
+		for _, e := range evs {
+			list = append(list, e.JSON())
+		}
+	}
+	return kit.O("events", list), nil
+}
