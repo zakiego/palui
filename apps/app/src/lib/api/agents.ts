@@ -36,6 +36,9 @@ export type CatalogTool = {
   connectorLabel: string
   connectorType: string
   class: ToolClass
+  // An MCP tool the owner hasn't classified yet: it runs as destructive (class)
+  // and this is what the server's annotations suggest. Left out otherwise.
+  suggestedClass?: ToolClass
   title: string | null
   untrusted: boolean
   guestSafe: boolean

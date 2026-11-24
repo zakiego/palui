@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from "vitest"
 
 vi.mock("@tanstack/react-router", () => ({ Link: (props: Record<string, unknown>) => <a href="#">{props.children as never}</a> }))
 
-import { GroupActions, type ToolItem, type ToolsViewProps } from "./shared"
+import { GroupActions, GroupMeta, PermissionTree, type ToolItem, type ToolsViewProps } from "./shared"
 
 afterEach(cleanup)
 
@@ -32,6 +32,7 @@ function props(over: Partial<ToolsViewProps> = {}): ToolsViewProps {
     setScope: vi.fn(),
     noPrivate: () => false,
     setNoPrivate: vi.fn(),
+    applySuggested: vi.fn(async () => {}),
     permissions: { allowAll: false, tools: {} },
     setPermission: vi.fn(),
     ...over,
@@ -64,4 +65,51 @@ test("a server shared with other agents says how many", () => {
 test("a built-in connector has no switch", () => {
   render(<GroupActions head={item("reminders", "reminders")} props={props()} />)
   expect(screen.queryByRole("switch")).toBeNull()
+})
+
+// An MCP tool the owner hasn't classified: destructive at runtime, with the
+// class the server's annotations suggest.
+const hub = (tool: string, cls: ToolItem["class"], suggestedClass?: ToolItem["class"]): ToolItem => ({
+  ...item("mcp-hub", "mcp"),
+  name: `mcp-hub__${tool}`,
+  tool,
+  connectorLabel: "MCP Hub",
+  class: cls,
+  ...(suggestedClass ? { suggestedClass } : {}),
+})
+
+const hubTools = [
+  hub("list_todos", "destructive", "read"),
+  hub("search", "destructive", "read"),
+  hub("add_todo", "destructive", "write"),
+  hub("mystery", "destructive", "destructive"),
+  hub("drop_all", "destructive"),
+  hub("get_time", "read"),
+]
+
+test("an MCP server with unclassified tools offers the server's suggestions in one click", async () => {
+  const p = props({ tools: [...hubTools, item("reminders", "reminders")] })
+  render(<GroupActions head={hubTools[0]!} props={p} />)
+  expect(screen.getByText("4 tools aren't classified yet")).toBeTruthy()
+  expect(screen.getByText(/The server suggests 2 read, 1 write and 1 destructive\./)).toBeTruthy()
+  await userEvent.click(screen.getByRole("button", { name: "Use suggested classes" }))
+  expect(p.applySuggested).toHaveBeenCalledWith("mcp-hub")
+})
+
+test("no suggestions once every tool has a class", () => {
+  render(<GroupActions head={hubTools[4]!} props={props({ tools: [hubTools[4]!, hubTools[5]!] })} />)
+  expect(screen.queryByRole("button", { name: "Use suggested classes" })).toBeNull()
+})
+
+test("the group counts saved destructive tools apart from unclassified ones", () => {
+  render(<GroupMeta list={hubTools} scope="shared" />)
+  expect(screen.getByText("1 destructive")).toBeTruthy()
+  expect(screen.getByText("4 not classified")).toBeTruthy()
+})
+
+test("an unclassified tool says what the server suggests", () => {
+  render(<PermissionTree head={hubTools[0]!} list={hubTools} props={props({ tools: hubTools })} />)
+  expect(screen.getAllByText("Not classified, suggests read")).toHaveLength(2)
+  expect(screen.getByText("Not classified, suggests write")).toBeTruthy()
+  expect(screen.queryAllByText(/^Not classified/)).toHaveLength(4)
 })

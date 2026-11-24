@@ -51,10 +51,10 @@ import { StatusText } from "@/components/ui/status-text"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useLiveRefresh } from "@/hooks/use-live-events"
-import { setConnectorDataFn, setConnectorOwnerFn } from "@/lib/api/connectors"
+import { applySuggestedToolClassesFn, setConnectorDataFn, setConnectorOwnerFn } from "@/lib/api/connectors"
 import { deleteAgentFn, getAgentMemoryFn, getAgentPage, getAgentToolsFn, saveAgentFn, setAgentToolPermissionsFn, setChatAllowedFn, setChatDeployNoticeFn, setChatReplyModeFn } from "@/lib/api/agents"
 import { ago, errorMessage } from "@/lib/format"
-import { useT } from "@/lib/i18n"
+import { useCount, useT } from "@/lib/i18n"
 
 const TABS = ["settings", "chats", "instructions", "memory", "tools"] as const
 type Tab = (typeof TABS)[number]
@@ -936,6 +936,19 @@ function ToolsTab({ agent }: { agent: Agent }) {
     }
     refresh()
   }
+  // The server's suggested class for every MCP tool not classified yet. The
+  // classes come from the runtime, so reload the list after.
+  const count = useCount()
+  const applySuggested = async (connectorId: string) => {
+    try {
+      const r = await applySuggestedToolClassesFn({ data: { id: connectorId } })
+      toast.success(r.saved ? count(r.saved, "agents.tools.suggestedSaved.one", "agents.tools.suggestedSaved.many") : t("agents.tools.suggestedNone"))
+    } catch (err) {
+      toast.error(errorMessage(err))
+      return
+    }
+    refresh()
+  }
   // Tool permissions save at once, like the scope. Rolled back when the save fails.
   const router = useRouter()
   const [permissions, setPermissions] = React.useState(agent.toolPermissions)
@@ -1027,7 +1040,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
       )}
       {tools && tools.length > 0 && groups.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">{t("agents.tools.searchEmpty")}</p>}
       {data && tools && groups.length > 0 && (
-        <ToolsByScope agent={agent} data={data} tools={tools} groups={groups} query={query} agentsOf={agentsOf} setScope={(id, scope) => void setScope(id, scope)} noPrivate={noPrivate} setNoPrivate={(id, on) => void setNoPrivate(id, on)} permissions={permissions} setPermission={setPermission} />
+        <ToolsByScope agent={agent} data={data} tools={tools} groups={groups} query={query} agentsOf={agentsOf} setScope={(id, scope) => void setScope(id, scope)} noPrivate={noPrivate} setNoPrivate={(id, on) => void setNoPrivate(id, on)} applySuggested={applySuggested} permissions={permissions} setPermission={setPermission} />
       )}
     </>
   )
