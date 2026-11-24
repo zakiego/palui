@@ -18,6 +18,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - Added: Proactive can read WhatsApp through MCP Hub's `wa-personal__list_chats` too, so wa-hub doesn't need its own connector. ([#27](https://github.com/zakiego/palui/pull/27))
 - Changed: Proactive reads a waiting chat's recent messages before telling you about it, and skips conversations that are already finished. ([#28](https://github.com/zakiego/palui/pull/28))
 
+### Tools
+
+- Changed: the host bridge speaks MCP spec 2026-07-28 as well as the older `initialize` flow, on `@modelcontextprotocol/server` v2. Existing clients keep working unchanged.
+
 ## 0.16.0 (2026-11-25)
 
 ### Chat

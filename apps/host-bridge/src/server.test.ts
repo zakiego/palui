@@ -1,5 +1,4 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client"
 import { createLogger } from "./log.ts"
 import { afterEach, describe, expect, it } from "vitest"
 import { parseConfig } from "./config.ts"
@@ -27,9 +26,16 @@ afterEach(async () => {
   logs.length = 0
 })
 
-async function connect(token = TOKEN): Promise<Client> {
+// legacy: the 2025 initialize handshake (Claude Code, mcporter, Palui's Go
+// client against older servers). modern: spec 2026-07-28, no handshake.
+type Era = "legacy" | "modern"
+
+async function connect(token = TOKEN, era: Era = "legacy"): Promise<Client> {
   bridge ??= await startBridge({ ...config, port: 0 }, createLogger({}, (l) => logs.push(l)))
-  const client = new Client({ name: "test", version: "1.0.0" })
+  const client = new Client(
+    { name: "test", version: "1.0.0" },
+    era === "modern" ? { versionNegotiation: { mode: { pin: "2026-07-28" } } } : undefined,
+  )
   await client.connect(new StreamableHTTPClientTransport(new URL(bridge.url), { requestInit: { headers: { authorization: `Bearer ${token}` } } }))
   return client
 }
@@ -130,5 +136,55 @@ describe("host bridge", () => {
     const r = await client.callTool({ name: "nomatch", arguments: {} })
     expect(r.isError).toBe(false)
     expect(text(r)).toBe("exit 1\n(no output)")
+  })
+})
+
+describe("host bridge over both protocol eras", () => {
+  it.each(["legacy", "modern"] as const)("%s client lists and runs tools", async (era) => {
+    const client = await connect(TOKEN, era)
+    expect(client.getProtocolEra()).toBe(era)
+    const { tools } = await client.listTools()
+    expect(tools.map((t) => t.name).sort()).toEqual(["fail", "flood", "nomatch", "say", "slow"])
+    const say = await client.callTool({ name: "say", arguments: { word: "palui" } })
+    expect(say.isError).toBe(false)
+    expect(text(say)).toBe("exit 0\n--- stdout ---\nhi palui\n")
+    const fail = await client.callTool({ name: "fail", arguments: {} })
+    expect(fail.isError).toBe(true)
+  })
+
+  it("gives a modern client the same tool list as a legacy one", async () => {
+    const legacy = await (await connect(TOKEN, "legacy")).listTools()
+    const modern = await (await connect(TOKEN, "modern")).listTools()
+    expect(modern.tools).toEqual(legacy.tools)
+  })
+
+  it("answers server/discover with the 2026-07-28 revision", async () => {
+    bridge ??= await startBridge({ ...config, port: 0 }, createLogger({}, (l) => logs.push(l)))
+    const meta = {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientInfo": { name: "test", version: "1" },
+      "io.modelcontextprotocol/clientCapabilities": {},
+    }
+    const res = await fetch(bridge.url, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "mcp-protocol-version": "2026-07-28",
+        "mcp-method": "server/discover",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: meta } }),
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { result: { resultType: string; supportedVersions: string[]; capabilities: { tools?: object } } }
+    expect(body.result.resultType).toBe("complete")
+    expect(body.result.supportedVersions).toContain("2026-07-28")
+    expect(body.result.capabilities.tools).toBeDefined()
+  })
+
+  it("refuses a wrong token from a modern client too", async () => {
+    await expect(connect("wrong", "modern")).rejects.toThrow()
+    expect(logs.some((l) => l.includes('"status":401'))).toBe(true)
   })
 })
