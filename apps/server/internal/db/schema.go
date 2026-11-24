@@ -997,6 +997,29 @@ func ScanProactiveNote(s Scanner) (ProactiveNote, error) {
 	return r, err
 }
 
+// WaInboxChat is a wa_inbox_chats row: one chat of a read-only WhatsApp
+// inbox. WaitingSince is nil when the owner replied last.
+type WaInboxChat struct {
+	ConnectorID  string `json:"connectorId"`
+	ChatJID      string `json:"chatJid"`
+	Kind         string `json:"kind"`
+	Name         string `json:"name"`
+	LastInAt     *int64 `json:"lastInAt"`
+	LastOutAt    *int64 `json:"lastOutAt"`
+	WaitingSince *int64 `json:"waitingSince"`
+	Unanswered   int64  `json:"unanswered"`
+	Preview      string `json:"preview"`
+	UpdatedAt    int64  `json:"updatedAt"`
+}
+
+const WaInboxChatCols = "connector_id, chat_jid, kind, name, last_in_at, last_out_at, waiting_since, unanswered, preview, updated_at"
+
+func ScanWaInboxChat(s Scanner) (WaInboxChat, error) {
+	var r WaInboxChat
+	err := s.Scan(&r.ConnectorID, &r.ChatJID, &r.Kind, &r.Name, &r.LastInAt, &r.LastOutAt, &r.WaitingSince, &r.Unanswered, &r.Preview, &r.UpdatedAt)
+	return r, err
+}
+
 // ProactiveTick is a proactive_ticks row: one collection pass.
 type ProactiveTick struct {
 	ID         string  `json:"id"`

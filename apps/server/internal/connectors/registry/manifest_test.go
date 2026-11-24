@@ -16,6 +16,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/t3code"
 	"github.com/zakiego/palui/apps/server/internal/connectors/telegram"
 	"github.com/zakiego/palui/apps/server/internal/connectors/voice"
+	"github.com/zakiego/palui/apps/server/internal/connectors/wainbox"
 	"github.com/zakiego/palui/apps/server/internal/connectors/whatsapp"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/testutil"
@@ -33,6 +34,7 @@ var configSchemas = map[string]*zod.ObjectS{
 	"http":     httpreq.ConfigZod,
 	"gcal":     gcal.ConfigZod,
 	"ics":      ics.ConfigZod,
+	"wa-inbox": wainbox.ConfigZod,
 	"t3code":   t3code.ConfigZod,
 	"printer":  printer.ConfigZod,
 	"voice":    voice.ConfigZod,

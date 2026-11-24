@@ -217,6 +217,14 @@ func worst(k *Kit) {
 		Detail: ptr("Can't reach the printer at ipp://host.docker.internal:631/printers/Meeting_Room_Second_Floor_Color_Laser. Check the URL, and that the Mac and CUPS are up."),
 		Config: obj("url", "ipp://host.docker.internal:631/printers/Meeting_Room_Second_Floor_Color_Laser"),
 	})
+	// A WhatsApp inbox someone unlinked from the phone, with the longest label.
+	k.Connector("wa-inbox-pribadi", "wa-inbox", ConnectorOpts{
+		Label:  ptr(within("WhatsApp pribadi (nomor lama, dipakai buat keluarga dan klien)", L.connectorLabel)),
+		Status: "error",
+		Trust:  ptr("external"),
+		Detail: ptr("unlinked"),
+		Config: obj("pairPhone", "+62 812 3456 7890", "linkedNumber", "6281234567890"),
+	})
 	// A calendar feed with the longest label, the owner's addresses at their
 	// limit, and the error a reset link gives.
 	k.Connector("ics-keluarga", "ics", ConnectorOpts{

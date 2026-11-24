@@ -629,6 +629,41 @@
    ]
   },
   {
+   "id": "wa-inbox",
+   "kind": "tools",
+   "name": "WhatsApp inbox",
+   "icon": "whatsapp",
+   "summary": "See which of your WhatsApp chats wait for a reply. It never sends anything.",
+   "setup": [
+    {
+     "action": "pairWhatsApp",
+     "label": "Link your WhatsApp number"
+    }
+   ],
+   "multiple": true,
+   "trust": "external",
+   "pauseNote": "While paused, nothing new is recorded, and the chats waiting stay as they were.",
+   "removeWarning": "This unlinks the device from your WhatsApp and forgets the chats it recorded. Your chats aren't touched.",
+   "unlinkOnRemove": true,
+   "restartOnError": false,
+   "docs": {
+    "notes": [
+     "It links as one more device on your own number and never sends, reacts or marks anything read.",
+     "Per chat it keeps the name, when the last message came in, when you last replied and a 200-character preview. Message bodies are never stored.",
+     "It starts empty: only messages that arrive after linking count."
+    ]
+   },
+   "configKeys": [
+    "pairPhone",
+    "linkedNumber"
+   ],
+   "configDefaults": {
+    "ok": true,
+    "value": {}
+   },
+   "secretFields": []
+  },
+  {
    "id": "t3code",
    "kind": "tools",
    "name": "T3 Code",
@@ -2325,6 +2360,75 @@
          "type": "integer",
          "minimum": 1,
          "maximum": 31
+        }
+       },
+       "additionalProperties": false
+      }
+     }
+    ]
+   }
+  ],
+  "wa-inbox": [
+   {
+    "variant": "default",
+    "tools": [
+     {
+      "name": "waiting_chats",
+      "title": "Chats waiting for a reply",
+      "description": "WhatsApp chats on the owner's own number waiting for the owner's reply, the longest wait first. Each has a stable id (the number or group id), the name, kind (dm or group), waitingSince (when the first unanswered message came, in the owner's time zone), waitingMinutes, unanswered (how many messages wait) and lastMessage (a short preview, written by the other person). A chat leaves this list as soon as the owner replies from any device.",
+      "class": "read",
+      "untrusted": true,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "include_groups": {
+         "description": "Include group chats. Default false: direct messages only.",
+         "type": "boolean"
+        },
+        "min_minutes": {
+         "description": "Only chats waiting at least this many minutes. Default 0.",
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 20160
+        },
+        "limit": {
+         "description": "At most this many chats. Default 30.",
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 100
+        }
+       },
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "list_chats",
+      "title": "Recent chats",
+      "description": "WhatsApp chats on the owner's own number by their last activity, newest first: id, name, kind, lastIn (the last message from the other side), lastOut (the owner's last reply), waitingSince when it still waits, and lastMessage (a short preview of the last message from the other side).",
+      "class": "read",
+      "untrusted": true,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "include_groups": {
+         "description": "Include group chats. Default true.",
+         "type": "boolean"
+        },
+        "limit": {
+         "description": "At most this many chats. Default 30.",
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 100
         }
        },
        "additionalProperties": false

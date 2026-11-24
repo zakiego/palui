@@ -26,6 +26,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/remotemcp"
 	settingsconn "github.com/zakiego/palui/apps/server/internal/connectors/settings"
 	t3conn "github.com/zakiego/palui/apps/server/internal/connectors/t3code"
+	wainboxconn "github.com/zakiego/palui/apps/server/internal/connectors/wainbox"
 	webfetchconn "github.com/zakiego/palui/apps/server/internal/connectors/webfetch"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
@@ -105,9 +106,10 @@ func catalogBuilders(t *testing.T, e *catalogEnv) map[string]map[string]*connect
 			"forget_memory", connectors.PaluiTool{Tool: recallconn.ForgetTool(api, nil), Class: "destructive", Title: "Forget memory"},
 			"forget_document", connectors.PaluiTool{Tool: recallconn.ForgetDocumentTool(api, nil), Class: "destructive", Title: "Delete document"},
 		)},
-		"ics":    {"default": icsconn.Tools(icsconn.NewFeed("https://calendar.example.com/private-abc/basic.ics", nil, icsconn.Options{}), e.owner, icsconn.Options{})},
-		"gcal":   {"default": with("get_calendar", connectors.PaluiTool{Tool: gcalconn.CalendarTool(tokens, gcalCfg, e.owner, nil, clock), Class: "read", Untrusted: true, Title: "Check the calendar"})},
-		"t3code": {"default": t3(nil, false), "custom": t3(jsonx.NewMap[any]().Assign(kitObj("baseRef", "develop")), true)},
+		"ics":      {"default": icsconn.Tools(icsconn.NewFeed("https://calendar.example.com/private-abc/basic.ics", nil, icsconn.Options{}), e.owner, icsconn.Options{})},
+		"wa-inbox": {"default": wainboxconn.Tools(e.db, "wa-inbox-1", e.owner, clock)},
+		"gcal":     {"default": with("get_calendar", connectors.PaluiTool{Tool: gcalconn.CalendarTool(tokens, gcalCfg, e.owner, nil, clock), Class: "read", Untrusted: true, Title: "Check the calendar"})},
+		"t3code":   {"default": t3(nil, false), "custom": t3(jsonx.NewMap[any]().Assign(kitObj("baseRef", "develop")), true)},
 	}
 }
 

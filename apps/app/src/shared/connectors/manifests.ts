@@ -24,6 +24,7 @@ import t3code from "./t3code/manifest"
 import telegram from "./telegram/manifest"
 import tgbot from "./tgbot/manifest"
 import voice from "./voice/manifest"
+import waInbox from "./wa-inbox/manifest"
 import web from "./web/manifest"
 import webfetch from "./webfetch/manifest"
 import whatsapp from "./whatsapp/manifest"
@@ -41,6 +42,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   http,
   gcal,
   ics,
+  "wa-inbox": waInbox,
   t3code,
   printer,
   reminders,
