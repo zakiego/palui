@@ -55,7 +55,7 @@ type Candidate struct {
 	Snapshot Snapshot
 }
 
-// Event is one calendar event as the gcal events action returns it.
+// Event is one calendar event, from the gcal events action or an MCP tool.
 type Event struct {
 	ID       string
 	Title    string
@@ -100,8 +100,11 @@ func (s LiveSources) entry(id string) (*connectors.RunningEntry, error) {
 	return nil, fmt.Errorf("Connector %s isn't running. Turn it on in Connectors.", id)
 }
 
-// Events calls the gcal connector's events action.
+// Events calls the gcal connector's events action, or the MCP tool cal.Tool.
 func (s LiveSources) Events(ctx context.Context, cal CalendarSource, agentID string, from, to int64, tz string) ([]Event, error) {
+	if cal.Tool != "" {
+		return s.mcpEvents(ctx, cal, agentID, from, to, tz)
+	}
 	e, err := s.entry(cal.ConnectorID)
 	if err != nil {
 		return nil, err
@@ -157,6 +160,140 @@ func ParseEvents(out *jsonx.Object, tz string) ([]Event, error) {
 		list = append(list, Event{ID: e.ID, Title: e.Title, Start: start, End: end, AllDay: e.AllDay, Location: e.Location, MeetLink: e.MeetLink})
 	}
 	return list, nil
+}
+
+// mcpEvents calls a Google Calendar style list_events tool over MCP. The tool
+// caller refuses it until the owner classifies it read.
+func (s LiveSources) mcpEvents(ctx context.Context, cal CalendarSource, agentID string, from, to int64, tz string) ([]Event, error) {
+	if s.CallTool == nil {
+		return nil, errors.New("No tool caller is wired")
+	}
+	loc := loadTZ(tz)
+	args := jsonx.NewMap[any]()
+	args.Set("timeMin", time.UnixMilli(from).In(loc).Format(time.RFC3339))
+	args.Set("timeMax", time.UnixMilli(to).In(loc).Format(time.RFC3339))
+	args.Set("timeZone", loc.String())
+	out, err := s.CallTool(ctx, cal.ConnectorID, cal.Tool, args, &tools.CallScope{AgentID: agentID})
+	if err != nil {
+		return nil, err
+	}
+	return ParseMCPEvents(out, tz)
+}
+
+// ErrNoEvents is the refusal for a calendar tool whose result has no events
+// list, so a wrong tool isn't read as an empty calendar.
+var ErrNoEvents = errors.New("The calendar tool didn't return an events list. Pick a Google Calendar list_events tool.")
+
+// mcpEventTime is a Google Calendar start or end: dateTime, or date for an
+// all-day event.
+type mcpEventTime struct {
+	DateTime string `json:"dateTime"`
+	Date     string `json:"date"`
+}
+
+// ParseMCPEvents reads a list_events MCP result in the Google Calendar API
+// shape: {events: [...]} as structured content or as JSON text. Cancelled
+// events and events the owner declined are left out.
+func ParseMCPEvents(out any, tz string) ([]Event, error) {
+	b, err := jsonx.Marshal(out)
+	if err != nil {
+		return nil, err
+	}
+	var res struct {
+		IsError bool `json:"isError"`
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+		Structured json.RawMessage `json:"structuredContent"`
+	}
+	if err := json.Unmarshal(b, &res); err != nil {
+		return nil, err
+	}
+	if res.IsError {
+		msg := "The calendar tool refused the call"
+		for _, c := range res.Content {
+			if c.Type == "text" && c.Text != "" {
+				msg = c.Text
+				break
+			}
+		}
+		return nil, errors.New(clip(msg, 300))
+	}
+	var body struct {
+		Events *[]struct {
+			ID          string       `json:"id"`
+			Summary     string       `json:"summary"`
+			Start       mcpEventTime `json:"start"`
+			End         mcpEventTime `json:"end"`
+			Status      string       `json:"status"`
+			Location    string       `json:"location"`
+			Description string       `json:"description"`
+			MeetLink    string       `json:"meetLink"`
+			HangoutLink string       `json:"hangoutLink"`
+			Attendees   []struct {
+				Self           bool   `json:"self"`
+				Response       string `json:"response"`
+				ResponseStatus string `json:"responseStatus"`
+			} `json:"attendees"`
+		} `json:"events"`
+	}
+	parsed := false
+	if len(res.Structured) > 0 && string(res.Structured) != "null" {
+		parsed = json.Unmarshal(res.Structured, &body) == nil && body.Events != nil
+	}
+	for i := 0; !parsed && i < len(res.Content); i++ {
+		if c := res.Content[i]; c.Type == "text" {
+			parsed = json.Unmarshal([]byte(c.Text), &body) == nil && body.Events != nil
+		}
+	}
+	if !parsed {
+		return nil, ErrNoEvents
+	}
+	loc := loadTZ(tz)
+	list := []Event{}
+	for _, e := range *body.Events {
+		if e.ID == "" || e.Status == "cancelled" {
+			continue
+		}
+		declined := false
+		for _, a := range e.Attendees {
+			declined = declined || (a.Self && (a.Response == "declined" || a.ResponseStatus == "declined"))
+		}
+		if declined {
+			continue
+		}
+		allDay := e.Start.DateTime == "" && e.Start.Date != ""
+		start, ok := parseWhen(e.Start.DateTime+e.Start.Date, loc)
+		if !ok {
+			continue
+		}
+		end, ok := parseWhen(e.End.DateTime+e.End.Date, loc)
+		if !ok {
+			end = start
+		}
+		link := e.MeetLink
+		if link == "" {
+			link = e.HangoutLink
+		}
+		if link == "" {
+			link = joinLinkIn(e.Description)
+		}
+		list = append(list, Event{ID: e.ID, Title: e.Summary, Start: start, End: end, AllDay: allDay, Location: e.Location, MeetLink: link})
+	}
+	return list, nil
+}
+
+// joinLinkRe finds a video call link in an event description (Teams and Zoom
+// invites put it there instead of in a conference field).
+var joinLinkRe = regexp.MustCompile(`https://(?:meet\.google\.com|(?:[a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com)/[^\s<>"')\]]+`)
+
+func joinLinkIn(text string) string {
+	link := joinLinkRe.FindString(text)
+	if len(link) > 1000 {
+		return ""
+	}
+	return link
 }
 
 func loadTZ(tz string) *time.Location {
@@ -250,10 +387,14 @@ func ParseWaiting(out any) ([]WaitingChat, error) {
 
 var urlRe = regexp.MustCompile(`(?i)^https?://\S+$`)
 
-// isPhysical: a location someone travels to (not empty, not a link).
+// videoLabelRe is a location that only names a video call service.
+var videoLabelRe = regexp.MustCompile(`(?i)^(microsoft teams( meeting)?|teams meeting|zoom( meeting)?|google meet|online|virtual)$`)
+
+// isPhysical: a location someone travels to (not empty, not a link, not a
+// video call label like "Microsoft Teams Meeting").
 func isPhysical(loc string) bool {
 	l := strings.TrimSpace(loc)
-	if l == "" || urlRe.MatchString(l) {
+	if l == "" || urlRe.MatchString(l) || videoLabelRe.MatchString(l) {
 		return false
 	}
 	if u, err := url.Parse(l); err == nil && u.Scheme != "" && u.Host != "" {

@@ -197,7 +197,11 @@ func checkSources(q db.Q, agentID string, cfg Config) error {
 		return nil
 	}
 	if cfg.Calendar != nil {
-		if err := check(cfg.Calendar.ConnectorID, "calendar", "gcal"); err != nil {
+		calType := "gcal"
+		if cfg.Calendar.Tool != "" {
+			calType = "mcp"
+		}
+		if err := check(cfg.Calendar.ConnectorID, "calendar", calType); err != nil {
 			return err
 		}
 	}
