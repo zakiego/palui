@@ -19,6 +19,7 @@ import (
 	notesconn "github.com/zakiego/palui/apps/server/internal/connectors/notes"
 	outboundconn "github.com/zakiego/palui/apps/server/internal/connectors/outbound"
 	printerconn "github.com/zakiego/palui/apps/server/internal/connectors/printer"
+	proactiveconn "github.com/zakiego/palui/apps/server/internal/connectors/proactive"
 	recallconn "github.com/zakiego/palui/apps/server/internal/connectors/recall"
 	remindersconn "github.com/zakiego/palui/apps/server/internal/connectors/reminders"
 	"github.com/zakiego/palui/apps/server/internal/connectors/remotemcp"
@@ -91,6 +92,7 @@ func catalogBuilders(t *testing.T, e *catalogEnv) map[string]map[string]*connect
 		"flows":       {"owner": owner, "flow": with("recap", flowsconn.RecapTool(e.db, flowTurn, clock))},
 		"hooks":       {"default": started(hooksconn.Runtime)},
 		"jobs":        {"default": jobsconn.Tools(e.db, clock, "")},
+		"proactive":   {"default": proactiveconn.Tools(e.db, clock, e.owner)},
 		"notes":       {"default": must(notesconn.Tools(e.db, clock, "")), "agent": must(notesconn.Tools(e.db, clock, e.agentID))},
 		"printer":     {"default": printerconn.Tools(e.db, e.owner, printerconn.Config{URL: "ipp://host.docker.internal:631/printers/My_Printer"}, printerconn.Options{})},
 		"outbound":    {"owner": must(outboundconn.Tools(e.db, e.owner, clock)), "unattended": must(outboundconn.Tools(e.db, unattended, clock))},

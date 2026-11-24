@@ -804,6 +804,35 @@
    "secretFields": []
   },
   {
+   "id": "proactive",
+   "kind": "skill",
+   "name": "Proactive",
+   "icon": "radar",
+   "summary": "Tells you what matters without being asked.",
+   "description": "An agent with proactive on checks your calendar and WhatsApp every 30 minutes and messages you first: when to leave, a meeting about to start, a changed event, a chat waiting for your reply, plus a morning and an evening summary. Set it up per agent on the agent's Proactive tab, or from chat with these tools.",
+   "setup": [],
+   "builtin": true,
+   "pauseNote": "Pausing hides the chat tools. Proactive keeps running; turn it off on the agent's Proactive tab.",
+   "docs": {
+    "commands": [
+     "nyalain proactive di chat ini",
+     "jam tenang jadi 23:00",
+     "jangan ingetin grup kantor lagi",
+     "proactive hari ini ngabarin apa aja?"
+    ],
+    "notes": [
+     "Proactive is off for every agent until you turn it on. Its messages only go to your own DM or the web chat.",
+     "WhatsApp needs a wa-hub MCP server whose list_chats returns structured content, classified read on the Connectors page."
+    ]
+   },
+   "configKeys": [],
+   "configDefaults": {
+    "ok": true,
+    "value": {}
+   },
+   "secretFields": []
+  },
+  {
    "id": "chats",
    "kind": "skill",
    "name": "Chat history",
@@ -2209,6 +2238,159 @@
          "type": "boolean"
         }
        },
+       "additionalProperties": false
+      }
+     }
+    ]
+   }
+  ],
+  "proactive": [
+   {
+    "variant": "default",
+    "tools": [
+     {
+      "name": "get_proactive",
+      "title": "Read proactive settings",
+      "description": "This agent's proactive settings: on or off, target chat, check interval, quiet hours, morning and evening summary, calendar and WhatsApp sources, important contacts and muted subjects.",
+      "class": "read",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {},
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "update_proactive",
+      "title": "Change proactive settings",
+      "description": "Change this agent's proactive settings. enabled turns it on or off; chat \"this\" makes the current chat the target; patch is a JSON merge patch on the config (keys: checkEveryMin 15-120, maxPerHour 1-10, quietHours {start,end,urgentPasses}, morning {on,at}, evening {on,at}, calendar {connectorId,departLeadMin,onlineLeadMin,notifyChanges} or null, whatsapp {connectorId,account,waitHours,escalateHours,maxAgeDays,skipGroups} or null, contactsAuto, contacts [{subject,label}], modelRole fast|default). Times are HH:MM.",
+      "class": "write",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": true,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "enabled": {
+         "description": "Turn proactive on or off for this agent.",
+         "type": "boolean"
+        },
+        "chat": {
+         "description": "\"this\" sends proactive messages to the current chat (it must be the owner's DM or the web chat).",
+         "type": "string",
+         "enum": [
+          "this"
+         ]
+        },
+        "patch": {}
+       },
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "mute_proactive",
+      "title": "Stop a proactive reminder",
+      "description": "Stop proactive reminders about one chat or event, found by name among recent proactive messages.",
+      "class": "write",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "who": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 120,
+         "description": "A name or event title from a recent proactive message, e.g. \"grup kantor\" or \"Pak Budi\"."
+        }
+       },
+       "required": [
+        "who"
+       ],
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "unmute_proactive",
+      "title": "Resume a proactive reminder",
+      "description": "Let proactive remind about a muted chat or event again, by its name in the muted list.",
+      "class": "write",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "who": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 120,
+         "description": "A name or event title from a recent proactive message, e.g. \"grup kantor\" or \"Pak Budi\"."
+        }
+       },
+       "required": [
+        "who"
+       ],
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "list_nudges",
+      "title": "List proactive messages",
+      "description": "What proactive found recently and what it did with each: sent, pending, dropped (with why), done, snoozed.",
+      "class": "read",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "status": {
+         "description": "Filter. Default all.",
+         "type": "string",
+         "enum": [
+          "all",
+          "sent",
+          "pending",
+          "dropped"
+         ]
+        }
+       },
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "check_proactive_now",
+      "title": "Check now",
+      "description": "Run this agent's proactive check within a minute instead of waiting for the next one.",
+      "class": "write",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {},
        "additionalProperties": false
       }
      }
