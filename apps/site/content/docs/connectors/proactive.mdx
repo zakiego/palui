@@ -12,7 +12,7 @@ Proactive is built in. Set it up on an agent's page, in the **Proactive** tab:
 1. Pick where messages go: your own DM or the web chat. Groups and other people's chats can't be picked.
 2. Pick the sources:
    - **Calendar**: a [Google Calendar](/docs/connectors/google-calendar) connector, or an [MCP server](/docs/connectors/mcp) with a Google Calendar `list_events` tool (MCP Hub's `calendar__list_events`, for example), classified **read**. The tool needs `calendar` or `gcal` in its name and the Google Calendar arguments (`timeMin`, `timeMax`, `timeZone`).
-   - **WhatsApp**: an [MCP server](/docs/connectors/mcp) connector pointing at [wa-hub](https://github.com/zakiego/wa-hub), with its `list_chats` tool classified **read**. wa-hub needs the version whose `list_chats` returns structured content.
+   - **WhatsApp**: an [MCP server](/docs/connectors/mcp) connector pointing at [wa-hub](https://github.com/zakiego/wa-hub), with its `list_chats` tool classified **read**, or a hub that serves wa-hub's tool under a prefix starting with `wa` (MCP Hub's `wa-personal__list_chats`). wa-hub needs the version whose `list_chats` returns structured content, and a hub must pass that through.
 3. Switch on **Message me first**.
 
 You can do the same from chat: "nyalain proactive di chat ini".

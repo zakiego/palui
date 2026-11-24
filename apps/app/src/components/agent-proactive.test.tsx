@@ -182,3 +182,19 @@ test("an MCP calendar tool is a calendar source, saved with its tool", async () 
     data: { agentId: "agt_palui", config: { calendar: { connectorId: "mcp-hub", tool: "calendar__list_events", departLeadMin: 30, onlineLeadMin: 10, notifyChanges: true } } },
   })
 })
+
+test("wa-hub behind a hub is a WhatsApp source, saved with its tool", async () => {
+  const hub = { id: "mcp-hub", label: "MCP Hub", status: "on" as const }
+  api.getProactiveFn.mockResolvedValue(view({ connectors: { calendar: [], whatsapp: [{ ...hub, tool: "wa-personal__list_chats" }] } }))
+  api.saveProactiveFn.mockImplementation(async () => view())
+  const user = userEvent.setup()
+  render(<AgentProactive agentId="agt_palui" />)
+  await user.click(await screen.findByRole("combobox", { name: "WhatsApp" }))
+  await user.click(await screen.findByRole("option", { name: "MCP Hub (wa-personal__list_chats)" }))
+  expect(api.saveProactiveFn).toHaveBeenCalledWith({
+    data: {
+      agentId: "agt_palui",
+      config: { whatsapp: { connectorId: "mcp-hub", tool: "wa-personal__list_chats", account: "personal", waitHours: 2, escalateHours: 4, maxAgeDays: 3, skipGroups: true } },
+    },
+  })
+})

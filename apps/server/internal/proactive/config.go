@@ -59,9 +59,12 @@ type CalendarSource struct {
 	NotifyChanges bool   `json:"notifyChanges"`
 }
 
-// WhatsAppSource reads wa-hub's list_chats over an MCP connector.
+// WhatsAppSource reads wa-hub's list_chats over an MCP connector: the
+// connector's own list_chats, or Tool when wa-hub is behind a hub that
+// prefixes it ("wa-personal__list_chats" on MCP Hub).
 type WhatsAppSource struct {
 	ConnectorID   string `json:"connectorId"`
+	Tool          string `json:"tool,omitempty"`
 	Account       string `json:"account"`
 	WaitHours     int    `json:"waitHours"`
 	EscalateHours int    `json:"escalateHours"`
@@ -158,6 +161,9 @@ func (c Config) Validate() error {
 	if wa := c.WhatsApp; wa != nil {
 		if strings.TrimSpace(wa.ConnectorID) == "" {
 			return bad("Pick a WhatsApp connector")
+		}
+		if wa.Tool != "" && !toolNameRe.MatchString(wa.Tool) {
+			return bad("WhatsApp tool must be an MCP tool name")
 		}
 		if strings.TrimSpace(wa.Account) == "" || len(wa.Account) > 32 {
 			return bad("WhatsApp account must be 1 to 32 characters")

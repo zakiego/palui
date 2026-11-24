@@ -793,7 +793,7 @@ export const id: Record<Key, string> = {
   "proactive.noConnectors": "Belum ada konektor kalender atau MCP.",
   "proactive.addConnector": "Tambah konektor",
   "proactive.calendar": "Kalender",
-  "proactive.calendarTool": "{label} ({tool})",
+  "proactive.sourceTool": "{label} ({tool})",
   "proactive.whatsapp": "WhatsApp",
   "proactive.off": "Mati",
   "proactive.departLead": "Waktunya berangkat",
