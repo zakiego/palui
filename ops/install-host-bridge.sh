@@ -61,6 +61,12 @@ sed -e "s|__LABEL__|$label|g" -e "s|__HOST_DIR__|$PALUI_HOST_DIR|g" -e "s|__NODE
 plutil -lint "$plist" >/dev/null
 
 launchctl bootout "$domain/$label" 2>/dev/null || true
+# bootout returns before launchd has removed the job, and a bootstrap in that
+# window fails with "Bootstrap failed: 5: Input/output error". Wait up to 10s.
+for _ in $(seq 1 50); do
+  launchctl print "$domain/$label" >/dev/null 2>&1 || break
+  sleep 0.2
+done
 launchctl bootstrap "$domain" "$plist"
 
 echo
