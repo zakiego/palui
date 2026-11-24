@@ -330,8 +330,8 @@ func checkFields(q db.Q, i Input, selfID string, isDefault bool) error {
 			return errf("Persona is at most %d characters.", MaxPersona)
 		}
 	}
-	if i.GuestTools != nil && *i.GuestTools != "none" && *i.GuestTools != "safe" {
-		return errf("Guest tools must be none or safe.")
+	if i.GuestTools != nil && *i.GuestTools != tools.GuestToolsNone && *i.GuestTools != tools.GuestToolsSafe && *i.GuestTools != tools.GuestToolsMembers {
+		return errf("Guest tools must be none, safe or members.")
 	}
 	if i.DailyTokenCap != nil && *i.DailyTokenCap < 0 {
 		return errf("Daily cap must be a whole number, 0 or more.")
