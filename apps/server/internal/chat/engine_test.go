@@ -324,15 +324,15 @@ func TestCommands(t *testing.T) {
 		notContains(t, latest.Text, "Owner replied to")
 	})
 
-	t.Run("/report without a note asks for one next time, after the report", func(t *testing.T) {
+	t.Run("/report without a note sends only the report", func(t *testing.T) {
 		h := basic(t, nil, extra{})
 		h.sendIdle("/report")
 		saved := need(db.ScanReport(h.DB.QueryRow("SELECT " + db.ReportCols + " FROM reports")))
 		eq(t, saved.Note, "")
 		notContains(t, saved.Text, "Owner says:")
 		texts := outboxTexts(t, h.DB)
+		eq(t, len(texts), 1)
 		eq(t, texts[0], saved.Text)
-		eq(t, texts[1], "Lain kali tulis juga apa yang salah, biar lebih gampang dilacak: /report <apa yang salah>")
 	})
 
 	t.Run("/connectors off telegram is allowed when WhatsApp is reachable, and says how to undo", func(t *testing.T) {
