@@ -453,7 +453,9 @@ func New(opts Options) *connectors.Runtime {
 					if ok && !pref.Enabled {
 						return connectors.ToolCallResult{}, fmt.Errorf("Tool %s is turned off on the Connectors page", name)
 					}
-					cls := SuggestClass(def.Annotations)
+					// Like SelectTools: the server's annotations don't count
+					// until the owner saves a class (fail closed).
+					cls := "destructive"
 					if ok && pref.Class != "" {
 						cls = pref.Class
 					}
