@@ -5,13 +5,16 @@ package rpcsetup
 // settings that live on it.
 
 import (
+	"fmt"
 	"net/http"
 	"regexp"
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/gcal"
+	"github.com/zakiego/palui/apps/server/internal/connectors/kit"
 	"github.com/zakiego/palui/apps/server/internal/connectors/manage"
+	mcpconn "github.com/zakiego/palui/apps/server/internal/connectors/mcp"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/events"
 	"github.com/zakiego/palui/apps/server/internal/httpapi"
@@ -530,6 +533,72 @@ func setConnectorData(c *httpapi.Call) (any, error) {
 	return map[string]bool{"ok": true}, nil
 }
 
+// applySuggestedToolClasses saves, for every tool of an MCP server the owner
+// hasn't classified yet, the class the server's annotations suggest. Until
+// then those tools run as destructive (fail closed); a saved class is never
+// touched, and a tool without annotations stays destructive. Owner only: the
+// annotations are the server's own word, so only the owner can take it.
+func applySuggestedToolClasses(c *httpapi.Call) (any, error) {
+	id := str(c, "id")
+	row, found, err := connectors.Get(c.DB(), id)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, httpapi.Fail("That connector doesn't exist anymore.")
+	}
+	if row.Type != "mcp" {
+		return nil, httpapi.Fail("Only an MCP server suggests tool classes.")
+	}
+	rt, err := c.Runtime()
+	if err != nil {
+		return nil, err
+	}
+	listed, err := rt.Action(c.Ctx, id, "listTools", nil)
+	if err != nil {
+		return nil, err
+	}
+	suggested := mcpconn.SuggestionsFrom(listed)
+	saved := 0
+	err = c.DB().Tx(func(tx db.Q) error {
+		// Read the prefs again here: a class saved since the listing wins.
+		row, found, err := connectors.Get(tx, id)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return httpapi.Fail("That connector doesn't exist anymore.")
+		}
+		prefs, n := mcpconn.WithSuggested(row.Config, suggested)
+		if n == 0 {
+			return nil
+		}
+		in := manage.DraftInput{ID: id, Type: "mcp", Config: jsonx.NewMap[any]()}
+		in.Config.Set("toolPrefs", prefs)
+		if _, err := manage.SaveDraft(tx, in, c.MasterKey(), c.Now()); err != nil {
+			return err
+		}
+		saved = n
+		msg := fmt.Sprintf("Saved the server's suggested class for %d tool%s", n, kit.Plural(n))
+		_, err = events.Log(tx, events.Input{ConnectorID: &id, Kind: "mcp.classes", Message: msg}, c.Now())
+		return err
+	})
+	if err != nil {
+		if me, ok := manage.IsError(err); ok {
+			return nil, httpapi.Fail("%s", me.Message)
+		}
+		return nil, err
+	}
+	// The running connector picks the new prefs up on restart.
+	if saved > 0 {
+		poke(c)
+	}
+	return struct {
+		OK    bool `json:"ok"`
+		Saved int  `json:"saved"`
+	}{true, saved}, nil
+}
+
 // phoneRe is /^\+?[\d\s-]{8,20}$/ with JS \s.
 var phoneRe = regexp.MustCompile(`^\+?[\d` + strx.SpaceClass + `-]{8,20}$`)
 
@@ -553,4 +622,5 @@ func init() {
 	post("duplicateConnectorFn", idInput(), duplicateConnector)
 	post("setConnectorOwnerFn", zod.Object(zod.F("id", idZod()), zod.F("agentIds", agentIDsZod().Optional()), zod.F("agentId", zod.Nullable(zod.String().Min(1).Max(100)).Optional())), setConnectorOwner)
 	post("setConnectorDataFn", zod.Object(zod.F("id", idZod()), zod.F("noPrivateData", zod.Bool())), setConnectorData)
+	post("applySuggestedToolClassesFn", idInput(), applySuggestedToolClasses)
 }
