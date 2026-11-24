@@ -1,0 +1,61 @@
+---
+title: Proactive
+description: An agent checks your calendar and WhatsApp on its own and messages you first, each thing once.
+---
+
+Kind: `skill`. With proactive on, an agent checks your calendar and your personal WhatsApp every 30 minutes and tells you what matters before you ask: when to leave for a place, a meeting about to start, an event that moved, a chat waiting for your reply. It also sends a morning and an evening summary. It's per agent and off for every agent until you turn it on.
+
+## Connect
+
+Proactive is built in. Set it up on an agent's page, in the **Proactive** tab:
+
+1. Pick where messages go: your own DM or the web chat. Groups and other people's chats can't be picked.
+2. Pick the sources:
+   - **Calendar**: a [Google Calendar](/docs/connectors/google-calendar) connector.
+   - **WhatsApp**: an [MCP server](/docs/connectors/mcp) connector pointing at [wa-hub](https://github.com/zakiego/wa-hub), with its `list_chats` tool classified **read**. wa-hub needs the version whose `list_chats` returns structured content.
+3. Switch on **Message me first**.
+
+You can do the same from chat: "nyalain proactive di chat ini".
+
+## Settings
+
+| Setting | Default | What it does |
+|---|---|---|
+| Check every | 30 min | How often sources are read. Reading costs no tokens when nothing is new. |
+| At most | 4 per hour | Messages over the limit wait and go out together later. |
+| Morning / evening summary | 07:00 / 20:00 | Today's events, reminders and waiting chats; tomorrow's events and when to leave. |
+| Quiet hours | 22:00 to 07:00 | Nothing is sent. What was held goes into the morning summary. |
+| Urgent calendar changes still come through | on | An event inside the next 3 hours that moved still reaches you in quiet hours. |
+| Time to leave | 30 min before | For events with a physical location. |
+| Online meeting | 10 min before | For events with a video link, with the link. |
+| Unanswered after | 2 h | How long a chat waits before you're told. |
+| Remind again after | 4 h | One more reminder if it's still unanswered. Never a third. |
+| Skip groups | on | Only direct chats count. |
+| Important contacts | none | Always told, whatever the model thinks. Star a chat in the tab's activity list to add it. |
+| Guess from memory | on | The agent's memory helps judge who else matters. |
+
+## Tools
+
+All offered only in your own turns in your DM or the web chat:
+
+- `get_proactive` reads the agent's settings.
+- `update_proactive` turns it on or off, picks the current chat as the target, or changes the settings with a merge patch ("jam tenang jadi 23:00").
+- `mute_proactive` and `unmute_proactive` stop or resume reminders about one chat or event, by name.
+- `list_nudges` lists what proactive found today and what it did with each.
+- `check_proactive_now` checks within a minute.
+
+Each proactive message has buttons: **Selesai**, **1j**, **3j**, **Besok** and **Jangan ingetin**. On WhatsApp, reply to the message with "done", "tunda 3 jam" or "jangan ingetin". Replying to the person on your phone closes the reminder too.
+
+## Safety
+
+<Callout type="warn" title="Chat previews go to your model provider">
+  To judge what matters and word the message, the agent sends the names, chat previews and event titles it found to your model. That call has no tools, so a message written to trick the model can only change the wording of one message to you.
+</Callout>
+
+- Messages only go to a chat whose audience is you. If the target becomes shared, proactive pauses and says why on the tab.
+- Time-bound messages (leave now, meeting starting) come from a fixed template, without the model, so a down model provider never makes you late.
+- The ledger keeps what was found for 30 days.
+
+## Pause and remove
+
+Pausing this connector hides the chat tools only. To stop proactive messages, switch off **Message me first** on the agent's Proactive tab.
