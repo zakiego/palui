@@ -64,7 +64,10 @@ type Options struct {
 	Clock         *Clock
 	Log           *logx.Logger
 	// Waits before a failed message turn runs again (default: an hour, so a
-	// test fires retries itself with Engine.RetryNow).
+	// test fires retries itself with Engine.RetryNow). A connector turning on
+	// doesn't fire them either, unlike `palui serve`: every connector turns on
+	// at startup, and that callback runs in its own goroutine, so it could
+	// retry a waiting message at a random moment later in the test.
 	RetryDelaysMs []int64
 }
 
@@ -111,11 +114,6 @@ func New(t testing.TB, o Options) *Harness {
 		DB: d, Registry: o.Registry, Services: services, Log: log, MasterKey: testutil.TestKey, DataDir: "/tmp/palui-test",
 		Clock: clock.Now,
 		InUse: func(id string) bool { return engine != nil && engine.InUse(id) },
-		OnOnline: func(string) {
-			if engine != nil {
-				engine.RetryNow()
-			}
-		},
 	})
 	bus := chat.NewBus()
 	engine = chat.NewEngine(chat.EngineOptions{
