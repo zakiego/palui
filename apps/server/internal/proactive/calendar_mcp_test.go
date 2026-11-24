@@ -152,3 +152,25 @@ func TestLiveSourcesCallsTheWhatsAppToolBehindAHub(t *testing.T) {
 		t.Fatalf("%v", got)
 	}
 }
+
+func TestLiveSourcesReadsAThreadNextToTheListTool(t *testing.T) {
+	var got []string
+	src := proactive.LiveSources{CallTool: func(ctx context.Context, connectorID, tool string, args *jsonx.Object, scope *tools.CallScope) (any, error) {
+		b, _ := jsonx.Marshal(args)
+		got = append(got, connectorID+"/"+tool+" "+string(b))
+		return textResult("Chat 46: Sylvi\n[1] me: Sama-sama bu\n[2] Sylvi: [sticker]"), nil
+	}}
+	wa := proactive.DefaultWhatsApp("mcp-hub")
+	wa.Tool = "wa-personal__list_chats"
+	text, err := src.Thread(context.Background(), *wa, "agt_1", "46", 10)
+	tu.Must(t, err)
+	if !strings.HasSuffix(text, "[2] Sylvi: [sticker]") {
+		t.Fatalf("%q", text)
+	}
+	_, err = src.Thread(context.Background(), *proactive.DefaultWhatsApp("wa-hub"), "agt_1", "46", 10)
+	tu.Must(t, err)
+	want := `mcp-hub/wa-personal__get_chat {"account":"personal","chat_id":46,"limit":10},wa-hub/get_chat {"account":"personal","chat_id":46,"limit":10}`
+	if strings.Join(got, ",") != want {
+		t.Fatalf("%v", got)
+	}
+}

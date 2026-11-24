@@ -31,6 +31,15 @@ type fakeSources struct {
 	evErr  error
 	waErr  error
 	calls  int
+	// Chat id to its recent messages; a chat without one can't be read.
+	threads map[string]string
+}
+
+func (f *fakeSources) Thread(_ context.Context, _ proactive.WhatsAppSource, _ string, chatID string, _ int) (string, error) {
+	if t, ok := f.threads[chatID]; ok {
+		return t, nil
+	}
+	return "", errors.New("no such chat")
 }
 
 func (f *fakeSources) Events(_ context.Context, _ proactive.CalendarSource, _ string, from, to int64, _ string) ([]proactive.Event, error) {

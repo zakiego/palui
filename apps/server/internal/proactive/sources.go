@@ -40,6 +40,11 @@ type Snapshot struct {
 	Count         int64  `json:"count,omitempty"`
 	Preview       string `json:"preview,omitempty"`
 	Escalation    bool   `json:"escalation,omitempty"`
+	// Triage: the unanswered count when the conversation was last judged
+	// (0: never), and the model's one line on what they wait for. Gist is
+	// model output from untrusted text, so it's rendered as untrusted too.
+	TriagedCount int64  `json:"triagedCount,omitempty"`
+	Gist         string `json:"gist,omitempty"`
 	// Summaries: the date they cover ("2026-11-24").
 	Date string `json:"date,omitempty"`
 }
@@ -80,6 +85,8 @@ type WaitingChat struct {
 type Sources interface {
 	Events(ctx context.Context, cal CalendarSource, agentID string, from, to int64, tz string) ([]Event, error)
 	Waiting(ctx context.Context, wa WhatsAppSource, agentID string, since int64) ([]WaitingChat, error)
+	// Thread is a chat's recent messages as text for the model to read.
+	Thread(ctx context.Context, wa WhatsAppSource, agentID, chatID string, limit int) (string, error)
 }
 
 // LiveSources reads through the supervisor's running connectors.
@@ -334,6 +341,70 @@ func (s LiveSources) Waiting(ctx context.Context, wa WhatsAppSource, agentID str
 		return nil, err
 	}
 	return ParseWaiting(out)
+}
+
+// threadTool is wa-hub's get_chat next to the list_chats tool in use
+// ("wa-personal__list_chats" reads "wa-personal__get_chat").
+func threadTool(wa WhatsAppSource) string {
+	if p, ok := strings.CutSuffix(wa.Tool, "list_chats"); ok {
+		return p + "get_chat"
+	}
+	return "get_chat"
+}
+
+// ThreadMaxChars bounds the conversation text one chat adds to the prompt.
+const ThreadMaxChars = 2500
+
+// Thread calls wa-hub's get_chat and returns its text. The text only goes to
+// the model, fenced as untrusted, so nothing parses its wording.
+func (s LiveSources) Thread(ctx context.Context, wa WhatsAppSource, agentID, chatID string, limit int) (string, error) {
+	if s.CallTool == nil {
+		return "", errors.New("No tool caller is wired")
+	}
+	args := jsonx.NewMap[any]()
+	args.Set("account", wa.Account)
+	if n, err := strconv.ParseInt(chatID, 10, 64); err == nil {
+		args.Set("chat_id", n)
+	} else {
+		args.Set("chat_id", chatID)
+	}
+	args.Set("limit", limit)
+	out, err := s.CallTool(ctx, wa.ConnectorID, threadTool(wa), args, &tools.CallScope{AgentID: agentID})
+	if err != nil {
+		return "", err
+	}
+	b, err := jsonx.Marshal(out)
+	if err != nil {
+		return "", err
+	}
+	var res struct {
+		IsError bool `json:"isError"`
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(b, &res); err != nil {
+		return "", err
+	}
+	var parts []string
+	for _, c := range res.Content {
+		if c.Type == "text" && strings.TrimSpace(c.Text) != "" {
+			parts = append(parts, c.Text)
+		}
+	}
+	text := strings.Join(parts, "\n")
+	if res.IsError {
+		return "", errors.New(clip(text, 300))
+	}
+	if strings.TrimSpace(text) == "" {
+		return "", errors.New("get_chat sent no text")
+	}
+	// Keep the end: the newest messages matter most.
+	if r := []rune(text); len(r) > ThreadMaxChars {
+		text = "…" + string(r[len(r)-ThreadMaxChars:])
+	}
+	return text, nil
 }
 
 // ErrNoStructured is the refusal for a wa-hub too old to send JSON.
