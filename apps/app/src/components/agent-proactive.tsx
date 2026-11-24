@@ -409,7 +409,9 @@ function Sources({ view, save, t }: { view: ProactiveView; save: Save; t: T }) {
   const cal = cfg.calendar
   const wa = cfg.whatsapp
   const off = { value: "", label: t("proactive.off") }
-  const calOptions: Option[] = [off, ...view.connectors.calendar.map((c) => ({ value: c.id, label: c.label }))]
+  // An MCP calendar is a connector plus its list_events tool, so one connector can be both a calendar and WhatsApp.
+  const calKey = (id: string, tool?: string) => (tool ? `${id}#${tool}` : id)
+  const calOptions: Option[] = [off, ...view.connectors.calendar.map((c) => ({ value: calKey(c.id, c.tool), label: c.tool ? t("proactive.calendarTool", { label: c.label, tool: c.tool }) : c.label }))]
   const waOptions: Option[] = [off, ...view.connectors.whatsapp.map((c) => ({ value: c.id, label: c.label }))]
   const minutes = (ns: number[]) =>
     ns.map((n) => ({
@@ -450,15 +452,16 @@ function Sources({ view, save, t }: { view: ProactiveView; save: Save; t: T }) {
             </FieldLabel>
             <SimpleSelect
               id="proactive-cal"
-              value={cal?.connectorId ?? ""}
-              options={withCurrent(calOptions, cal?.connectorId ?? "")}
-              onChange={(v) =>
+              value={cal ? calKey(cal.connectorId, cal.tool) : ""}
+              options={withCurrent(calOptions, cal ? calKey(cal.connectorId, cal.tool) : "")}
+              onChange={(v) => {
+                const picked = view.connectors.calendar.find((c) => calKey(c.id, c.tool) === v)
                 void save({
                   config: {
-                    calendar: v ? { ...(cal ?? view.defaults.calendar), connectorId: v } : null,
+                    calendar: picked ? { ...(cal ?? view.defaults.calendar), connectorId: picked.id, tool: picked.tool ?? "" } : null,
                   },
                 })
-              }
+              }}
             />
           </Field>
           {cal && (
