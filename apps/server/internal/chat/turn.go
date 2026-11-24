@@ -1040,7 +1040,13 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		outside := audience == tools.AudienceOutside
 		// Members and outside turns have nobody to ask (PLAN 19.4).
 		open := tools.NoApprovals(audience)
-		noTools := input.NoTools || origin == "hook" || (outside && agent.GuestTools == "none")
+		// The agent's "Tools for other people" is off and this chat counts as
+		// outside: the turn runs with no tools at all, and the prompt says why.
+		guestToolsOff := outside && agent.GuestTools == "none"
+		noTools := input.NoTools || origin == "hook" || guestToolsOff
+		if guestToolsOff && !input.NoTools && origin != "hook" {
+			rlog.Info("turn has no tools: tools for other people are off and the chat counts as outside", logx.Fields{"agent_id": agent.ID})
+		}
 		toolScope := input.ToolScope
 		toolNames := input.ToolNames
 		if rs != nil {
@@ -1196,20 +1202,21 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				summary = *session.Summary
 			}
 			system = SystemBlocks(BuildSystem(SystemInput{
-				Persona:      agent.Persona,
-				Channel:      chat.Channel,
-				Chat:         &SystemChat{ID: chat.ID, ExternalID: chat.ExternalID, Kind: chat.Kind, SessionID: chat.SessionID},
-				Capabilities: capabilityList(c, collected, agent.ID, outside),
-				ToolSearch:   len(collected.Deferred) > 0,
-				Notes:        notesText,
-				ChatRules:    rulesText,
-				RuleSetter:   ruleSetter != nil,
-				Trigger:      origin,
-				Shared:       sharedInfo,
-				Dashboard:    dashboard,
-				ReplyMode:    replyMode,
-				Inbound:      inbound,
-				Mentions:     mentions,
+				Persona:       agent.Persona,
+				Channel:       chat.Channel,
+				Chat:          &SystemChat{ID: chat.ID, ExternalID: chat.ExternalID, Kind: chat.Kind, SessionID: chat.SessionID},
+				Capabilities:  capabilityList(c, collected, agent.ID, outside),
+				GuestToolsOff: guestToolsOff && origin != "hook",
+				ToolSearch:    len(collected.Deferred) > 0,
+				Notes:         notesText,
+				ChatRules:     rulesText,
+				RuleSetter:    ruleSetter != nil,
+				Trigger:       origin,
+				Shared:        sharedInfo,
+				Dashboard:     dashboard,
+				ReplyMode:     replyMode,
+				Inbound:       inbound,
+				Mentions:      mentions,
 			}), summary)
 			checkins := ""
 			// Flow check-ins are the owner's; a shared chat never sees them.

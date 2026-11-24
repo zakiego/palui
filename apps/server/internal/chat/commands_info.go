@@ -319,7 +319,7 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 		return "", err
 	}
 	if audience == tools.AudienceOutside && agent.GuestTools == "none" {
-		return "Gak ada tool buat " + agent.Name + " di chat ini: tool buat orang lain dimatiin.", nil
+		return "Gak ada tool buat " + agent.Name + " di chat ini: tool buat orang lain dimatiin, dan di sini ada yang bukan owner atau member " + agent.Name + ". Nyalain di dashboard: agent " + agent.Name + " > Settings > \"Tools for other people\", atau jadiin semua orang di sini member.", nil
 	}
 	perms := agent.ToolPermissions.V
 	turn := connectors.TurnInfo{ChatID: chat.ID, Channel: chat.Channel, Trigger: "message", TZ: all.Timezone, Now: now, AgentID: agent.ID}

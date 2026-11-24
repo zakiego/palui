@@ -538,8 +538,18 @@ func TestAgentsToolsAndApprovals(t *testing.T) {
 		h.guest("@bot cek")
 		h.Engine.Idle()
 		p := models.PromptText(h.m.Prompts[len(h.m.Prompts)-1])
-		contains(t, p, "No tools are enabled right now.")
+		// The model hears why it has no tools, so it doesn't tell the owner
+		// a connector is missing (report rpt_0mwug5nod5v027iweyb).
+		contains(t, p, "No tools in this chat, on purpose")
+		contains(t, p, "Never say a connector is missing or disconnected.")
+		notContains(t, p, "No tools are enabled right now.")
 		notContains(t, p, "Enabled capabilities")
+	})
+
+	t.Run("an owner-only turn with no tools still says none are enabled", func(t *testing.T) {
+		got := chat.BuildSystem(chat.SystemInput{Persona: "P", Channel: "whatsapp"})
+		contains(t, got, "No tools are enabled right now.")
+		notContains(t, got, "Tools for other people")
 	})
 
 	t.Run("a tool set to ask is left out of an outside turn", func(t *testing.T) {

@@ -197,7 +197,9 @@ func TestToolsCommandInASharedChat(t *testing.T) {
 		h.Engine.Idle()
 		h.owner("/tools")
 		h.Engine.Idle()
-		contains(t, lastRow(t, h.DB).Payload.Text, "Gak ada tool buat Chef di chat ini")
+		text := lastRow(t, h.DB).Payload.Text
+		contains(t, text, "Gak ada tool buat Chef di chat ini")
+		contains(t, text, "Tools for other people")
 	})
 }
 
