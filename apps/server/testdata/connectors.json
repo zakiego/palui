@@ -582,6 +582,53 @@
    ]
   },
   {
+   "id": "ics",
+   "kind": "tools",
+   "name": "Calendar feed",
+   "icon": "calendar",
+   "summary": "Read any calendar from its secret iCal link.",
+   "setup": [
+    {
+     "field": "url",
+     "label": "iCal address",
+     "help": "The calendar's private iCal link. Google: Settings, your calendar, Secret address in iCal format. iCloud: share the calendar as public. Outlook: Publish a calendar, ICS. Fastmail and Nextcloud: the subscription link.",
+     "secret": true,
+     "placeholder": "https://calendar.google.com/calendar/ical/…/basic.ics"
+    },
+    {
+     "field": "emails",
+     "label": "Your email addresses",
+     "help": "Separated by commas. Invites you declined are marked declined.",
+     "placeholder": "you@example.com",
+     "optional": true
+    }
+   ],
+   "multiple": true,
+   "trust": "external",
+   "pauseNote": "While paused, agents can't read this calendar.",
+   "removeWarning": "This removes the link from Palui. The calendar isn't touched.",
+   "docs": {
+    "notes": [
+     "Read only: one tool, get_events, lists the events in a time range, recurring ones expanded.",
+     "The feed is read at most every 5 minutes. Most services refresh their iCal link every few minutes to a few hours.",
+     "Event titles and descriptions come from whoever sent the invite, so they're treated as outside text."
+    ]
+   },
+   "configKeys": [
+    "emails"
+   ],
+   "configDefaults": {
+    "ok": true,
+    "value": {}
+   },
+   "secretFields": [
+    {
+     "name": "url",
+     "optional": false
+    }
+   ]
+  },
+  {
    "id": "t3code",
    "kind": "tools",
    "name": "T3 Code",
@@ -2237,6 +2284,47 @@
          "default": true,
          "description": "Include paused jobs.",
          "type": "boolean"
+        }
+       },
+       "additionalProperties": false
+      }
+     }
+    ]
+   }
+  ],
+  "ics": [
+   {
+    "variant": "default",
+    "tools": [
+     {
+      "name": "get_events",
+      "title": "List calendar events",
+      "description": "List the events of this calendar in a time range, recurring events expanded, sorted by start. Each event has an id (stable per occurrence), title, start and end in the owner's time zone (a date for all-day events), location, a video call link when there is one, and declined when the owner declined it. Titles and descriptions are written by whoever sent the invite.",
+      "class": "read",
+      "untrusted": true,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "from": {
+         "description": "Start of the range: an ISO date-time with offset (2026-11-25T08:00:00+08:00) or a date (2026-11-25). Default: now.",
+         "type": "string",
+         "maxLength": 40
+        },
+        "to": {
+         "description": "End of the range, like from. Default: from plus days.",
+         "type": "string",
+         "maxLength": 40
+        },
+        "days": {
+         "description": "Length of the range in days when to is left out. Default 2.",
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 31
         }
        },
        "additionalProperties": false

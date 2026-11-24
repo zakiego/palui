@@ -166,6 +166,7 @@ var builtinTools = map[string][]struct {
 	"webfetch": {{tool: "fetch_page", class: "read", title: "Ambil isi halaman web", guestSafe: true, untrusted: true}},
 	"notes":    {{tool: "tambah_instruksi", class: "write", title: "Tambah instruksi tetap"}},
 	"chats":    {{tool: "cari_obrolan", class: "read"}},
+	"ics":      {{tool: "get_events", class: "read", title: "List calendar events", untrusted: true}},
 	"printer": {
 		{tool: "printer_status", class: "read", title: "Check the printer"},
 		{tool: "print_file", class: "write", title: "Print a file"},

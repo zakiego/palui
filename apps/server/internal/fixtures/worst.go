@@ -217,6 +217,16 @@ func worst(k *Kit) {
 		Detail: ptr("Can't reach the printer at ipp://host.docker.internal:631/printers/Meeting_Room_Second_Floor_Color_Laser. Check the URL, and that the Mac and CUPS are up."),
 		Config: obj("url", "ipp://host.docker.internal:631/printers/Meeting_Room_Second_Floor_Color_Laser"),
 	})
+	// A calendar feed with the longest label, the owner's addresses at their
+	// limit, and the error a reset link gives.
+	k.Connector("ics-keluarga", "ics", ConnectorOpts{
+		Label:   ptr(within("Kalender keluarga besar Bani H. Abdul Karim Hasan (arisan, haul)", L.connectorLabel)),
+		Status:  "error",
+		Trust:   ptr("external"),
+		Detail:  ptr("https://p118-caldav.icloud.com/… answered 404. The link may have been reset: copy the secret iCal address again."),
+		Config:  obj("emails", within("bartholomew.fitzgerald-montgomery@northwind-industries-holdings.example.com, "+worstEmail, 500)),
+		Secrets: sec("url", "webcal://p118-caldav.icloud.com/published/2/MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTA"),
+	})
 	var readContainers []string
 	for i := 1; i <= 5; i++ {
 		readContainers = append(readContainers, fmt.Sprintf("kb-arisan-keluarga-bani-abdul-karim-hasan-surabaya-catatan-%d", i))

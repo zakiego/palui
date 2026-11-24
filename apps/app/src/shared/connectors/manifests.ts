@@ -8,6 +8,7 @@ import gateway from "./gateway/manifest"
 import gcal from "./gcal/manifest"
 import hooks from "./hooks/manifest"
 import http from "./http/manifest"
+import ics from "./ics/manifest"
 import jobs from "./jobs/manifest"
 import proactive from "./proactive/manifest"
 import mcp from "./mcp/manifest"
@@ -39,6 +40,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   mcp,
   http,
   gcal,
+  ics,
   t3code,
   printer,
   reminders,
