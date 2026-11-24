@@ -151,6 +151,11 @@ type SharedInfo struct {
 	Members bool
 }
 
+// GuestToolsOffLine replaces "No tools are enabled" when the agent's tools
+// are off for this chat on purpose, so the model doesn't blame a missing
+// connector (report rpt_0mwug5nod5v027iweyb).
+const GuestToolsOffLine = `No tools in this chat, on purpose: someone here is neither the owner nor a member of this agent, and this agent's "Tools for other people" setting is "No tools". Your connectors are still set up and work in the owner's own chats. When asked for something that needs a tool, say tools are off for this agent in chats with other people. Never say a connector is missing or disconnected. If the owner asks how to turn them on: set "Tools for other people" on this agent's settings page in the dashboard, or add everyone in this chat as a member of this agent.`
+
 // SystemInput is buildSystem's input.
 type SystemInput struct {
 	Persona string
@@ -158,6 +163,9 @@ type SystemInput struct {
 	Channel      string
 	Chat         *SystemChat
 	Capabilities []string
+	// The agent's "Tools for other people" is off and this chat counts as
+	// outside, so the turn has no tools on purpose.
+	GuestToolsOff bool
 	// More tools than budgets.maxTools: some load through palui__search_tools.
 	ToolSearch bool
 	// Standing instructions and preferences (notes.Prompt).
@@ -287,6 +295,8 @@ func BuildSystem(i SystemInput) string {
 	}
 	if len(i.Capabilities) > 0 {
 		parts = append(parts, fmt.Sprintf("Enabled capabilities: %s.", strings.Join(i.Capabilities, ", ")))
+	} else if i.GuestToolsOff {
+		parts = append(parts, GuestToolsOffLine)
 	} else {
 		parts = append(parts, "No tools are enabled right now.")
 	}
