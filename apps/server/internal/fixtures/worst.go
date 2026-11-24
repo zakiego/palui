@@ -155,7 +155,8 @@ func worst(k *Kit) {
 	k.Connector("mcp-linear", "mcp", ConnectorOpts{Label: ptr("Linear"), Status: "on", Trust: ptr("external"), Config: obj("url", "https://mcp.linear.app/mcp")})
 	k.Connector("mcp-northwind", "mcp", ConnectorOpts{Label: ptr("Northwind"), Status: "on", Config: obj("url", "https://northwind.example.com/api/mcp/")})
 	k.Connector("mcp-ledger", "mcp", ConnectorOpts{Label: ptr("Ledger"), Status: "paused", Config: obj("url", "https://ledger.example.com/mcp")})
-	k.Connector("mcp-tasks", "mcp", ConnectorOpts{Label: ptr("Task Board"), Status: "on", Config: obj("url", "https://todo.example.com/api/mcp")})
+	// One tool classified, the rest still on the server's suggestions.
+	k.Connector("mcp-tasks", "mcp", ConnectorOpts{Label: ptr("Task Board"), Status: "on", Config: obj("url", "https://todo.example.com/api/mcp", "toolPrefs", obj("disk_free", obj("enabled", true, "class", "read")))})
 	k.Connector("gcal", "gcal", ConnectorOpts{Status: "not_set_up"})
 	k.Connector("t3code", "t3code", ConnectorOpts{
 		Status:  "error",
