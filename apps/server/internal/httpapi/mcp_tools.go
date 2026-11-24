@@ -67,7 +67,7 @@ func MCPTools() []MCPTool {
 		{Name: "delete_chat_rule", RPC: "deleteChatRuleFn", Title: "Delete chat rule", Description: "Remove one chat rule (id from get_chat_rules). agentId is the agent id.", Destructive: true},
 		{Name: "undo_chat_rule_change", RPC: "undoChatRuleChangeFn", Title: "Undo chat rule change", Description: "Undo an add or remove from get_chat_rules changes: an add takes the rule out, a remove puts it back. agentId is the agent id, id the change id."},
 		{Name: "delete_agent", RPC: "deleteAgentFn", Title: "Delete agent", Description: "Delete an agent. Its chats go back to the default agent. The default agent can't be deleted.", Destructive: true},
-		{Name: "set_agent_tool_permissions", RPC: "setAgentToolPermissionsFn", Title: "Set agent tool permissions", Description: "Set allowAll, or per-tool allow, ask or deny (null clears one) for an agent. Tool names come from get_agent_tools.", Idempotent: true},
+		{Name: "set_agent_tool_permissions", RPC: "setAgentToolPermissionsFn", Title: "Set agent tool permissions", Description: "Set allowAll, or allow, ask or deny (null clears one) for an agent per tool (tools), per connector (connectors, keyed by connector id) or per class within a connector (classes, keyed \"<connectorId>:<read|write|destructive>\"). A higher level locks the ones under it: connector, then class, then tool, then allowAll as the fallback. Tool names and connector ids come from get_agent_tools.", Idempotent: true},
 
 		// Chats
 		{Name: "list_chats", RPC: "getChats", Title: "List chats", Description: "Every chat on every channel with its id, title, agent, reply mode and whether it's allowed."},

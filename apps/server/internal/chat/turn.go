@@ -1048,11 +1048,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		}
 		perms := agent.ToolPermissions.V
 		collectAudience := ""
-		deny := tools.DeniedTools(&perms)
 		if open {
-			collectAudience = audience
 			// No approvals here: a tool the owner wants a say on isn't offered at all.
-			deny = append(deny, tools.AskTools(&perms)...)
+			collectAudience = audience
 		}
 		var collected *tools.Collected
 		if noTools {
@@ -1075,7 +1073,8 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				Scope:              scopeList,
 				Only:               onlyList,
 				ExcludeDestructive: unattended(origin),
-				Deny:               deny,
+				Permissions:        &perms,
+				HideAsk:            open,
 				Audience:           collectAudience,
 				Sticky:             sticky,
 				OnLoad: func(names []string) {
@@ -1384,13 +1383,13 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				if meta != nil && meta.NeedsApproval != nil && safeNeedsApproval(meta.NeedsApproval, call.InputJSON) {
 					return true
 				}
-				class := "destructive"
+				class, connectorID := "destructive", ""
 				if meta != nil {
-					class = meta.Class
+					class, connectorID = meta.Class, meta.ConnectorID
 				}
 				return tools.NeedsApproval(tools.ApprovalInput{
 					Class:         class,
-					Permission:    tools.PermissionFor(&perms, call.ToolName),
+					Permission:    tools.PermissionFor(&perms, call.ToolName, connectorID, class),
 					OwnerTurn:     ownerTurn,
 					Tainted:       tainted.Load(),
 					ReplayTainted: replayTainted.Load(),

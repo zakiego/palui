@@ -141,6 +141,25 @@ type savedAgent struct {
 	Slug string `json:"slug"`
 }
 
+// permissionEntries reads one optional {key: permission | null} field.
+func permissionEntries(o *jsonx.Object, field string) *jsonx.Map[*string] {
+	v, ok := o.Get(field)
+	if !ok {
+		return nil
+	}
+	out := jsonx.NewMap[*string]()
+	m := v.(*jsonx.Object)
+	for _, k := range m.Keys() {
+		p, _ := m.Get(k)
+		if s, ok := p.(string); ok {
+			out.Set(k, &s)
+		} else {
+			out.Set(k, nil)
+		}
+	}
+	return out
+}
+
 type toolPermissionsResult struct {
 	ToolPermissions db.ToolPermissions `json:"toolPermissions"`
 }
@@ -388,6 +407,8 @@ func init() {
 			zod.F("id", agentID),
 			zod.F("allowAll", zod.Optional(zod.Bool())),
 			zod.F("tools", zod.Optional(zod.Record(zod.Nullable(zod.Enum("allow", "ask", "deny"))).Keys(zod.String().Max(64)))),
+			zod.F("connectors", zod.Optional(zod.Record(zod.Nullable(zod.Enum("allow", "ask", "deny"))).Keys(zod.String().Max(100)))),
+			zod.F("classes", zod.Optional(zod.Record(zod.Nullable(zod.Enum("allow", "ask", "deny"))).Keys(zod.String().Max(120)))),
 		),
 		Fn: func(c *httpapi.Call) (any, error) {
 			o := c.Obj()
@@ -397,19 +418,9 @@ func init() {
 				b := v.(bool)
 				patch.AllowAll = &b
 			}
-			if v, ok := o.Get("tools"); ok {
-				ts := jsonx.NewMap[*string]()
-				m := v.(*jsonx.Object)
-				for _, k := range m.Keys() {
-					p, _ := m.Get(k)
-					if s, ok := p.(string); ok {
-						ts.Set(k, &s)
-					} else {
-						ts.Set(k, nil)
-					}
-				}
-				patch.Tools = ts
-			}
+			patch.Tools = permissionEntries(o, "tools")
+			patch.Connectors = permissionEntries(o, "connectors")
+			patch.Classes = permissionEntries(o, "classes")
 			row, err := agents.SetToolPermissions(c.DB(), id.(string), patch, c.Now())
 			if err != nil {
 				return nil, rethrowAgent(err)

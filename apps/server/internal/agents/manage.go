@@ -551,10 +551,32 @@ func Update(q db.Q, id string, patch Input, now int64) (db.Agent, error) {
 }
 
 // PermissionsPatch is ToolPermissionsPatch: AllowAll changes the default;
-// Tools sets one tool each, a nil value putting it back to the default.
+// Tools, Connectors and Classes set one entry each, a nil value putting it
+// back to the default. Classes keys are "<connectorId>:<class>".
 type PermissionsPatch struct {
-	AllowAll *bool
-	Tools    *jsonx.Map[*string]
+	AllowAll   *bool
+	Tools      *jsonx.Map[*string]
+	Connectors *jsonx.Map[*string]
+	Classes    *jsonx.Map[*string]
+}
+
+// applyPermissions writes one patch map onto its stored map.
+func applyPermissions(into *jsonx.Map[string], patch *jsonx.Map[*string], valid func(string) bool, unknown string) error {
+	for _, k := range patch.Keys() {
+		p, _ := patch.Get(k)
+		if !valid(k) {
+			return errf("%s %s.", unknown, k)
+		}
+		switch {
+		case p == nil:
+			into.Delete(k)
+		case slices.Contains(tools.Permissions, *p):
+			into.Set(k, *p)
+		default:
+			return errf("A tool permission is allow, ask or deny.")
+		}
+	}
+	return nil
 }
 
 // SetToolPermissions is setToolPermissions.
@@ -570,33 +592,33 @@ func SetToolPermissions(q db.Q, id string, patch PermissionsPatch, now int64) (d
 	if row.ToolPermissions.Valid {
 		next = tools.ReadPermissions([]byte(jsonx.Stringify(row.ToolPermissions.V)))
 	}
-	ts := next.Tools.Clone()
-	if patch.Tools != nil {
-		for _, name := range patch.Tools.Keys() {
-			p, _ := patch.Tools.Get(name)
-			if !tools.ToolName.MatchString(name) {
-				return db.Agent{}, errf("Unknown tool name %s.", name)
-			}
-			switch {
-			case p == nil:
-				ts.Delete(name)
-			case slices.Contains(tools.Permissions, *p):
-				ts.Set(name, *p)
-			default:
-				return db.Agent{}, errf("A tool permission is allow, ask or deny.")
-			}
-		}
+	ts, cs, cls := next.Tools.Clone(), next.Connectors.Clone(), next.Classes.Clone()
+	if err := applyPermissions(ts, patch.Tools, tools.ToolName.MatchString, "Unknown tool name"); err != nil {
+		return db.Agent{}, err
 	}
-	if ts.Len() > tools.MaxToolPermissions {
-		return db.Agent{}, errf("At most %d tool permissions.", tools.MaxToolPermissions)
+	if err := applyPermissions(cs, patch.Connectors, tools.ValidConnectorKey, "Unknown connector"); err != nil {
+		return db.Agent{}, err
+	}
+	if err := applyPermissions(cls, patch.Classes, tools.ValidClassKey, "Unknown tool group"); err != nil {
+		return db.Agent{}, err
 	}
 	allowAll := next.AllowAll
 	if patch.AllowAll != nil {
 		allowAll = *patch.AllowAll
 	}
+	out := db.ToolPermissions{AllowAll: allowAll, Tools: ts}
+	if cs.Len() > 0 {
+		out.Connectors = cs
+	}
+	if cls.Len() > 0 {
+		out.Classes = cls
+	}
+	if tools.Entries(out) > tools.MaxToolPermissions {
+		return db.Agent{}, errf("At most %d tool permissions.", tools.MaxToolPermissions)
+	}
 	value := db.NullJSON[db.ToolPermissions]{}
-	if allowAll || ts.Len() > 0 {
-		value = db.SomeJSON(db.ToolPermissions{AllowAll: allowAll, Tools: ts})
+	if allowAll || tools.Entries(out) > 0 {
+		value = db.SomeJSON(out)
 	}
 	return db.ScanAgent(q.WQueryRow("UPDATE agents SET tool_permissions = ?, updated_at = ? WHERE id = ? RETURNING "+db.AgentCols, value, now, id))
 }

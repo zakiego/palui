@@ -323,10 +323,9 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 	}
 	perms := agent.ToolPermissions.V
 	turn := connectors.TurnInfo{ChatID: chat.ID, Channel: chat.Channel, Trigger: "message", TZ: all.Timezone, Now: now, AgentID: agent.ID}
-	deny := tools.DeniedTools(&perms)
-	if tools.NoApprovals(audience) {
+	open := tools.NoApprovals(audience)
+	if open {
 		turn.Mode = audience
-		deny = append(deny, tools.AskTools(&perms)...)
 	} else {
 		audience = ""
 	}
@@ -334,7 +333,8 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 		Turn:              turn,
 		MaxTools:          int(all.Budgets.MaxTools),
 		Sticky:            sticky,
-		Deny:              deny,
+		Permissions:       &perms,
+		HideAsk:           open,
 		Audience:          audience,
 		Log:               c.Log,
 		OnUntrustedResult: func(*tools.ToolMeta) {},

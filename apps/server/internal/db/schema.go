@@ -577,9 +577,15 @@ func ScanPreference(s Scanner) (Preference, error) {
 // --- agents -------------------------------------------------------------------------
 
 // ToolPermissions is agents.tool_permissions. Tools keeps the stored key order.
+// Connectors holds one entry per connector id, and Classes one per
+// "<connectorId>:<class>". A higher level locks the ones under it: connector,
+// then class, then tool, then AllowAll as the fallback. Both stay out of the
+// JSON while empty.
 type ToolPermissions struct {
-	AllowAll bool               `json:"allowAll"`
-	Tools    *jsonx.Map[string] `json:"tools"`
+	AllowAll   bool               `json:"allowAll"`
+	Tools      *jsonx.Map[string] `json:"tools"`
+	Connectors *jsonx.Map[string] `json:"connectors,omitempty"`
+	Classes    *jsonx.Map[string] `json:"classes,omitempty"`
 }
 
 // ModelLink is one step of a model chain: a model connector, a model id and
