@@ -35,6 +35,7 @@ type proactiveConnector struct {
 type proactiveNudge struct {
 	ID          string  `json:"id"`
 	Kind        string  `json:"kind"`
+	Subject     string  `json:"subject"`
 	Status      string  `json:"status"`
 	Label       string  `json:"label"`
 	Reason      *string `json:"reason"`
@@ -238,7 +239,7 @@ func proactiveFor(q db.Q, agentID string, now int64) (*proactiveView, error) {
 	}
 	sentOutboxes := map[string]bool{}
 	for _, n := range nudges {
-		v.Activity = append(v.Activity, proactiveNudge{ID: n.ID, Kind: n.Kind, Status: n.Status, Label: proactive.Label(n), Reason: n.Reason, SentAt: n.SentAt, EscalatedAt: n.EscalatedAt, WakeAt: n.WakeAt, UpdatedAt: n.UpdatedAt})
+		v.Activity = append(v.Activity, proactiveNudge{ID: n.ID, Kind: n.Kind, Subject: n.Subject, Status: n.Status, Label: proactive.Label(n), Reason: n.Reason, SentAt: n.SentAt, EscalatedAt: n.EscalatedAt, WakeAt: n.WakeAt, UpdatedAt: n.UpdatedAt})
 		if n.SentAt != nil && *n.SentAt >= dayStart && n.OutboxID != nil {
 			sentOutboxes[*n.OutboxID] = true
 		}
