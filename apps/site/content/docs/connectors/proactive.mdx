@@ -1,60 +1,98 @@
 ---
 title: Proactive
-description: An agent checks your calendar and WhatsApp on its own and messages you first, each thing once.
+description: An agent runs a prompt you write on a timer and messages you first, each thing once.
 ---
 
-Kind: `skill`. With proactive on, an agent checks your calendar and your personal WhatsApp every 30 minutes and tells you what matters before you ask: when to leave for a place, a meeting about to start, an event that moved, a chat waiting for your reply. It also sends a morning and an evening summary. It's per agent and off for every agent until you turn it on.
+Kind: `skill`. With proactive on, an agent runs a prompt you write every 30 minutes and tells you what matters before you ask: when to leave for a place, a meeting about to start, a chat waiting for your reply. It also sends a morning and an evening summary. It's per agent and off for every agent until you turn it on.
+
+The prompt is the flexible part: what to check and what counts as important. The settings are the fixed part: when it runs, where it sends, quiet hours and how many messages an hour. Whatever the prompt says, nothing is told twice and quiet hours hold.
 
 ## Connect
 
 Proactive is built in. Set it up on an agent's page, in the **Proactive** tab:
 
 1. Pick where messages go: your own DM or the web chat. Groups and other people's chats can't be picked.
-2. Pick the sources:
-   - **Calendar**: a [Google Calendar](/docs/connectors/google-calendar) connector, or an [MCP server](/docs/connectors/mcp) with a Google Calendar `list_events` tool (MCP Hub's `calendar__list_events`, for example), classified **read**. The tool needs `calendar` or `gcal` in its name and the Google Calendar arguments (`timeMin`, `timeMax`, `timeZone`).
-   - **WhatsApp**: an [MCP server](/docs/connectors/mcp) connector pointing at [wa-hub](https://github.com/zakiego/wa-hub), with its `list_chats` tool classified **read**, or a hub that serves wa-hub's tool under a prefix starting with `wa` (MCP Hub's `wa-personal__list_chats`). wa-hub needs the version whose `list_chats` returns structured content, and a hub must pass that through.
-3. Switch on **Message me first**.
+2. Write the prompt, in English. Type `@` to mention a tool it may read, like `@gcal__get_calendar`. **Start from an example** fills in a template.
+3. Press **Test run** to see what it would send right now. Nothing is sent or saved.
+4. Save the prompt and switch on **Message me first**.
 
 You can do the same from chat: "nyalain proactive di chat ini".
+
+A prompt looks like this:
+
+```text
+Check @gcal__get_calendar for the next 36 hours. If an event has a place to go to,
+tell me 30 minutes before I have to leave. If it's online, 10 minutes before it
+starts, with the link. If an event moves, tell me right away.
+
+Check @wa-inbox__waiting_chats. Tell me about direct messages waiting for my reply
+for more than 2 hours, only when they look like they need an answer. Skip groups,
+promos, receipts and one-time codes.
+```
+
+## Mentions
+
+A mention is `@` followed by the tool's full name, `<connector id>__<tool>`. The mentions are the whole tool list of a run: it can't reach any other tool.
+
+- Only **read** tools can be mentioned. A tool that can change things is listed but can't be picked, and an [MCP server](/docs/connectors/mcp) tool needs to be classified **read** on the Connectors page first.
+- The tool's connector must be on and allowed for the agent.
+- A mention that doesn't resolve is refused when you save, and fails the run with the reason. Three failed runs in a row pause proactive and tell you once.
+- At most 10 mentions and 4,000 characters.
+
+Any read tool works: [Google Calendar](/docs/connectors/google-calendar), an MCP server, [web fetch](/docs/connectors/web-fetch), your notes or reminders. What those tools return goes to your model provider.
 
 ## Settings
 
 | Setting | Default | What it does |
 |---|---|---|
-| Check every | 30 min | How often sources are read. Reading costs no tokens when nothing is new. |
+| Check every | 30 min | How often the prompt runs, outside quiet hours. |
 | At most | 4 per hour | Messages over the limit wait and go out together later. |
-| Morning / evening summary | 07:00 / 20:00 | Today's events, reminders and waiting chats; tomorrow's events and when to leave. |
-| Quiet hours | 22:00 to 07:00 | Nothing is sent. What was held goes into the morning summary. |
-| Urgent calendar changes still come through | on | An event inside the next 3 hours that moved still reaches you in quiet hours. |
-| Time to leave | 30 min before | For events with a physical location. |
-| Online meeting | 10 min before | For events with a video link, with the link. |
-| Unanswered after | 2 h | How long a chat waits before you're told. Before that, the agent reads the chat's last 10 messages: a conversation that's already finished (you answered, they only said thanks or sent a sticker) is closed quietly, and it opens again if they write something new. |
-| Remind again after | 4 h | One more reminder if it's still unanswered. Never a third. |
-| Skip groups | on | Only direct chats count. |
-| Important contacts | none | Always told, whatever the model thinks. Star a chat in the tab's activity list to add it. |
-| Guess from memory | on | The agent's memory helps judge who else matters. |
+| Morning / evening summary | 07:00 / 20:00 | A run that also writes a summary, and carries what was held. |
+| Quiet hours | 22:00 to 07:00 | No runs and nothing sent. What was held goes into the morning summary. |
+| Urgent items still come through | on | An item the run marks urgent can pass quiet hours, at most 3 a day. |
+| Model | fast | The model role the run uses. |
+
+Messages are written in the language set in Settings. On **auto**, that's the language you write your notes in, or casual Indonesian.
+
+## How a run works
+
+1. The engine checks every mention, then gives the model your prompt, the mentioned tools, your memory notes and what's already open.
+2. The model calls the tools it needs and answers with items: one thing to tell you each, with a key that names it.
+3. The engine sends new items through the outbox. A key that was already sent is never sent again. An item with a time (like "30 minutes before you leave") goes out at that minute, from its stored text, without another model call.
+
+When the tools return exactly what they returned last time and nothing else changed, the run skips the model and costs no tokens. A full run still happens at least every 2 hours.
+
+## Memory
+
+Proactive keeps short notes between runs, listed on the tab:
+
+- **Yours** never expire. Add them on the tab, from chat ("inget ya, Pak Budi selalu bales telat"), or by replying to a proactive message with something that isn't a button. The agent still answers that reply as usual.
+- **The agent's** are things no tool will tell it again, like "Pak Budi promised the papers tomorrow". They expire after 7 days by default and 30 at most. **Keep** turns one into yours.
+
+Memory holds 50 notes or 4,000 characters. When it's full, the agent's oldest notes go first. Proactive memory is separate from the agent's long-term [memory](/docs/connectors/recall); a run can read that one by mentioning its tool.
 
 ## Tools
 
 All offered only in your own turns in your DM or the web chat:
 
-- `get_proactive` reads the agent's settings.
-- `update_proactive` turns it on or off, picks the current chat as the target, or changes the settings with a merge patch ("jam tenang jadi 23:00").
-- `mute_proactive` and `unmute_proactive` stop or resume reminders about one chat or event, by name.
-- `list_nudges` lists what proactive found today and what it did with each.
-- `check_proactive_now` checks within a minute.
+- `get_proactive` reads the agent's settings and the tools the prompt mentions.
+- `update_proactive` turns it on or off, picks the current chat as the target, or changes the prompt and settings with a merge patch ("jam tenang jadi 23:00").
+- `list_proactive_notes`, `remember_proactive` and `forget_proactive` read and change memory.
+- `mute_proactive` and `unmute_proactive` stop or resume reminders about one subject, by name.
+- `list_nudges` lists what proactive said today and what happened to each.
+- `check_proactive_now` runs within a minute.
 
-Each proactive message has buttons: **Selesai**, **1j**, **3j**, **Besok** and **Jangan ingetin**. On WhatsApp, reply to the message with "done", "tunda 3 jam" or "jangan ingetin". Replying to the person on your phone closes the reminder too.
+Each proactive message has buttons: **Selesai**, **1j**, **3j**, **Besok** and **Jangan ingetin**. On WhatsApp, reply to the message with "done", "tunda 3 jam" or "jangan ingetin".
 
 ## Safety
 
-<Callout type="warn" title="Chat previews go to your model provider">
-  To judge what matters and word the message, the agent sends the names, chat previews, event titles and the last 10 messages of each new waiting chat to your model. That call has no tools, so a message written to trick the model can only change the wording of one message to you.
+<Callout type="warn" title="Tool results go to your model provider">
+  A run sends what the mentioned tools return to your model: chat previews, event titles, web pages. That text is treated as data, never as instructions, and the run can only read, so a message written to trick the model can at worst change the wording of a message to you.
 </Callout>
 
 - Messages only go to a chat whose audience is you. If the target becomes shared, proactive pauses and says why on the tab.
-- Time-bound messages (leave now, meeting starting) come from a fixed template, without the model, so a down model provider never makes you late.
-- The ledger keeps what was found for 30 days.
+- Notes the agent writes after reading outside text are marked as context, expire, and are listed on the tab so you can delete them.
+- What was said is kept for 30 days.
 
 ## Pause and remove
 

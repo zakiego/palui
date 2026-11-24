@@ -12,11 +12,15 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
+### Breaking
+
+- Proactive runs from a prompt you write now, and agents that had it on are paused. Write a prompt that mentions its tools, then save. Adds a migration.
+
 ### Agents
 
-- Added: Proactive can read your calendar through an MCP server's Google Calendar tool, like MCP Hub's, so you don't need your own Google OAuth client. ([#26](https://github.com/zakiego/palui/pull/26))
-- Added: Proactive can read WhatsApp through MCP Hub's `wa-personal__list_chats` too, so wa-hub doesn't need its own connector. ([#27](https://github.com/zakiego/palui/pull/27))
-- Changed: Proactive reads a waiting chat's recent messages before telling you about it, and skips conversations that are already finished. ([#28](https://github.com/zakiego/palui/pull/28))
+- Added: Proactive mentions any read tool with `@`, like `@gcal__get_calendar`, so every connector can be a source.
+- Added: Proactive memory keeps notes between runs, from the agent, the Proactive tab or your replies.
+- Added: Test run on the Proactive tab shows what would be sent, without sending anything.
 
 ### Tools
 

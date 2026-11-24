@@ -1,6 +1,6 @@
 # RFC: Proactive from a prompt
 
-Status: decided 2026-11-25, not built yet. Decisions are in section 16. Author: Palui agent session. Reviewer: the maintainer.
+Status: accepted and built, 2026-11-25. Decisions are in section 16. Author: Palui agent session. Reviewer: the maintainer.
 Replaces the sources, rules and templates of `docs/rfc/proactive.md` (accepted 2026-11-24). Its ledger, delivery policy and owner actions stay. Once accepted, PLAN 6d is rewritten from this RFC.
 
 ## TL;DR
