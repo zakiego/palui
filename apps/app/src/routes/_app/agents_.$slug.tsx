@@ -5,7 +5,7 @@
 // they do on Notes and Chats. Memory and Tools ask the runtime when opened.
 import * as React from "react"
 import { createFileRoute, Link, useBlocker, useNavigate, useRouter } from "@tanstack/react-router"
-import { ArrowLeftIcon, AtSignIcon, BrainIcon, CircleAlertIcon, ContactIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, SearchIcon, SearchXIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
+import { ArrowLeftIcon, AtSignIcon, BrainIcon, CircleAlertIcon, ContactIcon, NotebookPenIcon, SlidersHorizontalIcon, CircleDotIcon, MessagesSquareIcon, MonitorIcon, PlusIcon, RadarIcon, SearchIcon, SearchXIcon, UserIcon, UsersIcon, WrenchIcon } from "lucide-react"
 import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { AgentAvatar } from "@/components/agent-avatar"
 import { AgentChatRules } from "@/components/agent-chat-rules"
 import { AgentMembers } from "@/components/agent-members"
+import { AgentProactive } from "@/components/agent-proactive"
 import { AvatarPicker } from "@/components/agents/avatar-picker"
 import { AppError } from "@/components/app-error"
 import { ConnectorStatusBadge } from "@/components/connector-status"
@@ -57,7 +58,7 @@ import type { GuestTools } from "@/lib/api/types"
 import { ago, errorMessage } from "@/lib/format"
 import { useCount, useT } from "@/lib/i18n"
 
-const TABS = ["settings", "chats", "instructions", "memory", "tools"] as const
+const TABS = ["settings", "chats", "instructions", "memory", "tools", "proactive"] as const
 type Tab = (typeof TABS)[number]
 
 export const Route = createFileRoute("/_app/agents_/$slug")({
@@ -531,6 +532,10 @@ function AgentSettings({ data }: { data: Loaded }) {
           <TabsContent value="tools" className="flex flex-col gap-6 text-base">
             <ToolsTab agent={agent} />
           </TabsContent>
+
+          <TabsContent value="proactive" className="flex flex-col gap-6 text-base">
+            {tab === "proactive" && <AgentProactive agentId={agent.id} />}
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -577,6 +582,7 @@ const SECTIONS = [
   { value: "instructions", Icon: NotebookPenIcon, title: "agents.tab.instructions" },
   { value: "memory", Icon: BrainIcon, title: "agents.tab.memory" },
   { value: "tools", Icon: WrenchIcon, title: "agents.tab.tools" },
+  { value: "proactive", Icon: RadarIcon, title: "agents.tab.proactive" },
 ] as const
 
 function SectionTabs({ counts }: { counts: Partial<Record<Tab, number>> }) {
