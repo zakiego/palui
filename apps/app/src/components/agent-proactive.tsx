@@ -1,18 +1,16 @@
-// The agent page's Proactive tab (docs/rfc/proactive.md 12). Every control
-// saves on its own, like the Tools tab: a switch or a select saves as it
-// changes, the account field when it loses focus.
+// The agent page's Proactive tab (docs/rfc/proactive-prompt.md 12). The prompt
+// is a draft until Save; every other control saves on its own, like the Tools
+// tab: a switch or a select saves as it changes.
 import * as React from "react"
-import { Link } from "@tanstack/react-router"
-import { BellOffIcon, CalendarClockIcon, CalendarIcon, CircleAlertIcon, MessageCircleIcon, RefreshCwIcon, StarIcon, SunIcon, MoonIcon, VideoIcon, XIcon, CarIcon } from "lucide-react"
+import { BellOffIcon, BookmarkIcon, CircleAlertIcon, MessageCircleIcon, MoonIcon, PlayIcon, RefreshCwIcon, SunIcon, Trash2Icon, WrenchIcon } from "lucide-react"
 import { toast } from "sonner"
 
-import { WhatsAppIcon } from "@/components/brand-icons"
 import { SimpleSelect, type Option } from "@/components/simple-select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
-import { Field, FieldContent, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
@@ -20,17 +18,27 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { StatusText, type StatusTone } from "@/components/ui/status-text"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import {
+  addProactiveNoteFn,
   checkProactiveNowFn,
+  deleteProactiveNoteFn,
+  editProactiveNoteFn,
   getProactiveFn,
+  MAX_MENTIONS,
+  MAX_NOTE_CHARS,
+  MAX_NOTES_CHARS,
+  MAX_PROMPT_CHARS,
   saveProactiveFn,
+  testProactiveFn,
   unmuteProactiveFn,
-  type NudgeKind,
   type NudgeStatus,
   type ProactiveConfig,
-  type ProactiveConnector,
+  type ProactiveNote,
   type ProactiveNudge,
   type ProactivePatch,
+  type ProactiveTestResult,
+  type ProactiveTool,
   type ProactiveView,
 } from "@/lib/api/proactive"
 import { clockTime, errorMessage } from "@/lib/format"
@@ -58,19 +66,36 @@ function merged(cfg: ProactiveConfig, patch: ProactivePatch): ProactiveConfig {
   return out as ProactiveConfig
 }
 
+// The server's mention syntax (internal/proactive/mentions.go): "@" then a
+// namespaced tool name, not inside a word or an email address.
+const MENTION_RE = /(^|[^A-Za-z0-9_.@-])@([A-Za-z0-9][A-Za-z0-9_-]*__[A-Za-z0-9][A-Za-z0-9_-]*)/g
+// The mention being typed right before the caret.
+const TYPING_RE = /(^|[^A-Za-z0-9_.@-])@([A-Za-z0-9_-]*)$/
+
+export function mentionsIn(prompt: string): string[] {
+  const out: string[] = []
+  for (const m of prompt.matchAll(MENTION_RE)) {
+    const name = m[2].replace(/[-_]+$/, "")
+    if (name.length <= 64 && !out.includes(name)) out.push(name)
+  }
+  return out
+}
+
+// What's wrong with a mention, from the tools the agent may use (the server
+// checks the same way at save and at every run).
+function problemFor(mention: string, tools: ProactiveTool[]): Key | null {
+  const tool = tools.find((x) => x.name === mention)
+  if (!tool) return "proactive.reason.notFound"
+  if (tool.class === "read") return null
+  if (tool.suggestedClass) return "proactive.reason.unsorted"
+  return "proactive.reason.notRead"
+}
+
 const sameDay = (ms: number) => new Date(ms).toDateString() === new Date().toDateString()
 const shortDay = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short" })
 const shownAt = (n: ProactiveNudge) => (n.status === "scheduled" && n.wakeAt ? n.wakeAt : (n.sentAt ?? n.updatedAt))
 const byTime = (list: ProactiveNudge[]) => [...list].sort((a, b) => shownAt(b) - shownAt(a))
-
-const KIND_ICON: Record<NudgeKind, React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>> = {
-  cal_depart: CarIcon,
-  cal_start: VideoIcon,
-  cal_changed: CalendarClockIcon,
-  wa_waiting: WhatsAppIcon,
-  sum_morning: SunIcon,
-  sum_evening: MoonIcon,
-}
+const DAY_MS = 24 * 3600_000
 
 const STATUS: Record<NudgeStatus, { tone: StatusTone; key: Key }> = {
   pending: { tone: "outline", key: "proactive.status.pending" },
@@ -81,6 +106,7 @@ const STATUS: Record<NudgeStatus, { tone: StatusTone; key: Key }> = {
   snoozed: { tone: "secondary", key: "proactive.status.snoozed" },
   dropped: { tone: "secondary", key: "proactive.status.dropped" },
   expired: { tone: "secondary", key: "proactive.status.expired" },
+  tracking: { tone: "secondary", key: "proactive.status.dropped" },
 }
 
 export function AgentProactive({ agentId }: { agentId: string }) {
@@ -115,7 +141,7 @@ export function AgentProactive({ agentId }: { agentId: string }) {
   }, [agentId, reload, run])
 
   const save = async (input: { enabled?: boolean; chatId?: string; config?: ProactivePatch }) => {
-    if (!view) return
+    if (!view) return false
     setView({
       ...view,
       enabled: input.enabled ?? view.enabled,
@@ -125,9 +151,11 @@ export function AgentProactive({ agentId }: { agentId: string }) {
     const { p, req } = run(() => saveProactiveFn({ data: { agentId, ...input } }))
     try {
       await p
+      return true
     } catch (err) {
       if (req === latest.current && confirmed.current) setView(confirmed.current)
       toast.error(errorMessage(err))
+      return false
     }
   }
 
@@ -163,6 +191,17 @@ export function AgentProactive({ agentId }: { agentId: string }) {
     }
   }
 
+  // Memory actions return the whole view, like the rest.
+  const notes = async (call: () => Promise<ProactiveView>) => {
+    try {
+      await run(call).p
+      return true
+    } catch (err) {
+      toast.error(errorMessage(err))
+      return false
+    }
+  }
+
   if (error) {
     return (
       <Alert variant="destructive">
@@ -190,8 +229,7 @@ export function AgentProactive({ agentId }: { agentId: string }) {
         </div>
         <Separator />
         <Skeleton className="h-5 w-24" />
-        <Skeleton className="h-24 w-full rounded-xl" />
-        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
       </div>
     )
   }
@@ -201,11 +239,7 @@ export function AgentProactive({ agentId }: { agentId: string }) {
     value: c.id,
     label: c.channel === "web" ? t("proactive.webChat") : c.title,
   }))
-  const contactSubjects = new Set(cfg.contacts.map((c) => c.subject))
-  const toggleContact = (n: ProactiveNudge) => {
-    const contacts = contactSubjects.has(n.subject) ? cfg.contacts.filter((c) => c.subject !== n.subject) : [...cfg.contacts, { subject: n.subject, label: n.label }]
-    void save({ config: { contacts } })
-  }
+  const lastRun = view.lastRun
 
   return (
     <div className="flex flex-col gap-6">
@@ -241,6 +275,7 @@ export function AgentProactive({ agentId }: { agentId: string }) {
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <span className="text-sm text-muted-foreground tabular-nums">
                 {view.lastTickAt ? t("proactive.lastCheck", { at: clockTime(view.lastTickAt) }) : t("proactive.noCheckYet")}
+                {lastRun && !lastRun.error && lastRun.skipped === "unchanged" ? ` (${t("proactive.lastRunSkipped")})` : ""}
                 {view.nextTickAt && !view.pausedReason ? ` · ${t("proactive.nextCheck", { at: clockTime(Math.max(view.nextTickAt, Date.now())) })}` : ""}
               </span>
               <Button variant="outline" size="sm" disabled={checking || !!view.pausedReason} onClick={() => void checkNow()}>
@@ -256,91 +291,60 @@ export function AgentProactive({ agentId }: { agentId: string }) {
               <AlertDescription className="[overflow-wrap:anywhere]">{view.pausedReason}</AlertDescription>
             </Alert>
           )}
+          {view.enabled && !view.pausedReason && lastRun?.error && (
+            <Alert variant="warning">
+              <CircleAlertIcon aria-hidden="true" />
+              <AlertTitle>{t("proactive.lastRunFailed")}</AlertTitle>
+              <AlertDescription className="[overflow-wrap:anywhere]">{lastRun.error}</AlertDescription>
+            </Alert>
+          )}
         </FieldGroup>
       </Section>
 
-      <Section id="sources" title={t("proactive.sources")} description={t("proactive.sourcesNote")}>
-        <Sources view={view} save={save} t={t} />
+      <Section id="prompt" title={t("proactive.prompt")} description={t("proactive.promptNote")}>
+        <PromptEditor key={view.agentId} view={view} save={save} t={t} />
       </Section>
+
+      <Section id="rhythm" title={t("proactive.rhythm")} description={t("proactive.quietNote")}>
+        <Rhythm cfg={cfg} save={save} t={t} />
+      </Section>
+
+      <Section
+        id="memory"
+        title={t("proactive.memory")}
+        description={t("proactive.memoryNote")}
+        action={<span className="text-sm text-muted-foreground tabular-nums">{t("proactive.notesUsed", { n: view.notesChars.toLocaleString(), max: MAX_NOTES_CHARS.toLocaleString() })}</span>}
+      >
+        <Memory view={view} t={t} count={count} act={notes} agentId={agentId} />
+      </Section>
+
+      {view.mutes.length > 0 && (
+        <Section id="mutes" title={t("proactive.mutes")}>
+          <ItemGroup role="list" aria-label={t("proactive.mutes")} className="gap-1">
+            {view.mutes.map((m) => (
+              <Item key={m.subject} role="listitem" size="sm" className="px-0">
+                <ItemMedia variant="icon">
+                  <BellOffIcon aria-hidden="true" className="text-muted-foreground" />
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle dir="auto" className="line-clamp-none w-full [overflow-wrap:anywhere]">
+                    {m.label}
+                  </ItemTitle>
+                </ItemContent>
+                <ItemActions>
+                  <Button variant="outline" size="sm" disabled={unmuting === m.subject} onClick={() => void unmute(m.subject)}>
+                    {unmuting === m.subject && <Spinner data-icon="inline-start" />}
+                    {t("proactive.unmute")}
+                  </Button>
+                </ItemActions>
+              </Item>
+            ))}
+          </ItemGroup>
+        </Section>
+      )}
 
       {view.enabled && (
         <>
-          <Section id="rhythm" title={t("proactive.rhythm")}>
-            <Rhythm cfg={cfg} save={save} t={t} />
-          </Section>
-
-          <Section id="contacts" title={t("proactive.contacts")}>
-            <FieldGroup>
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldLabel htmlFor="proactive-auto">{t("proactive.contactsAuto")}</FieldLabel>
-                </FieldContent>
-                <Switch id="proactive-auto" checked={cfg.contactsAuto} onCheckedChange={(v) => void save({ config: { contactsAuto: v } })} />
-              </Field>
-              {cfg.contacts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("proactive.contactsNone")}</p>
-              ) : (
-                <ItemGroup role="list" aria-label={t("proactive.contacts")} className="gap-1">
-                  {cfg.contacts.map((c) => (
-                    <Item key={c.subject} role="listitem" size="sm" className="px-0">
-                      <ItemMedia variant="icon">
-                        <StarIcon aria-hidden="true" className="fill-current text-muted-foreground" />
-                      </ItemMedia>
-                      <ItemContent>
-                        <ItemTitle dir="auto" className="line-clamp-none w-full [overflow-wrap:anywhere]">
-                          {c.label}
-                        </ItemTitle>
-                      </ItemContent>
-                      <ItemActions>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={t("proactive.removeContact", {
-                            name: c.label,
-                          })}
-                          onClick={() =>
-                            void save({
-                              config: {
-                                contacts: cfg.contacts.filter((x) => x.subject !== c.subject),
-                              },
-                            })
-                          }
-                        >
-                          <XIcon />
-                        </Button>
-                      </ItemActions>
-                    </Item>
-                  ))}
-                </ItemGroup>
-              )}
-            </FieldGroup>
-          </Section>
-
-          {view.mutes.length > 0 && (
-            <Section id="mutes" title={t("proactive.mutes")}>
-              <ItemGroup role="list" aria-label={t("proactive.mutes")} className="gap-1">
-                {view.mutes.map((m) => (
-                  <Item key={m.subject} role="listitem" size="sm" className="px-0">
-                    <ItemMedia variant="icon">
-                      <BellOffIcon aria-hidden="true" className="text-muted-foreground" />
-                    </ItemMedia>
-                    <ItemContent>
-                      <ItemTitle dir="auto" className="line-clamp-none w-full [overflow-wrap:anywhere]">
-                        {m.label}
-                      </ItemTitle>
-                    </ItemContent>
-                    <ItemActions>
-                      <Button variant="outline" size="sm" disabled={unmuting === m.subject} onClick={() => void unmute(m.subject)}>
-                        {unmuting === m.subject && <Spinner data-icon="inline-start" />}
-                        {t("proactive.unmute")}
-                      </Button>
-                    </ItemActions>
-                  </Item>
-                ))}
-              </ItemGroup>
-            </Section>
-          )}
-
           <Section
             id="activity"
             title={t("proactive.activity")}
@@ -355,7 +359,7 @@ export function AgentProactive({ agentId }: { agentId: string }) {
             ) : (
               <ul className="flex flex-col divide-y" aria-label={t("proactive.activity")}>
                 {byTime(view.activity).map((n) => (
-                  <ActivityRow key={n.id} n={n} t={t} important={contactSubjects.has(n.subject)} onImportant={() => toggleContact(n)} />
+                  <ActivityRow key={n.id} n={n} t={t} />
                 ))}
               </ul>
             )}
@@ -403,190 +407,371 @@ export function AgentProactive({ agentId }: { agentId: string }) {
   )
 }
 
-type Save = (input: { enabled?: boolean; chatId?: string; config?: ProactivePatch }) => Promise<void>
+type Save = (input: { enabled?: boolean; chatId?: string; config?: ProactivePatch }) => Promise<boolean>
 
-function Sources({ view, save, t }: { view: ProactiveView; save: Save; t: T }) {
-  const cfg = view.config
-  const cal = cfg.calendar
-  const wa = cfg.whatsapp
-  const off = { value: "", label: t("proactive.off") }
-  // A source behind a hub is a connector plus its tool, so one connector (MCP Hub) can be both the calendar and WhatsApp.
-  const sourceKey = (id: string, tool?: string) => (tool ? `${id}#${tool}` : id)
-  const sourceOptions = (list: ProactiveConnector[]): Option[] => [off, ...list.map((c) => ({ value: sourceKey(c.id, c.tool), label: c.tool ? t("proactive.sourceTool", { label: c.label, tool: c.tool }) : c.label }))]
-  const calOptions = sourceOptions(view.connectors.calendar)
-  const waOptions = sourceOptions(view.connectors.whatsapp)
-  const minutes = (ns: number[]) =>
-    ns.map((n) => ({
-      value: String(n),
-      label: n === 0 ? t("proactive.atStart") : t("proactive.minutesBefore", { n }),
-    }))
-  const hours = (ns: number[]) => ns.map((n) => ({ value: String(n), label: t("proactive.hours", { n }) }))
-  const [account, setAccount] = React.useState(wa?.account ?? "")
-  React.useEffect(() => setAccount(wa?.account ?? ""), [wa?.account])
-  const noConnectors = view.connectors.calendar.length === 0 && view.connectors.whatsapp.length === 0
+function PromptEditor({ view, save, t }: { view: ProactiveView; save: Save; t: T }) {
+  const count = useCount()
+  const saved = view.config.prompt
+  const [draft, setDraft] = React.useState(saved)
+  const [saving, setSaving] = React.useState(false)
+  const [testing, setTesting] = React.useState(false)
+  const [result, setResult] = React.useState<ProactiveTestResult | null>(null)
+  // A saved prompt from the server replaces the draft only when there's no edit in progress.
+  const lastSaved = React.useRef(saved)
+  React.useEffect(() => {
+    setDraft((d) => (d === lastSaved.current ? saved : d))
+    lastSaved.current = saved
+  }, [saved])
+  const dirty = draft !== saved
+  const mentions = mentionsIn(draft)
+  const chars = draft.length
+  const tooLong = chars > MAX_PROMPT_CHARS
+  const tooMany = mentions.length > MAX_MENTIONS
+
+  const onSave = async () => {
+    setSaving(true)
+    const ok = await save({ config: { prompt: draft } })
+    setSaving(false)
+    if (ok) toast.success(t("proactive.saved"))
+  }
+  const onTest = async () => {
+    setTesting(true)
+    setResult(null)
+    try {
+      setResult(await testProactiveFn({ data: { agentId: view.agentId, prompt: draft } }))
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setTesting(false)
+    }
+  }
 
   return (
     <FieldGroup>
-      {noConnectors && (
-        <p className="text-sm text-muted-foreground">
-          {t("proactive.noConnectors")}{" "}
-          <Link to="/connectors/new" className="underline underline-offset-4">
-            {t("proactive.addConnector")}
-          </Link>
-        </p>
+      <Field>
+        <FieldLabel htmlFor="proactive-prompt" className="sr-only">
+          {t("proactive.promptLabel")}
+        </FieldLabel>
+        <MentionTextarea id="proactive-prompt" value={draft} onChange={setDraft} tools={view.tools} t={t} invalid={tooLong || tooMany} />
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-caption text-muted-foreground tabular-nums">
+          <span className={tooMany ? "text-destructive" : undefined}>{count(mentions.length, "proactive.mentionsOne", "proactive.mentionsMany")}</span>
+          <span className={tooLong ? "text-destructive" : undefined}>{t("proactive.chars", { n: chars.toLocaleString(), max: MAX_PROMPT_CHARS.toLocaleString() })}</span>
+        </div>
+      </Field>
+      {draft.trim() === "" && (
+        <div>
+          <Button variant="outline" size="sm" onClick={() => setDraft(view.starter)}>
+            {t("proactive.useStarter")}
+          </Button>
+        </div>
       )}
-      {(["calendar", "whatsapp"] as const).map((kind) =>
-        view.lastErrors[kind] ? (
-          <Alert key={kind} variant="warning">
+      {mentions.length > 0 && (
+        <ul className="flex flex-col gap-1.5" aria-label={t("proactive.prompt")}>
+          {mentions.map((m) => {
+            const tool = view.tools.find((x) => x.name === m)
+            const problem = problemFor(m, view.tools)
+            return (
+              <li key={m} className="flex min-w-0 items-start gap-2 text-sm">
+                <WrenchIcon aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${problem ? "text-destructive" : "text-muted-foreground"}`} />
+                <span className="min-w-0 [overflow-wrap:anywhere]">
+                  <span className="font-mono text-caption">@{m}</span>
+                  {tool && !problem && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {tool.connectorLabel}
+                      {tool.title ? ` · ${tool.title}` : ""}
+                    </span>
+                  )}
+                  {problem && <span className="text-destructive"> {t(problem)}</span>}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" disabled={!dirty || saving || tooLong || tooMany} onClick={() => void onSave()}>
+          {saving && <Spinner data-icon="inline-start" />}
+          {t("proactive.savePrompt")}
+        </Button>
+        {dirty && (
+          <Button variant="ghost" size="sm" disabled={saving} onClick={() => setDraft(saved)}>
+            {t("proactive.discard")}
+          </Button>
+        )}
+        <Button variant="outline" size="sm" disabled={testing || mentions.length === 0 || tooLong || tooMany} onClick={() => void onTest()}>
+          {testing ? <Spinner data-icon="inline-start" /> : <PlayIcon data-icon="inline-start" />}
+          {testing ? t("proactive.testing") : t("proactive.test")}
+        </Button>
+        {dirty && <span className="text-caption text-muted-foreground">{t("proactive.unsaved")}</span>}
+      </div>
+      <FieldDescription>{t("proactive.testNote")}</FieldDescription>
+      {result && <TestResult r={result} t={t} />}
+    </FieldGroup>
+  )
+}
+
+function TestResult({ r, t }: { r: ProactiveTestResult; t: T }) {
+  return (
+    <Card size="sm" aria-live="polite">
+      <CardContent className="flex flex-col gap-3">
+        {r.error ? (
+          <Alert variant="destructive">
             <CircleAlertIcon aria-hidden="true" />
-            <AlertTitle>{t(kind === "calendar" ? "proactive.calendarFailed" : "proactive.whatsappFailed")}</AlertTitle>
-            <AlertDescription className="[overflow-wrap:anywhere]">{view.lastErrors[kind]}</AlertDescription>
+            <AlertTitle>{t("proactive.testFailed")}</AlertTitle>
+            <AlertDescription className="[overflow-wrap:anywhere]">{r.error}</AlertDescription>
           </Alert>
-        ) : null,
-      )}
+        ) : r.items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("proactive.testNothing")}</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">{t("proactive.testWouldSend")}</h3>
+            <ul className="flex flex-col gap-2">
+              {r.items.map((it) => (
+                <li key={it.key} className="flex min-w-0 flex-col gap-0.5">
+                  <span dir="auto" className="text-sm whitespace-pre-line [overflow-wrap:anywhere]">
+                    {it.text}
+                  </span>
+                  <span className="text-caption text-muted-foreground tabular-nums [overflow-wrap:anywhere]">
+                    <span className="font-mono">{it.key}</span>
+                    {it.sendAt ? ` · ${t("proactive.testAt", { at: `${clockTime(it.sendAt)}${sameDay(it.sendAt) ? "" : ` ${shortDay(it.sendAt)}`}` })}` : ""}
+                    {it.urgent ? ` · ${t("proactive.testUrgent")}` : ""}
+                    {it.dropped ? ` · ${t("proactive.testDropped", { why: it.dropped })}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {r.remember.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <h3 className="text-sm font-medium">{t("proactive.testRemember")}</h3>
+            <ul className="flex list-disc flex-col gap-1 ps-5 text-sm">
+              {r.remember.map((n) => (
+                <li key={n} dir="auto" className="[overflow-wrap:anywhere]">
+                  {n}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <p className="text-caption text-muted-foreground tabular-nums">{t("proactive.testCalls", { calls: r.calls.length.toLocaleString(), tokens: r.tokens.toLocaleString() })}</p>
+      </CardContent>
+    </Card>
+  )
+}
 
-      <Card size="sm">
-        <CardContent className="flex flex-col gap-4">
-          <Field>
-            <FieldLabel htmlFor="proactive-cal" className="gap-2">
-              <CalendarIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-              {t("proactive.calendar")}
-            </FieldLabel>
-            <SimpleSelect
-              id="proactive-cal"
-              value={cal ? sourceKey(cal.connectorId, cal.tool) : ""}
-              options={withCurrent(calOptions, cal ? sourceKey(cal.connectorId, cal.tool) : "")}
-              onChange={(v) => {
-                const picked = view.connectors.calendar.find((c) => sourceKey(c.id, c.tool) === v)
-                void save({
-                  config: {
-                    calendar: picked ? { ...(cal ?? view.defaults.calendar), connectorId: picked.id, tool: picked.tool ?? "" } : null,
-                  },
-                })
-              }}
-            />
-          </Field>
-          {cal && (
-            <>
-              <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor="proactive-depart">{t("proactive.departLead")}</FieldLabel>
-                  <SimpleSelect
-                    id="proactive-depart"
-                    value={String(cal.departLeadMin)}
-                    options={withCurrent(minutes([0, 15, 30, 45, 60, 90, 120]), String(cal.departLeadMin))}
-                    onChange={(v) =>
-                      void save({
-                        config: { calendar: { departLeadMin: Number(v) } },
-                      })
-                    }
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="proactive-online">{t("proactive.onlineLead")}</FieldLabel>
-                  <SimpleSelect
-                    id="proactive-online"
-                    value={String(cal.onlineLeadMin)}
-                    options={withCurrent(minutes([0, 5, 10, 15, 30]), String(cal.onlineLeadMin))}
-                    onChange={(v) =>
-                      void save({
-                        config: { calendar: { onlineLeadMin: Number(v) } },
-                      })
-                    }
-                  />
-                </Field>
-              </div>
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldLabel htmlFor="proactive-changes">{t("proactive.notifyChanges")}</FieldLabel>
-                </FieldContent>
-                <Switch id="proactive-changes" checked={cal.notifyChanges} onCheckedChange={(v) => void save({ config: { calendar: { notifyChanges: v } } })} />
-              </Field>
-            </>
-          )}
-        </CardContent>
-      </Card>
+// MentionTextarea is a textarea that suggests tools after "@". It follows the
+// combobox pattern on the textbox itself: the list is announced through
+// aria-activedescendant, arrows move, Enter or Tab inserts, Escape closes.
+function MentionTextarea({ id, value, onChange, tools, t, invalid }: { id: string; value: string; onChange: (v: string) => void; tools: ProactiveTool[]; t: T; invalid: boolean }) {
+  const count = useCount()
+  const ref = React.useRef<HTMLTextAreaElement>(null)
+  const listId = React.useId()
+  const [query, setQuery] = React.useState<{ start: number; text: string } | null>(null)
+  const [active, setActive] = React.useState(0)
 
-      <Card size="sm">
-        <CardContent className="flex flex-col gap-4">
-          <Field>
-            <FieldLabel htmlFor="proactive-wa" className="gap-2">
-              <WhatsAppIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-              {t("proactive.whatsapp")}
-            </FieldLabel>
-            <SimpleSelect
-              id="proactive-wa"
-              value={wa ? sourceKey(wa.connectorId, wa.tool) : ""}
-              options={withCurrent(waOptions, wa ? sourceKey(wa.connectorId, wa.tool) : "")}
-              onChange={(v) => {
-                const picked = view.connectors.whatsapp.find((c) => sourceKey(c.id, c.tool) === v)
-                void save({
-                  config: {
-                    whatsapp: picked ? { ...(wa ?? view.defaults.whatsapp), connectorId: picked.id, tool: picked.tool ?? "" } : null,
-                  },
-                })
-              }}
-            />
-          </Field>
-          {wa && (
-            <>
-              <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor="proactive-wait">{t("proactive.waitHours")}</FieldLabel>
-                  <SimpleSelect
-                    id="proactive-wait"
-                    value={String(wa.waitHours)}
-                    options={withCurrent(hours([1, 2, 3, 4, 6, 8, 12, 24]), String(wa.waitHours))}
-                    onChange={(v) =>
-                      void save({
-                        config: { whatsapp: { waitHours: Number(v) } },
-                      })
-                    }
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="proactive-escalate">{t("proactive.escalate")}</FieldLabel>
-                  <SimpleSelect
-                    id="proactive-escalate"
-                    value={String(wa.escalateHours)}
-                    options={withCurrent([{ value: "0", label: t("proactive.never") }, ...hours([1, 2, 4, 6, 8, 12, 24])], String(wa.escalateHours))}
-                    onChange={(v) =>
-                      void save({
-                        config: { whatsapp: { escalateHours: Number(v) } },
-                      })
-                    }
-                  />
-                </Field>
-              </div>
-              <Field className="@xl/main:max-w-[calc(50%-0.5rem)]">
-                <FieldLabel htmlFor="proactive-account">{t("proactive.account")}</FieldLabel>
-                <Input
-                  id="proactive-account"
-                  className="font-mono"
-                  spellCheck={false}
-                  autoCapitalize="none"
-                  autoComplete="off"
-                  maxLength={32}
-                  value={account}
-                  onChange={(e) => setAccount(e.target.value)}
-                  onBlur={() => {
-                    const v = account.trim()
-                    if (!v) setAccount(wa.account)
-                    else if (v !== wa.account) void save({ config: { whatsapp: { account: v } } })
+  const options = React.useMemo(() => {
+    if (!query) return []
+    const q = query.text.toLowerCase()
+    const hit = (x: ProactiveTool) => !q || x.name.toLowerCase().includes(q) || x.connectorLabel.toLowerCase().includes(q) || (x.title ?? "").toLowerCase().includes(q)
+    const list = tools.filter(hit)
+    // Read tools first: they're the only ones that can be picked.
+    return [...list.filter((x) => x.class === "read"), ...list.filter((x) => x.class !== "read")].slice(0, 8)
+  }, [query, tools])
+  const open = query !== null
+  const firstRead = options.findIndex((o) => o.class === "read")
+
+  const track = (el: HTMLTextAreaElement) => {
+    const before = el.value.slice(0, el.selectionStart ?? 0)
+    const m = TYPING_RE.exec(before)
+    if (m) {
+      const start = before.length - m[2].length - 1
+      setQuery((cur) => (cur && cur.start === start && cur.text === m[2] ? cur : { start, text: m[2] }))
+    } else {
+      setQuery(null)
+    }
+  }
+  React.useEffect(() => setActive(Math.max(0, firstRead)), [query?.text, firstRead])
+
+  const insert = (tool: ProactiveTool) => {
+    const el = ref.current
+    if (!el || !query || tool.class !== "read") return
+    const end = el.selectionStart ?? value.length
+    const next = value.slice(0, query.start) + "@" + tool.name + " " + value.slice(end)
+    const caret = query.start + tool.name.length + 2
+    onChange(next)
+    setQuery(null)
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(caret, caret)
+    })
+  }
+
+  const move = (dir: 1 | -1) => {
+    if (options.length === 0) return
+    let i = active
+    for (let n = 0; n < options.length; n++) {
+      i = (i + dir + options.length) % options.length
+      if (options[i].class === "read") break
+    }
+    setActive(i)
+  }
+
+  return (
+    <div className="relative">
+      <Textarea
+        ref={ref}
+        id={id}
+        value={value}
+        rows={8}
+        spellCheck={false}
+        aria-invalid={invalid || undefined}
+        aria-autocomplete="list"
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open && options[active] ? `${listId}-${active}` : undefined}
+        placeholder={t("proactive.promptPlaceholder")}
+        className="max-h-[60vh] min-h-40 overflow-y-auto font-mono text-sm leading-relaxed"
+        onChange={(e) => {
+          onChange(e.target.value)
+          track(e.target)
+        }}
+        onClick={(e) => track(e.currentTarget)}
+        onKeyUp={(e) => ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key) && track(e.currentTarget)}
+        onBlur={() => setQuery(null)}
+        onKeyDown={(e) => {
+          if (!open) return
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault()
+            move(e.key === "ArrowDown" ? 1 : -1)
+          } else if ((e.key === "Enter" || e.key === "Tab") && options[active]?.class === "read") {
+            e.preventDefault()
+            insert(options[active])
+          } else if (e.key === "Escape") {
+            e.preventDefault()
+            setQuery(null)
+          }
+        }}
+      />
+      {open && (
+        <ul id={listId} role="listbox" aria-label={t("proactive.prompt")} className="absolute inset-x-0 top-full z-20 mt-1 flex max-h-72 flex-col overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-md">
+          {options.length === 0 ? (
+            <li role="presentation" className="px-2 py-1.5 text-sm text-muted-foreground">
+              {tools.some((x) => x.class === "read") ? t("proactive.noMatch") : t("proactive.noTools")}
+            </li>
+          ) : (
+            options.map((o, i) => {
+              const disabled = o.class !== "read"
+              return (
+                <li
+                  key={o.name}
+                  id={`${listId}-${i}`}
+                  role="option"
+                  aria-selected={i === active}
+                  aria-disabled={disabled || undefined}
+                  className={`flex min-w-0 cursor-default flex-col rounded-md px-2 py-1.5 ${i === active ? "bg-accent text-accent-foreground" : ""} ${disabled ? "opacity-50" : ""}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    insert(o)
                   }}
-                  onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-                />
-              </Field>
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldLabel htmlFor="proactive-groups">{t("proactive.skipGroups")}</FieldLabel>
-                </FieldContent>
-                <Switch id="proactive-groups" checked={wa.skipGroups} onCheckedChange={(v) => void save({ config: { whatsapp: { skipGroups: v } } })} />
-              </Field>
-            </>
+                  onMouseMove={() => !disabled && setActive(i)}
+                >
+                  <span className="flex min-w-0 items-baseline justify-between gap-2">
+                    <span className="truncate text-sm">{o.title ?? o.tool}</span>
+                    <span className="shrink-0 text-caption text-muted-foreground">{disabled ? t("proactive.onlyRead") : o.untrusted ? t("proactive.outsideData") : ""}</span>
+                  </span>
+                  <span className="truncate font-mono text-caption text-muted-foreground">
+                    {o.connectorLabel} · @{o.name}
+                  </span>
+                </li>
+              )
+            })
           )}
-        </CardContent>
-      </Card>
+        </ul>
+      )}
+      <span className="sr-only" aria-live="polite">
+        {open ? count(options.filter((o) => o.class === "read").length, "proactive.suggestionsOne", "proactive.suggestionsMany") : ""}
+      </span>
+    </div>
+  )
+}
+
+function Memory({ view, t, count, act, agentId }: { view: ProactiveView; t: T; count: ReturnType<typeof useCount>; act: (call: () => Promise<ProactiveView>) => Promise<boolean>; agentId: string }) {
+  const [text, setText] = React.useState("")
+  const [busy, setBusy] = React.useState<string | null>(null)
+  const add = async () => {
+    const v = text.trim()
+    if (!v) return
+    setBusy("add")
+    if (await act(() => addProactiveNoteFn({ data: { agentId, text: v } }))) setText("")
+    setBusy(null)
+  }
+  const now = Date.now()
+  return (
+    <FieldGroup>
+      {view.notes.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("proactive.memoryNone")}</p>
+      ) : (
+        <ItemGroup role="list" aria-label={t("proactive.memory")} className="gap-1">
+          {view.notes.map((n: ProactiveNote) => {
+            const days = n.expiresAt ? Math.max(1, Math.ceil((n.expiresAt - now) / DAY_MS)) : 0
+            return (
+              <Item key={n.id} role="listitem" size="sm" className="px-0">
+                <ItemContent>
+                  <ItemTitle dir="auto" className="line-clamp-none w-full font-normal [overflow-wrap:anywhere]">
+                    {n.text}
+                  </ItemTitle>
+                  <ItemDescription>{n.source === "owner" ? t("proactive.noteYou") : count(days, "proactive.noteDaysOne", "proactive.noteDaysMany")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  {n.source === "model" && (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={t("proactive.keepNote")}
+                      title={t("proactive.keep")}
+                      disabled={busy === n.id}
+                      onClick={async () => {
+                        setBusy(n.id)
+                        await act(() => editProactiveNoteFn({ data: { agentId, noteId: n.id, keep: true } }))
+                        setBusy(null)
+                      }}
+                    >
+                      <BookmarkIcon />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t("proactive.deleteNote")}
+                    disabled={busy === n.id}
+                    onClick={async () => {
+                      setBusy(n.id)
+                      await act(() => deleteProactiveNoteFn({ data: { agentId, noteId: n.id } }))
+                      setBusy(null)
+                    }}
+                  >
+                    <Trash2Icon />
+                  </Button>
+                </ItemActions>
+              </Item>
+            )
+          })}
+        </ItemGroup>
+      )}
+      <form
+        className="flex min-w-0 flex-col gap-2 @md/main:flex-row"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void add()
+        }}
+      >
+        <Input aria-label={t("proactive.addNote")} placeholder={t("proactive.notePlaceholder")} maxLength={MAX_NOTE_CHARS} value={text} onChange={(e) => setText(e.target.value)} className="min-w-0 flex-1" />
+        <Button type="submit" variant="outline" disabled={!text.trim() || busy === "add"}>
+          {busy === "add" && <Spinner data-icon="inline-start" />}
+          {t("proactive.addNote")}
+        </Button>
+      </form>
     </FieldGroup>
   )
 }
@@ -670,9 +855,9 @@ function Rhythm({ cfg, save, t }: { cfg: ProactiveConfig; save: Save; t: T }) {
   )
 }
 
-function ActivityRow({ n, t, important, onImportant }: { n: ProactiveNudge; t: T; important: boolean; onImportant: () => void }) {
-  const Icon = KIND_ICON[n.kind] ?? MessageCircleIcon
-  const s = STATUS[n.status] ?? STATUS.pending
+function ActivityRow({ n, t }: { n: ProactiveNudge; t: T }) {
+  const Icon = n.kind === "sum_morning" ? SunIcon : n.kind === "sum_evening" ? MoonIcon : MessageCircleIcon
+  const s = STATUS[n.status as NudgeStatus] ?? STATUS.pending
   const at = shownAt(n)
   const isSummary = n.kind === "sum_morning" || n.kind === "sum_evening"
   return (
@@ -685,21 +870,15 @@ function ActivityRow({ n, t, important, onImportant }: { n: ProactiveNudge; t: T
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span dir="auto" className="min-w-0 text-sm [overflow-wrap:anywhere]">
           {isSummary ? t(n.kind === "sum_morning" ? "proactive.morning" : "proactive.evening") : n.label}
-          {n.escalatedAt && <span className="text-muted-foreground"> · {t("proactive.escalated")}</span>}
         </span>
         <StatusText tone={s.tone} className="@xl/main:hidden">
           {t(s.key)}
         </StatusText>
-        {n.status === "dropped" && n.reason && <span className="min-w-0 text-caption text-muted-foreground [overflow-wrap:anywhere]">{n.reason}</span>}
+        {(n.status === "dropped" || n.status === "pending") && n.reason && <span className="min-w-0 text-caption text-muted-foreground [overflow-wrap:anywhere]">{n.reason}</span>}
       </span>
       <StatusText tone={s.tone} className="hidden pt-0.5 @xl/main:inline-flex">
         {t(s.key)}
       </StatusText>
-      {n.kind === "wa_waiting" && (
-        <Button variant="ghost" size="icon-sm" className="-my-1" aria-pressed={important} aria-label={t("proactive.markImportant", { name: n.label })} onClick={onImportant}>
-          <StarIcon className={important ? "fill-current text-foreground" : undefined} />
-        </Button>
-      )}
     </li>
   )
 }
@@ -732,3 +911,4 @@ function Section({ id, first, title, label, description, action, children }: { i
     </>
   )
 }
+
