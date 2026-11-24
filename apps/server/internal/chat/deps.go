@@ -100,9 +100,12 @@ type Outbound interface {
 type Deps struct {
 	ReminderActions ReminderActions
 	FlowActions     FlowActions
-	ParseReminder   func(ctx context.Context, text, tz string, now int64, model models.LanguageModel) (ParsedReminder, error)
-	Scheduler       Scheduler
-	Jobs            Jobs
-	Flows           Flows
-	Outbound        Outbound
+	// ProactiveActions: buttons ("ndg:") and quoted replies on proactive
+	// messages (docs/rfc/proactive.md 10).
+	ProactiveActions ReminderActions
+	ParseReminder    func(ctx context.Context, text, tz string, now int64, model models.LanguageModel) (ParsedReminder, error)
+	Scheduler        Scheduler
+	Jobs             Jobs
+	Flows            Flows
+	Outbound         Outbound
 }

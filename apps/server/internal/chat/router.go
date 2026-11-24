@@ -294,10 +294,11 @@ type RouteInput struct {
 	Text                string
 	ReplyToChannelMsgID string
 	// The stored message id (chat triggers key their run on it).
-	MessageID       string
-	ReminderActions ReminderActions
-	FlowActions     FlowActions
-	Outbound        Outbound
+	MessageID        string
+	ReminderActions  ReminderActions
+	FlowActions      FlowActions
+	ProactiveActions ReminderActions
+	Outbound         Outbound
 	// false for a guest (PLAN 19.3): approvals, buttons, commands and
 	// reminder actions are the owner's.
 	FromOwner bool
@@ -358,6 +359,15 @@ func RouteMessage(i RouteInput) (Route, error) {
 		}
 		if strings.HasPrefix(cb, "rem:") && i.ReminderActions != nil {
 			reply, ok, err := i.ReminderActions.FromCallback(i.DB, cb, i.Chat.ID, i.Now)
+			if err != nil {
+				return Route{}, err
+			}
+			if ok {
+				return Route{Kind: "reminder", Reply: reply}, nil
+			}
+		}
+		if strings.HasPrefix(cb, "ndg:") && i.ProactiveActions != nil {
+			reply, ok, err := i.ProactiveActions.FromCallback(i.DB, cb, i.Chat.ID, i.Now)
 			if err != nil {
 				return Route{}, err
 			}
@@ -453,6 +463,15 @@ func RouteMessage(i RouteInput) (Route, error) {
 	}
 	if i.ReminderActions != nil && hasText {
 		reply, ok, err := i.ReminderActions.FromText(i.DB, i.Text, i.ReplyToChannelMsgID, i.Chat.ID, i.Now)
+		if err != nil {
+			return Route{}, err
+		}
+		if ok {
+			return Route{Kind: "reminder", Reply: reply}, nil
+		}
+	}
+	if i.ProactiveActions != nil && hasText {
+		reply, ok, err := i.ProactiveActions.FromText(i.DB, i.Text, i.ReplyToChannelMsgID, i.Chat.ID, i.Now)
 		if err != nil {
 			return Route{}, err
 		}

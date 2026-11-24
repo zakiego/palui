@@ -908,3 +908,91 @@ func ScanMCPGrant(s Scanner) (MCPGrant, error) {
 	err := s.Scan(&r.ID, &r.Kind, &r.Name, &r.UserID, &r.ClientID, &r.Scope, &r.TokenHint, &r.AccessHash, &r.AccessExpiresAt, &r.RefreshHash, &r.RefreshExpiresAt, &r.PrevRefreshHash, &r.RotatedAt, &r.CreatedAt, &r.LastUsedAt)
 	return r, err
 }
+
+// AgentProactive is an agent_proactive row (docs/rfc/proactive.md 4.1): one
+// per agent, off until the owner turns it on. Config is the versioned JSON
+// the proactive package validates.
+type AgentProactive struct {
+	AgentID        string  `json:"agentId"`
+	Enabled        bool    `json:"enabled"`
+	ChatID         *string `json:"chatId"`
+	Config         RawJSON `json:"config"`
+	NextTickAt     *int64  `json:"nextTickAt"`
+	LastTickAt     *int64  `json:"lastTickAt"`
+	TickLeaseUntil *int64  `json:"tickLeaseUntil"`
+	PausedReason   *string `json:"pausedReason"`
+	CreatedAt      int64   `json:"createdAt"`
+	UpdatedAt      int64   `json:"updatedAt"`
+}
+
+const AgentProactiveCols = "agent_id, enabled, chat_id, config, next_tick_at, last_tick_at, tick_lease_until, paused_reason, created_at, updated_at"
+
+func ScanAgentProactive(s Scanner) (AgentProactive, error) {
+	var r AgentProactive
+	err := s.Scan(&r.AgentID, &r.Enabled, &r.ChatID, &r.Config, &r.NextTickAt, &r.LastTickAt, &r.TickLeaseUntil, &r.PausedReason, &r.CreatedAt, &r.UpdatedAt)
+	return r, err
+}
+
+// Nudge is a nudges row (docs/rfc/proactive.md 4.2): one thing a proactive
+// agent found, with its status, so it's told once.
+type Nudge struct {
+	ID          string  `json:"id"`
+	AgentID     string  `json:"agentId"`
+	Key         string  `json:"key"`
+	Kind        string  `json:"kind"`
+	Subject     string  `json:"subject"`
+	Status      string  `json:"status"`
+	WakeAt      *int64  `json:"wakeAt"`
+	SentAt      *int64  `json:"sentAt"`
+	EscalatedAt *int64  `json:"escalatedAt"`
+	Snapshot    RawJSON `json:"snapshot"`
+	Reason      *string `json:"reason"`
+	OutboxID    *string `json:"outboxId"`
+	CreatedAt   int64   `json:"createdAt"`
+	UpdatedAt   int64   `json:"updatedAt"`
+}
+
+const NudgeCols = "id, agent_id, key, kind, subject, status, wake_at, sent_at, escalated_at, snapshot, reason, outbox_id, created_at, updated_at"
+
+func ScanNudge(s Scanner) (Nudge, error) {
+	var r Nudge
+	err := s.Scan(&r.ID, &r.AgentID, &r.Key, &r.Kind, &r.Subject, &r.Status, &r.WakeAt, &r.SentAt, &r.EscalatedAt, &r.Snapshot, &r.Reason, &r.OutboxID, &r.CreatedAt, &r.UpdatedAt)
+	return r, err
+}
+
+// ProactiveMute is a proactive_mutes row: a subject never nudged again.
+type ProactiveMute struct {
+	AgentID   string `json:"agentId"`
+	Subject   string `json:"subject"`
+	Label     string `json:"label"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+const ProactiveMuteCols = "agent_id, subject, label, created_at"
+
+func ScanProactiveMute(s Scanner) (ProactiveMute, error) {
+	var r ProactiveMute
+	err := s.Scan(&r.AgentID, &r.Subject, &r.Label, &r.CreatedAt)
+	return r, err
+}
+
+// ProactiveTick is a proactive_ticks row: one collection pass.
+type ProactiveTick struct {
+	ID         string  `json:"id"`
+	AgentID    string  `json:"agentId"`
+	StartedAt  int64   `json:"startedAt"`
+	FinishedAt *int64  `json:"finishedAt"`
+	Sources    RawJSON `json:"sources"`
+	Found      int64   `json:"found"`
+	Sent       int64   `json:"sent"`
+	Tokens     int64   `json:"tokens"`
+	Error      *string `json:"error"`
+}
+
+const ProactiveTickCols = "id, agent_id, started_at, finished_at, sources, found, sent, tokens, error"
+
+func ScanProactiveTick(s Scanner) (ProactiveTick, error) {
+	var r ProactiveTick
+	err := s.Scan(&r.ID, &r.AgentID, &r.StartedAt, &r.FinishedAt, &r.Sources, &r.Found, &r.Sent, &r.Tokens, &r.Error)
+	return r, err
+}

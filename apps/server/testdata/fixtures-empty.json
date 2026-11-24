@@ -10,6 +10,10 @@
    "columns": ["agent_id","member_id","created_at","can_set_rules"],
    "rows": []
   },
+  "agent_proactive": {
+   "columns": ["agent_id","enabled","chat_id","config","next_tick_at","last_tick_at","tick_lease_until","paused_reason","created_at","updated_at"],
+   "rows": []
+  },
   "agents": {
    "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat","model_roles","transcribe_voice"],
    "rows": []
@@ -102,6 +106,10 @@
    "columns": ["id","chat_id","session_id","role","content","text","channel_msg_id","reply_to_channel_msg_id","sender_id","status","ignore_reason","run_id","created_at","sender_name","from_owner"],
    "rows": []
   },
+  "nudges": {
+   "columns": ["id","agent_id","key","kind","subject","status","wake_at","sent_at","escalated_at","snapshot","reason","outbox_id","created_at","updated_at"],
+   "rows": []
+  },
   "oauth_clients": {
    "columns": ["id","name","client_uri","redirect_uris","auth_method","secret_hash","created_at"],
    "rows": []
@@ -138,6 +146,14 @@
   },
   "preferences": {
    "columns": ["key","value","updated_at"],
+   "rows": []
+  },
+  "proactive_mutes": {
+   "columns": ["agent_id","subject","label","created_at"],
+   "rows": []
+  },
+  "proactive_ticks": {
+   "columns": ["id","agent_id","started_at","finished_at","sources","found","sent","tokens","error"],
    "rows": []
   },
   "reminders": {

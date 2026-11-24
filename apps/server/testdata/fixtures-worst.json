@@ -15,6 +15,10 @@
     ["<agt#2>","<mem#3>",1794621600000,0]
    ]
   },
+  "agent_proactive": {
+   "columns": ["agent_id","enabled","chat_id","config","next_tick_at","last_tick_at","tick_lease_until","paused_reason","created_at","updated_at"],
+   "rows": []
+  },
   "agents": {
    "columns": ["id","slug","name","persona","is_default","recall_container","owner_powers","guest_tools","daily_token_cap","telegram_connector_id","avatar_image","avatar_icon","avatar_color","created_at","updated_at","tool_permissions","recall_read_containers","recall_per_chat","model_roles","transcribe_voice"],
    "rows": [
@@ -447,6 +451,10 @@
     ["<msg#41>","<chat#2>","<ses#1>","user","{\"text\":\"ini diabaikan\"}","ini diabaikan",null,null,null,"ignored","not on the allowlist",null,1794611820000,null,1]
    ]
   },
+  "nudges": {
+   "columns": ["id","agent_id","key","kind","subject","status","wake_at","sent_at","escalated_at","snapshot","reason","outbox_id","created_at","updated_at"],
+   "rows": []
+  },
   "oauth_clients": {
    "columns": ["id","name","client_uri","redirect_uris","auth_method","secret_hash","created_at"],
    "rows": [
@@ -524,6 +532,14 @@
     ["x","y",1794621600000],
     ["nama_panggilan","Đặng Thị Ngọc Hân 🌴",1794621600000]
    ]
+  },
+  "proactive_mutes": {
+   "columns": ["agent_id","subject","label","created_at"],
+   "rows": []
+  },
+  "proactive_ticks": {
+   "columns": ["id","agent_id","started_at","finished_at","sources","found","sent","tokens","error"],
+   "rows": []
   },
   "reminders": {
    "columns": ["id","chat_id","text","rrule","tz","local_start","fire_at","scheduled_for","status","last_fired_at","snoozed_until","smart_prompt","last_outbox_id","created_at","updated_at"],

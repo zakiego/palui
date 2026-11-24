@@ -438,7 +438,7 @@ func (e *Engine) dispatch(chat db.Chat, row db.Message) (*Route, error) {
 	}
 	r, err := RouteMessage(RouteInput{
 		DB: c.DB, Chat: chat, Content: content, Text: row.Text, ReplyToChannelMsgID: reply, MessageID: row.ID,
-		ReminderActions: c.Deps.ReminderActions, FlowActions: c.Deps.FlowActions, Outbound: c.Deps.Outbound,
+		ReminderActions: c.Deps.ReminderActions, FlowActions: c.Deps.FlowActions, ProactiveActions: c.Deps.ProactiveActions, Outbound: c.Deps.Outbound,
 		FromOwner: row.FromOwner, Now: c.Clock(),
 	})
 	if err != nil {
