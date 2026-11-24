@@ -134,3 +134,21 @@ func TestAnMCPCalendarNeedsAnMCPConnectorAndAToolName(t *testing.T) {
 	tu.Must(t, save("mcp-hub", "calendar__list_events"))
 	tu.Must(t, save("gcal-1", ""))
 }
+
+func TestLiveSourcesCallsTheWhatsAppToolBehindAHub(t *testing.T) {
+	var got []string
+	src := proactive.LiveSources{CallTool: func(ctx context.Context, connectorID, tool string, args *jsonx.Object, scope *tools.CallScope) (any, error) {
+		got = append(got, connectorID+"/"+tool)
+		return map[string]any{"content": []any{}, "structuredContent": map[string]any{"chats": []any{}}}, nil
+	}}
+	wa := proactive.DefaultWhatsApp("wa-hub")
+	_, err := src.Waiting(context.Background(), *wa, "agt_1", NOW)
+	tu.Must(t, err)
+	wa = proactive.DefaultWhatsApp("mcp-hub")
+	wa.Tool = "wa-personal__list_chats"
+	_, err = src.Waiting(context.Background(), *wa, "agt_1", NOW)
+	tu.Must(t, err)
+	if strings.Join(got, ",") != "wa-hub/list_chats,mcp-hub/wa-personal__list_chats" {
+		t.Fatalf("%v", got)
+	}
+}

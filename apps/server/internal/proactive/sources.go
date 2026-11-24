@@ -313,7 +313,7 @@ func parseWhen(s string, loc *time.Location) (int64, bool) {
 	return 0, false
 }
 
-// Waiting calls wa-hub's list_chats (tab unanswered, since) and reads its
+// Waiting calls wa-hub's list_chats or wa.Tool (tab unanswered, since) and reads its
 // structured content. A wa-hub without it is refused: parsing its text would
 // break on a wording change (RFC decision 1).
 func (s LiveSources) Waiting(ctx context.Context, wa WhatsAppSource, agentID string, since int64) ([]WaitingChat, error) {
@@ -325,7 +325,11 @@ func (s LiveSources) Waiting(ctx context.Context, wa WhatsAppSource, agentID str
 	args.Set("tab", "unanswered")
 	args.Set("limit", 100)
 	args.Set("since", since)
-	out, err := s.CallTool(ctx, wa.ConnectorID, "list_chats", args, &tools.CallScope{AgentID: agentID})
+	tool := wa.Tool
+	if tool == "" {
+		tool = "list_chats"
+	}
+	out, err := s.CallTool(ctx, wa.ConnectorID, tool, args, &tools.CallScope{AgentID: agentID})
 	if err != nil {
 		return nil, err
 	}
