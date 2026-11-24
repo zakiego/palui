@@ -342,10 +342,15 @@ func (e *Engine) Sweep(now int64) (int, error) {
 			if _, err := insertNudge(q, r.AgentID, key, which, "summary", Snapshot{Date: date}, StatusFiring, nil, now); err != nil {
 				continue // another sweep claimed it
 			}
+			// One run per agent at a time: a summary shares the tick's slot, so
+			// the two never deliver the same pending items twice.
 			agentID := r.AgentID
-			if e.spawn("summary:"+agentID+":"+which, func() { e.tick(agentID, mode, key) }) {
+			if e.spawn("tick:"+agentID, func() { e.tick(agentID, mode, key) }) {
 				n++
 				summarized = true
+			} else if _, err := q.Exec("DELETE FROM nudges WHERE agent_id = ? AND key = ? AND status = ?", agentID, key, StatusFiring); err != nil {
+				// A run is still going: let the next sweep claim the summary again.
+				return n, err
 			}
 		}
 		if summarized && r.NextTickAt != nil && *r.NextTickAt <= now {
@@ -369,6 +374,9 @@ func (e *Engine) Sweep(now int64) (int, error) {
 					agentID := r.AgentID
 					if e.spawn("tick:"+agentID, func() { e.tick(agentID, SummaryNone, "") }) {
 						n++
+					} else if _, err := q.Exec("UPDATE agent_proactive SET tick_lease_until = NULL WHERE agent_id = ?", agentID); err != nil {
+						// A summary run holds the slot; this tick is skipped, not stuck.
+						return n, err
 					}
 				}
 			}
