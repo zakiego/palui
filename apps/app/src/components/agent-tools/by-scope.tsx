@@ -30,7 +30,7 @@ import {
   GroupActions,
   GroupMeta,
   groupData,
-  ToolRow,
+  PermissionTree,
   useSearchOpen,
   type ToolItem,
   type ToolsViewProps,
@@ -273,18 +273,16 @@ function Groups({
                   />
                 </span>
               </AccordionTrigger>
-              <AccordionContent className="flex flex-col gap-1 px-4 pb-4 @xl/main:ps-16">
+              <AccordionContent className="flex flex-col gap-3 px-4 pb-4 @xl/main:ps-[4.25rem]">
                 <GroupActions head={head} props={props} />
-                <ul className="flex flex-col divide-y">
-                  {list.map((x) => (
-                    <ToolRow
-                      key={x.name}
-                      x={x}
-                      props={props}
-                      scope={mixed ? dataOf(x, owned, noPrivate) : undefined}
-                    />
-                  ))}
-                </ul>
+                <PermissionTree
+                  head={head}
+                  list={list}
+                  props={props}
+                  scopeOf={
+                    mixed ? (x) => dataOf(x, owned, noPrivate) : undefined
+                  }
+                />
               </AccordionContent>
             </AccordionItem>
           );
