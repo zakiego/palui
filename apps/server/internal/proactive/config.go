@@ -49,9 +49,11 @@ type Summary struct {
 	At string `json:"at"`
 }
 
-// CalendarSource reads a gcal connector.
+// CalendarSource reads a gcal connector, or with Tool an MCP connector's
+// Google Calendar style list_events tool (timeMin, timeMax, timeZone).
 type CalendarSource struct {
 	ConnectorID   string `json:"connectorId"`
+	Tool          string `json:"tool,omitempty"`
 	DepartLeadMin int    `json:"departLeadMin"`
 	OnlineLeadMin int    `json:"onlineLeadMin"`
 	NotifyChanges bool   `json:"notifyChanges"`
@@ -107,6 +109,7 @@ func bad(format string, a ...any) error { return &ConfigError{fmt.Sprintf(format
 
 var hhmm = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
 var subjectRe = regexp.MustCompile(`^wa:chat:[A-Za-z0-9_-]{1,64}$`)
+var toolNameRe = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,128}$`)
 
 func between(name string, v, lo, hi int) error {
 	if v < lo || v > hi {
@@ -141,6 +144,9 @@ func (c Config) Validate() error {
 	if cal := c.Calendar; cal != nil {
 		if strings.TrimSpace(cal.ConnectorID) == "" {
 			return bad("Pick a calendar connector")
+		}
+		if cal.Tool != "" && !toolNameRe.MatchString(cal.Tool) {
+			return bad("Calendar tool must be an MCP tool name")
 		}
 		if err := between("Leave reminder", cal.DepartLeadMin, 0, 180); err != nil {
 			return err

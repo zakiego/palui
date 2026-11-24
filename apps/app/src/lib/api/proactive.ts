@@ -7,6 +7,8 @@ export type ProactiveSummary = { on: boolean; at: string }
 
 export type CalendarSource = {
   connectorId: string
+  // An MCP calendar: its Google Calendar style list_events tool.
+  tool?: string
   departLeadMin: number
   onlineLeadMin: number
   notifyChanges: boolean
@@ -57,6 +59,7 @@ export type ProactiveConnector = {
   id: string
   label: string
   status: ConnectorStatus
+  tool?: string
 }
 
 export type ProactiveView = {

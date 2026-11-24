@@ -169,3 +169,16 @@ test("counts read right at one", async () => {
   render(<AgentProactive agentId="agt_palui" />)
   expect(await screen.findByText("1 check · 1 sent")).toBeTruthy()
 })
+
+test("an MCP calendar tool is a calendar source, saved with its tool", async () => {
+  const hub = { id: "mcp-hub", label: "MCP Hub", status: "on" as const }
+  api.getProactiveFn.mockResolvedValue(view({ connectors: { calendar: [{ ...hub, tool: "calendar__list_events" }], whatsapp: [hub] } }))
+  api.saveProactiveFn.mockImplementation(async () => view())
+  const user = userEvent.setup()
+  render(<AgentProactive agentId="agt_palui" />)
+  await user.click(await screen.findByRole("combobox", { name: "Calendar" }))
+  await user.click(await screen.findByRole("option", { name: "MCP Hub (calendar__list_events)" }))
+  expect(api.saveProactiveFn).toHaveBeenCalledWith({
+    data: { agentId: "agt_palui", config: { calendar: { connectorId: "mcp-hub", tool: "calendar__list_events", departLeadMin: 30, onlineLeadMin: 10, notifyChanges: true } } },
+  })
+})

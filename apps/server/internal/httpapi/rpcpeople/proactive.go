@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
@@ -16,6 +17,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/httpapi"
 	"github.com/zakiego/palui/apps/server/internal/proactive"
 	"github.com/zakiego/palui/apps/server/internal/settings"
+	"github.com/zakiego/palui/apps/server/internal/tools"
 	"github.com/zakiego/palui/apps/server/internal/zod"
 	"github.com/zakiego/palui/apps/server/internal/zone"
 )
@@ -30,6 +32,8 @@ type proactiveConnector struct {
 	ID     string `json:"id"`
 	Label  string `json:"label"`
 	Status string `json:"status"`
+	// An MCP calendar: the list_events tool to call.
+	Tool string `json:"tool,omitempty"`
 }
 
 type proactiveNudge struct {
@@ -78,7 +82,7 @@ func init() {
 		Input: zod.Object(zod.F("agentId", agentID)),
 		Fn: func(c *httpapi.Call) (any, error) {
 			id, _ := c.Obj().Get("agentId")
-			return proactiveFor(c.DB(), id.(string), c.Now())
+			return proactiveWithTools(c, c.DB(), id.(string), c.Now())
 		},
 	})
 	httpapi.Register(httpapi.Handler{
@@ -118,7 +122,7 @@ func init() {
 			if rt, err := c.Runtime(); err == nil {
 				rt.Reconcile()
 			}
-			return proactiveFor(q, in.AgentID, now)
+			return proactiveWithTools(c, q, in.AgentID, now)
 		},
 	})
 	httpapi.Register(httpapi.Handler{
@@ -131,7 +135,7 @@ func init() {
 			if _, err := proactive.Unmute(c.DB(), id.(string), subject.(string)); err != nil {
 				return nil, err
 			}
-			return proactiveFor(c.DB(), id.(string), c.Now())
+			return proactiveWithTools(c, c.DB(), id.(string), c.Now())
 		},
 	})
 	httpapi.Register(httpapi.Handler{
@@ -149,7 +153,7 @@ func init() {
 			if err := rt.Built.Proactive.CheckNow(id.(string), c.Now()); err != nil {
 				return nil, failConfig(err)
 			}
-			return proactiveFor(c.DB(), id.(string), c.Now())
+			return proactiveWithTools(c, c.DB(), id.(string), c.Now())
 		},
 	})
 }
@@ -160,6 +164,49 @@ func failConfig(err error) error {
 		return httpapi.Fail("%s", ce.Msg)
 	}
 	return err
+}
+
+// proactiveWithTools is proactiveFor plus the MCP calendar tools this agent can
+// call, which only the running connectors know.
+func proactiveWithTools(c *httpapi.Call, q db.Q, agentID string, now int64) (*proactiveView, error) {
+	v, err := proactiveFor(q, agentID, now)
+	if err != nil {
+		return nil, err
+	}
+	rt, err := runtimeOf(c)
+	if err != nil {
+		return v, nil
+	}
+	list, err := rt.AgentTools(c.Ctx, agentID)
+	if err != nil {
+		return v, nil
+	}
+	addCalendarTools(v, list)
+	return v, nil
+}
+
+// calendarToolRe is a Google Calendar list_events tool on an MCP server
+// ("calendar__list_events" on MCP Hub, "gcal_list_events", ...). It needs
+// "calendar" or "gcal" in the name, so a server's own log list_events isn't
+// offered.
+var calendarToolRe = regexp.MustCompile(`(?i)(calendar|gcal).*list_events$`)
+
+// addCalendarTools offers each MCP calendar tool as a calendar source, next
+// to the gcal connectors.
+func addCalendarTools(v *proactiveView, list []tools.CatalogTool) {
+	status := map[string]string{}
+	for _, c := range v.Connectors["whatsapp"] {
+		status[c.ID] = c.Status
+	}
+	seen := map[string]bool{}
+	for _, t := range list {
+		st, ok := status[t.ConnectorID]
+		if t.ConnectorType != "mcp" || !ok || !calendarToolRe.MatchString(t.Tool) || seen[t.ConnectorID+"/"+t.Tool] {
+			continue
+		}
+		seen[t.ConnectorID+"/"+t.Tool] = true
+		v.Connectors["calendar"] = append(v.Connectors["calendar"], proactiveConnector{ID: t.ConnectorID, Label: t.ConnectorLabel, Status: st, Tool: t.Tool})
+	}
 }
 
 func proactiveFor(q db.Q, agentID string, now int64) (*proactiveView, error) {
