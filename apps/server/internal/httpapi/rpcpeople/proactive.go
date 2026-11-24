@@ -166,8 +166,8 @@ func failConfig(err error) error {
 	return err
 }
 
-// proactiveWithTools is proactiveFor plus the MCP calendar tools this agent can
-// call, which only the running connectors know.
+// proactiveWithTools is proactiveFor plus the MCP calendar and WhatsApp tools
+// this agent can call, which only the running connectors know.
 func proactiveWithTools(c *httpapi.Call, q db.Q, agentID string, now int64) (*proactiveView, error) {
 	v, err := proactiveFor(q, agentID, now)
 	if err != nil {
@@ -181,7 +181,7 @@ func proactiveWithTools(c *httpapi.Call, q db.Q, agentID string, now int64) (*pr
 	if err != nil {
 		return v, nil
 	}
-	addCalendarTools(v, list)
+	addSourceTools(v, list)
 	return v, nil
 }
 
@@ -191,22 +191,44 @@ func proactiveWithTools(c *httpapi.Call, q db.Q, agentID string, now int64) (*pr
 // offered.
 var calendarToolRe = regexp.MustCompile(`(?i)(calendar|gcal).*list_events$`)
 
-// addCalendarTools offers each MCP calendar tool as a calendar source, next
-// to the gcal connectors.
-func addCalendarTools(v *proactiveView, list []tools.CatalogTool) {
+// whatsAppToolRe is wa-hub's list_chats: bare on wa-hub itself, or behind a
+// hub prefix that starts with "wa" ("wa-personal__list_chats"). Palui's own
+// list_chats through a hub ("palui-agent__list_chats") isn't offered.
+var whatsAppToolRe = regexp.MustCompile(`(?i)^(wa[a-z0-9_-]*__)?list_chats$`)
+
+// addSourceTools offers each MCP calendar tool as a calendar source, next to
+// the gcal connectors, and each wa-hub list_chats tool as a WhatsApp source.
+// The WhatsApp list arrives as every MCP connector the agent may use; it's
+// cut down to the ones with a list_chats tool.
+func addSourceTools(v *proactiveView, list []tools.CatalogTool) {
 	status := map[string]string{}
 	for _, c := range v.Connectors["whatsapp"] {
 		status[c.ID] = c.Status
 	}
+	whatsapp := []proactiveConnector{}
 	seen := map[string]bool{}
 	for _, t := range list {
 		st, ok := status[t.ConnectorID]
-		if t.ConnectorType != "mcp" || !ok || !calendarToolRe.MatchString(t.Tool) || seen[t.ConnectorID+"/"+t.Tool] {
+		key := t.ConnectorID + "/" + t.Tool
+		if t.ConnectorType != "mcp" || !ok || seen[key] {
 			continue
 		}
-		seen[t.ConnectorID+"/"+t.Tool] = true
-		v.Connectors["calendar"] = append(v.Connectors["calendar"], proactiveConnector{ID: t.ConnectorID, Label: t.ConnectorLabel, Status: st, Tool: t.Tool})
+		switch {
+		case calendarToolRe.MatchString(t.Tool):
+			v.Connectors["calendar"] = append(v.Connectors["calendar"], proactiveConnector{ID: t.ConnectorID, Label: t.ConnectorLabel, Status: st, Tool: t.Tool})
+		case whatsAppToolRe.MatchString(t.Tool):
+			c := proactiveConnector{ID: t.ConnectorID, Label: t.ConnectorLabel, Status: st}
+			// A bare list_chats is the connector's default: no tool saved.
+			if t.Tool != "list_chats" {
+				c.Tool = t.Tool
+			}
+			whatsapp = append(whatsapp, c)
+		default:
+			continue
+		}
+		seen[key] = true
 	}
+	v.Connectors["whatsapp"] = whatsapp
 }
 
 func proactiveFor(q db.Q, agentID string, now int64) (*proactiveView, error) {
