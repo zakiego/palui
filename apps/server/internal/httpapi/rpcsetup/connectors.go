@@ -589,9 +589,11 @@ func applySuggestedToolClasses(c *httpapi.Call) (any, error) {
 		}
 		return nil, err
 	}
-	// The running connector picks the new prefs up on restart.
+	// The running connector picks the new prefs up on restart. Wait for it,
+	// so the page's next load lists the tools with their new classes instead
+	// of missing the server mid-restart.
 	if saved > 0 {
-		poke(c)
+		rt.Sup.Reconcile()
 	}
 	return struct {
 		OK    bool `json:"ok"`
