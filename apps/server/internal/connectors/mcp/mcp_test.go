@@ -168,7 +168,7 @@ func TestOffersOnlyEnabledToolsWithTheirClassUnsetOnesAsDestructive(t *testing.T
 
 func TestCallToolCallsAToolDirectlyWithItsClass(t *testing.T) {
 	srv := conntest.StartMCPServer(t, conntest.MCPOptions{Register: register, Token: TOKEN})
-	cfg := config_(t, srv.URL, `,"toolPrefs":{"delete_all":{"enabled":false,"class":"destructive"},"add_note":{"enabled":true,"class":"write"}}`)
+	cfg := config_(t, srv.URL, `,"toolPrefs":{"search":{"enabled":true,"class":"read"},"delete_all":{"enabled":false,"class":"destructive"},"add_note":{"enabled":true,"class":"write"}}`)
 	running, err := mcpconn.Runtime.Start(ctx(t, cfg, map[string]string{"token": TOKEN}, "").Context)
 	testutil.Must(t, err)
 	defer running.Stop(context.Background())
@@ -189,6 +189,20 @@ func TestCallToolCallsAToolDirectlyWithItsClass(t *testing.T) {
 	}
 	if _, err := running.CallTool(context.Background(), "nope", args(`{}`)); err == nil || !strings.Contains(err.Error(), "No tool nope") {
 		t.Fatal(err)
+	}
+}
+
+// A flow source calls a tool directly. One the owner hasn't classified is
+// destructive there too, whatever its annotations claim, so it never runs.
+func TestCallToolTreatsAnUnclassifiedReadOnlyToolAsDestructive(t *testing.T) {
+	srv := conntest.StartMCPServer(t, conntest.MCPOptions{Register: register, Token: TOKEN})
+	running, err := mcpconn.Runtime.Start(ctx(t, config_(t, srv.URL, ""), map[string]string{"token": TOKEN}, "").Context)
+	testutil.Must(t, err)
+	defer running.Stop(context.Background())
+	r, err := running.CallTool(context.Background(), "search", jsonx.NewMap[any]())
+	testutil.Must(t, err)
+	if r.Class != "destructive" || r.Output != nil {
+		t.Fatalf("%+v", r)
 	}
 }
 
