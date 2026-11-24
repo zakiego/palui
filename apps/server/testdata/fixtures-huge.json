@@ -224,6 +224,12 @@
    "first": null,
    "last": null
   },
+  "proactive_notes": {
+   "columns": ["id","agent_id","text","source","expires_at","created_at","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
   "proactive_ticks": {
    "columns": ["id","agent_id","started_at","finished_at","sources","found","sent","tokens","error"],
    "count": 0,

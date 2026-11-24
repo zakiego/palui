@@ -1,21 +1,27 @@
 package proactive
 
-// The proactive engine (RFC 6): a scheduler extension. Each sweep
+// The proactive engine (docs/rfc/proactive-prompt.md 4): a scheduler
+// extension. Each sweep
 //
-//	ticks      claims agents whose next_tick_at passed (lease, then the
-//	           next tick time moves on) and runs a tick in the background:
-//	           collect, reconcile with the ledger, decide, send
-//	timed      claims scheduled nudges whose wake_at passed and sends them
-//	           from a template, no model (RFC 7); a snoozed chat nudge goes
-//	           back to pending and pokes its agent's tick
-//	summaries  claims a morning or evening summary once per day by
-//	           inserting its nudge row (the key is unique)
+//	timed      claims scheduled items whose wake_at passed and sends their
+//	           stored text, no model (RFC 6); a snoozed item goes back to
+//	           pending and pokes its agent's tick
+//	ticks      claims agents whose next_tick_at passed (lease, then the next
+//	           tick time moves on; inside quiet hours it moves to their end)
+//	           and runs a tick in the background: resolve the mentions, skip
+//	           when a replay shows nothing changed, else run the prompt,
+//	           reconcile its items with the ledger, deliver
+//	summaries  claims a morning or evening summary once per day by inserting
+//	           its nudge row (the key is unique)
 //
 // Engine implements reminders.Extension, Recoverer and Idler.
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -37,24 +43,20 @@ import (
 const (
 	// TickLeaseMs: a tick that runs longer is presumed dead.
 	TickLeaseMs = 5 * 60_000
-	// SourceTimeout bounds one source read.
-	SourceTimeout = 20 * time.Second
-	// HorizonMs is how far ahead the calendar is read (RFC 5.1).
-	HorizonMs = 36 * 3600_000
-	// MergeWindowMs: timed nudges this close together go out as one message.
+	// MergeWindowMs: timed items this close together go out as one message.
 	MergeWindowMs = 5 * 60_000
+	// TimedLateMs: a timed item claimed later than this (downtime) expires.
+	TimedLateMs = 10 * 60_000
 	// SummaryLateMs: a summary more than this late (downtime) is skipped.
 	SummaryLateMs = 2 * 3600_000
-	// UrgentWithinMs: a change to an event this soon passes quiet hours.
-	UrgentWithinMs = 3 * 3600_000
 	// OutboxTTLMs: a proactive message older than this isn't worth sending.
 	OutboxTTLMs = 6 * 3600_000
-	// HoldTicks: a pending nudge the model keeps skipping is sent after this
-	// many ticks, from its template.
-	HoldTicks = 2
-	// FailNoticeAfter: a source failing this many ticks in a row tells the
-	// owner, once a day.
-	FailNoticeAfter = 3
+	// FullRunEveryMs: replay may skip the model, but not for longer than this.
+	FullRunEveryMs = 2 * 3600_000
+	// FailPauseAfter failed runs in a row pause proactive.
+	FailPauseAfter = 3
+	// MaxUrgentPerDay caps the items a day that may pass quiet hours.
+	MaxUrgentPerDay = 3
 )
 
 // Options wire the engine.
@@ -62,13 +64,11 @@ type Options struct {
 	DB  db.Q
 	Log *logx.Logger
 	// Unix ms; default time.Now.
-	Clock   func() int64
-	Sources Sources
+	Clock func() int64
+	// Tools lists and opens the agent's tools; nil uses DefaultToolHost.
+	Tools ToolHost
 	// Models resolves the agent's model chain (the supervisor).
 	Models models.ModelHost
-	// Profile is the agent's memory profile for judging importance; nil or
-	// "" skips it.
-	Profile func(ctx context.Context, a db.Agent, chatID string) string
 	// Serial runs ticks and summaries at the end of Sweep, in order (tests).
 	Serial bool
 }
@@ -82,13 +82,7 @@ type Engine struct {
 	wg        sync.WaitGroup
 	queue     []func()
 	lastPrune int64
-	profiles  map[string]profileEntry
 	poke      func()
-}
-
-type profileEntry struct {
-	day  string
-	text string
 }
 
 // New makes an engine.
@@ -100,11 +94,18 @@ func New(o Options) *Engine {
 	if log == nil {
 		log = logx.Silent
 	}
-	return &Engine{o: o, log: log, busy: map[string]bool{}, profiles: map[string]profileEntry{}}
+	return &Engine{o: o, log: log, busy: map[string]bool{}}
 }
 
 // OnPoke sets what CheckNow calls to wake the scheduler.
 func (e *Engine) OnPoke(fn func()) { e.poke = fn }
+
+func (e *Engine) tools() ToolHost {
+	if e.o.Tools != nil {
+		return e.o.Tools
+	}
+	return DefaultToolHost()
+}
 
 func (e *Engine) spawn(key string, fn func()) bool {
 	e.mu.Lock()
@@ -159,29 +160,28 @@ func (e *Engine) Idle() {
 	e.wg.Wait()
 }
 
-// Recover releases what a crash left claimed. A timed nudge's send and its
+// Recover releases what a crash left claimed. A timed item's send and its
 // status move are one transaction, so a firing row was never sent.
 func (e *Engine) Recover(now int64) error {
 	if _, err := e.o.DB.Exec("UPDATE agent_proactive SET tick_lease_until = NULL WHERE tick_lease_until IS NOT NULL"); err != nil {
 		return err
 	}
-	_, err := e.o.DB.Exec("UPDATE nudges SET status = ?, updated_at = ? WHERE status = ? AND kind NOT IN (?, ?)", StatusScheduled, now, StatusFiring, KindSumMorning, KindSumEvening)
-	if err != nil {
+	if _, err := e.o.DB.Exec("UPDATE nudges SET status = ?, updated_at = ? WHERE status = ? AND kind NOT IN (?, ?)", StatusScheduled, now, StatusFiring, KindSumMorning, KindSumEvening); err != nil {
 		return err
 	}
 	// A summary claimed but never sent: let the next sweep try again.
-	_, err = e.o.DB.Exec("DELETE FROM nudges WHERE status = ? AND kind IN (?, ?)", StatusFiring, KindSumMorning, KindSumEvening)
+	_, err := e.o.DB.Exec("DELETE FROM nudges WHERE status = ? AND kind IN (?, ?)", StatusFiring, KindSumMorning, KindSumEvening)
 	return err
 }
 
 // CheckNow ticks an agent on the next sweep ("cek sekarang").
 func (e *Engine) CheckNow(agentID string, now int64) error {
-	res, err := e.o.DB.Exec("UPDATE agent_proactive SET next_tick_at = ? WHERE agent_id = ? AND enabled = 1", now, agentID)
+	res, err := e.o.DB.Exec("UPDATE agent_proactive SET next_tick_at = ? WHERE agent_id = ? AND enabled = 1 AND paused_reason IS NULL", now, agentID)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return bad("Proactive is off for this agent")
+		return bad("Proactive is off or paused for this agent")
 	}
 	if e.poke != nil {
 		e.poke()
@@ -197,7 +197,7 @@ func (e *Engine) tz() string {
 	return tz
 }
 
-// NextDue is the earliest of the next tick, the next timed nudge and the next
+// NextDue is the earliest of the next tick, the next timed item and the next
 // summary of any enabled agent.
 func (e *Engine) NextDue() (int64, bool, error) {
 	q := e.o.DB
@@ -215,7 +215,7 @@ func (e *Engine) NextDue() (int64, bool, error) {
 	if n.Valid {
 		take(n.Int64)
 	}
-	if err := q.QueryRow("SELECT min(wake_at) FROM nudges WHERE status IN (?, ?) AND wake_at IS NOT NULL", StatusScheduled, StatusSnoozed).Scan(&n); err != nil {
+	if err := q.QueryRow("SELECT min(n.wake_at) FROM nudges n JOIN agent_proactive p ON p.agent_id = n.agent_id WHERE p.enabled = 1 AND p.paused_reason IS NULL AND n.status IN (?, ?) AND n.wake_at IS NOT NULL", StatusScheduled, StatusSnoozed).Scan(&n); err != nil {
 		return 0, false, err
 	}
 	if n.Valid {
@@ -261,10 +261,23 @@ func nextAt(hhmm, tz string, now int64) int64 {
 	if today >= now-SummaryLateMs {
 		return max(today, now)
 	}
+	return tomorrowAt(hhmm, tz, now)
+}
+
+func tomorrowAt(hhmm, tz string, now int64) int64 {
 	loc := loadTZ(tz)
 	t := time.UnixMilli(now).In(loc).AddDate(0, 0, 1)
 	m := minutesOf(hhmm)
 	return time.Date(t.Year(), t.Month(), t.Day(), m/60, m%60, 0, 0, loc).UnixMilli()
+}
+
+// quietEnd is when the quiet hours around now end.
+func quietEnd(q QuietHours, tz string, now int64) int64 {
+	end := atOn(q.End, tz, now)
+	if end <= now {
+		end = tomorrowAt(q.End, tz, now)
+	}
+	return end
 }
 
 func localDate(ms int64, tz string) string {
@@ -300,25 +313,14 @@ func (e *Engine) Sweep(now int64) (int, error) {
 			e.log.Error("proactive config unreadable", logx.Fields{"agent_id": r.AgentID, "err": err})
 			continue
 		}
-		// Timed nudges first: they're the ones with a minute that matters.
+		// Timed items first: they're the ones with a minute that matters.
 		sent, err := e.fireTimed(r, cfg, tz, now)
 		if err != nil {
-			e.log.Error("proactive timed nudges failed", logx.Fields{"agent_id": r.AgentID, "err": err})
+			e.log.Error("proactive timed items failed", logx.Fields{"agent_id": r.AgentID, "err": err})
 		}
 		n += sent
-		if r.NextTickAt != nil && *r.NextTickAt <= now && (r.TickLeaseUntil == nil || *r.TickLeaseUntil <= now) {
-			res, err := q.Exec("UPDATE agent_proactive SET tick_lease_until = ?, next_tick_at = ? WHERE agent_id = ? AND enabled = 1 AND next_tick_at <= ? AND (tick_lease_until IS NULL OR tick_lease_until <= ?)",
-				now+TickLeaseMs, now+int64(cfg.CheckEveryMin)*60_000, r.AgentID, now, now)
-			if err != nil {
-				return n, err
-			}
-			if c, _ := res.RowsAffected(); c == 1 {
-				agentID := r.AgentID
-				if e.spawn("tick:"+agentID, func() { e.tick(agentID) }) {
-					n++
-				}
-			}
-		}
+		// Then summaries: a summary due now is this sweep's run.
+		summarized := false
 		for _, which := range []string{KindSumMorning, KindSumEvening} {
 			s := cfg.Morning
 			if which == KindSumEvening {
@@ -332,17 +334,43 @@ func (e *Engine) Sweep(now int64) (int, error) {
 				continue
 			}
 			date := localDate(now, tz)
-			key := "sum:" + strings.TrimPrefix(which, "sum_") + ":" + date
-			c := Candidate{Key: key, Kind: which, Subject: "summary", Snapshot: Snapshot{Date: date}}
+			mode := strings.TrimPrefix(which, "sum_")
+			key := "sum:" + mode + ":" + date
 			if _, found, err := nudgeByKey(q, r.AgentID, key); err != nil || found {
 				continue
 			}
-			if _, err := insertNudge(q, r.AgentID, c, StatusFiring, nil, nil, now); err != nil {
+			if _, err := insertNudge(q, r.AgentID, key, which, "summary", Snapshot{Date: date}, StatusFiring, nil, now); err != nil {
 				continue // another sweep claimed it
 			}
-			agentID, kind := r.AgentID, which
-			if e.spawn("summary:"+agentID+":"+kind, func() { e.summary(agentID, kind, key) }) {
+			agentID := r.AgentID
+			if e.spawn("summary:"+agentID+":"+which, func() { e.tick(agentID, mode, key) }) {
 				n++
+				summarized = true
+			}
+		}
+		if summarized && r.NextTickAt != nil && *r.NextTickAt <= now {
+			// The summary is this run: the next plain one comes a period later.
+			if _, err := q.Exec("UPDATE agent_proactive SET next_tick_at = ? WHERE agent_id = ?", now+int64(cfg.CheckEveryMin)*60_000, r.AgentID); err != nil {
+				return n, err
+			}
+		} else if r.NextTickAt != nil && *r.NextTickAt <= now && (r.TickLeaseUntil == nil || *r.TickLeaseUntil <= now) {
+			if cfg.QuietHours.InQuiet(localMinute(now, tz)) {
+				// No runs in quiet hours (RFC 9): look again when they end.
+				if _, err := q.Exec("UPDATE agent_proactive SET next_tick_at = ? WHERE agent_id = ?", quietEnd(cfg.QuietHours, tz, now), r.AgentID); err != nil {
+					return n, err
+				}
+			} else {
+				res, err := q.Exec("UPDATE agent_proactive SET tick_lease_until = ?, next_tick_at = ? WHERE agent_id = ? AND enabled = 1 AND next_tick_at <= ? AND (tick_lease_until IS NULL OR tick_lease_until <= ?)",
+					now+TickLeaseMs, now+int64(cfg.CheckEveryMin)*60_000, r.AgentID, now, now)
+				if err != nil {
+					return n, err
+				}
+				if c, _ := res.RowsAffected(); c == 1 {
+					agentID := r.AgentID
+					if e.spawn("tick:"+agentID, func() { e.tick(agentID, SummaryNone, "") }) {
+						n++
+					}
+				}
 			}
 		}
 	}
@@ -352,39 +380,39 @@ func (e *Engine) Sweep(now int64) (int, error) {
 	return n, nil
 }
 
-// fireTimed sends this agent's due timed nudges (RFC 7) and turns due
-// snoozed chat nudges back to pending.
+// fireTimed sends this agent's due timed items (RFC 6) and turns due snoozed
+// items back to pending.
 func (e *Engine) fireTimed(r db.AgentProactive, cfg Config, tz string, now int64) (int, error) {
 	q := e.o.DB
-	// A snoozed chat nudge is checked against the source again first.
-	res, err := q.Exec("UPDATE nudges SET status = ?, wake_at = NULL, updated_at = ? WHERE agent_id = ? AND status = ? AND kind = ? AND wake_at <= ?", StatusPending, now, r.AgentID, StatusSnoozed, KindWAWaiting, now)
+	res, err := q.Exec("UPDATE nudges SET status = ?, wake_at = NULL, updated_at = ? WHERE agent_id = ? AND status = ? AND wake_at <= ?", StatusPending, now, r.AgentID, StatusSnoozed, now)
 	if err != nil {
 		return 0, err
 	}
 	if c, _ := res.RowsAffected(); c > 0 {
-		if _, err := q.Exec("UPDATE agent_proactive SET next_tick_at = ? WHERE agent_id = ?", now, r.AgentID); err != nil {
+		// The next run sees it open again and may close it; else it's sent.
+		if _, err := q.Exec("UPDATE agent_proactive SET next_tick_at = min(coalesce(next_tick_at, ?), ?) WHERE agent_id = ?", now, now, r.AgentID); err != nil {
 			return 0, err
 		}
 	}
 	var due int
-	if err := q.QueryRow("SELECT count(*) FROM nudges WHERE agent_id = ? AND status IN (?, ?) AND wake_at <= ?", r.AgentID, StatusScheduled, StatusSnoozed, now).Scan(&due); err != nil || due == 0 {
+	if err := q.QueryRow("SELECT count(*) FROM nudges WHERE agent_id = ? AND status = ? AND wake_at <= ?", r.AgentID, StatusScheduled, now).Scan(&due); err != nil || due == 0 {
 		return 0, err
 	}
-	rows, err := q.WQuery("UPDATE nudges SET status = ?, updated_at = ? WHERE agent_id = ? AND status IN (?, ?) AND wake_at <= ? RETURNING "+db.NudgeCols, StatusFiring, now, r.AgentID, StatusScheduled, StatusSnoozed, now+MergeWindowMs)
+	rows, err := q.WQuery("UPDATE nudges SET status = ?, updated_at = ? WHERE agent_id = ? AND status = ? AND wake_at <= ? RETURNING "+db.NudgeCols, StatusFiring, now, r.AgentID, StatusScheduled, now+MergeWindowMs)
 	claimed, err := db.All(rows, err, db.ScanNudge)
 	if err != nil {
 		return 0, err
 	}
 	sort.Slice(claimed, func(i, j int) bool { return deref(claimed[i].WakeAt) < deref(claimed[j].WakeAt) })
-	var send []db.Nudge
 	quiet := cfg.QuietHours.InQuiet(localMinute(now, tz))
+	var send []db.Nudge
 	for _, n := range claimed {
-		s := snapshotOf(n)
 		switch {
-		case s.Start != 0 && s.Start <= now:
-			err = setStatus(q, n.ID, StatusExpired, "the event already started", now)
-		case quiet && !cfg.QuietHours.UrgentPasses:
-			err = setStatus(q, n.ID, StatusExpired, "quiet hours", now)
+		case deref(n.WakeAt) < now-TimedLateMs:
+			err = setStatus(q, n.ID, StatusExpired, "too late to send", now)
+		case quiet && !(cfg.QuietHours.UrgentPasses && snapshotOf(n).Urgent):
+			// Held for the morning summary.
+			_, err = q.Exec("UPDATE nudges SET status = ?, wake_at = NULL, reason = 'quiet hours', updated_at = ? WHERE id = ?", StatusPending, now, n.ID)
 		default:
 			send = append(send, n)
 		}
@@ -395,11 +423,17 @@ func (e *Engine) fireTimed(r db.AgentProactive, cfg Config, tz string, now int64
 	if len(send) == 0 {
 		return 0, nil
 	}
-	lines := make([]string, len(send))
-	for i, n := range send {
-		lines[i] = Line(n, tz, now)
+	return len(send), e.deliver(r, send, joinTexts(send), now)
+}
+
+func joinTexts(list []db.Nudge) string {
+	parts := make([]string, 0, len(list))
+	for _, n := range list {
+		if t := snapshotOf(n).Text; t != "" {
+			parts = append(parts, t)
+		}
 	}
-	return len(send), e.deliver(r, send, strings.Join(lines, "\n\n"), now)
+	return MessageText(strings.Join(parts, "\n\n"))
 }
 
 func deref(p *int64) int64 {
@@ -412,30 +446,32 @@ func deref(p *int64) int64 {
 // deliver enqueues one message for these nudges and marks them sent, in one
 // transaction.
 func (e *Engine) deliver(r db.AgentProactive, list []db.Nudge, text string, now int64) error {
-	if r.ChatID == nil {
+	if r.ChatID == nil || len(list) == 0 {
 		return nil
 	}
 	q := e.o.DB
 	chat, err := CheckTarget(q, *r.ChatID)
 	if err != nil {
-		return e.pause(r.AgentID, err.Error(), now)
+		return e.pause(r, err.Error(), now)
 	}
-	hasChat := false
+	if strings.TrimSpace(text) == "" {
+		text = "…"
+	}
+	var actions []db.OutboxAction
 	for _, n := range list {
-		hasChat = hasChat || n.Kind == KindWAWaiting
+		if n.Kind == KindItem {
+			actions = Buttons(n, Language(q))
+			break
+		}
 	}
 	expires := now + OutboxTTLMs
 	err = q.Tx(func(tx db.Q) error {
-		row, err := outbox.Enqueue(tx, outbox.EnqueueInput{ChatID: chat.ID, Channel: chat.Channel, ConnectorID: chat.ConnectorID, Payload: db.OutboxPayload{Text: text, Actions: Buttons(list[0], hasChat), Format: "plain"}, Source: OutboxSourcePrefix + r.AgentID, ExpiresAt: &expires}, now)
+		row, err := outbox.Enqueue(tx, outbox.EnqueueInput{ChatID: chat.ID, Channel: chat.Channel, ConnectorID: chat.ConnectorID, Payload: db.OutboxPayload{Text: text, Actions: actions, Format: "plain"}, Source: OutboxSourcePrefix + r.AgentID, ExpiresAt: &expires}, now)
 		if err != nil {
 			return err
 		}
 		for _, n := range list {
-			esc := any(nil)
-			if snapshotOf(n).Escalation {
-				esc = now
-			}
-			if _, err := tx.Exec("UPDATE nudges SET status = ?, sent_at = ?, outbox_id = ?, escalated_at = coalesce(?, escalated_at), wake_at = NULL, updated_at = ? WHERE id = ?", StatusSent, now, row.ID, esc, now, n.ID); err != nil {
+			if _, err := tx.Exec("UPDATE nudges SET status = ?, sent_at = ?, outbox_id = ?, wake_at = NULL, reason = NULL, updated_at = ? WHERE id = ?", StatusSent, now, row.ID, now, n.ID); err != nil {
 				return err
 			}
 		}
@@ -447,307 +483,329 @@ func (e *Engine) deliver(r db.AgentProactive, list []db.Nudge, text string, now 
 	return err
 }
 
-// pause stops an agent's proactive until the owner saves again (RFC 11).
-func (e *Engine) pause(agentID, reason string, now int64) error {
+// pause stops an agent's proactive until the owner saves again.
+func (e *Engine) pause(r db.AgentProactive, reason string, now int64) error {
 	q := e.o.DB
-	if _, err := q.Exec("UPDATE agent_proactive SET paused_reason = ?, tick_lease_until = NULL, updated_at = ? WHERE agent_id = ?", reason, now, agentID); err != nil {
+	if _, err := q.Exec("UPDATE agent_proactive SET paused_reason = ?, tick_lease_until = NULL, updated_at = ? WHERE agent_id = ?", reason, now, r.AgentID); err != nil {
 		return err
 	}
-	_, err := events.Log(q, events.Input{Level: "warn", Kind: "proactive.paused", Message: "Proactive paused for agent " + agentID + ": " + reason}, now)
+	_, err := events.Log(q, events.Input{Level: "warn", Kind: "proactive.paused", Message: "Proactive paused for agent " + r.AgentID + ": " + reason}, now)
 	return err
 }
 
-// SourceResult is one source's outcome on a tick (proactive_ticks.sources).
-type SourceResult struct {
-	OK    bool   `json:"ok"`
-	Count int    `json:"count"`
-	Error string `json:"error,omitempty"`
+// TickLog is a tick's proactive_ticks.sources: what it called and why it
+// did or didn't ask the model.
+type TickLog struct {
+	Mentions []string `json:"mentions"`
+	Calls    []Call   `json:"calls"`
+	// Full: the model ran. Skipped says why it didn't.
+	Full    bool     `json:"full"`
+	Skipped string   `json:"skipped,omitempty"`
+	State   string   `json:"state,omitempty"`
+	Ignored []string `json:"ignored,omitempty"`
+	Summary string   `json:"summary,omitempty"`
 }
 
-func (e *Engine) tick(agentID string) {
+// Skip reasons in TickLog.
+const (
+	SkipUnchanged = "unchanged"
+	SkipNoModel   = "no model or over budget"
+)
+
+// tick runs the prompt once (RFC 4). summary is SummaryNone for a normal
+// tick, or the summary to write; summaryKey is its claimed nudge.
+func (e *Engine) tick(agentID, summary, summaryKey string) {
 	q := e.o.DB
 	now := e.o.Clock()
 	tickID := secret.NewID("ptk")
-	results := map[string]SourceResult{}
+	var log TickLog
 	var tokens int64
 	found, sent := 0, 0
 	var tickErr error
+	var summaryNudge *db.Nudge
+	if summary != SummaryNone {
+		n, ok, err := nudgeByKey(q, agentID, summaryKey)
+		if err != nil || !ok {
+			return
+		}
+		summaryNudge = &n
+		log.Summary = summary
+	}
 	defer func() {
-		raw, _ := jsonx.Marshal(results)
+		raw, _ := jsonx.Marshal(log)
 		var msg *string
 		if tickErr != nil {
-			s := tickErr.Error()
+			s := clip(tickErr.Error(), 600)
 			msg = &s
-			e.log.Error("proactive tick failed", logx.Fields{"agent_id": agentID, "err": tickErr})
+			e.log.Warn("proactive run failed", logx.Fields{"agent_id": agentID, "err": tickErr})
 		}
 		end := e.o.Clock()
 		_, _ = q.Exec("INSERT INTO proactive_ticks (id, agent_id, started_at, finished_at, sources, found, sent, tokens, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", tickID, agentID, now, end, string(raw), found, sent, tokens, msg)
 		_, _ = q.Exec("UPDATE agent_proactive SET last_tick_at = ?, tick_lease_until = NULL WHERE agent_id = ?", now, agentID)
+		if summaryNudge != nil && tickErr != nil {
+			_ = setStatus(q, summaryNudge.ID, StatusDropped, clip(tickErr.Error(), 200), now)
+		}
+		if tickErr != nil {
+			e.failed(agentID, tickErr, now)
+		}
 	}()
 	row, cfg, ok, err := Get(q, agentID)
 	if err != nil || !ok || !row.Enabled || row.PausedReason != nil {
 		tickErr = err
+		if summaryNudge != nil && err == nil {
+			_ = setStatus(q, summaryNudge.ID, StatusDropped, "proactive is off", now)
+		}
 		return
 	}
 	agent, ok, err := agents.Get(q, agentID)
 	if err != nil || !ok {
-		tickErr = err
+		tickErr = fmt.Errorf("agent missing: %v", err)
 		return
 	}
 	if row.ChatID == nil {
-		tickErr = e.pause(agentID, "No chat to send to", now)
+		tickErr = e.pause(row, "No chat to send to", now)
 		return
 	}
 	if _, err := CheckTarget(q, *row.ChatID); err != nil {
-		tickErr = e.pause(agentID, err.Error(), now)
+		tickErr = e.pause(row, err.Error(), now)
 		return
 	}
 	tz := e.tz()
 	ctx := context.Background()
-	var cands []Candidate
-	okCal, okWA := false, false
-	if cal := cfg.Calendar; cal != nil {
-		sctx, cancel := context.WithTimeout(ctx, SourceTimeout)
-		evs, err := e.o.Sources.Events(sctx, *cal, agentID, now, now+HorizonMs, tz)
-		cancel()
-		if err != nil {
-			results["calendar"] = SourceResult{Error: clip(err.Error(), 300)}
-		} else {
-			okCal = true
-			cc := CalendarCandidates(evs, *cal)
-			cands = append(cands, cc...)
-			results["calendar"] = SourceResult{OK: true, Count: len(evs)}
-		}
+	host := e.tools()
+	if host == nil {
+		tickErr = errors.New("no tool host is wired")
+		return
 	}
-	if wa := cfg.WhatsApp; wa != nil {
-		sctx, cancel := context.WithTimeout(ctx, SourceTimeout)
-		chats, err := e.o.Sources.Waiting(sctx, *wa, agentID, now-int64(wa.MaxAgeDays)*24*3600_000)
-		cancel()
-		if err != nil {
-			results["whatsapp"] = SourceResult{Error: clip(err.Error(), 300)}
-		} else {
-			okWA = true
-			wc := WhatsAppCandidates(chats, *wa, now)
-			cands = append(cands, wc...)
-			results["whatsapp"] = SourceResult{OK: true, Count: len(chats)}
-		}
-	}
-	for _, c := range cands {
-		if c.Kind != KindCalEvent {
-			found++
-		}
-	}
-	seed := row.LastTickAt == nil
-	if err := q.Tx(func(tx db.Q) error { return reconcile(tx, agentID, cfg, cands, okCal, okWA, seed, now) }); err != nil {
+	log.Mentions = Mentions(cfg.Prompt)
+	list, err := host.Tools(ctx, agentID, *row.ChatID, now)
+	if err != nil {
 		tickErr = err
 		return
 	}
-	e.failNotice(row, results, tz, now)
-	if okWA {
-		if err := e.triage(ctx, row, cfg, agent, tz, now, &tokens); err != nil {
+	tools, err := Resolve(log.Mentions, list)
+	if err != nil {
+		tickErr = err
+		return
+	}
+	in, err := e.runInput(agent, row, cfg, tools, tz, summary, now)
+	if err != nil {
+		tickErr = err
+		return
+	}
+	log.State = stateHash(in)
+	if summary == SummaryNone {
+		if prev, ok := e.lastFull(agentID); ok && prev.log.State == log.State && now-prev.at < FullRunEveryMs && Replay(ctx, tools, prev.log.Calls) {
+			log.Skipped = SkipUnchanged
+			log.Calls = prev.log.Calls
+			sent, tickErr = e.deliverPending(row, cfg, tz, now)
+			return
+		}
+	}
+	model, ok, err := agentModel(q, e.o.Models, agent, cfg.ModelRole, now, e.o.Clock, &tokens)
+	if err != nil {
+		tickErr = err
+		return
+	}
+	var out Output
+	if ok {
+		res, err := Run(ctx, model, in)
+		log.Calls = res.Calls
+		if err != nil {
+			tickErr = err
+			// Items already scheduled still fire; held ones wait.
+			if summary == SummaryNone {
+				_, _ = e.deliverPending(row, cfg, tz, now)
+			} else {
+				e.sendSummary(row, *summaryNudge, "", in.Held, now)
+				summaryNudge = nil
+			}
+			return
+		}
+		log.Full = true
+		log.Ignored = res.Output.Skipped
+		out = res.Output
+		found = len(out.Items)
+		if err := q.Tx(func(tx db.Q) error { return apply(tx, agentID, out, tz, now) }); err != nil {
 			tickErr = err
 			return
 		}
+	} else {
+		log.Skipped = SkipNoModel
 	}
-	sent, tickErr = e.decideAndSend(ctx, row, cfg, agent, tz, now, &tokens)
-}
-
-// failNotice tells the owner once a day when a source failed the last
-// FailNoticeAfter ticks in a row (this one included).
-func (e *Engine) failNotice(r db.AgentProactive, results map[string]SourceResult, tz string, now int64) {
-	q := e.o.DB
-	for name, res := range results {
-		if res.OK {
-			continue
-		}
-		rows, err := q.Query("SELECT sources FROM proactive_ticks WHERE agent_id = ? ORDER BY started_at DESC LIMIT ?", r.AgentID, FailNoticeAfter-1)
+	if summary != SummaryNone {
+		// Whatever is pending now, held overnight or found just now, goes
+		// out with the summary.
+		held, err := pendingNudges(q, agentID)
 		if err != nil {
+			tickErr = err
 			return
 		}
-		failed := 1
-		for rows.Next() {
-			var raw string
-			if rows.Scan(&raw) != nil {
-				continue
-			}
-			var m map[string]SourceResult
-			if jsonUnmarshal(raw, &m) == nil {
-				if r, ok := m[name]; ok && !r.OK {
-					failed++
-				}
-			}
-		}
-		rows.Close()
-		if failed < FailNoticeAfter {
-			continue
-		}
-		kind := "proactive.source_failed." + name
-		var x int
-		dayStart := atOn("00:00", tz, now)
-		err = q.QueryRow("SELECT 1 FROM events WHERE kind = ? AND at >= ? AND message LIKE ? LIMIT 1", kind, dayStart, "%"+r.AgentID+"%").Scan(&x)
-		if !noRows(err) {
-			continue // already told today, or the check failed: don't risk a repeat
-		}
-		label := map[string]string{"calendar": "Kalender", "whatsapp": "WhatsApp"}[name]
-		_, _ = events.Log(q, events.Input{Level: "warn", Kind: kind, Message: "Proactive source " + name + " keeps failing for agent " + r.AgentID + ": " + res.Error}, now)
-		if r.ChatID == nil {
-			continue
-		}
-		chat, err := CheckTarget(q, *r.ChatID)
-		if err != nil {
-			continue
-		}
-		text := fmt.Sprintf("⚠️ %s nggak kebaca dari tadi, jadi aku belum bisa ngabarin dari situ. Error-nya: %s", label, Field(res.Error))
-		expires := now + OutboxTTLMs
-		if _, err := outbox.Enqueue(q, outbox.EnqueueInput{ChatID: chat.ID, Channel: chat.Channel, ConnectorID: chat.ConnectorID, Payload: db.OutboxPayload{Text: text, Format: "plain"}, Source: "system", ExpiresAt: &expires}, now); err == nil {
-			outbox.Notify()
-		}
+		sent = len(held)
+		e.sendSummary(row, *summaryNudge, out.Summary, held, now)
+		summaryNudge = nil
+		return
 	}
+	sent, tickErr = e.deliverPending(row, cfg, tz, now)
 }
 
-// reconcile merges this tick's candidates into the ledger (RFC 6, step 3).
-func reconcile(q db.Q, agentID string, cfg Config, cands []Candidate, okCal, okWA, seed bool, now int64) error {
-	seen := map[string]bool{}
-	for _, c := range cands {
-		seen[c.Key] = true
-		if c.Kind != KindCalEvent {
-			m, err := muted(q, agentID, c.Subject)
-			if err != nil {
-				return err
+// runInput gathers what a run sees.
+func (e *Engine) runInput(agent db.Agent, row db.AgentProactive, cfg Config, tools map[string]Tool, tz, summary string, now int64) (RunInput, error) {
+	q := e.o.DB
+	in := RunInput{Agent: agent, Config: cfg, Tools: tools, TZ: tz, Now: now, Language: Language(q), Summary: summary}
+	var err error
+	if in.Notes, err = Notes(q, agent.ID, now); err != nil {
+		return in, err
+	}
+	if in.Mutes, err = Mutes(q, agent.ID); err != nil {
+		return in, err
+	}
+	rows, err := q.Query("SELECT "+db.NudgeCols+" FROM nudges WHERE agent_id = ? AND kind = ? AND status IN (?, ?, ?, ?) AND updated_at >= ? ORDER BY updated_at DESC, id LIMIT ?", agent.ID, KindItem, StatusPending, StatusScheduled, StatusSnoozed, StatusSent, now-OpenWindowMs, MaxOpenShown)
+	if in.Open, err = db.All(rows, err, db.ScanNudge); err != nil {
+		return in, err
+	}
+	if summary != SummaryNone {
+		if in.Held, err = pendingNudges(q, agent.ID); err != nil {
+			return in, err
+		}
+	}
+	return in, nil
+}
+
+func pendingNudges(q db.Q, agentID string) ([]db.Nudge, error) {
+	rows, err := q.Query("SELECT "+db.NudgeCols+" FROM nudges WHERE agent_id = ? AND status = ? ORDER BY created_at, id", agentID, StatusPending)
+	return db.All(rows, err, db.ScanNudge)
+}
+
+// stateHash fingerprints what a run sees besides the tools: the prompt, the
+// notes, the mutes and the open items. A replay skip needs it unchanged.
+func stateHash(in RunInput) string {
+	h := sha256.New()
+	fmt.Fprintf(h, "%s\x00%s\x00", in.Config.Prompt, in.Language)
+	for _, n := range in.Notes {
+		fmt.Fprintf(h, "n:%s:%s\x00", n.ID, n.Text)
+	}
+	for _, m := range in.Mutes {
+		fmt.Fprintf(h, "m:%s\x00", m.Subject)
+	}
+	for _, n := range in.Open {
+		fmt.Fprintf(h, "o:%s:%s:%d\x00", n.Key, n.Status, deref(n.WakeAt))
+	}
+	return hex.EncodeToString(h.Sum(nil)[:8])
+}
+
+type fullTick struct {
+	at  int64
+	log TickLog
+}
+
+// lastFull is the agent's last tick that ran the model without an error.
+func (e *Engine) lastFull(agentID string) (fullTick, bool) {
+	rows, err := e.o.DB.Query("SELECT started_at, sources FROM proactive_ticks WHERE agent_id = ? AND error IS NULL ORDER BY started_at DESC LIMIT 20", agentID)
+	if err != nil {
+		return fullTick{}, false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var at int64
+		var raw string
+		if rows.Scan(&at, &raw) != nil {
+			continue
+		}
+		var l TickLog
+		if db.RawJSON(raw).Decode(&l) != nil {
+			continue
+		}
+		if l.Full && l.Summary == "" {
+			return fullTick{at: at, log: l}, true
+		}
+	}
+	return fullTick{}, false
+}
+
+// apply reconciles a run's answer with the ledger and the memory (RFC 6, 8).
+func apply(q db.Q, agentID string, out Output, tz string, now int64) error {
+	urgentToday := -1
+	for _, it := range out.Items {
+		m, err := muted(q, agentID, it.Subject)
+		if err != nil {
+			return err
+		}
+		if m {
+			continue
+		}
+		if it.Urgent {
+			if urgentToday < 0 {
+				if err := q.QueryRow("SELECT count(*) FROM nudges WHERE agent_id = ? AND created_at >= ? AND json_extract(snapshot, '$.urgent') = 1", agentID, atOn("00:00", tz, now)).Scan(&urgentToday); err != nil {
+					return err
+				}
 			}
-			if m {
-				continue
+			if urgentToday >= MaxUrgentPerDay {
+				it.Urgent = false
+			} else {
+				urgentToday++
 			}
 		}
+		snap := Snapshot{Text: it.Text, Urgent: it.Urgent}
+		ex, found, err := nudgeByKey(q, agentID, it.Key)
+		if err != nil {
+			return err
+		}
+		status := StatusPending
+		var wake *int64
+		if it.SendAt > 0 {
+			status = StatusScheduled
+			w := it.SendAt
+			wake = &w
+		}
+		if !found {
+			if _, err := insertNudge(q, agentID, it.Key, KindItem, it.Subject, snap, status, wake, now); err != nil {
+				return err
+			}
+			continue
+		}
+		if ex.Status != StatusPending && ex.Status != StatusScheduled {
+			continue // said already, or the owner acted on it: never twice
+		}
+		raw, err := jsonx.Marshal(snap)
+		if err != nil {
+			return err
+		}
+		if _, err := q.Exec("UPDATE nudges SET status = ?, wake_at = ?, snapshot = ?, subject = ?, updated_at = ? WHERE id = ?", status, wake, string(raw), it.Subject, now, ex.ID); err != nil {
+			return err
+		}
+	}
+	for _, c := range out.Closed {
 		ex, found, err := nudgeByKey(q, agentID, c.Key)
 		if err != nil {
 			return err
 		}
-		snap, err := jsonx.Marshal(c.Snapshot)
-		if err != nil {
-			return err
+		if !found || ex.Kind != KindItem {
+			continue
 		}
-		switch c.Kind {
-		case KindCalEvent:
-			if !found {
-				_, err = insertNudge(q, agentID, c, StatusTracking, nil, nil, now)
-				break
-			}
-			prev := snapshotOf(ex)
-			moved := prev.Start != c.Snapshot.Start || strings.TrimSpace(prev.Location) != strings.TrimSpace(c.Snapshot.Location)
-			if moved && ex.Status == StatusTracking && cfg.Calendar != nil && cfg.Calendar.NotifyChanges && c.Snapshot.Start > now {
-				ch := c
-				ch.Kind = KindCalChanged
-				ch.Key = fmt.Sprintf("cal:%s:changed:%d:%s", c.Snapshot.EventID, c.Snapshot.Start, shortHash(c.Snapshot.Location))
-				ch.Snapshot.PrevStart = prev.Start
-				ch.Snapshot.PrevLocation = prev.Location
-				if _, dup, err := nudgeByKey(q, agentID, ch.Key); err != nil {
-					return err
-				} else if !dup {
-					if m, err := muted(q, agentID, ch.Subject); err != nil {
-						return err
-					} else if !m {
-						if _, err := insertNudge(q, agentID, ch, StatusPending, nil, nil, now); err != nil {
-							return err
-						}
-					}
-				}
-			}
-			_, err = q.Exec("UPDATE nudges SET status = ?, snapshot = ?, updated_at = ? WHERE id = ?", StatusTracking, string(snap), now, ex.ID)
-		case KindCalDepart, KindCalStart:
-			if c.Snapshot.Start <= now {
-				break
-			}
-			wake := max(c.WakeAt, now)
-			if !found {
-				_, err = insertNudge(q, agentID, c, StatusScheduled, &wake, nil, now)
-				break
-			}
-			if ex.Status == StatusScheduled && (deref(ex.WakeAt) != wake || string(ex.Snapshot) != string(snap)) {
-				_, err = q.Exec("UPDATE nudges SET wake_at = ?, snapshot = ?, updated_at = ? WHERE id = ?", wake, string(snap), now, ex.ID)
-			}
-		case KindWAWaiting:
-			if !found {
-				if seed {
-					r := "already waiting when proactive started"
-					_, err = insertNudge(q, agentID, c, StatusDropped, nil, &r, now)
-				} else {
-					_, err = insertNudge(q, agentID, c, StatusPending, nil, nil, now)
-				}
-				break
-			}
-			wa := cfg.WhatsApp
-			escalate := ex.Status == StatusSent && ex.EscalatedAt == nil && wa != nil && wa.EscalateHours > 0 && ex.SentAt != nil && now-*ex.SentAt >= int64(wa.EscalateHours)*3600_000
-			switch {
-			case escalate:
-				c.Snapshot.Escalation = true
-				snap, _ = jsonx.Marshal(c.Snapshot)
-				_, err = q.Exec("UPDATE nudges SET status = ?, snapshot = ?, updated_at = ? WHERE id = ?", StatusPending, string(snap), now, ex.ID)
-			case ex.Status == StatusPending || ex.Status == StatusSent || ex.Status == StatusSnoozed:
-				// Keep the latest preview and count; the escalation mark and the
-				// triage verdict stay (a higher count makes triage look again).
-				prev := snapshotOf(ex)
-				c.Snapshot.Escalation, c.Snapshot.TriagedCount, c.Snapshot.Gist = prev.Escalation, prev.TriagedCount, prev.Gist
-				snap, _ = jsonx.Marshal(c.Snapshot)
-				_, err = q.Exec("UPDATE nudges SET snapshot = ? WHERE id = ?", string(snap), ex.ID)
-			case ex.Status == StatusDropped && ex.Reason != nil && strings.HasPrefix(*ex.Reason, ReasonClosed) && c.Snapshot.Count > snapshotOf(ex).Count:
-				// Judged finished, then they wrote again without a reply in
-				// between: judge it again.
-				_, err = q.Exec("UPDATE nudges SET status = ?, reason = NULL, snapshot = ?, updated_at = ? WHERE id = ?", StatusPending, string(snap), now, ex.ID)
-			}
+		why := "resolved"
+		if c.Why != "" {
+			why = c.Why
+		}
+		switch ex.Status {
+		case StatusPending, StatusScheduled, StatusSnoozed:
+			err = setStatus(q, ex.ID, StatusDropped, "model: "+why, now)
+		case StatusSent:
+			err = setStatus(q, ex.ID, StatusDone, "model: "+why, now)
 		}
 		if err != nil {
 			return err
 		}
 	}
-	// What a source that answered no longer shows.
-	if okWA {
-		rows, err := q.Query("SELECT id, key FROM nudges WHERE agent_id = ? AND kind = ? AND status IN (?, ?, ?)", agentID, KindWAWaiting, StatusPending, StatusSent, StatusSnoozed)
-		if err != nil {
+	for _, id := range out.Forget {
+		if _, err := ForgetNote(q, agentID, id, true); err != nil {
 			return err
-		}
-		var gone []string
-		for rows.Next() {
-			var id, key string
-			if err := rows.Scan(&id, &key); err != nil {
-				rows.Close()
-				return err
-			}
-			if !seen[key] {
-				gone = append(gone, id)
-			}
-		}
-		rows.Close()
-		for _, id := range gone {
-			if err := setStatus(q, id, StatusDone, "no longer waiting for a reply", now); err != nil {
-				return err
-			}
 		}
 	}
-	if okCal {
-		rows, err := q.Query("SELECT id, key, kind FROM nudges WHERE agent_id = ? AND ((kind IN (?, ?) AND status = ?) OR (kind = ? AND status = ?))", agentID, KindCalDepart, KindCalStart, StatusScheduled, KindCalEvent, StatusTracking)
-		if err != nil {
-			return err
-		}
-		type g struct{ id, kind string }
-		var gone []g
-		for rows.Next() {
-			var id, key, kind string
-			if err := rows.Scan(&id, &key, &kind); err != nil {
-				rows.Close()
-				return err
-			}
-			if !seen[key] {
-				gone = append(gone, g{id, kind})
-			}
-		}
-		rows.Close()
-		for _, x := range gone {
-			status, reason := StatusDropped, "the event was cancelled or moved out of range"
-			if x.kind == KindCalEvent {
-				reason = "no longer in range"
-			}
-			if err := setStatus(q, x.id, status, reason, now); err != nil {
+	for _, r := range out.Remember {
+		if _, err := AddNote(q, agentID, r.Text, NoteSourceModel, r.Days, now); err != nil {
+			var ce *ConfigError
+			if !errors.As(err, &ce) {
 				return err
 			}
 		}
@@ -755,354 +813,258 @@ func reconcile(q db.Q, agentID string, cfg Config, cands []Candidate, okCal, okW
 	return nil
 }
 
-func shortHash(s string) string {
-	var h uint32 = 2166136261
-	for i := 0; i < len(s); i++ {
-		h ^= uint32(s[i])
-		h *= 16777619
-	}
-	return fmt.Sprintf("%08x", h)
-}
-
-func jsonUnmarshal(s string, v any) error { return db.RawJSON(s).Decode(v) }
-
-// decideAndSend tells the owner what's pending, within quiet hours and the
-// rate limit (RFC 8, 9). It returns how many nudges went out.
-func (e *Engine) decideAndSend(ctx context.Context, r db.AgentProactive, cfg Config, agent db.Agent, tz string, now int64, tokens *int64) (int, error) {
+// deliverPending sends what's pending as one message, within quiet hours and
+// the rate limit (RFC 2). It returns how many items went out.
+func (e *Engine) deliverPending(r db.AgentProactive, cfg Config, tz string, now int64) (int, error) {
 	q := e.o.DB
-	rows, err := q.Query("SELECT "+db.NudgeCols+" FROM nudges WHERE agent_id = ? AND status = ? ORDER BY created_at, id", r.AgentID, StatusPending)
-	pending, err := db.All(rows, err, db.ScanNudge)
+	pending, err := pendingNudges(q, r.AgentID)
 	if err != nil || len(pending) == 0 {
 		return 0, err
 	}
-	urgent := func(n db.Nudge) bool {
-		s := snapshotOf(n)
-		return n.Kind == KindCalChanged && s.Start-now <= UrgentWithinMs
-	}
-	if cfg.QuietHours.InQuiet(localMinute(now, tz)) {
+	urgentOnly := func(list []db.Nudge) []db.Nudge {
 		var keep []db.Nudge
-		if cfg.QuietHours.UrgentPasses {
-			for _, n := range pending {
-				if urgent(n) {
-					keep = append(keep, n)
-				}
+		for _, n := range list {
+			if snapshotOf(n).Urgent {
+				keep = append(keep, n)
 			}
 		}
-		if pending = keep; len(pending) == 0 {
+		return keep
+	}
+	if cfg.QuietHours.InQuiet(localMinute(now, tz)) {
+		if !cfg.QuietHours.UrgentPasses {
 			return 0, nil
 		}
+		pending = urgentOnly(pending)
 	}
 	var recent int
 	if err := q.QueryRow("SELECT count(DISTINCT outbox_id) FROM nudges WHERE agent_id = ? AND sent_at >= ? AND outbox_id IS NOT NULL AND kind NOT IN (?, ?)", r.AgentID, now-3600_000, KindSumMorning, KindSumEvening).Scan(&recent); err != nil {
 		return 0, err
 	}
 	if recent >= cfg.MaxPerHour {
-		var keep []db.Nudge
-		for _, n := range pending {
-			if urgent(n) {
-				keep = append(keep, n)
-			}
-		}
-		if pending = keep; len(pending) == 0 {
-			return 0, nil
+		pending = urgentOnly(pending)
+	}
+	var list []db.Nudge
+	for _, n := range pending {
+		if n.Kind == KindItem {
+			list = append(list, n)
 		}
 	}
-	important := map[string]bool{}
-	for _, c := range cfg.Contacts {
-		important[c.Subject] = true
-	}
-	mustTell := func(n db.Nudge) bool {
-		return important[n.Subject] || n.Kind == KindCalChanged || snapshotOf(n).Escalation
-	}
-	holdMs := int64(HoldTicks*cfg.CheckEveryMin) * 60_000
-
-	var send []db.Nudge
-	text := ""
-	model, ok, err := agentModel(q, e.o.Models, agent, cfg.ModelRole, now, e.o.Clock, tokens)
-	if err != nil {
-		return 0, err
-	}
-	var decision Decision
-	decided := false
-	if ok {
-		in := DecideInput{Agent: agent, TZ: tz, Now: now, Items: pending, Important: important}
-		in.ToldToday, _ = e.toldToday(r.AgentID, tz, now)
-		if cfg.ContactsAuto {
-			in.Profile = e.profile(ctx, agent, deref2(r.ChatID), tz, now)
-		}
-		decision, err = Decide(ctx, model, in)
-		if err != nil {
-			e.log.Warn("proactive decide failed, using templates", logx.Fields{"agent_id": r.AgentID, "err": err})
-		} else {
-			decided = true
-		}
-	}
-	var extra []string
-	if decided {
-		inSend := map[string]bool{}
-		for _, k := range decision.Send {
-			inSend[k] = true
-		}
-		for _, n := range pending {
-			switch {
-			case inSend[n.Key]:
-				send = append(send, n)
-			case mustTell(n):
-				send = append(send, n)
-				extra = append(extra, Line(n, tz, now))
-			case decision.Drop[n.Key] != "":
-				if err := setStatus(q, n.ID, StatusDropped, "model: "+decision.Drop[n.Key], now); err != nil {
-					return 0, err
-				}
-			case now-n.CreatedAt >= holdMs:
-				send = append(send, n)
-				extra = append(extra, Line(n, tz, now))
-			}
-		}
-		text = decision.Text
-		if len(decision.Send) == 0 {
-			text = ""
-		}
-	} else {
-		for _, n := range pending {
-			if mustTell(n) || now-n.CreatedAt >= holdMs {
-				send = append(send, n)
-				extra = append(extra, Line(n, tz, now))
-			}
-		}
-	}
-	if len(send) == 0 {
+	if len(list) == 0 {
 		return 0, nil
 	}
-	parts := []string{}
-	if text != "" {
-		parts = append(parts, text)
-	}
-	parts = append(parts, extra...)
-	if len(parts) == 0 {
-		for _, n := range send {
-			parts = append(parts, Line(n, tz, now))
-		}
-	}
-	return len(send), e.deliver(r, send, MessageText(strings.Join(parts, "\n\n")), now)
+	return len(list), e.deliver(r, list, joinTexts(list), now)
 }
 
-func deref2(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
-}
-
-// toldToday is today's sent nudges as short lines.
-func (e *Engine) toldToday(agentID, tz string, now int64) ([]string, error) {
-	rows, err := e.o.DB.Query("SELECT "+db.NudgeCols+" FROM nudges WHERE agent_id = ? AND status IN (?, ?) AND sent_at >= ? AND kind NOT IN (?, ?) ORDER BY sent_at LIMIT 30", agentID, StatusSent, StatusDone, atOn("00:00", tz, now), KindSumMorning, KindSumEvening)
-	list, err := db.All(rows, err, db.ScanNudge)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]string, len(list))
-	for i, n := range list {
-		out[i] = Line(n, tz, now)
-	}
-	return out, nil
-}
-
-// profile is the agent's memory profile, read once a day.
-func (e *Engine) profile(ctx context.Context, a db.Agent, chatID, tz string, now int64) string {
-	if e.o.Profile == nil {
-		return ""
-	}
-	day := localDate(now, tz)
-	e.mu.Lock()
-	p, ok := e.profiles[a.ID]
-	e.mu.Unlock()
-	if ok && p.day == day {
-		return p.text
-	}
-	text := e.o.Profile(ctx, a, chatID)
-	e.mu.Lock()
-	e.profiles[a.ID] = profileEntry{day: day, text: text}
-	e.mu.Unlock()
-	return text
-}
-
-// summary builds and sends the morning or evening message (RFC 9). Its nudge
-// row was inserted as firing by the sweep that claimed it.
-func (e *Engine) summary(agentID, kind, key string) {
+// sendSummary sends a summary with the held items, the model's text or a
+// plain list when there's none.
+func (e *Engine) sendSummary(r db.AgentProactive, nudge db.Nudge, text string, held []db.Nudge, now int64) {
 	q := e.o.DB
-	now := e.o.Clock()
-	var tokens int64
-	nudge, ok, err := nudgeByKey(q, agentID, key)
-	if err != nil || !ok {
-		return
-	}
-	fail := func(err error) {
-		e.log.Error("proactive summary failed", logx.Fields{"agent_id": agentID, "kind": kind, "err": err})
-		_ = setStatus(q, nudge.ID, StatusDropped, clip(err.Error(), 200), now)
-	}
-	row, cfg, ok, err := Get(q, agentID)
-	if err != nil || !ok || !row.Enabled {
-		_ = setStatus(q, nudge.ID, StatusDropped, "proactive is off", now)
-		return
-	}
-	agent, ok, err := agents.Get(q, agentID)
-	if err != nil || !ok {
-		fail(fmt.Errorf("agent missing: %v", err))
-		return
-	}
-	tz := e.tz()
-	morning := kind == KindSumMorning
-	facts, held, err := e.summaryFacts(context.Background(), row, cfg, agentID, tz, now, morning)
-	if err != nil {
-		fail(err)
-		return
-	}
-	text := ""
-	if model, ok, err := agentModel(q, e.o.Models, agent, cfg.ModelRole, now, e.o.Clock, &tokens); err == nil && ok {
-		text, err = Summarize(context.Background(), model, SummaryInput{Agent: agent, TZ: tz, Now: now, Morning: morning, Facts: facts})
-		if err != nil {
-			e.log.Warn("proactive summary wording failed, using the list", logx.Fields{"agent_id": agentID, "err": err})
-		}
-	}
 	if text == "" {
-		head := "Pagi! Ini hari ini:"
-		if !morning {
-			head = "Buat besok:"
-		}
-		if len(facts) == 0 {
-			text = map[bool]string{true: "Pagi! Hari ini kosong, nggak ada jadwal atau chat yang nunggu.", false: "Besok kosong, nggak ada jadwal."}[morning]
-		} else {
-			text = head + "\n" + strings.Join(facts, "\n")
-		}
+		text = fallbackSummary(nudge.Kind == KindSumMorning, held, Language(q))
 	}
 	list := append([]db.Nudge{nudge}, held...)
-	if err := e.deliver(row, list, MessageText(text), now); err != nil {
-		fail(err)
+	if err := e.deliver(r, list, MessageText(text), now); err != nil {
+		e.log.Error("proactive summary failed", logx.Fields{"agent_id": r.AgentID, "err": err})
+		_ = setStatus(q, nudge.ID, StatusDropped, clip(err.Error(), 200), now)
 	}
 }
 
-// summaryFacts are the plain lines a summary is made of. Morning: today's
-// events, reminders due today, chats waiting, and what quiet hours held
-// (returned so it's marked sent with the summary). Evening: tomorrow's events
-// and when to leave for the first one.
-func (e *Engine) summaryFacts(ctx context.Context, r db.AgentProactive, cfg Config, agentID, tz string, now int64, morning bool) ([]string, []db.Nudge, error) {
-	q := e.o.DB
-	var facts []string
-	dayStart := atOn("00:00", tz, now)
-	from, to := dayStart, dayStart+24*3600_000
-	if !morning {
-		from, to = to, to+24*3600_000
+func fallbackSummary(morning bool, held []db.Nudge, lang string) string {
+	en := lang == "en"
+	if len(held) == 0 {
+		switch {
+		case morning && en:
+			return "Morning! Nothing to tell you right now."
+		case morning:
+			return "Pagi! Belum ada yang perlu dikabarin."
+		case en:
+			return "Evening! Nothing to tell you for tomorrow."
+		}
+		return "Malam! Belum ada yang perlu dikabarin buat besok."
 	}
-	if cal := cfg.Calendar; cal != nil {
-		sctx, cancel := context.WithTimeout(ctx, SourceTimeout)
-		evs, err := e.o.Sources.Events(sctx, *cal, agentID, from, to, tz)
-		cancel()
-		if err != nil {
-			facts = append(facts, "(Kalender nggak kebaca: "+Field(err.Error())+")")
-		}
-		firstDepart := int64(0)
-		for _, ev := range evs {
-			line := "- " + Field(ev.Title)
-			if ev.AllDay {
-				line += " (seharian)"
-			} else {
-				line = "- " + clock(ev.Start, tz) + " " + Field(ev.Title)
-				if isPhysical(ev.Location) && firstDepart == 0 {
-					firstDepart = ev.Start - int64(cal.DepartLeadMin)*60_000
-				}
-			}
-			if ev.Location != "" {
-				line += " di " + Field(ev.Location)
-			}
-			facts = append(facts, line)
-		}
-		if !morning && firstDepart != 0 {
-			facts = append(facts, "- Berangkat paling lambat "+clock(firstDepart, tz))
-		}
+	head := "Pagi! Ini yang ketahan:"
+	switch {
+	case morning && en:
+		head = "Morning! Here's what was held:"
+	case !morning && en:
+		head = "Evening! Still open:"
+	case !morning:
+		head = "Malam! Yang masih kebuka:"
 	}
-	if morning {
-		rems, err := remindersBetween(q, agentID, from, to)
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, rm := range rems {
-			facts = append(facts, "- Pengingat "+clock(rm.at, tz)+": "+Field(rm.text))
-		}
-		if wa := cfg.WhatsApp; wa != nil {
-			sctx, cancel := context.WithTimeout(ctx, SourceTimeout)
-			chats, err := e.o.Sources.Waiting(sctx, *wa, agentID, now-int64(wa.MaxAgeDays)*24*3600_000)
-			cancel()
-			if err != nil {
-				facts = append(facts, "(WhatsApp nggak kebaca: "+Field(err.Error())+")")
-			} else {
-				// Muted chats and ones triage judged finished are left out.
-				var lines []string
-				for _, c := range WhatsAppCandidates(chats, *wa, now) {
-					if m, _ := muted(q, agentID, c.Subject); m {
-						continue
-					}
-					line := "- " + Field(c.Snapshot.Name) + " nunggu balasan dari " + when(c.Snapshot.AwaitingSince, tz, now)
-					if n, ok, _ := nudgeByKey(q, agentID, c.Key); ok {
-						if n.Status == StatusDropped && n.Reason != nil && strings.HasPrefix(*n.Reason, ReasonClosed) {
-							continue
-						}
-						if g := snapshotOf(n).Gist; g != "" {
-							line += ": " + Field(g)
-						}
-					}
-					lines = append(lines, line)
-				}
-				if len(lines) > 3 {
-					lines = append(lines[:3], fmt.Sprintf("- Dan %d chat lain yang belum kebales", len(lines)-3))
-				}
-				facts = append(facts, lines...)
-			}
-		}
-	}
-	rows, err := q.Query("SELECT "+db.NudgeCols+" FROM nudges WHERE agent_id = ? AND status = ? ORDER BY created_at, id", agentID, StatusPending)
-	held, err := db.All(rows, err, db.ScanNudge)
-	if err != nil {
-		return nil, nil, err
-	}
-	if !morning {
-		held = nil
-	}
+	lines := []string{head}
 	for _, n := range held {
-		if n.Kind != KindWAWaiting { // waiting chats are already listed above
-			facts = append(facts, "- "+Line(n, tz, now))
+		if t := Field(snapshotOf(n).Text); t != "" {
+			lines = append(lines, "- "+t)
 		}
 	}
-	return facts, held, nil
+	return strings.Join(lines, "\n")
 }
 
-type reminderFact struct {
-	at   int64
-	text string
-}
-
-// remindersBetween is the pending reminders due in a window, in the chats
-// this agent serves.
-func remindersBetween(q db.Q, agentID string, from, to int64) ([]reminderFact, error) {
-	where, args, err := agents.ChatsServedBy(q, agentID)
-	if err != nil {
-		return nil, err
+// failed handles a failed run: one owner notice a day, and a pause after
+// FailPauseAfter failures in a row (RFC 3).
+func (e *Engine) failed(agentID string, runErr error, now int64) {
+	q := e.o.DB
+	row, _, ok, err := Get(q, agentID)
+	if err != nil || !ok || !row.Enabled || row.PausedReason != nil {
+		return
 	}
-	all := append([]any{from, to}, args...)
-	rows, err := q.Query(`SELECT fire_at, text FROM reminders WHERE status = 'pending' AND fire_at >= ? AND fire_at < ? AND chat_id IN (SELECT "chats"."id" FROM chats WHERE `+where+`) ORDER BY fire_at LIMIT 20`, all...)
+	rows, err := q.Query("SELECT error FROM proactive_ticks WHERE agent_id = ? ORDER BY started_at DESC LIMIT ?", agentID, FailPauseAfter)
 	if err != nil {
-		return nil, err
+		return
 	}
-	defer rows.Close()
-	var out []reminderFact
+	failedRuns := 0
 	for rows.Next() {
-		var f reminderFact
-		if err := rows.Scan(&f.at, &f.text); err != nil {
-			return nil, err
+		var msg sql.NullString
+		if rows.Scan(&msg) != nil || !msg.Valid {
+			break
 		}
-		out = append(out, f)
+		failedRuns++
 	}
-	return out, rows.Err()
+	rows.Close()
+	reason := clip(runErr.Error(), 300)
+	en := Language(q) == "en"
+	if failedRuns >= FailPauseAfter {
+		_ = e.pause(row, "Proactive failed "+fmt.Sprint(FailPauseAfter)+" runs in a row: "+reason, now)
+		text := "⚠️ Proactive aku matiin dulu, " + fmt.Sprint(FailPauseAfter) + "x gagal berturut-turut: " + Field(reason) + ". Benerin di tab Proactive, terus simpan lagi."
+		if en {
+			text = "⚠️ I paused proactive after " + fmt.Sprint(FailPauseAfter) + " failed runs in a row: " + Field(reason) + ". Fix it on the Proactive tab and save again."
+		}
+		e.notify(row, text, now)
+		return
+	}
+	kind := "proactive.run_failed"
+	var x int
+	dayStart := atOn("00:00", e.tz(), now)
+	err = q.QueryRow("SELECT 1 FROM events WHERE kind = ? AND at >= ? AND message LIKE ? LIMIT 1", kind, dayStart, "%"+agentID+"%").Scan(&x)
+	if !noRows(err) {
+		return // already told today, or the check failed: don't risk a repeat
+	}
+	_, _ = events.Log(q, events.Input{Level: "warn", Kind: kind, Message: "Proactive run failed for agent " + agentID + ": " + reason}, now)
+	text := "⚠️ Proactive gagal jalan: " + Field(reason)
+	if en {
+		text = "⚠️ Proactive couldn't run: " + Field(reason)
+	}
+	e.notify(row, text, now)
+}
+
+// notify sends the owner a system message in the target chat.
+func (e *Engine) notify(r db.AgentProactive, text string, now int64) {
+	if r.ChatID == nil {
+		return
+	}
+	q := e.o.DB
+	chat, err := CheckTarget(q, *r.ChatID)
+	if err != nil {
+		return
+	}
+	expires := now + OutboxTTLMs
+	if _, err := outbox.Enqueue(q, outbox.EnqueueInput{ChatID: chat.ID, Channel: chat.Channel, ConnectorID: chat.ConnectorID, Payload: db.OutboxPayload{Text: MessageText(text), Format: "plain"}, Source: "system", ExpiresAt: &expires}, now); err == nil {
+		outbox.Notify()
+	}
+}
+
+// TestResult is a test run's answer: what it called, what it would send and
+// remember, and what it cost. Nothing is written.
+type TestResult struct {
+	Calls    []Call     `json:"calls"`
+	Items    []TestItem `json:"items"`
+	Closed   []string   `json:"closed"`
+	Remember []string   `json:"remember"`
+	Forget   []string   `json:"forget"`
+	Ignored  []string   `json:"ignored"`
+	Tokens   int64      `json:"tokens"`
+	Error    string     `json:"error,omitempty"`
+}
+
+// TestItem is one item a test run would send.
+type TestItem struct {
+	Key     string `json:"key"`
+	Subject string `json:"subject"`
+	Text    string `json:"text"`
+	SendAt  *int64 `json:"sendAt"`
+	Urgent  bool   `json:"urgent"`
+	// Muted, or already said (the ledger would drop it).
+	Dropped string `json:"dropped,omitempty"`
+}
+
+// TestRun plays the prompt (the saved one, or prompt when given) for real
+// against the tools and the model, without writing nudges, notes or messages.
+// Mention problems come back as an error the tab shows as is.
+func (e *Engine) TestRun(ctx context.Context, agentID string, prompt *string, now int64) (TestResult, error) {
+	q := e.o.DB
+	out := TestResult{Calls: []Call{}, Items: []TestItem{}, Closed: []string{}, Remember: []string{}, Forget: []string{}, Ignored: []string{}}
+	row, cfg, _, err := Get(q, agentID)
+	if err != nil {
+		return out, err
+	}
+	if prompt != nil {
+		cfg.Prompt = *prompt
+		if err := cfg.Validate(); err != nil {
+			return out, err
+		}
+	}
+	agent, ok, err := agents.Get(q, agentID)
+	if err != nil {
+		return out, err
+	}
+	if !ok {
+		return out, bad("That agent doesn't exist")
+	}
+	host := e.tools()
+	if host == nil {
+		return out, bad("Proactive can't reach the tools right now")
+	}
+	chatID := ""
+	if row.ChatID != nil {
+		chatID = *row.ChatID
+	}
+	list, err := host.Tools(ctx, agentID, chatID, now)
+	if err != nil {
+		return out, err
+	}
+	tools, err := Resolve(Mentions(cfg.Prompt), list)
+	if err != nil {
+		return out, err
+	}
+	in, err := e.runInput(agent, row, cfg, tools, e.tz(), SummaryNone, now)
+	if err != nil {
+		return out, err
+	}
+	model, ok, err := agentModel(q, e.o.Models, agent, cfg.ModelRole, now, e.o.Clock, &out.Tokens)
+	if err != nil {
+		return out, err
+	}
+	if !ok {
+		return out, bad("No model is available, or a token budget is used up for today")
+	}
+	res, err := Run(ctx, model, in)
+	out.Calls = append(out.Calls, res.Calls...)
+	if err != nil {
+		out.Error = clip(err.Error(), 600)
+		return out, nil
+	}
+	for _, it := range res.Output.Items {
+		ti := TestItem{Key: it.Key, Subject: it.Subject, Text: it.Text, Urgent: it.Urgent}
+		if it.SendAt > 0 {
+			at := it.SendAt
+			ti.SendAt = &at
+		}
+		if m, err := muted(q, agentID, it.Subject); err == nil && m {
+			ti.Dropped = "muted"
+		} else if ex, found, err := nudgeByKey(q, agentID, it.Key); err == nil && found && ex.Status != StatusPending && ex.Status != StatusScheduled {
+			ti.Dropped = "already " + ex.Status
+		}
+		out.Items = append(out.Items, ti)
+	}
+	for _, c := range res.Output.Closed {
+		out.Closed = append(out.Closed, c.Key)
+	}
+	for _, r := range res.Output.Remember {
+		out.Remember = append(out.Remember, r.Text)
+	}
+	out.Forget = append(out.Forget, res.Output.Forget...)
+	out.Ignored = append(out.Ignored, res.Output.Skipped...)
+	return out, nil
 }
 
 var _ reminders.Extension = (*Engine)(nil)

@@ -1,6 +1,7 @@
 package proactive
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
@@ -12,21 +13,17 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/secret"
 )
 
-// Nudge kinds (RFC 4.2). cal_event is an internal row per calendar event that
-// remembers its last snapshot, so a change can be told; it's never sent.
+// Nudge kinds (RFC 6): an item the model said, or a summary. Rows from
+// schema 1 keep their old kinds (cal_depart, wa_waiting, ...) until pruned.
 const (
-	KindCalDepart  = "cal_depart"
-	KindCalStart   = "cal_start"
-	KindCalChanged = "cal_changed"
-	KindCalEvent   = "cal_event"
-	KindWAWaiting  = "wa_waiting"
+	KindItem       = "item"
 	KindSumMorning = "sum_morning"
 	KindSumEvening = "sum_evening"
 )
 
-// Nudge statuses. pending: found, waiting to be told (held by quiet hours,
-// the rate limit or the model). scheduled: a timed nudge waiting for wake_at.
-// firing: claimed by a sweep. tracking: a cal_event row.
+// Nudge statuses. pending: waiting to be told (held by quiet hours or the
+// rate limit). scheduled: a timed item waiting for wake_at. firing: claimed
+// by a sweep. tracking: a schema 1 calendar row, never written now.
 const (
 	StatusPending   = "pending"
 	StatusScheduled = "scheduled"
@@ -68,6 +65,9 @@ type SaveInput struct {
 	// "" clears the target.
 	ChatID *string
 	Config *Config
+	// Tools checks the prompt's mentions when proactive is on after the
+	// save; nil uses DefaultToolHost.
+	Tools ToolHost
 }
 
 // CheckTarget refuses a chat proactive may not write to: missing, or one
@@ -90,8 +90,8 @@ func CheckTarget(q db.Q, chatID string) (db.Chat, error) {
 	return c, nil
 }
 
-// Save upserts the row. Turning on needs a target and at least one source,
-// and ticks at once; turning off drops the waiting timed nudges (the ledger
+// Save upserts the row. Turning on needs a target and a prompt whose
+// mentions resolve, and ticks at once; turning off drops the waiting timed nudges (the ledger
 // stays, so turning back on doesn't repeat old things).
 func Save(q db.Q, in SaveInput, now int64) (db.AgentProactive, Config, error) {
 	var out db.AgentProactive
@@ -132,10 +132,18 @@ func Save(q db.Q, in SaveInput, now int64) (db.AgentProactive, Config, error) {
 			if chatID == nil {
 				return bad("Pick a chat to send to first")
 			}
-			if cfg.Calendar == nil && cfg.WhatsApp == nil {
-				return bad("Add a calendar or WhatsApp source first")
+			host := in.Tools
+			if host == nil {
+				host = DefaultToolHost()
 			}
-			if err := checkSources(tx, in.AgentID, cfg); err != nil {
+			if host == nil {
+				return bad("Proactive can't check the tools right now. Try again in a minute.")
+			}
+			list, err := host.Tools(context.Background(), in.AgentID, *chatID, now)
+			if err != nil {
+				return err
+			}
+			if err := Check(Mentions(cfg.Prompt), Infos(list)); err != nil {
 				return err
 			}
 		}
@@ -171,48 +179,6 @@ func Save(q db.Q, in SaveInput, now int64) (db.AgentProactive, Config, error) {
 	return out, outCfg, err
 }
 
-// checkSources: every source connector exists, has the right type, and this
-// agent may use it (connectors.agent_ids, NULL or [] meaning every agent).
-func checkSources(q db.Q, agentID string, cfg Config) error {
-	check := func(id, what string, types ...string) error {
-		var typ string
-		var agentIDs sql.NullString
-		err := q.QueryRow("SELECT type, agent_ids FROM connectors WHERE id = ?", id).Scan(&typ, &agentIDs)
-		if noRows(err) {
-			return bad("The %s connector %s doesn't exist", what, id)
-		}
-		if err != nil {
-			return err
-		}
-		okType := false
-		for _, t := range types {
-			okType = okType || typ == t
-		}
-		if !okType {
-			return bad("%s isn't a %s connector", id, what)
-		}
-		if agentIDs.Valid && agentIDs.String != "" && agentIDs.String != "[]" && !strings.Contains(agentIDs.String, `"`+agentID+`"`) {
-			return bad("This agent can't use the connector %s. Allow it on the Connectors page.", id)
-		}
-		return nil
-	}
-	if cfg.Calendar != nil {
-		calType := "gcal"
-		if cfg.Calendar.Tool != "" {
-			calType = "mcp"
-		}
-		if err := check(cfg.Calendar.ConnectorID, "calendar", calType); err != nil {
-			return err
-		}
-	}
-	if cfg.WhatsApp != nil {
-		if err := check(cfg.WhatsApp.ConnectorID, "WhatsApp", "mcp"); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // Enabled lists the rows that are on.
 func Enabled(q db.Q) ([]db.AgentProactive, error) {
 	rows, err := q.Query("SELECT " + db.AgentProactiveCols + " FROM agent_proactive WHERE enabled = 1 ORDER BY created_at, agent_id")
@@ -243,13 +209,13 @@ func nudgeByKey(q db.Q, agentID, key string) (db.Nudge, bool, error) {
 	return db.One(q.QueryRow("SELECT "+db.NudgeCols+" FROM nudges WHERE agent_id = ? AND key = ?", agentID, key), db.ScanNudge)
 }
 
-func insertNudge(q db.Q, agentID string, c Candidate, status string, wakeAt *int64, reason *string, now int64) (db.Nudge, error) {
-	snap, err := jsonx.Marshal(c.Snapshot)
+func insertNudge(q db.Q, agentID, key, kind, subject string, snap Snapshot, status string, wakeAt *int64, now int64) (db.Nudge, error) {
+	raw, err := jsonx.Marshal(snap)
 	if err != nil {
 		return db.Nudge{}, err
 	}
-	return db.ScanNudge(q.WQueryRow("INSERT INTO nudges (id, agent_id, key, kind, subject, status, wake_at, snapshot, reason, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.NudgeCols,
-		secret.NewID("ndg"), agentID, c.Key, c.Kind, c.Subject, status, wakeAt, string(snap), reason, now, now))
+	return db.ScanNudge(q.WQueryRow("INSERT INTO nudges (id, agent_id, key, kind, subject, status, wake_at, snapshot, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.NudgeCols,
+		secret.NewID("ndg"), agentID, key, kind, subject, status, wakeAt, string(raw), now, now))
 }
 
 func setStatus(q db.Q, id, status string, reason string, now int64) error {
@@ -315,8 +281,10 @@ func Prune(q db.Q, now int64) error {
 	if _, err := q.Exec("DELETE FROM proactive_ticks WHERE started_at < ?", cut); err != nil {
 		return err
 	}
-	_, err := q.Exec("DELETE FROM nudges WHERE updated_at < ? AND status IN (?, ?, ?, ?, ?)", cut, StatusSent, StatusDone, StatusDropped, StatusExpired, StatusTracking)
-	return err
+	if _, err := q.Exec("DELETE FROM nudges WHERE updated_at < ? AND status IN (?, ?, ?, ?, ?)", cut, StatusSent, StatusDone, StatusDropped, StatusExpired, StatusTracking); err != nil {
+		return err
+	}
+	return PruneNotes(q, now)
 }
 
 func clip(s string, n int) string {

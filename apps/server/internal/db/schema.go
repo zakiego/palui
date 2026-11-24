@@ -976,6 +976,27 @@ func ScanProactiveMute(s Scanner) (ProactiveMute, error) {
 	return r, err
 }
 
+// ProactiveNote is a proactive_notes row: one memory note an agent's
+// proactive runs carry between runs. Source is owner or model; owner notes
+// never expire.
+type ProactiveNote struct {
+	ID        string `json:"id"`
+	AgentID   string `json:"agentId"`
+	Text      string `json:"text"`
+	Source    string `json:"source"`
+	ExpiresAt *int64 `json:"expiresAt"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
+const ProactiveNoteCols = "id, agent_id, text, source, expires_at, created_at, updated_at"
+
+func ScanProactiveNote(s Scanner) (ProactiveNote, error) {
+	var r ProactiveNote
+	err := s.Scan(&r.ID, &r.AgentID, &r.Text, &r.Source, &r.ExpiresAt, &r.CreatedAt, &r.UpdatedAt)
+	return r, err
+}
+
 // ProactiveTick is a proactive_ticks row: one collection pass.
 type ProactiveTick struct {
 	ID         string  `json:"id"`

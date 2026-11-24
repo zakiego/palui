@@ -1,5 +1,6 @@
 // Package proactive is the proactive connector: the chat tools to read and
-// change an agent's proactive settings (docs/rfc/proactive.md 10). The engine
+// change an agent's proactive prompt, settings and memory
+// (docs/rfc/proactive-prompt.md 11). The engine
 // itself is internal/proactive and runs whether or not this connector is on.
 package proactive
 
@@ -27,15 +28,15 @@ var Manifest = connectors.Manifest{
 	Name:        "Proactive",
 	Icon:        "radar",
 	Summary:     "Tells you what matters without being asked.",
-	Description: "An agent with proactive on checks your calendar and WhatsApp every 30 minutes and messages you first: when to leave, a meeting about to start, a changed event, a chat waiting for your reply, plus a morning and an evening summary. Set it up per agent on the agent's Proactive tab, or from chat with these tools.",
+	Description: "An agent with proactive on runs a prompt you write every 30 minutes and messages you first when something matters: when to leave, a meeting about to start, a chat waiting for your reply, plus a morning and an evening summary. The prompt mentions the read tools it may use, like @gcal__get_calendar, so any connector can be a source. Set it up per agent on the agent's Proactive tab, or from chat with these tools.",
 	Builtin:     true,
 	Setup:       []connectors.SetupStep{},
 	PauseNote:   "Pausing hides the chat tools. Proactive keeps running; turn it off on the agent's Proactive tab.",
 	Docs: &connectors.Docs{
-		Commands: []string{"nyalain proactive di chat ini", "jam tenang jadi 23:00", "jangan ingetin grup kantor lagi", "proactive hari ini ngabarin apa aja?"},
+		Commands: []string{"nyalain proactive di chat ini", "jam tenang jadi 23:00", "jangan ingetin grup kantor lagi", "inget ya, Pak Budi selalu bales telat", "proactive hari ini ngabarin apa aja?"},
 		Notes: []string{
 			"Proactive is off for every agent until you turn it on. Its messages only go to your own DM or the web chat.",
-			"WhatsApp needs a wa-hub MCP server whose list_chats returns structured content, classified read on the Connectors page.",
+			"The prompt can only mention read tools the agent may use. A mention that doesn't resolve fails the run, and three failed runs in a row pause proactive.",
 		},
 	},
 	ParseConfig: kit.ParseConfig(zod.Object()),
@@ -54,6 +55,12 @@ var (
 	)
 	listInput = zod.Object(
 		zod.F("status", zod.Enum("all", "sent", "pending", "dropped").Optional().Describe("Filter. Default all.")),
+	)
+	rememberInput = zod.Object(
+		zod.F("text", zod.String().Trim().Min(1).Max(proactive.MaxNoteChars).Describe("The note, one short sentence, e.g. \"Pak Budi always replies late, don't remind me twice\".")),
+	)
+	forgetInput = zod.Object(
+		zod.F("id", zod.String().Trim().Min(1).Max(100).Describe("The note id (pmem_...) from list_proactive_notes.")),
 	)
 )
 
@@ -118,7 +125,8 @@ func view(q db.Q, a db.Agent) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return kit.O("ok", true, "agent", a.Name, "enabled", row.Enabled, "chatId", kit.StrPtr(row.ChatID), "pausedReason", kit.StrPtr(row.PausedReason), "config", cfgVal, "muted", muted), nil
+	mentions := proactive.Mentions(cfg.Prompt)
+	return kit.O("ok", true, "agent", a.Name, "enabled", row.Enabled, "chatId", kit.StrPtr(row.ChatID), "pausedReason", kit.StrPtr(row.PausedReason), "config", cfgVal, "mentions", mentions, "muted", muted), nil
 }
 
 // Tools is the tool set for one turn.
@@ -129,7 +137,7 @@ func Tools(d *db.DB, clock func() int64, turn connectors.TurnInfo) *connectors.T
 	set := connectors.NewToolSet()
 	set.Set("get_proactive", connectors.PaluiTool{
 		Data: connectors.DataAgent, Class: "read", Title: "Read proactive settings",
-		Tool: kit.Tool("This agent's proactive settings: on or off, target chat, check interval, quiet hours, morning and evening summary, calendar and WhatsApp sources, important contacts and muted subjects.", getInput,
+		Tool: kit.Tool("This agent's proactive settings: on or off, target chat, the prompt and the tools it mentions, check interval, quiet hours, morning and evening summary, and muted subjects.", getInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				a, err := agentFor(d, turn)
 				if err != nil {
@@ -140,7 +148,7 @@ func Tools(d *db.DB, clock func() int64, turn connectors.TurnInfo) *connectors.T
 	})
 	set.Set("update_proactive", connectors.PaluiTool{
 		Data: connectors.DataAgent, Class: "write", Title: "Change proactive settings",
-		Tool: kit.Tool("Change this agent's proactive settings. enabled turns it on or off; chat \"this\" makes the current chat the target; patch is a JSON merge patch on the config (keys: checkEveryMin 15-120, maxPerHour 1-10, quietHours {start,end,urgentPasses}, morning {on,at}, evening {on,at}, calendar {connectorId,departLeadMin,onlineLeadMin,notifyChanges} or null, whatsapp {connectorId,account,waitHours,escalateHours,maxAgeDays,skipGroups} or null, contactsAuto, contacts [{subject,label}], modelRole fast|default). Times are HH:MM.", updateInput,
+		Tool: kit.Tool("Change this agent's proactive settings. enabled turns it on or off; chat \"this\" makes the current chat the target; patch is a JSON merge patch on the config (keys: prompt, the owner's instructions in English that mention the read tools a run may use as @<connectorId>__<tool>, at most 4000 characters and 10 tools; checkEveryMin 15-120; maxPerHour 1-10; quietHours {start,end,urgentPasses}, no runs and no messages inside them; morning {on,at}; evening {on,at}; modelRole fast|default). Times are HH:MM. Turning it on checks every mention.", updateInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				now := clock()
 				a, err := agentFor(d, turn)
@@ -176,6 +184,58 @@ func Tools(d *db.DB, clock func() int64, turn connectors.TurnInfo) *connectors.T
 				return view(d, a)
 			}),
 		Preview: func(input json.RawMessage) string { return "Ubah setelan proactive: " + string(input) },
+	})
+	set.Set("list_proactive_notes", connectors.PaluiTool{
+		Data: connectors.DataAgent, Class: "read", Title: "List proactive memory",
+		Tool: kit.Tool("The notes proactive carries between runs: the owner's (never expire) and its own (expire). Each has an id.", getInput,
+			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
+				a, err := agentFor(d, turn)
+				if err != nil {
+					return nil, err
+				}
+				list, err := proactive.Notes(d, a.ID, clock())
+				if err != nil {
+					return nil, err
+				}
+				out := make([]any, len(list))
+				for i, n := range list {
+					out[i] = kit.O("id", n.ID, "text", n.Text, "source", n.Source, "expiresAt", n.ExpiresAt)
+				}
+				return kit.O("ok", true, "count", len(out), "notes", out), nil
+			}),
+	})
+	set.Set("remember_proactive", connectors.PaluiTool{
+		Data: connectors.DataAgent, Class: "write", Title: "Add to proactive memory",
+		Tool: kit.Tool("Keep a note for this agent's proactive runs, as the owner's instruction: who matters, what to skip, a promise someone made. It never expires.", rememberInput,
+			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
+				a, err := agentFor(d, turn)
+				if err != nil {
+					return nil, err
+				}
+				n, err := proactive.AddNote(d, a.ID, in.S("text"), proactive.NoteSourceOwner, 0, clock())
+				if err != nil {
+					return refusal(err)
+				}
+				return kit.O("ok", true, "id", n.ID, "text", n.Text), nil
+			}),
+	})
+	set.Set("forget_proactive", connectors.PaluiTool{
+		Data: connectors.DataAgent, Class: "write", Title: "Remove from proactive memory",
+		Tool: kit.Tool("Delete one proactive memory note by its id.", forgetInput,
+			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
+				a, err := agentFor(d, turn)
+				if err != nil {
+					return nil, err
+				}
+				ok, err := proactive.ForgetNote(d, a.ID, in.S("id"), false)
+				if err != nil {
+					return nil, err
+				}
+				if !ok {
+					return kit.O("ok", false, "error", "Catatan itu nggak ada."), nil
+				}
+				return kit.O("ok", true), nil
+			}),
 	})
 	set.Set("mute_proactive", connectors.PaluiTool{
 		Data: connectors.DataAgent, Class: "write", Title: "Stop a proactive reminder",
@@ -259,12 +319,12 @@ func Tools(d *db.DB, clock func() int64, turn connectors.TurnInfo) *connectors.T
 				if err != nil {
 					return nil, err
 				}
-				res, err := d.Exec("UPDATE agent_proactive SET next_tick_at = ? WHERE agent_id = ? AND enabled = 1", clock(), a.ID)
+				res, err := d.Exec("UPDATE agent_proactive SET next_tick_at = ? WHERE agent_id = ? AND enabled = 1 AND paused_reason IS NULL", clock(), a.ID)
 				if err != nil {
 					return nil, err
 				}
 				if n, _ := res.RowsAffected(); n == 0 {
-					return kit.O("ok", false, "error", "Proactive lagi mati buat agent ini."), nil
+					return kit.O("ok", false, "error", "Proactive lagi mati atau di-pause buat agent ini."), nil
 				}
 				return kit.O("ok", true, "message", "Oke, dicek dalam semenit."), nil
 			}),

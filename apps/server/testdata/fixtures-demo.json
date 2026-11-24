@@ -344,6 +344,10 @@
    "columns": ["agent_id","subject","label","created_at"],
    "rows": []
   },
+  "proactive_notes": {
+   "columns": ["id","agent_id","text","source","expires_at","created_at","updated_at"],
+   "rows": []
+  },
   "proactive_ticks": {
    "columns": ["id","agent_id","started_at","finished_at","sources","found","sent","tokens","error"],
    "rows": []

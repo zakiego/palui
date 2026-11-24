@@ -1,23 +1,21 @@
 package rpcpeople
 
-// The agent page's Proactive tab (docs/rfc/proactive.md 12): read and save
-// an agent's proactive settings, unmute a subject, check now.
+// The agent page's Proactive tab (docs/rfc/proactive-prompt.md 12): read and
+// save an agent's proactive prompt and settings, its memory notes, unmute a
+// subject, check now, and a test run.
 
 import (
-	"database/sql"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
-	"regexp"
-	"strings"
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
-
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/httpapi"
 	"github.com/zakiego/palui/apps/server/internal/proactive"
 	"github.com/zakiego/palui/apps/server/internal/settings"
-	"github.com/zakiego/palui/apps/server/internal/tools"
+	"github.com/zakiego/palui/apps/server/internal/strx"
 	"github.com/zakiego/palui/apps/server/internal/zod"
 	"github.com/zakiego/palui/apps/server/internal/zone"
 )
@@ -28,50 +26,48 @@ type proactiveChat struct {
 	Channel string `json:"channel"`
 }
 
-type proactiveConnector struct {
-	ID     string `json:"id"`
-	Label  string `json:"label"`
-	Status string `json:"status"`
-	// An MCP calendar: the list_events tool to call.
-	Tool string `json:"tool,omitempty"`
+type proactiveNudge struct {
+	ID        string  `json:"id"`
+	Kind      string  `json:"kind"`
+	Subject   string  `json:"subject"`
+	Status    string  `json:"status"`
+	Label     string  `json:"label"`
+	Reason    *string `json:"reason"`
+	SentAt    *int64  `json:"sentAt"`
+	WakeAt    *int64  `json:"wakeAt"`
+	UpdatedAt int64   `json:"updatedAt"`
 }
 
-type proactiveNudge struct {
-	ID          string  `json:"id"`
-	Kind        string  `json:"kind"`
-	Subject     string  `json:"subject"`
-	Status      string  `json:"status"`
-	Label       string  `json:"label"`
-	Reason      *string `json:"reason"`
-	SentAt      *int64  `json:"sentAt"`
-	EscalatedAt *int64  `json:"escalatedAt"`
-	WakeAt      *int64  `json:"wakeAt"`
-	UpdatedAt   int64   `json:"updatedAt"`
+type proactiveLastRun struct {
+	At      int64   `json:"at"`
+	Full    bool    `json:"full"`
+	Skipped string  `json:"skipped"`
+	Calls   int     `json:"calls"`
+	Error   *string `json:"error"`
 }
 
 type proactiveView struct {
-	AgentID      string                          `json:"agentId"`
-	Enabled      bool                            `json:"enabled"`
-	ChatID       *string                         `json:"chatId"`
-	PausedReason *string                         `json:"pausedReason"`
-	LastTickAt   *int64                          `json:"lastTickAt"`
-	NextTickAt   *int64                          `json:"nextTickAt"`
-	Config       proactive.Config                `json:"config"`
-	Defaults     proactiveDefaults               `json:"defaults"`
-	Chats        []proactiveChat                 `json:"chats"`
-	Connectors   map[string][]proactiveConnector `json:"connectors"`
-	Mutes        []db.ProactiveMute              `json:"mutes"`
-	Activity     []proactiveNudge                `json:"activity"`
-	TicksToday   int                             `json:"ticksToday"`
-	SentToday    int                             `json:"sentToday"`
-	TokensToday  int64                           `json:"tokensToday"`
-	TokenCap     int64                           `json:"tokenCap"`
-	LastErrors   map[string]string               `json:"lastErrors"`
-}
-
-type proactiveDefaults struct {
-	Calendar proactive.CalendarSource `json:"calendar"`
-	WhatsApp proactive.WhatsAppSource `json:"whatsapp"`
+	AgentID      string               `json:"agentId"`
+	Enabled      bool                 `json:"enabled"`
+	ChatID       *string              `json:"chatId"`
+	PausedReason *string              `json:"pausedReason"`
+	LastTickAt   *int64               `json:"lastTickAt"`
+	NextTickAt   *int64               `json:"nextTickAt"`
+	Config       proactive.Config     `json:"config"`
+	Starter      string               `json:"starter"`
+	Chats        []proactiveChat      `json:"chats"`
+	Tools        []proactive.ToolInfo `json:"tools"`
+	// Each mention in the saved prompt, with why it doesn't resolve ("" when it does).
+	Mentions    []proactive.MentionProblem `json:"mentions"`
+	Notes       []db.ProactiveNote         `json:"notes"`
+	NotesChars  int                        `json:"notesChars"`
+	Mutes       []db.ProactiveMute         `json:"mutes"`
+	Activity    []proactiveNudge           `json:"activity"`
+	TicksToday  int                        `json:"ticksToday"`
+	SentToday   int                        `json:"sentToday"`
+	TokensToday int64                      `json:"tokensToday"`
+	TokenCap    int64                      `json:"tokenCap"`
+	LastRun     *proactiveLastRun          `json:"lastRun"`
 }
 
 const proactiveAgentGone = "That agent doesn't exist anymore."
@@ -82,7 +78,7 @@ func init() {
 		Input: zod.Object(zod.F("agentId", agentID)),
 		Fn: func(c *httpapi.Call) (any, error) {
 			id, _ := c.Obj().Get("agentId")
-			return proactiveWithTools(c, c.DB(), id.(string), c.Now())
+			return proactiveFor(c, id.(string))
 		},
 	})
 	httpapi.Register(httpapi.Handler{
@@ -104,7 +100,7 @@ func init() {
 				return nil, err
 			}
 			q, now := c.DB(), c.Now()
-			save := proactive.SaveInput{AgentID: in.AgentID, Enabled: in.Enabled, ChatID: in.ChatID}
+			save := proactive.SaveInput{AgentID: in.AgentID, Enabled: in.Enabled, ChatID: in.ChatID, Tools: toolHost(c)}
 			if len(in.Config) > 0 && string(in.Config) != "null" {
 				_, cur, _, err := proactive.Get(q, in.AgentID)
 				if err != nil {
@@ -122,7 +118,7 @@ func init() {
 			if rt, err := c.Runtime(); err == nil {
 				rt.Reconcile()
 			}
-			return proactiveWithTools(c, q, in.AgentID, now)
+			return proactiveFor(c, in.AgentID)
 		},
 	})
 	httpapi.Register(httpapi.Handler{
@@ -135,7 +131,7 @@ func init() {
 			if _, err := proactive.Unmute(c.DB(), id.(string), subject.(string)); err != nil {
 				return nil, err
 			}
-			return proactiveWithTools(c, c.DB(), id.(string), c.Now())
+			return proactiveFor(c, id.(string))
 		},
 	})
 	httpapi.Register(httpapi.Handler{
@@ -153,9 +149,102 @@ func init() {
 			if err := rt.Built.Proactive.CheckNow(id.(string), c.Now()); err != nil {
 				return nil, failConfig(err)
 			}
-			return proactiveWithTools(c, c.DB(), id.(string), c.Now())
+			return proactiveFor(c, id.(string))
 		},
 	})
+	httpapi.Register(httpapi.Handler{
+		Name: "testProactiveFn", Method: http.MethodPost, Guard: httpapi.Writer,
+		Input: zod.Object(zod.F("agentId", agentID), zod.F("prompt", zod.String().Max(proactive.MaxPromptChars*2).Optional())),
+		Fn: func(c *httpapi.Call) (any, error) {
+			var in struct {
+				AgentID string  `json:"agentId"`
+				Prompt  *string `json:"prompt"`
+			}
+			if err := c.Decode(&in); err != nil {
+				return nil, err
+			}
+			rt, err := c.Runtime()
+			if err != nil {
+				return nil, err
+			}
+			if rt.Built == nil || rt.Built.Proactive == nil {
+				return nil, httpapi.Fail("Proactive isn't running.")
+			}
+			res, err := rt.Built.Proactive.TestRun(c.Ctx, in.AgentID, in.Prompt, c.Now())
+			if err != nil {
+				return nil, failConfig(err)
+			}
+			return res, nil
+		},
+	})
+	httpapi.Register(httpapi.Handler{
+		Name: "addProactiveNoteFn", Method: http.MethodPost, Guard: httpapi.Writer,
+		Input: zod.Object(zod.F("agentId", agentID), zod.F("text", zod.String().Trim().Min(1).Max(proactive.MaxNoteChars*2))),
+		Fn: func(c *httpapi.Call) (any, error) {
+			o := c.Obj()
+			id, _ := o.Get("agentId")
+			text, _ := o.Get("text")
+			if err := mustAgent(c.DB(), id.(string)); err != nil {
+				return nil, err
+			}
+			if _, err := proactive.AddNote(c.DB(), id.(string), text.(string), proactive.NoteSourceOwner, 0, c.Now()); err != nil {
+				return nil, failConfig(err)
+			}
+			return proactiveFor(c, id.(string))
+		},
+	})
+	httpapi.Register(httpapi.Handler{
+		Name: "editProactiveNoteFn", Method: http.MethodPost, Guard: httpapi.Writer,
+		Input: zod.Object(
+			zod.F("agentId", agentID),
+			zod.F("noteId", zod.String().Min(1).Max(100)),
+			zod.F("text", zod.String().Trim().Min(1).Max(proactive.MaxNoteChars*2).Optional()),
+			zod.F("keep", zod.Bool().Optional()),
+		),
+		Fn: func(c *httpapi.Call) (any, error) {
+			var in struct {
+				AgentID string  `json:"agentId"`
+				NoteID  string  `json:"noteId"`
+				Text    *string `json:"text"`
+				Keep    *bool   `json:"keep"`
+			}
+			if err := c.Decode(&in); err != nil {
+				return nil, err
+			}
+			ok, err := proactive.EditNote(c.DB(), in.AgentID, in.NoteID, in.Text, in.Keep != nil && *in.Keep, c.Now())
+			if err != nil {
+				return nil, failConfig(err)
+			}
+			if !ok {
+				return nil, httpapi.Fail("That note is gone.")
+			}
+			return proactiveFor(c, in.AgentID)
+		},
+	})
+	httpapi.Register(httpapi.Handler{
+		Name: "deleteProactiveNoteFn", Method: http.MethodPost, Guard: httpapi.Writer,
+		Input: zod.Object(zod.F("agentId", agentID), zod.F("noteId", zod.String().Min(1).Max(100))),
+		Fn: func(c *httpapi.Call) (any, error) {
+			o := c.Obj()
+			id, _ := o.Get("agentId")
+			noteID, _ := o.Get("noteId")
+			if _, err := proactive.ForgetNote(c.DB(), id.(string), noteID.(string), false); err != nil {
+				return nil, err
+			}
+			return proactiveFor(c, id.(string))
+		},
+	})
+}
+
+func mustAgent(q db.Q, agentID string) error {
+	_, ok, err := agents.Get(q, agentID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return httpapi.Fail(proactiveAgentGone)
+	}
+	return nil
 }
 
 func failConfig(err error) error {
@@ -166,72 +255,36 @@ func failConfig(err error) error {
 	return err
 }
 
-// proactiveWithTools is proactiveFor plus the MCP calendar and WhatsApp tools
-// this agent can call, which only the running connectors know.
-func proactiveWithTools(c *httpapi.Call, q db.Q, agentID string, now int64) (*proactiveView, error) {
-	v, err := proactiveFor(q, agentID, now)
+// catalogHost is the agent's tools as the runtime lists them, without a way
+// to call them: enough to check mentions when no live host is wired (tests).
+type catalogHost struct{ c *httpapi.Call }
+
+func (h catalogHost) Tools(ctx context.Context, agentID, _ string, _ int64) ([]proactive.Tool, error) {
+	rt, err := runtimeOf(h.c)
 	if err != nil {
 		return nil, err
 	}
-	rt, err := runtimeOf(c)
+	list, err := rt.AgentTools(ctx, agentID)
 	if err != nil {
-		return v, nil
+		return nil, err
 	}
-	list, err := rt.AgentTools(c.Ctx, agentID)
-	if err != nil {
-		return v, nil
-	}
-	addSourceTools(v, list)
-	return v, nil
-}
-
-// calendarToolRe is a Google Calendar list_events tool on an MCP server
-// ("calendar__list_events" on MCP Hub, "gcal_list_events", ...). It needs
-// "calendar" or "gcal" in the name, so a server's own log list_events isn't
-// offered.
-var calendarToolRe = regexp.MustCompile(`(?i)(calendar|gcal).*list_events$`)
-
-// whatsAppToolRe is wa-hub's list_chats: bare on wa-hub itself, or behind a
-// hub prefix that starts with "wa" ("wa-personal__list_chats"). Palui's own
-// list_chats through a hub ("palui-agent__list_chats") isn't offered.
-var whatsAppToolRe = regexp.MustCompile(`(?i)^(wa[a-z0-9_-]*__)?list_chats$`)
-
-// addSourceTools offers each MCP calendar tool as a calendar source, next to
-// the gcal connectors, and each wa-hub list_chats tool as a WhatsApp source.
-// The WhatsApp list arrives as every MCP connector the agent may use; it's
-// cut down to the ones with a list_chats tool.
-func addSourceTools(v *proactiveView, list []tools.CatalogTool) {
-	status := map[string]string{}
-	for _, c := range v.Connectors["whatsapp"] {
-		status[c.ID] = c.Status
-	}
-	whatsapp := []proactiveConnector{}
-	seen := map[string]bool{}
+	out := make([]proactive.Tool, 0, len(list))
 	for _, t := range list {
-		st, ok := status[t.ConnectorID]
-		key := t.ConnectorID + "/" + t.Tool
-		if t.ConnectorType != "mcp" || !ok || seen[key] {
-			continue
-		}
-		switch {
-		case calendarToolRe.MatchString(t.Tool):
-			v.Connectors["calendar"] = append(v.Connectors["calendar"], proactiveConnector{ID: t.ConnectorID, Label: t.ConnectorLabel, Status: st, Tool: t.Tool})
-		case whatsAppToolRe.MatchString(t.Tool):
-			c := proactiveConnector{ID: t.ConnectorID, Label: t.ConnectorLabel, Status: st}
-			// A bare list_chats is the connector's default: no tool saved.
-			if t.Tool != "list_chats" {
-				c.Tool = t.Tool
-			}
-			whatsapp = append(whatsapp, c)
-		default:
-			continue
-		}
-		seen[key] = true
+		out = append(out, proactive.Tool{Info: proactive.ToolInfo{Name: t.Name, ConnectorID: t.ConnectorID, ConnectorLabel: t.ConnectorLabel, Tool: t.Tool, Class: t.Class, SuggestedClass: t.SuggestedClass, Title: t.Title, Untrusted: t.Untrusted}})
 	}
-	v.Connectors["whatsapp"] = whatsapp
+	return out, nil
 }
 
-func proactiveFor(q db.Q, agentID string, now int64) (*proactiveView, error) {
+// toolHost is the live host, or the runtime's catalog when none is wired.
+func toolHost(c *httpapi.Call) proactive.ToolHost {
+	if h := proactive.DefaultToolHost(); h != nil {
+		return h
+	}
+	return catalogHost{c}
+}
+
+func proactiveFor(c *httpapi.Call, agentID string) (*proactiveView, error) {
+	q, now := c.DB(), c.Now()
 	agent, ok, err := agents.Get(q, agentID)
 	if err != nil {
 		return nil, err
@@ -245,13 +298,11 @@ func proactiveFor(q db.Q, agentID string, now int64) (*proactiveView, error) {
 	}
 	v := &proactiveView{
 		AgentID: agentID, Enabled: row.Enabled, ChatID: row.ChatID, PausedReason: row.PausedReason,
-		LastTickAt: row.LastTickAt, NextTickAt: row.NextTickAt, Config: cfg,
-		Defaults:   proactiveDefaults{Calendar: *proactive.DefaultCalendar(""), WhatsApp: *proactive.DefaultWhatsApp("")},
-		Connectors: map[string][]proactiveConnector{"calendar": {}, "whatsapp": {}},
-		Chats:      []proactiveChat{}, Activity: []proactiveNudge{}, LastErrors: map[string]string{},
-		TokenCap: agent.DailyTokenCap,
+		LastTickAt: row.LastTickAt, NextTickAt: row.NextTickAt, Config: cfg, Starter: proactive.StarterPrompt,
+		Chats: []proactiveChat{}, Tools: []proactive.ToolInfo{}, Mentions: []proactive.MentionProblem{},
+		Activity: []proactiveNudge{}, TokenCap: agent.DailyTokenCap,
 	}
-	// Owner chats only (RFC 11): the web chat and the owner's DMs.
+	// Owner chats only: the web chat and the owner's DMs.
 	rows, err := q.Query("SELECT " + db.ChatCols + " FROM chats WHERE channel = 'web' OR kind = 'dm' ORDER BY (channel = 'web'), last_message_at DESC LIMIT 200")
 	list, err := db.All(rows, err, db.ScanChat)
 	if err != nil {
@@ -269,28 +320,28 @@ func proactiveFor(q db.Q, agentID string, now int64) (*proactiveView, error) {
 		}
 		v.Chats = append(v.Chats, proactiveChat{ID: ch.ID, Title: title, Channel: ch.Channel})
 	}
-	// Connectors this agent may use, by source.
-	crows, err := q.Query("SELECT id, type, label, status, agent_ids FROM connectors WHERE type IN ('gcal', 'mcp') ORDER BY sort_order, created_at")
-	if err != nil {
+	// The tools the prompt may mention, and how its mentions resolve. A host
+	// that can't list them leaves the list empty rather than failing the tab.
+	chatID := ""
+	if row.ChatID != nil {
+		chatID = *row.ChatID
+	}
+	if tools, err := toolHost(c).Tools(c.Ctx, agentID, chatID, now); err == nil {
+		v.Tools = proactive.Infos(tools)
+		if v.Tools == nil {
+			v.Tools = []proactive.ToolInfo{}
+		}
+		v.Mentions = proactive.MentionStatus(proactive.Mentions(cfg.Prompt), v.Tools)
+	}
+	if v.Notes, err = proactive.Notes(q, agentID, now); err != nil {
 		return nil, err
 	}
-	for crows.Next() {
-		var id, typ, label, status string
-		var ids sql.NullString
-		if err := crows.Scan(&id, &typ, &label, &status, &ids); err != nil {
-			crows.Close()
-			return nil, err
-		}
-		if ids.Valid && ids.String != "" && ids.String != "[]" && !strings.Contains(ids.String, `"`+agentID+`"`) {
-			continue
-		}
-		key := "whatsapp"
-		if typ == "gcal" {
-			key = "calendar"
-		}
-		v.Connectors[key] = append(v.Connectors[key], proactiveConnector{ID: id, Label: label, Status: status})
+	if v.Notes == nil {
+		v.Notes = []db.ProactiveNote{}
 	}
-	crows.Close()
+	for _, n := range v.Notes {
+		v.NotesChars += strx.Len16(n.Text)
+	}
 	if v.Mutes, err = proactive.Mutes(q, agentID); err != nil {
 		return nil, err
 	}
@@ -308,7 +359,7 @@ func proactiveFor(q db.Q, agentID string, now int64) (*proactiveView, error) {
 	}
 	sentOutboxes := map[string]bool{}
 	for _, n := range nudges {
-		v.Activity = append(v.Activity, proactiveNudge{ID: n.ID, Kind: n.Kind, Subject: n.Subject, Status: n.Status, Label: proactive.Label(n), Reason: n.Reason, SentAt: n.SentAt, EscalatedAt: n.EscalatedAt, WakeAt: n.WakeAt, UpdatedAt: n.UpdatedAt})
+		v.Activity = append(v.Activity, proactiveNudge{ID: n.ID, Kind: n.Kind, Subject: n.Subject, Status: n.Status, Label: proactive.Label(n), Reason: n.Reason, SentAt: n.SentAt, WakeAt: n.WakeAt, UpdatedAt: n.UpdatedAt})
 		if n.SentAt != nil && *n.SentAt >= dayStart && n.OutboxID != nil {
 			sentOutboxes[*n.OutboxID] = true
 		}
@@ -325,15 +376,11 @@ func proactiveFor(q db.Q, agentID string, now int64) (*proactiveView, error) {
 	for _, t := range ticks {
 		v.TokensToday += t.Tokens
 	}
-	if len(ticks) > 0 {
-		var res map[string]proactive.SourceResult
-		if err := ticks[0].Sources.Decode(&res); err == nil {
-			for name, r := range res {
-				if !r.OK && r.Error != "" {
-					v.LastErrors[name] = r.Error
-				}
-			}
-		}
+	if last, err := proactive.Ticks(q, agentID, 0, 1); err == nil && len(last) == 1 {
+		t := last[0]
+		var l proactive.TickLog
+		_ = t.Sources.Decode(&l)
+		v.LastRun = &proactiveLastRun{At: t.StartedAt, Full: l.Full, Skipped: l.Skipped, Calls: len(l.Calls), Error: t.Error}
 	}
 	return v, nil
 }

@@ -809,21 +809,22 @@
    "name": "Proactive",
    "icon": "radar",
    "summary": "Tells you what matters without being asked.",
-   "description": "An agent with proactive on checks your calendar and WhatsApp every 30 minutes and messages you first: when to leave, a meeting about to start, a changed event, a chat waiting for your reply, plus a morning and an evening summary. Set it up per agent on the agent's Proactive tab, or from chat with these tools.",
+   "description": "An agent with proactive on runs a prompt you write every 30 minutes and messages you first when something matters: when to leave, a meeting about to start, a chat waiting for your reply, plus a morning and an evening summary. The prompt mentions the read tools it may use, like @gcal__get_calendar, so any connector can be a source. Set it up per agent on the agent's Proactive tab, or from chat with these tools.",
    "setup": [],
    "builtin": true,
    "pauseNote": "Pausing hides the chat tools. Proactive keeps running; turn it off on the agent's Proactive tab.",
    "docs": {
     "commands": [
-     "nyalain proactive di chat ini",
-     "jam tenang jadi 23:00",
-     "jangan ingetin grup kantor lagi",
-     "proactive hari ini ngabarin apa aja?"
-    ],
+      "nyalain proactive di chat ini",
+      "jam tenang jadi 23:00",
+      "jangan ingetin grup kantor lagi",
+      "inget ya, Pak Budi selalu bales telat",
+      "proactive hari ini ngabarin apa aja?"
+     ],
     "notes": [
-     "Proactive is off for every agent until you turn it on. Its messages only go to your own DM or the web chat.",
-     "WhatsApp needs a wa-hub MCP server whose list_chats returns structured content, classified read on the Connectors page."
-    ]
+      "Proactive is off for every agent until you turn it on. Its messages only go to your own DM or the web chat.",
+      "The prompt can only mention read tools the agent may use. A mention that doesn't resolve fails the run, and three failed runs in a row pause proactive."
+     ]
    },
    "configKeys": [],
    "configDefaults": {
@@ -2251,7 +2252,7 @@
      {
       "name": "get_proactive",
       "title": "Read proactive settings",
-      "description": "This agent's proactive settings: on or off, target chat, check interval, quiet hours, morning and evening summary, calendar and WhatsApp sources, important contacts and muted subjects.",
+      "description": "This agent's proactive settings: on or off, target chat, the prompt and the tools it mentions, check interval, quiet hours, morning and evening summary, and muted subjects.",
       "class": "read",
       "untrusted": false,
       "guestSafe": false,
@@ -2268,7 +2269,7 @@
      {
       "name": "update_proactive",
       "title": "Change proactive settings",
-      "description": "Change this agent's proactive settings. enabled turns it on or off; chat \"this\" makes the current chat the target; patch is a JSON merge patch on the config (keys: checkEveryMin 15-120, maxPerHour 1-10, quietHours {start,end,urgentPasses}, morning {on,at}, evening {on,at}, calendar {connectorId,departLeadMin,onlineLeadMin,notifyChanges} or null, whatsapp {connectorId,account,waitHours,escalateHours,maxAgeDays,skipGroups} or null, contactsAuto, contacts [{subject,label}], modelRole fast|default). Times are HH:MM.",
+      "description": "Change this agent's proactive settings. enabled turns it on or off; chat \"this\" makes the current chat the target; patch is a JSON merge patch on the config (keys: prompt, the owner's instructions in English that mention the read tools a run may use as @<connectorId>__<tool>, at most 4000 characters and 10 tools; checkEveryMin 15-120; maxPerHour 1-10; quietHours {start,end,urgentPasses}, no runs and no messages inside them; morning {on,at}; evening {on,at}; modelRole fast|default). Times are HH:MM. Turning it on checks every mention.",
       "class": "write",
       "untrusted": false,
       "guestSafe": false,
@@ -2292,6 +2293,77 @@
         },
         "patch": {}
        },
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "list_proactive_notes",
+      "title": "List proactive memory",
+      "description": "The notes proactive carries between runs: the owner's (never expire) and its own (expire). Each has an id.",
+      "class": "read",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {},
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "remember_proactive",
+      "title": "Add to proactive memory",
+      "description": "Keep a note for this agent's proactive runs, as the owner's instruction: who matters, what to skip, a promise someone made. It never expires.",
+      "class": "write",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "text": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 300,
+         "description": "The note, one short sentence, e.g. \"Pak Budi always replies late, don't remind me twice\"."
+        }
+       },
+       "required": [
+        "text"
+       ],
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "forget_proactive",
+      "title": "Remove from proactive memory",
+      "description": "Delete one proactive memory note by its id.",
+      "class": "write",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 100,
+         "description": "The note id (pmem_...) from list_proactive_notes."
+        }
+       },
+       "required": [
+        "id"
+       ],
        "additionalProperties": false
       }
      },
