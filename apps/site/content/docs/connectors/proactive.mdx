@@ -28,7 +28,7 @@ You can do the same from chat: "nyalain proactive di chat ini".
 | Urgent calendar changes still come through | on | An event inside the next 3 hours that moved still reaches you in quiet hours. |
 | Time to leave | 30 min before | For events with a physical location. |
 | Online meeting | 10 min before | For events with a video link, with the link. |
-| Unanswered after | 2 h | How long a chat waits before you're told. |
+| Unanswered after | 2 h | How long a chat waits before you're told. Before that, the agent reads the chat's last 10 messages: a conversation that's already finished (you answered, they only said thanks or sent a sticker) is closed quietly, and it opens again if they write something new. |
 | Remind again after | 4 h | One more reminder if it's still unanswered. Never a third. |
 | Skip groups | on | Only direct chats count. |
 | Important contacts | none | Always told, whatever the model thinks. Star a chat in the tab's activity list to add it. |
@@ -49,7 +49,7 @@ Each proactive message has buttons: **Selesai**, **1j**, **3j**, **Besok** and *
 ## Safety
 
 <Callout type="warn" title="Chat previews go to your model provider">
-  To judge what matters and word the message, the agent sends the names, chat previews and event titles it found to your model. That call has no tools, so a message written to trick the model can only change the wording of one message to you.
+  To judge what matters and word the message, the agent sends the names, chat previews, event titles and the last 10 messages of each new waiting chat to your model. That call has no tools, so a message written to trick the model can only change the wording of one message to you.
 </Callout>
 
 - Messages only go to a chat whose audience is you. If the target becomes shared, proactive pauses and says why on the tab.
