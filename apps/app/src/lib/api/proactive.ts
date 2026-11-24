@@ -16,6 +16,8 @@ export type CalendarSource = {
 
 export type WhatsAppSource = {
   connectorId: string
+  // wa-hub behind a hub: its prefixed list_chats ("wa-personal__list_chats").
+  tool?: string
   account: string
   waitHours: number
   escalateHours: number

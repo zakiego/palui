@@ -794,7 +794,7 @@ export const en = {
   "proactive.noConnectors": "No calendar or MCP connector yet.",
   "proactive.addConnector": "Add a connector",
   "proactive.calendar": "Calendar",
-  "proactive.calendarTool": "{label} ({tool})",
+  "proactive.sourceTool": "{label} ({tool})",
   "proactive.whatsapp": "WhatsApp",
   "proactive.off": "Off",
   "proactive.departLead": "Time to leave",
