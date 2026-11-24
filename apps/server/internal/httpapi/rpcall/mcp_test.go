@@ -404,3 +404,61 @@ func TestMCPToolsThatDeleteAreDestructive(t *testing.T) {
 		t.Errorf("%s isn't an MCP tool", name)
 	}
 }
+
+// /mcp serves both protocol eras: go-sdk's client probes server/discover and
+// stays on 2026-07-28, while a client pinned to 2025-11-25 (like the old TS
+// SDK in Claude Code and mcporter) goes through initialize. Both get the same
+// tools and can call them.
+func TestMCPServesBothProtocolEras(t *testing.T) {
+	e := apitest.New(t, nil)
+	session := e.SignIn()
+	code, body := e.Post(session, "createMcpToken", `{"name":"eras"}`)
+	if code != 200 {
+		t.Fatalf("create: %d %s", code, body)
+	}
+	var created struct{ Token string }
+	_ = json.Unmarshal([]byte(body), &created)
+
+	srv := httptest.NewServer(e.Handler)
+	t.Cleanup(srv.Close)
+	connect := func(opts *sdk.ClientSessionOptions) *sdk.ClientSession {
+		t.Helper()
+		c := sdk.NewClient(&sdk.Implementation{Name: "test", Version: "1"}, nil)
+		hc := &http.Client{Transport: bearer{created.Token}}
+		s, err := c.Connect(context.Background(), &sdk.StreamableClientTransport{Endpoint: srv.URL + "/mcp", HTTPClient: hc, DisableStandaloneSSE: true}, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = s.Close() })
+		return s
+	}
+	modern := connect(nil)
+	legacy := connect(&sdk.ClientSessionOptions{ProtocolVersion: "2025-11-25"})
+	if v := modern.InitializeResult().ProtocolVersion; v != "2026-07-28" {
+		t.Fatalf("modern client negotiated %q", v)
+	}
+	if v := legacy.InitializeResult().ProtocolVersion; v != "2025-11-25" {
+		t.Fatalf("legacy client negotiated %q", v)
+	}
+
+	names := func(s *sdk.ClientSession) string {
+		t.Helper()
+		res, err := s.ListTools(context.Background(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, tool := range res.Tools {
+			out = append(out, tool.Name)
+		}
+		return strings.Join(out, " ")
+	}
+	if m, l := names(modern), names(legacy); m != l || !strings.Contains(" "+m+" ", " list_agents ") {
+		t.Fatalf("tools differ:\nmodern: %s\nlegacy: %s", m, l)
+	}
+	mText, mErr := callText(t, modern, "list_agents", nil)
+	lText, lErr := callText(t, legacy, "list_agents", nil)
+	if mErr || lErr || mText != lText {
+		t.Fatalf("list_agents differs:\nmodern: %s\nlegacy: %s", mText, lText)
+	}
+}
