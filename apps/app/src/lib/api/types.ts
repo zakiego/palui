@@ -22,7 +22,7 @@ export type MessageStatus = "pending" | "handled" | "ignored" | "context"
 export type ToolClass = "read" | "write" | "destructive"
 export type ReplyMode = "mention" | "all"
 export type ChatKind = "dm" | "group"
-export type GuestTools = "none" | "safe"
+export type GuestTools = "none" | "safe" | "members"
 export type ToolPermission = "allow" | "ask" | "deny"
 // A higher level locks the ones under it: the connector's entry, then its
 // class (classes, keyed "<connectorId>:<class>"), then the tool's own, then

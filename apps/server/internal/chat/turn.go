@@ -1056,7 +1056,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		collectAudience := ""
 		if open {
 			// No approvals here: a tool the owner wants a say on isn't offered at all.
-			collectAudience = audience
+			collectAudience = tools.ToolAudience(audience, agent)
 		}
 		var collected *tools.Collected
 		if noTools {

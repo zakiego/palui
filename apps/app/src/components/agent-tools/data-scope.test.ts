@@ -126,3 +126,18 @@ describe("audience", () => {
     expect(groupAudience([guest, wipe], agent, off)).toBeNull()
   })
 })
+
+describe("guest tools: same as members", () => {
+  const own = { ...tool("deals"), memberSafe: true }
+  const allow = { allowAll: true, tools: {} }
+  it("gives shared chats the member-safe tools", () => {
+    expect(inSharedChats(own, "members", allow)).toBe(true)
+    expect(inSharedChats(own, "safe", allow)).toBe(false)
+    expect(inSharedChats(own, "none", allow)).toBe(false)
+    expect(audienceOf(own, { id: "agt_1", isDefault: false, guestTools: "members" }, allow)).toBe("everyone")
+  })
+  it("still leaves out a tool set to ask or off", () => {
+    expect(inSharedChats(own, "members", { allowAll: true, tools: { "mcp-crm__deals": "ask" } })).toBe(false)
+    expect(inSharedChats(own, "members", { allowAll: true, tools: { "mcp-crm__deals": "deny" } })).toBe(false)
+  })
+})

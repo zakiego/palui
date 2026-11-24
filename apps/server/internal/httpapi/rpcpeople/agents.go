@@ -47,7 +47,7 @@ func agentFields(extra ...zod.Field) *zod.ObjectS {
 	fields := []zod.Field{
 		zod.F("name", zod.String().Trim().Min(1).Max(agents.MaxAgentName)),
 		zod.F("persona", zod.String().Trim().Min(1).Max(agents.MaxPersona)),
-		zod.F("guestTools", zod.Enum("none", "safe")),
+		zod.F("guestTools", zod.Enum("none", "safe", "members")),
 		zod.F("dailyTokenCap", zod.Int().Min(0).Max(100_000_000)),
 		zod.F("recallContainer", zod.Nullable(zod.String().Trim().Max(64))),
 		zod.F("recallReadContainers", zod.Array(zod.String().Trim().Max(64)).Max(agents.MaxReadContainers)),

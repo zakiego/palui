@@ -326,6 +326,7 @@ func ToolsText(c *EngineCtx, chat db.Chat, args []string) (string, error) {
 	open := tools.NoApprovals(audience)
 	if open {
 		turn.Mode = audience
+		audience = tools.ToolAudience(audience, agent)
 	} else {
 		audience = ""
 	}

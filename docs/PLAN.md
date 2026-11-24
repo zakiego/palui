@@ -554,7 +554,7 @@ Palui stops being one persona for one person. An agent is a named persona with i
 | `slug` | Lowercase id used in `/agent <slug>` and on the Agents page (`chef`, `shop-cs`). Fixed after creation. |
 | `name`, `persona` | Display name and the persona text that opens the system prompt (max 8000 chars). |
 | `recall_container` | Where its memory lives. Palui (the default agent) uses the recall connector's container. Every other agent gets `agent-<slug>`. |
-| `guest_tools` | `none` or `safe`: whether a chat with outsiders gets tools at all (19.4). |
+| `guest_tools` | `none`, `safe` or `members`: what a chat with outsiders gets (19.4). `members` gives outside turns the `members` column below. |
 | members | People the owner trusts with this agent's data (`agent_members`, 19.4). Palui has none. |
 | `daily_token_cap` | Tokens per day across all its chats. 0 means only the global cap applies. |
 | `telegram_connector_id` | Optional: its own Telegram bot (19.6). |
@@ -610,7 +610,7 @@ Data scope is `PaluiTool.Data` from the connector contract: `none`, `chat`, `age
 | `agent` (instructions, contacts, memory, jobs, the agent's own MCP servers) | yes | yes | no |
 | `shared` (settings, global MCP servers, the owner's accounts, HTTP API keys) | yes | no | no |
 
-`guest_tools: none` takes every tool away from `outside` turns.
+`guest_tools: none` takes every tool away from `outside` turns. `guest_tools: members` collects an `outside` turn's tools as a `members` turn (agent data, never destructive or shared), so the owner can open the agent's own tools to a group without adding everyone as a member. The rest of the turn stays `outside`: the prompt still calls them guests and chat rules stay off. The default agent never gets it.
 
 - A tool left out isn't in the turn at all: not in the tool list, not in "Enabled capabilities", not found by `palui__search_tools`, not named anywhere in the prompt. In `members` and `outside` turns the search tool itself takes the shared form: no `for` parameter, nothing about flows or destructive tools in its schema, and a no-match note that doesn't mention the owner. The prompt there doesn't talk about approvals or destructive tools either. The reply to "how much did the owner spend?" is the same whether a finance server exists or not.
 - `members` and `outside` turns have no approvals. A tool in the turn runs right away, with no limit on what it can do inside its scope (a recurring reminder in the group is fine). Destructive tools are never in those turns, and a call whose tool asks for approval on its own (`NeedsApproval`) is refused with a note to the model. Accepted risk: anyone in the chat can make the agent change that chat's data or that agent's data, and nothing past it.

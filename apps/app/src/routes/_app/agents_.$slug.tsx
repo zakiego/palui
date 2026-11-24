@@ -53,6 +53,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useLiveRefresh } from "@/hooks/use-live-events"
 import { applySuggestedToolClassesFn, setConnectorDataFn, setConnectorOwnerFn } from "@/lib/api/connectors"
 import { deleteAgentFn, getAgentMemoryFn, getAgentPage, getAgentToolsFn, saveAgentFn, setAgentToolPermissionsFn, setChatAllowedFn, setChatDeployNoticeFn, setChatReplyModeFn } from "@/lib/api/agents"
+import type { GuestTools } from "@/lib/api/types"
 import { ago, errorMessage } from "@/lib/format"
 import { useCount, useT } from "@/lib/i18n"
 
@@ -88,7 +89,7 @@ const CHANNEL = {
 type Form = {
   name: string
   persona: string
-  guestTools: "none" | "safe"
+  guestTools: GuestTools
   cap: string
   container: string
   // Comma or space separated in the input, a list on save.
@@ -369,13 +370,14 @@ function AgentSettings({ data }: { data: Loaded }) {
                       onChange={(v) => set("guestTools", v as Form["guestTools"])}
                       options={[
                         { value: "safe", label: t("agents.guestTools.safe") },
+                        { value: "members", label: t("agents.guestTools.members") },
                         { value: "none", label: t("agents.guestTools.none") },
                       ]}
-                      aria-describedby={form.guestTools === "safe" ? "agent-guests-hint" : undefined}
+                      aria-describedby={form.guestTools === "none" ? undefined : "agent-guests-hint"}
                     />
-                    {form.guestTools === "safe" && (
+                    {form.guestTools !== "none" && (
                       <FieldDescription id="agent-guests-hint" className="text-pretty">
-                        {t("agents.guestToolsHint")}
+                        {t(form.guestTools === "members" ? "agents.guestToolsMembersHint" : "agents.guestToolsHint")}
                       </FieldDescription>
                     )}
                   </Field>
@@ -979,7 +981,8 @@ function ToolsTab({ agent }: { agent: Agent }) {
   // A group or someone else's DM, Palui's groups included: one tool set for
   // everyone there, never asking first.
   const sharedCount = tools?.filter((x) => inSharedChats(x, agent.guestTools, permissions)).length ?? null
-  const sharedRule = agent.guestTools === "none" ? t("agents.tools.none") : sharedCount === null ? t("agents.tools.sharedRuleLoading") : t("agents.tools.sharedRule", { n: sharedCount.toLocaleString() })
+  const sharedKey = agent.guestTools === "members" ? "agents.tools.sharedRuleMembers" : "agents.tools.sharedRule"
+  const sharedRule = agent.guestTools === "none" ? t("agents.tools.none") : sharedCount === null ? t(`${sharedKey}Loading`) : t(sharedKey, { n: sharedCount.toLocaleString() })
   // A DM with a member, or a WhatsApp group of only you and members.
   const memberCount = tools?.filter((x) => inMemberChats(x, permissions)).length ?? null
   const membersRule = memberCount === null ? t("agents.tools.membersRuleLoading") : t("agents.tools.membersRule", { n: memberCount.toLocaleString() })

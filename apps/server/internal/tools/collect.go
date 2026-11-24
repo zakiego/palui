@@ -131,6 +131,27 @@ func Namespaced(connectorID, tool string) string {
 	return s
 }
 
+// Guest tool settings for an agent (agents.guest_tools, PLAN 19.4): what an
+// outside turn gets. None takes every tool away, safe keeps tools whose data
+// stays in that chat or that keep nothing, members gives everyone the tools a
+// member gets.
+const (
+	GuestToolsNone    = "none"
+	GuestToolsSafe    = "safe"
+	GuestToolsMembers = "members"
+)
+
+// ToolAudience is the audience a turn's tools are collected for. It's the
+// chat's audience, except that an outside turn of an agent whose guest tools
+// are "members" gets what a members turn gets. The default agent never has
+// members, so it never gets the upgrade.
+func ToolAudience(audience string, agent db.Agent) string {
+	if audience == AudienceOutside && agent.GuestTools == GuestToolsMembers && !agent.IsDefault {
+		return AudienceMembers
+	}
+	return audience
+}
+
 // InAudience says whether a tool with this resolved data scope and class may
 // be in a turn for this audience. The owner gets everything. A members turn
 // also gets the agent's own data, an outside turn only tools whose data stays
