@@ -33,7 +33,7 @@ import {
   type ProactiveView,
 } from "@/lib/api/proactive"
 import { clockTime, errorMessage } from "@/lib/format"
-import { useT } from "@/lib/i18n"
+import { useCount, useT } from "@/lib/i18n"
 import type { Key } from "@/lib/i18n/en"
 
 type T = ReturnType<typeof useT>
@@ -57,6 +57,8 @@ function merged(cfg: ProactiveConfig, patch: ProactivePatch): ProactiveConfig {
   return out as ProactiveConfig
 }
 
+const sameDay = (ms: number) => new Date(ms).toDateString() === new Date().toDateString()
+const shortDay = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short" })
 const shownAt = (n: ProactiveNudge) => (n.status === "scheduled" && n.wakeAt ? n.wakeAt : (n.sentAt ?? n.updatedAt))
 const byTime = (list: ProactiveNudge[]) => [...list].sort((a, b) => shownAt(b) - shownAt(a))
 
@@ -82,6 +84,7 @@ const STATUS: Record<NudgeStatus, { tone: StatusTone; key: Key }> = {
 
 export function AgentProactive({ agentId }: { agentId: string }) {
   const t = useT()
+  const count = useCount()
   const [view, setView] = React.useState<ProactiveView | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [checking, setChecking] = React.useState(false)
@@ -342,10 +345,7 @@ export function AgentProactive({ agentId }: { agentId: string }) {
             title={t("proactive.activity")}
             action={
               <span className="text-sm text-muted-foreground tabular-nums">
-                {t("proactive.activityCounts", {
-                  checks: view.ticksToday.toLocaleString(),
-                  sent: view.sentToday.toLocaleString(),
-                })}
+                {count(view.ticksToday, "proactive.checksOne", "proactive.checksMany")} · {count(view.sentToday, "proactive.sentOne", "proactive.sentMany")}
               </span>
             }
           >
@@ -671,7 +671,10 @@ function ActivityRow({ n, t, important, onImportant }: { n: ProactiveNudge; t: T
   const isSummary = n.kind === "sum_morning" || n.kind === "sum_evening"
   return (
     <li className="flex min-w-0 items-start gap-3 py-2.5 first:pt-0 last:pb-0">
-      <span className="w-[8.5ch] shrink-0 pt-0.5 font-mono text-caption text-muted-foreground tabular-nums">{clockTime(at)}</span>
+      <span className="flex w-[8.5ch] shrink-0 flex-col pt-0.5 font-mono text-caption text-muted-foreground tabular-nums">
+        {clockTime(at)}
+        {!sameDay(at) && <span>{shortDay(at)}</span>}
+      </span>
       <Icon aria-hidden={true} className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span dir="auto" className="min-w-0 text-sm [overflow-wrap:anywhere]">

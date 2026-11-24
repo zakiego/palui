@@ -163,3 +163,9 @@ test("saves run in order, and two failures go back to what the server last confi
   await waitFor(() => expect(screen.getByRole("switch", { name: "Skip groups" }).getAttribute("aria-checked")).toBe("true"))
   expect(screen.getByRole("switch", { name: "Tell me when an event changes" }).getAttribute("aria-checked")).toBe("true")
 })
+
+test("counts read right at one", async () => {
+  api.getProactiveFn.mockResolvedValue(view({ enabled: true, chatId: "chat_web", ticksToday: 1, sentToday: 1 }))
+  render(<AgentProactive agentId="agt_palui" />)
+  expect(await screen.findByText("1 check · 1 sent")).toBeTruthy()
+})
