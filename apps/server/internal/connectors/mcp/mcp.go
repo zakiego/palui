@@ -188,6 +188,9 @@ type Selected struct {
 	Def          ToolDef
 	Class        string
 	FlowApproval string
+	// Set while the owner hasn't classified the tool (Class is then
+	// destructive): the class its annotations suggest.
+	Suggested string
 }
 
 // SelectTools: enabled ones only, with their saved class; a tool the owner
@@ -200,17 +203,72 @@ func SelectTools(defs []ToolDef, prefs map[string]ToolPref) []Selected {
 			continue
 		}
 		s := Selected{Def: d, Class: "destructive", FlowApproval: "version"}
-		if ok {
-			if pref.Class != "" {
-				s.Class = pref.Class
-			}
-			if pref.FlowApproval != "" {
-				s.FlowApproval = pref.FlowApproval
-			}
+		if ok && pref.FlowApproval != "" {
+			s.FlowApproval = pref.FlowApproval
+		}
+		if ok && pref.Class != "" {
+			s.Class = pref.Class
+		} else {
+			s.Suggested = SuggestClass(d.Annotations)
 		}
 		out = append(out, s)
 	}
 	return out
+}
+
+// Suggestion is one listTools row as WithSuggested reads it.
+type Suggestion struct {
+	Name  string
+	Class string
+}
+
+// SuggestionsFrom reads the rows of a listTools answer. A class that isn't
+// read or write is destructive.
+func SuggestionsFrom(listed *jsonx.Object) []Suggestion {
+	var out []Suggestion
+	if listed == nil {
+		return out
+	}
+	raw, _ := listed.Get("tools")
+	rows, _ := raw.([]any)
+	for _, r := range rows {
+		o, ok := r.(*jsonx.Object)
+		if !ok {
+			continue
+		}
+		name := str(o, "name")
+		if name == "" {
+			continue
+		}
+		cls := str(o, "suggestedClass")
+		if cls != "read" && cls != "write" {
+			cls = "destructive"
+		}
+		out = append(out, Suggestion{Name: name, Class: cls})
+	}
+	return out
+}
+
+// WithSuggested is config.toolPrefs plus a pref for every listed tool the
+// owner hasn't saved one for: on (as it already was), with its suggested
+// class. Saved prefs keep their bytes. n is how many it added.
+func WithSuggested(config *jsonx.Object, tools []Suggestion) (prefs *jsonx.Object, n int) {
+	prefs = jsonx.NewMap[any]()
+	if config != nil {
+		if raw, ok := config.Get("toolPrefs"); ok {
+			if o, ok := raw.(*jsonx.Object); ok {
+				prefs = o.Clone()
+			}
+		}
+	}
+	for _, t := range tools {
+		if _, saved := prefs.Get(t.Name); saved {
+			continue
+		}
+		prefs.Set(t.Name, kit.O("enabled", true, "class", t.Class))
+		n++
+	}
+	return prefs, n
 }
 
 func refused(text string) *jsonx.Object {
@@ -364,7 +422,7 @@ func New(opts Options) *connectors.Runtime {
 						if title == "" {
 							title = p.Def.Name
 						}
-						set.Set(p.Def.Name, connectors.PaluiTool{Tool: WithFileRefs(tool, c.DB, &t, untrusted, masterKey), Class: p.Class, Untrusted: untrusted, FlowApproval: p.FlowApproval, Title: title})
+						set.Set(p.Def.Name, connectors.PaluiTool{Tool: WithFileRefs(tool, c.DB, &t, untrusted, masterKey), Class: p.Class, Suggested: p.Suggested, Untrusted: untrusted, FlowApproval: p.FlowApproval, Title: title})
 					}
 					return set, nil
 				},

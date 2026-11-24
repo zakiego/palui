@@ -142,6 +142,9 @@ func TestOffersOnlyEnabledToolsWithTheirClassUnsetOnesAsDestructive(t *testing.T
 	if cls("search").Class != "read" || cls("add_note").Class != "write" || cls("mystery").Class != "destructive" || !cls("search").Untrusted {
 		t.Fatal("classes")
 	}
+	if cls("search").Suggested != "" || cls("mystery").Suggested != "destructive" {
+		t.Fatal("suggested")
+	}
 	if out := exec(t, set, "search", `{"q":"kopi"}`); !strings.Contains(out.String(), "found kopi") {
 		t.Fatal(out)
 	}
@@ -348,5 +351,53 @@ func TestToolSchemaFillsPropertiesAndClosesAdditionalProperties(t *testing.T) {
 	got := string(mcpconn.ToolSchema(mcpconn.ToolDef{InputSchema: map[string]any{"type": "object"}}))
 	if got != `{"type":"object","properties":{},"additionalProperties":false}` {
 		t.Fatal(got)
+	}
+}
+
+// An unclassified tool runs as destructive but carries what its annotations
+// suggest, for the dashboard; a saved class drops the suggestion.
+func TestSelectToolsCarriesTheSuggestionOnlyForUnclassifiedTools(t *testing.T) {
+	defs := []mcpconn.ToolDef{
+		{Name: "search", Annotations: &sdk.ToolAnnotations{ReadOnlyHint: true}},
+		{Name: "add_note", Annotations: &sdk.ToolAnnotations{DestructiveHint: boolp(false)}},
+		{Name: "mystery"},
+		{Name: "list", Annotations: &sdk.ToolAnnotations{ReadOnlyHint: true}},
+	}
+	prefs := map[string]mcpconn.ToolPref{"list": {Enabled: true, Class: "write"}}
+	var got []string
+	for _, s := range mcpconn.SelectTools(defs, prefs) {
+		got = append(got, s.Def.Name+":"+s.Class+":"+s.Suggested)
+	}
+	if strings.Join(got, ",") != "search:destructive:read,add_note:destructive:write,mystery:destructive:destructive,list:write:" {
+		t.Fatal(got)
+	}
+}
+
+// "Use suggested classes": a pref for every listed tool without one, saved
+// prefs left byte for byte, an odd class read as destructive.
+func TestWithSuggestedFillsOnlyToolsWithoutASavedPref(t *testing.T) {
+	cfg := config_(t, "https://hub.example.com/mcp", `,"toolPrefs":{"search":{"enabled":false,"class":"destructive","flowApproval":"every_run"}}`)
+	listed, err := jsonx.ParseObject([]byte(`{"tools":[` +
+		`{"name":"search","suggestedClass":"read","saved":true},` +
+		`{"name":"add_note","suggestedClass":"write","saved":false},` +
+		`{"name":"mystery","suggestedClass":"destructive","saved":false},` +
+		`{"name":"odd","suggestedClass":"admin","saved":false},` +
+		`{"suggestedClass":"read"},"junk"]}`))
+	testutil.Must(t, err)
+	prefs, n := mcpconn.WithSuggested(cfg, mcpconn.SuggestionsFrom(listed))
+	b, err := jsonx.Marshal(prefs)
+	testutil.Must(t, err)
+	want := `{"search":{"enabled":false,"class":"destructive","flowApproval":"every_run"},"add_note":{"enabled":true,"class":"write"},"mystery":{"enabled":true,"class":"destructive"},"odd":{"enabled":true,"class":"destructive"}}`
+	if n != 3 || string(b) != want {
+		t.Fatal(n, string(b))
+	}
+	// The config it read is left alone; the caller saves the result.
+	if got := mcpconn.PrefsFrom(cfg); len(got) != 1 {
+		t.Fatal(got)
+	}
+	// Nothing left to fill: nothing added.
+	cfg.Set("toolPrefs", prefs)
+	if _, n := mcpconn.WithSuggested(cfg, mcpconn.SuggestionsFrom(listed)); n != 0 {
+		t.Fatal(n)
 	}
 }

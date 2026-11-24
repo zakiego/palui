@@ -42,7 +42,9 @@ type ToolMeta struct {
 	ConnectorID string `json:"connectorId"`
 	Tool        string `json:"tool"`
 	Class       string `json:"class"`
-	Untrusted   bool   `json:"untrusted"`
+	// PaluiTool.Suggested: set while the owner hasn't classified it.
+	Suggested string `json:"-"`
+	Untrusted bool   `json:"untrusted"`
 	// Results hold what other people wrote (PaluiTool.OthersWrote).
 	OthersWrote bool   `json:"-"`
 	Title       string `json:"title,omitempty"`
@@ -250,7 +252,7 @@ func Collect(ctx context.Context, running []connectors.RunningEntry, opts Collec
 			if Hidden(opts.Permissions, name, e.ID, cls, opts.HideAsk) {
 				continue
 			}
-			meta := &ToolMeta{Name: name, ConnectorID: e.ID, Tool: toolName, Class: cls, Untrusted: pt.Untrusted || pt.OthersWrote || e.Row.Trust == "external", OthersWrote: pt.OthersWrote, Title: pt.Title, Label: e.Row.Label, GuestSafe: pt.GuestSafe, Data: pt.Data, Scope: connectors.ResolveData(pt.Data, e.Row), NeedsApproval: pt.NeedsApproval, Preview: pt.Preview, OwnerReply: pt.OwnerReply}
+			meta := &ToolMeta{Name: name, ConnectorID: e.ID, Tool: toolName, Class: cls, Suggested: pt.Suggested, Untrusted: pt.Untrusted || pt.OthersWrote || e.Row.Trust == "external", OthersWrote: pt.OthersWrote, Title: pt.Title, Label: e.Row.Label, GuestSafe: pt.GuestSafe, Data: pt.Data, Scope: connectors.ResolveData(pt.Data, e.Row), NeedsApproval: pt.NeedsApproval, Preview: pt.Preview, OwnerReply: pt.OwnerReply}
 			out.Tools.Set(name, wrapTool(pt.Tool, meta, opts))
 			out.Meta[name] = meta
 			order = append(order, name)

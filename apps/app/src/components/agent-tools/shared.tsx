@@ -10,6 +10,7 @@ import { SimpleSelect } from "@/components/simple-select"
 import { CLASS_TONE } from "@/components/tool-trace"
 import { Button } from "@/components/ui/button"
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field"
+import { Spinner } from "@/components/ui/spinner"
 import { StatusText } from "@/components/ui/status-text"
 import { Switch } from "@/components/ui/switch"
 import type { DataScope, getAgentToolsFn } from "@/lib/api/agents"
@@ -34,6 +35,8 @@ export type ToolsViewProps = {
   // Whether the owner marked an MCP server as holding no private data.
   noPrivate: (connectorId: string) => boolean
   setNoPrivate: (connectorId: string, on: boolean) => void
+  // Save the server's suggested class for the MCP tools not classified yet.
+  applySuggested: (connectorId: string) => Promise<void>
   // The agent's tool permissions, as changed on this tab.
   permissions: ToolPermissions
   // One entry at one level: a tool name, a connector id, or a classKey().
@@ -51,6 +54,13 @@ export const CLASSES: ToolClass[] = ["read", "write", "destructive"]
 // Anything unclassified is destructive, like the server.
 export function classOf(x: ToolItem): ToolClass {
   return x.class === "read" || x.class === "write" ? x.class : "destructive"
+}
+
+// An MCP tool the owner hasn't classified yet: it runs as destructive, and
+// the server suggests a class. null once a class is saved.
+export function suggestedOf(x: ToolItem): ToolClass | null {
+  const s = x.suggestedClass
+  return s === "read" || s === "write" || s === "destructive" ? s : null
 }
 
 export const classKey = (connectorId: string, cls: ToolClass) => `${connectorId}:${cls}`
@@ -167,8 +177,22 @@ export function AudienceText({ audience, n }: { audience: Audience | "off"; n?: 
   )
 }
 
+// Saved classes only: a tool not classified yet counts on its own.
 export function countClass(list: ToolItem[], cls: ToolClass) {
-  return list.filter((x) => classOf(x) === cls).length
+  return list.filter((x) => !suggestedOf(x) && classOf(x) === cls).length
+}
+
+// The tools not classified yet, by the class the server suggests.
+export function countSuggested(list: ToolItem[]) {
+  const out: Record<ToolClass, number> = { read: 0, write: 0, destructive: 0 }
+  let total = 0
+  for (const x of list) {
+    const s = suggestedOf(x)
+    if (!s) continue
+    out[s]++
+    total++
+  }
+  return { ...out, total }
 }
 
 // Which panels are open. Starts at `initial`; a search opens every panel
@@ -214,7 +238,8 @@ export function ScopeSelect({ connectorLabel, agentId, agents, onChange }: { con
 }
 
 // The global-or-own select (when the connector has one) and for an MCP
-// server the owner's "holds no private data" switch. Nothing when neither.
+// server the owner's "holds no private data" switch and, while some tools
+// aren't classified, the server's suggestions. Nothing when none apply.
 export function GroupActions({ head, props }: { head: ToolItem; props: ToolsViewProps }) {
   const t = useT()
   const id = `no-private-${head.connectorId}`
@@ -225,6 +250,7 @@ export function GroupActions({ head, props }: { head: ToolItem; props: ToolsView
       {scoped && (
         <ScopeSelect connectorLabel={head.connectorLabel} agentId={props.agent.id} agents={props.agentsOf(head.connectorId)} onChange={(v) => props.setScope(head.connectorId, v)} />
       )}
+      {head.connectorType === "mcp" && <SuggestedClasses head={head} props={props} />}
       {head.connectorType === "mcp" && (
         <Field orientation="horizontal" className="max-w-2xl">
           <FieldContent>
@@ -237,6 +263,37 @@ export function GroupActions({ head, props }: { head: ToolItem; props: ToolsView
           <Switch id={id} checked={props.noPrivate(head.connectorId)} onCheckedChange={(v) => props.setNoPrivate(head.connectorId, v)} />
         </Field>
       )}
+    </div>
+  )
+}
+
+// The MCP tools the owner hasn't classified yet run as destructive. One
+// click saves what the server suggests for each; saved classes stay. Counts
+// every tool of the server, not only the search hits.
+export function SuggestedClasses({ head, props }: { head: ToolItem; props: ToolsViewProps }) {
+  const t = useT()
+  const count = useCount()
+  const [busy, setBusy] = React.useState(false)
+  const n = countSuggested(props.tools.filter((x) => x.connectorId === head.connectorId))
+  if (n.total === 0) return null
+  const apply = async () => {
+    setBusy(true)
+    try {
+      await props.applySuggested(head.connectorId)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="flex max-w-2xl flex-col items-start gap-2 rounded-lg border border-dashed px-3 py-2.5">
+      <span className="text-sm font-medium tabular-nums">{count(n.total, "agents.tools.unclassified.one", "agents.tools.unclassified.many")}</span>
+      <span className="text-caption text-pretty text-muted-foreground tabular-nums">
+        {t("agents.tools.unclassifiedHint", { read: n.read.toLocaleString(), write: n.write.toLocaleString(), destructive: n.destructive.toLocaleString() })}
+      </span>
+      <Button variant="outline" size="sm" disabled={busy} onClick={() => void apply()}>
+        {busy && <Spinner data-icon="inline-start" />}
+        {t("agents.tools.useSuggested")}
+      </Button>
     </div>
   )
 }
@@ -320,6 +377,8 @@ export function PermissionTree({ head, list, props, scopeOf }: { head: ToolItem;
 // tool says its own.
 export function ToolRow({ x, props, scope }: { x: ToolItem; props: ToolsViewProps; scope?: DataScope }) {
   const t = useT()
+  const label = useLabel()
+  const suggested = suggestedOf(x)
   const used = props.data.used[x.name]
   const audience = audienceOf(x, props.agent, props.permissions)
   return (
@@ -332,6 +391,11 @@ export function ToolRow({ x, props, scope }: { x: ToolItem; props: ToolsViewProp
           </span>
         )}
         <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {suggested && (
+            <StatusText tone="warning" icon={null}>
+              {t("agents.tools.suggests", { class: label("tool.class", suggested) })}
+            </StatusText>
+          )}
           {scope && <DataScopeText scope={scope} />}
           {x.untrusted && (
             <StatusText tone="secondary" icon={<GlobeIcon aria-hidden="true" />}>
@@ -390,7 +454,7 @@ export function PermissionSelect({
 }
 
 // How many tools a closed group holds, whose data they touch, who gets them,
-// and how many are destructive.
+// how many are destructive, and how many aren't classified yet.
 export function GroupMeta({
   list,
   scope,
@@ -408,6 +472,7 @@ export function GroupMeta({
   const count = useCount()
   const reach = agent && permissions ? groupAudience(list, agent, permissions) : null
   const destructive = countClass(list, "destructive")
+  const unclassified = countSuggested(list).total
   const allowed = permissions ? list.filter((x) => setFor(x, permissions) === "allow").length : 0
   const off = permissions ? list.filter((x) => setFor(x, permissions) === "deny").length : 0
   return (
@@ -418,6 +483,11 @@ export function GroupMeta({
       {destructive > 0 && (
         <StatusText tone="destructive" icon={null} className="tabular-nums">
           {t("agents.tools.destructiveCount", { n: destructive.toLocaleString() })}
+        </StatusText>
+      )}
+      {unclassified > 0 && (
+        <StatusText tone="warning" icon={null} className="tabular-nums">
+          {t("agents.tools.unclassifiedCount", { n: unclassified.toLocaleString() })}
         </StatusText>
       )}
       {allowed > 0 && <span className="tabular-nums">{t("agents.perm.allowedCount", { n: allowed.toLocaleString() })}</span>}

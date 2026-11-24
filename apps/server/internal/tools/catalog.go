@@ -21,9 +21,13 @@ type CatalogTool struct {
 	ConnectorID    string `json:"connectorId"`
 	ConnectorLabel string `json:"connectorLabel"`
 	// The connector's type ("mcp" for an MCP server).
-	ConnectorType string  `json:"connectorType"`
-	Class         string  `json:"class"`
-	Title         *string `json:"title"`
+	ConnectorType string `json:"connectorType"`
+	Class         string `json:"class"`
+	// An MCP tool the owner hasn't classified yet: Class is destructive (fail
+	// closed) and this is what the server's annotations suggest. Left out once
+	// a class is saved, and for every other connector.
+	SuggestedClass string  `json:"suggestedClass,omitempty"`
+	Title          *string `json:"title"`
 	// Its results come from outside, so they taint the turn.
 	Untrusted bool `json:"untrusted"`
 	// An outside turn (a shared chat, PLAN 19.4) gets it too.
@@ -97,7 +101,7 @@ func Catalog(ctx context.Context, running []connectors.RunningEntry, o CatalogOp
 			t := m.Title
 			title = &t
 		}
-		out = append(out, CatalogTool{Name: m.Name, Tool: m.Tool, ConnectorID: m.ConnectorID, ConnectorLabel: label, ConnectorType: typ, Class: m.Class, Title: title, Untrusted: m.Untrusted, GuestSafe: outside.Meta[name] != nil, MemberSafe: members.Meta[name] != nil, Data: m.Data})
+		out = append(out, CatalogTool{Name: m.Name, Tool: m.Tool, ConnectorID: m.ConnectorID, ConnectorLabel: label, ConnectorType: typ, Class: m.Class, SuggestedClass: m.Suggested, Title: title, Untrusted: m.Untrusted, GuestSafe: outside.Meta[name] != nil, MemberSafe: members.Meta[name] != nil, Data: m.Data})
 	}
 	return out
 }

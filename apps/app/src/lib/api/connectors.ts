@@ -73,3 +73,6 @@ export const setConnectorOwnerFn = withInput<{ id: string; agentIds: string[] },
 export const duplicateConnectorFn = withInput<{ id: string }, { ok: true; id: string }>("duplicateConnectorFn", "POST")
 // Mark an MCP server as holding no private data (PLAN 19.4), or clear the mark.
 export const setConnectorDataFn = withInput<{ id: string; noPrivateData: boolean }, Ok>("setConnectorDataFn", "POST")
+// Save the server's suggested class for every MCP tool the owner hasn't
+// classified yet. Saved classes stay; saved is how many it filled in.
+export const applySuggestedToolClassesFn = withInput<{ id: string }, { ok: true; saved: number }>("applySuggestedToolClassesFn", "POST")

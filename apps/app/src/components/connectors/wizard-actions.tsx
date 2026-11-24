@@ -514,7 +514,7 @@ function ListTools(props: WizardActionProps) {
       {unsaved > 0 && (
         <p className="text-caption text-muted-foreground">
           {unsaved === 1 ? "1 tool isn't saved yet" : `${unsaved} tools aren't saved yet`}. Until you save, Palui treats{" "}
-          {unsaved === 1 ? "it" : "them"} as destructive and asks before every call.
+          {unsaved === 1 ? "it" : "them"} as destructive and asks before every call. Saving keeps the classes shown, which start at what the server suggests.
         </p>
       )}
       <div className="flex gap-2">

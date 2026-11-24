@@ -182,6 +182,9 @@ type Tool struct {
 type PaluiTool struct {
 	Tool  Tool
 	Class string
+	// An MCP tool the owner hasn't classified yet runs as destructive (Class);
+	// this is the class the server's annotations suggest, for the dashboard.
+	Suggested string
 	// Results taint the turn (web fetch, hooks, external MCP).
 	Untrusted bool
 	// Results hold what other people wrote for the owner's agent to read

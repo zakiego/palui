@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/zakiego/palui/apps/server/internal/connectors"
+	mcpconn "github.com/zakiego/palui/apps/server/internal/connectors/mcp"
 	"github.com/zakiego/palui/apps/server/internal/connectors/web"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
@@ -187,7 +188,10 @@ var builtinData = map[string]string{
 
 // demoToolSet is demo-runtime.ts's agentTools for one connector: the fake MCP
 // list for an MCP connector and the built-in list for a skill, only while
-// the connector is on. A call answers with a fixed text; nothing runs.
+// the connector is on. A call answers with a fixed text; nothing runs. An MCP
+// row without toolPrefs offers every tool with its class as if saved; one
+// with toolPrefs follows them like the real runtime, so a tool without a
+// pref is destructive with its class as the suggestion.
 func demoToolSet(q db.Q, id, typ string) (*connectors.ToolSet, error) {
 	set := connectors.NewToolSet()
 	row, ok, err := connectors.Get(q, id)
@@ -197,7 +201,7 @@ func demoToolSet(q db.Q, id, typ string) (*connectors.ToolSet, error) {
 	if row.Kind != "skill" && row.Kind != "tools" && row.Kind != "memory" {
 		return set, nil
 	}
-	add := func(name, class, title string, guestSafe, untrusted bool) {
+	add := func(name, class, suggested, title string, guestSafe, untrusted bool) {
 		desc := title
 		if desc == "" {
 			desc = name
@@ -210,17 +214,31 @@ func demoToolSet(q db.Q, id, typ string) (*connectors.ToolSet, error) {
 					return "demo runtime: nothing ran", nil
 				},
 			},
-			Class: class, Title: title, GuestSafe: guestSafe, Untrusted: untrusted, Data: builtinData[typ],
+			Class: class, Suggested: suggested, Title: title, GuestSafe: guestSafe, Untrusted: untrusted, Data: builtinData[typ],
 		})
 	}
 	if typ == "mcp" {
+		_, followPrefs := row.Config.Get("toolPrefs")
+		prefs := mcpconn.PrefsFrom(row.Config)
 		for _, t := range demoTools {
-			add(t.name, t.class, t.title, false, false)
+			class, suggested := t.class, ""
+			if followPrefs {
+				pref, ok := prefs[t.name]
+				if ok && !pref.Enabled {
+					continue
+				}
+				if ok && pref.Class != "" {
+					class = pref.Class
+				} else {
+					class, suggested = "destructive", t.class
+				}
+			}
+			add(t.name, class, suggested, t.title, false, false)
 		}
 		return set, nil
 	}
 	for _, t := range builtinTools[typ] {
-		add(t.tool, t.class, t.title, t.guestSafe, t.untrusted)
+		add(t.tool, t.class, "", t.title, t.guestSafe, t.untrusted)
 	}
 	return set, nil
 }

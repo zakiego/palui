@@ -62,6 +62,7 @@ function props(permissions: ToolPermissions): ToolsViewProps {
     setScope: vi.fn(),
     noPrivate: () => false,
     setNoPrivate: vi.fn(),
+    applySuggested: vi.fn(),
     permissions,
     setPermission: vi.fn(),
   }
