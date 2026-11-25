@@ -112,6 +112,22 @@ func TestAgentMemoryReadsTheAgentsContainerAndPaluiUsesTheConnectors(t *testing.
 	}
 }
 
+func TestAgentMemoryPaluiReadsRecallsDefaultWhenNoContainerIsPicked(t *testing.T) {
+	e, token := agentsEnv(t)
+	cfg := jsonx.NewMap[any]()
+	cfg.Set("defaultContainer", "zaki")
+	secrets := jsonx.NewMap[string]()
+	secrets.Set("apiKey", "rcl_test")
+	testutil.SeedConnector(t, e.DB, "recall", "memory", testutil.SeedOptions{Config: cfg, Secrets: secrets}, agentsNow)
+	useFake(t, containersSpec(t, `[{"container":"zaki","memories":4409,"documents":6,"lastActivity":`+jsonx.NumberString(float64(agentsNow))+`}]`))
+	palui, err := agents.GetDefault(e.DB, agentsNow)
+	testutil.Must(t, err)
+	r := mustOK(t, e, token, "getAgentMemoryFn", `{"id":"`+palui.ID+`"}`)
+	if at(r, "container") != "zaki" || at(r, "stats", "memories") != 4409.0 {
+		t.Fatal(js(r))
+	}
+}
+
 func TestAgentMemoryReportsADownRuntimeWithoutFailing(t *testing.T) {
 	e, token := agentsEnv(t)
 	withRecall(t, e, "default")
