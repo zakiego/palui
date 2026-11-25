@@ -28,6 +28,10 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - Added: Calendar feed connector reads any calendar from its secret iCal link, with recurring events expanded. ([#32](https://github.com/zakiego/palui/pull/32))
 - Added: WhatsApp inbox connector links your own number read only and lists chats waiting for your reply. Adds a migration. ([#32](https://github.com/zakiego/palui/pull/32))
 
+### API
+
+- Added: `update_connector` on `/mcp` renames a connector and sets its config and MCP tool classes. Secrets stay in the dashboard. ([#33](https://github.com/zakiego/palui/pull/33))
+
 ### Self-hosting
 
 - Fixed: rerunning `ops/install-host-bridge.sh` or `ops/install-backup.sh` no longer fails with "Bootstrap failed: 5" and leaves the job unloaded. Both now wait for launchd to drop the old job first.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/zakiego/palui/apps/server/internal/agents"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
@@ -15,6 +16,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/kit"
 	"github.com/zakiego/palui/apps/server/internal/connectors/manage"
 	mcpconn "github.com/zakiego/palui/apps/server/internal/connectors/mcp"
+	"github.com/zakiego/palui/apps/server/internal/connectors/registry"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/events"
 	"github.com/zakiego/palui/apps/server/internal/httpapi"
@@ -601,6 +603,157 @@ func applySuggestedToolClasses(c *httpapi.Call) (any, error) {
 	}{true, saved}, nil
 }
 
+// lockedConfigKeys are config keys updateConnectorFn refuses, with why.
+var lockedConfigKeys = map[string]string{
+	"toolPrefs":                 "send toolPrefs on its own, not inside config",
+	connectors.NoPrivateDataKey: "only the owner marks a server as holding no private data, in the dashboard",
+	"addedFromChat":             "Palui sets it when a server is added from chat, to keep it on public addresses",
+}
+
+func toolPrefPatchZod() zod.Schema {
+	return zod.Nullable(zod.Object(
+		zod.F("enabled", zod.Bool().Optional()),
+		zod.F("class", zod.Enum("read", "write", "destructive").Optional()),
+		zod.F("flowApproval", zod.Enum("version", "every_run").Optional()),
+	))
+}
+
+func updateConnectorZod() *zod.ObjectS {
+	return zod.Object(
+		zod.F("id", idZod()),
+		zod.F("label", zod.String().Trim().Min(1).Max(80).Optional()),
+		zod.F("config", zod.Record(zod.Unknown()).Optional()),
+		zod.F("toolPrefs", zod.Record(toolPrefPatchZod()).Optional()),
+	)
+}
+
+// mergeToolPrefs applies a toolPrefs patch to the saved prefs: a tool sent
+// null loses its saved pref (it's unclassified, so destructive, again); a tool
+// sent an object keeps the fields it doesn't send. A tool without a saved pref
+// starts enabled and destructive, so leaving out class never makes it safer.
+func mergeToolPrefs(stored *jsonx.Object, patch *jsonx.Object) *jsonx.Object {
+	prefs := jsonx.NewMap[any]()
+	if stored != nil {
+		if raw, ok := stored.Get("toolPrefs"); ok {
+			if saved, ok := raw.(*jsonx.Object); ok {
+				prefs = saved.Clone()
+			}
+		}
+	}
+	for _, name := range patch.Keys() {
+		v, _ := patch.Get(name)
+		p, ok := v.(*jsonx.Object)
+		if !ok {
+			prefs.Delete(name)
+			continue
+		}
+		pref := jsonx.NewMap[any]()
+		pref.Set("enabled", true)
+		pref.Set("class", "destructive")
+		if old, ok := prefs.Get(name); ok {
+			if o, ok := old.(*jsonx.Object); ok {
+				pref = o.Clone()
+			}
+		}
+		for _, k := range []string{"enabled", "class", "flowApproval"} {
+			if v, ok := present(p, k); ok {
+				pref.Set(k, v)
+			}
+		}
+		// "version" is the default; the dashboard leaves it out too.
+		if fa, _ := pref.Get("flowApproval"); fa == "version" {
+			pref.Delete("flowApproval")
+		}
+		prefs.Set(name, pref)
+	}
+	return prefs
+}
+
+// updateConnector edits a connector that exists through the same SaveDraft
+// the dashboard's connector page uses: its label, its non-secret config
+// fields (checked by the type's ConfigZod) and, on an MCP server, per-tool
+// prefs merged into the saved ones. It never takes or returns secrets. The
+// change is logged, and the supervisor restarts the connector on its new
+// config before this returns.
+func updateConnector(c *httpapi.Call) (any, error) {
+	o, id := c.Obj(), str(c, "id")
+	var saved db.Connector
+	err := c.DB().Tx(func(tx db.Q) error {
+		row, found, err := connectors.Get(tx, id)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return httpapi.Fail("That connector doesn't exist anymore.")
+		}
+		m, ok := registry.Manifest(row.Type)
+		if !ok {
+			return httpapi.Fail("Unknown connector type %q.", row.Type)
+		}
+		in := manage.DraftInput{ID: id, Type: row.Type}
+		var changed []string
+		if v, ok := present(o, "label"); ok {
+			s, _ := v.(string)
+			in.Label = &s
+			changed = append(changed, "label")
+		}
+		if v, ok := present(o, "config"); ok {
+			cfg, _ := v.(*jsonx.Object)
+			for _, k := range cfg.Keys() {
+				if why, locked := lockedConfigKeys[k]; locked {
+					return httpapi.Fail("config.%s can't be changed here: %s.", k, why)
+				}
+				if m.ConfigZod == nil || m.ConfigZod.Field(k) == nil {
+					return httpapi.Fail("A %s connector has no config field %q.", m.Name, k)
+				}
+			}
+			if cfg.Len() > 0 {
+				in.Config = cfg.Clone()
+				changed = append(changed, "config "+strings.Join(cfg.Keys(), ", "))
+			}
+		}
+		if v, ok := present(o, "toolPrefs"); ok {
+			if row.Type != "mcp" {
+				return httpapi.Fail("Only an MCP server has per-tool settings.")
+			}
+			patch, _ := v.(*jsonx.Object)
+			if patch.Len() > 0 {
+				if in.Config == nil {
+					in.Config = jsonx.NewMap[any]()
+				}
+				in.Config.Set("toolPrefs", mergeToolPrefs(row.Config, patch))
+				changed = append(changed, "tool settings for "+strings.Join(patch.Keys(), ", "))
+			}
+		}
+		if len(changed) == 0 {
+			return httpapi.Fail("Nothing to change: send label, config or toolPrefs.")
+		}
+		if saved, err = manage.SaveDraft(tx, in, c.MasterKey(), c.Now()); err != nil {
+			return err
+		}
+		_, err = events.Log(tx, events.Input{ConnectorID: &id, Kind: "connector.update", Message: "Changed " + strings.Join(changed, "; ")}, c.Now())
+		return err
+	})
+	if err != nil {
+		if me, ok := manage.IsError(err); ok {
+			return nil, httpapi.Fail("%s", me.FieldsText())
+		}
+		return nil, err
+	}
+	// Wait for the restart, so a get_connector right after sees the new
+	// config live (applySuggestedToolClasses does the same).
+	rt, rtErr := c.Runtime()
+	if rtErr == nil {
+		rt.Sup.Reconcile()
+	}
+	return struct {
+		OK               bool          `json:"ok"`
+		RuntimeReachable bool          `json:"runtimeReachable"`
+		Label            string        `json:"label"`
+		Config           *jsonx.Object `json:"config"`
+	}{true, rtErr == nil, saved.Label, saved.Config}, nil
+}
+
 // phoneRe is /^\+?[\d\s-]{8,20}$/ with JS \s.
 var phoneRe = regexp.MustCompile(`^\+?[\d` + strx.SpaceClass + `-]{8,20}$`)
 
@@ -625,4 +778,5 @@ func init() {
 	post("setConnectorOwnerFn", zod.Object(zod.F("id", idZod()), zod.F("agentIds", agentIDsZod().Optional()), zod.F("agentId", zod.Nullable(zod.String().Min(1).Max(100)).Optional())), setConnectorOwner)
 	post("setConnectorDataFn", zod.Object(zod.F("id", idZod()), zod.F("noPrivateData", zod.Bool())), setConnectorData)
 	post("applySuggestedToolClassesFn", idInput(), applySuggestedToolClasses)
+	post("updateConnectorFn", updateConnectorZod(), updateConnector)
 }
