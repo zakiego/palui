@@ -52,6 +52,7 @@ var want = map[string]string{
 	"setContactPolicy": "POST", "removeContactFn": "POST", "cancelOutboundFn": "POST",
 	// reminders.ts
 	"getReminders": "GET", "parseReminder": "POST", "createReminderFn": "POST", "cancelReminderFn": "POST", "snoozeReminderFn": "POST",
+	"getWatches": "GET", "cancelWatchFn": "POST",
 	// session.ts
 	"getSession": "GET", "getInvite": "GET", "acceptInvite": "POST", "listPasskeys": "GET", "removePasskey": "POST",
 	// settings.ts
@@ -61,8 +62,8 @@ var want = map[string]string{
 var public = map[string]bool{"getSession": true, "getInvite": true, "acceptInvite": true}
 
 func TestEveryServerFunctionIsRegistered(t *testing.T) {
-	if len(want) != 108 {
-		t.Fatalf("the list has %d names, want 108", len(want))
+	if len(want) != 110 {
+		t.Fatalf("the list has %d names, want 110", len(want))
 	}
 	got := map[string]httpapi.Handler{}
 	for _, h := range httpapi.Handlers() {

@@ -24,6 +24,7 @@ import { Route as AppNotesRouteImport } from './routes/_app/notes'
 import { Route as AppOutboundRouteImport } from './routes/_app/outbound'
 import { Route as AppRemindersRouteImport } from './routes/_app/reminders'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppWatchesRouteImport } from './routes/_app/watches'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as OauthConsentRouteImport } from './routes/oauth.consent'
 import { Route as AppAgentsSlugRouteImport } from './routes/_app/agents_.$slug'
@@ -106,6 +107,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppWatchesRoute = AppWatchesRouteImport.update({
+  id: '/watches',
+  path: '/watches',
+  getParentRoute: () => AppRoute,
+} as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/outbound': typeof AppOutboundRoute
   '/reminders': typeof AppRemindersRoute
   '/settings': typeof AppSettingsRoute
+  '/watches': typeof AppWatchesRoute
   '/invite/$token': typeof InviteTokenRoute
   '/oauth/consent': typeof OauthConsentRoute
   '/agents/$slug': typeof AppAgentsSlugRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   '/outbound': typeof AppOutboundRoute
   '/reminders': typeof AppRemindersRoute
   '/settings': typeof AppSettingsRoute
+  '/watches': typeof AppWatchesRoute
   '/invite/$token': typeof InviteTokenRoute
   '/oauth/consent': typeof OauthConsentRoute
   '/': typeof AppIndexRoute
@@ -204,6 +212,7 @@ export interface FileRoutesById {
   '/_app/outbound': typeof AppOutboundRoute
   '/_app/reminders': typeof AppRemindersRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/watches': typeof AppWatchesRoute
   '/invite/$token': typeof InviteTokenRoute
   '/oauth/consent': typeof OauthConsentRoute
   '/_app/': typeof AppIndexRoute
@@ -230,6 +239,7 @@ export interface FileRouteTypes {
     | '/outbound'
     | '/reminders'
     | '/settings'
+    | '/watches'
     | '/invite/$token'
     | '/oauth/consent'
     | '/agents/$slug'
@@ -252,6 +262,7 @@ export interface FileRouteTypes {
     | '/outbound'
     | '/reminders'
     | '/settings'
+    | '/watches'
     | '/invite/$token'
     | '/oauth/consent'
     | '/'
@@ -276,6 +287,7 @@ export interface FileRouteTypes {
     | '/_app/outbound'
     | '/_app/reminders'
     | '/_app/settings'
+    | '/_app/watches'
     | '/invite/$token'
     | '/oauth/consent'
     | '/_app/'
@@ -400,6 +412,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/watches': {
+      id: '/_app/watches'
+      path: '/watches'
+      fullPath: '/watches'
+      preLoaderRoute: typeof AppWatchesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/invite/$token': {
       id: '/invite/$token'
       path: '/invite/$token'
@@ -465,6 +484,7 @@ interface AppRouteChildren {
   AppOutboundRoute: typeof AppOutboundRoute
   AppRemindersRoute: typeof AppRemindersRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppWatchesRoute: typeof AppWatchesRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAgentsSlugRoute: typeof AppAgentsSlugRoute
   AppConnectorsIdRoute: typeof AppConnectorsIdRoute
@@ -486,6 +506,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppOutboundRoute: AppOutboundRoute,
   AppRemindersRoute: AppRemindersRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppWatchesRoute: AppWatchesRoute,
   AppIndexRoute: AppIndexRoute,
   AppAgentsSlugRoute: AppAgentsSlugRoute,
   AppConnectorsIdRoute: AppConnectorsIdRoute,

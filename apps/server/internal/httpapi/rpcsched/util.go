@@ -12,6 +12,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/outbound"
 	"github.com/zakiego/palui/apps/server/internal/reminders"
+	"github.com/zakiego/palui/apps/server/internal/watches"
 	"github.com/zakiego/palui/apps/server/internal/zone"
 )
 
@@ -36,6 +37,7 @@ func friendly(err error) error {
 	var je *jobs.JobError
 	var re *reminders.ReminderError
 	var te *reminders.TimeError
+	var we *watches.WatchError
 	switch {
 	case errors.As(err, &oe):
 		return httpapi.Fail("%s", oe.Msg)
@@ -45,6 +47,8 @@ func friendly(err error) error {
 		return httpapi.Fail("%s", re.Msg)
 	case errors.As(err, &te):
 		return httpapi.Fail("%s", te.Msg)
+	case errors.As(err, &we):
+		return httpapi.Fail("%s", we.Msg)
 	}
 	return err
 }

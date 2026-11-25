@@ -41,6 +41,7 @@ export type ApprovalReason = "set-to-ask" | "tool-rule" | "destructive" | "unatt
 export type JobKind = "job" | "heartbeat" | "briefing"
 export type ModelRole = "default" | "fast" | "vision"
 export type ReminderStatus = "pending" | "firing" | "done" | "cancelled"
+export type WatchStatus = "active" | "checking" | "done" | "expired" | "cancelled" | "failed"
 export type ContactPolicy = "ask" | "allow"
 export type OutboxStatus = "pending" | "sending" | "sent" | "failed" | "cancelled"
 export type AttachmentKind = "image" | "document"

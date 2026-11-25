@@ -21,6 +21,7 @@ var functions = map[string]string{
 	"getJobs": "GET", "runJobNow": "POST", "setJobEnabledFn": "POST", "saveJob": "POST", "deleteJobFn": "POST", "getJobPreset": "GET",
 	"getReminders": "GET", "parseReminder": "POST", "createReminderFn": "POST", "cancelReminderFn": "POST", "snoozeReminderFn": "POST",
 	"getFlows": "GET", "getFlowFn": "GET",
+	"getWatches": "GET", "cancelWatchFn": "POST",
 }
 
 func TestEveryFunctionIsRegisteredWithItsGuard(t *testing.T) {
@@ -42,7 +43,7 @@ func TestEveryFunctionIsRegisteredWithItsGuard(t *testing.T) {
 			t.Errorf("%s: %s %s, want %s %s", name, h.Method, h.Guard, method, want)
 		}
 	}
-	if len(functions) != 20 {
+	if len(functions) != 22 {
 		t.Fatalf("%d functions", len(functions))
 	}
 }

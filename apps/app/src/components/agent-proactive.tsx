@@ -2,7 +2,8 @@
 // is a draft until Save; every other control saves on its own, like the Tools
 // tab: a switch or a select saves as it changes.
 import * as React from "react"
-import { BellOffIcon, BookmarkIcon, CircleAlertIcon, MessageCircleIcon, MoonIcon, PlayIcon, RefreshCwIcon, SunIcon, Trash2Icon, WrenchIcon } from "lucide-react"
+import { BellIcon, BellOffIcon, BookmarkIcon, CircleAlertIcon, MoonIcon, PlayIcon, RefreshCwIcon, SunIcon, Trash2Icon, WrenchIcon } from "lucide-react"
+import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
 import { toast } from "sonner"
 import { bindLayer, position } from "@ui-sdk/core"
 
@@ -994,8 +995,18 @@ function Rhythm({ cfg, save, t }: { cfg: ProactiveConfig; save: Save; t: T }) {
   )
 }
 
+// A nudge about a WhatsApp or Telegram chat gets that service's real logo. Anything
+// else gets a bell, never a generic chat bubble: a bubble reads as WhatsApp.
+function nudgeIcon(n: ProactiveNudge) {
+  if (n.kind === "sum_morning") return SunIcon
+  if (n.kind === "sum_evening") return MoonIcon
+  if (n.subject.startsWith("wa:")) return WhatsAppIcon
+  if (n.subject.startsWith("tg:")) return TelegramIcon
+  return BellIcon
+}
+
 function ActivityRow({ n, t }: { n: ProactiveNudge; t: T }) {
-  const Icon = n.kind === "sum_morning" ? SunIcon : n.kind === "sum_evening" ? MoonIcon : MessageCircleIcon
+  const Icon = nudgeIcon(n)
   const s = STATUS[n.status as NudgeStatus] ?? STATUS.pending
   const at = shownAt(n)
   const isSummary = n.kind === "sum_morning" || n.kind === "sum_evening"

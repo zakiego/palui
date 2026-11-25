@@ -114,6 +114,15 @@ func demo(k *Kit) {
 	rem("Standup", 20, ptr("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"), "pending")
 	rem("Old one", -30, nil, "done")
 
+	k.Watch(Watch{ChatID: tg.ID, Topic: "Laba bersih resmi Danantara 2025", Question: "Kabarin kalau laba bersih Danantara yang resmi udah keluar", NextCheckAt: ptr(now + 12*MIN), ExpiresAt: now + 5*D,
+		Checks: 14, LastCheckAt: ptr(now - 18*MIN), LastRunID: &runID, LastSummary: "Belum ada rilis resmi. Situs Danantara masih memuat laporan semester 1.", TokensUsed: 182_400, CreatedBy: "Rizky"})
+	k.Watch(Watch{ChatID: tg.ID, Topic: "Tiket konser Hindia Jakarta", Status: "checking", NextCheckAt: ptr(now), ExpiresAt: now + 2*D, EveryMin: 60, Checks: 3, LastCheckAt: ptr(now - H),
+		LastSummary: "Promotor baru umumkan tanggal, penjualan belum dibuka.", TokensUsed: 21_900})
+	k.Watch(Watch{ChatID: tg.ID, Topic: "Pengumuman CPNS 2026", Status: "done", ExpiresAt: now + 4*D, Checks: 31, LastCheckAt: ptr(now - 3*H), LastSummary: "Sudah keluar.",
+		Result: ptr("Pengumuman hasil seleksi administrasi CPNS 2026 sudah terbit di sscasn.bkn.go.id."), TokensUsed: 402_000, EndedAt: ptr(now - 3*H)})
+	k.Watch(Watch{ChatID: tg.ID, Topic: "Harga emas Antam di bawah 1,5 juta", Status: "expired", ExpiresAt: now - 2*D, EveryMin: 360, Checks: 28, LastCheckAt: ptr(now - 2*D),
+		LastSummary: "Masih 1.612.000 per gram.", TokensUsed: 96_000, EndedAt: ptr(now - 2*D)})
+
 	// A reply with the Markdown the model actually sends (bold, lists, code, a link).
 	k.Message(web, "user", "rekap minggu ini dong", now-30*MIN)
 	k.Message(web, "assistant",
