@@ -29,7 +29,7 @@ const (
 )
 
 // OutputSchema is the run's answer, for the repair call's ResponseFormat.
-const OutputSchema = `{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"key":{"type":"string"},"subject":{"type":"string"},"text":{"type":"string"},"sendAt":{"type":"string"},"urgent":{"type":"boolean"}},"required":["key","text"],"additionalProperties":false}},"closed":{"type":"array","items":{"type":"object","properties":{"key":{"type":"string"},"why":{"type":"string"}},"required":["key"],"additionalProperties":false}},"remember":{"type":"array","items":{"type":"object","properties":{"text":{"type":"string"},"days":{"type":"integer"}},"required":["text"],"additionalProperties":false}},"forget":{"type":"array","items":{"type":"string"}},"summary":{"type":"string"}},"required":["items"],"additionalProperties":false}`
+const OutputSchema = `{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"key":{"type":"string"},"subject":{"type":"string"},"text":{"type":"string"},"sendAt":{"type":"string"},"urgent":{"type":"boolean"}},"required":["key","text"],"additionalProperties":false}},"closed":{"type":"array","items":{"type":"object","properties":{"key":{"type":"string"},"why":{"type":"string"}},"required":["key"],"additionalProperties":false}},"remember":{"type":"array","items":{"type":"object","properties":{"text":{"type":"string"},"days":{"type":"integer"}},"required":["text"],"additionalProperties":false}},"forget":{"type":"array","items":{"type":"string"}},"message":{"type":"string"},"summary":{"type":"string"}},"required":["items"],"additionalProperties":false}`
 
 // Item is one thing to tell (RFC 5).
 type Item struct {
@@ -60,8 +60,11 @@ type Output struct {
 	Closed   []Closed
 	Remember []Remember
 	Forget   []string
-	Summary  string
-	Skipped  []string
+	// Message is the model's wording for the message that carries the items
+	// sent now; empty sends their texts one after another.
+	Message string
+	Summary string
+	Skipped []string
 }
 
 var keyRe = regexp.MustCompile(`^[A-Za-z0-9:._-]{1,200}$`)
@@ -114,6 +117,7 @@ type rawOutput struct {
 		Days int    `json:"days"`
 	} `json:"remember"`
 	Forget  []string `json:"forget"`
+	Message string   `json:"message"`
 	Summary string   `json:"summary"`
 }
 
@@ -187,6 +191,7 @@ func ParseOutput(text string, now int64) (Output, error) {
 			out.Forget = append(out.Forget, id)
 		}
 	}
+	out.Message = MessageText(raw.Message)
 	out.Summary = MessageText(raw.Summary)
 	return out, nil
 }

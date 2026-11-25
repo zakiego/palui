@@ -465,16 +465,9 @@ func (e *Engine) deliver(r db.AgentProactive, list []db.Nudge, text string, now 
 	if strings.TrimSpace(text) == "" {
 		text = "…"
 	}
-	var actions []db.OutboxAction
-	for _, n := range list {
-		if n.Kind == KindItem {
-			actions = Buttons(n, Language(q))
-			break
-		}
-	}
 	expires := now + OutboxTTLMs
 	err = q.Tx(func(tx db.Q) error {
-		row, err := outbox.Enqueue(tx, outbox.EnqueueInput{ChatID: chat.ID, Channel: chat.Channel, ConnectorID: chat.ConnectorID, Payload: db.OutboxPayload{Text: text, Actions: actions, Format: "plain"}, Source: OutboxSourcePrefix + r.AgentID, ExpiresAt: &expires}, now)
+		row, err := outbox.Enqueue(tx, outbox.EnqueueInput{ChatID: chat.ID, Channel: chat.Channel, ConnectorID: chat.ConnectorID, Payload: db.OutboxPayload{Text: text, Format: "plain"}, Source: OutboxSourcePrefix + r.AgentID, ExpiresAt: &expires}, now)
 		if err != nil {
 			return err
 		}
@@ -606,7 +599,7 @@ func (e *Engine) tick(agentID, summary, summaryKey string) {
 		if prev, ok := e.lastFull(agentID); ok && prev.log.State == log.State && now-prev.at < FullRunEveryMs && Replay(ctx, tools, prev.log.Calls) {
 			log.Skipped = SkipUnchanged
 			log.Calls = prev.log.Calls
-			sent, tickErr = e.deliverPending(row, cfg, tz, now)
+			sent, tickErr = e.deliverPending(row, cfg, tz, "", now)
 			return
 		}
 	}
@@ -623,7 +616,7 @@ func (e *Engine) tick(agentID, summary, summaryKey string) {
 			tickErr = err
 			// Items already scheduled still fire; held ones wait.
 			if summary == SummaryNone {
-				_, _ = e.deliverPending(row, cfg, tz, now)
+				_, _ = e.deliverPending(row, cfg, tz, "", now)
 			} else {
 				e.sendSummary(row, *summaryNudge, "", in.Held, now)
 				summaryNudge = nil
@@ -654,7 +647,7 @@ func (e *Engine) tick(agentID, summary, summaryKey string) {
 		summaryNudge = nil
 		return
 	}
-	sent, tickErr = e.deliverPending(row, cfg, tz, now)
+	sent, tickErr = e.deliverPending(row, cfg, tz, out.Message, now)
 }
 
 // runInput gathers what a run sees.
@@ -823,11 +816,20 @@ func apply(q db.Q, agentID string, out Output, tz string, now int64) error {
 
 // deliverPending sends what's pending as one message, within quiet hours and
 // the rate limit (RFC 2). It returns how many items went out.
-func (e *Engine) deliverPending(r db.AgentProactive, cfg Config, tz string, now int64) (int, error) {
+// deliverPending sends the pending items in one message. message is the run's
+// wording for it, used when every pending item goes out (the cap can hold
+// some back, and the wording would name them).
+func (e *Engine) deliverPending(r db.AgentProactive, cfg Config, tz, message string, now int64) (int, error) {
 	q := e.o.DB
 	pending, err := pendingNudges(q, r.AgentID)
 	if err != nil || len(pending) == 0 {
 		return 0, err
+	}
+	var all []db.Nudge
+	for _, n := range pending {
+		if n.Kind == KindItem {
+			all = append(all, n)
+		}
 	}
 	urgentOnly := func(list []db.Nudge) []db.Nudge {
 		var keep []db.Nudge
@@ -860,7 +862,11 @@ func (e *Engine) deliverPending(r db.AgentProactive, cfg Config, tz string, now 
 	if len(list) == 0 {
 		return 0, nil
 	}
-	return len(list), e.deliver(r, list, joinTexts(list), now)
+	text := joinTexts(list)
+	if message != "" && len(list) == len(all) {
+		text = message
+	}
+	return len(list), e.deliver(r, list, text, now)
 }
 
 // sendSummary sends a summary with the held items, the model's text or a
@@ -974,7 +980,9 @@ func (e *Engine) notify(r db.AgentProactive, text string, now int64) {
 // TestResult is a test run's answer: what it called, what it would send and
 // remember, and what it cost. Nothing is written.
 type TestResult struct {
-	Calls    []Call     `json:"calls"`
+	Calls []Call `json:"calls"`
+	// Message is the run's wording for what goes out now, when it wrote one.
+	Message  string     `json:"message,omitempty"`
 	Items    []TestItem `json:"items"`
 	Closed   []string   `json:"closed"`
 	Remember []string   `json:"remember"`
@@ -1071,6 +1079,7 @@ func (e *Engine) TestRun(ctx context.Context, agentID string, prompt *string, no
 		out.Remember = append(out.Remember, r.Text)
 	}
 	out.Forget = append(out.Forget, res.Output.Forget...)
+	out.Message = res.Output.Message
 	out.Ignored = append(out.Ignored, res.Output.Skipped...)
 	return out, nil
 }

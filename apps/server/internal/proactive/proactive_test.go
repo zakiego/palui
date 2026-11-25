@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -248,12 +249,32 @@ func TestOutputIsReadLenientlyAndBounded(t *testing.T) {
 	}
 }
 
+func TestTheRunWritesTheMessageForWhatGoesOutNow(t *testing.T) {
+	w := newWorld(t, nil)
+	msg := "Hai Zaki 👋, ini yang perlu kamu cek:\n\n1. 💬 Bu Diana belum dibalas.\n2. 📧 Tagihan listrik jatuh tempo besok."
+	w.answer(`{"items":[{"key":"wa:1:a","text":"Bu Diana belum dibalas."},{"key":"mail:z:9","text":"Tagihan listrik jatuh tempo besok."},{"key":"cal:e1:leave","text":"Berangkat ke klinik.","sendAt":"2026-11-10T13:30:00+08:00"}],"message":` + strconv.Quote(msg) + `}`)
+	w.sweep()
+	out := w.outbox()
+	if len(out) != 1 || out[0].Payload.Text != msg || len(out[0].Payload.Actions) != 0 {
+		t.Fatalf("%+v", out)
+	}
+	if w.nudge("wa:1:a").Status != proactive.StatusSent || w.nudge("mail:z:9").Status != proactive.StatusSent || w.nudge("cal:e1:leave").Status != proactive.StatusScheduled {
+		t.Fatal("the message carries the items sent now; the timed one waits")
+	}
+	// No wording: the texts go out one after another.
+	w.answer(`{"items":[{"key":"wa:2:b","text":"Mama Isti nanya video."},{"key":"wa:3:c","text":"Lim nanya helm."}]}`)
+	w.at(NOW + 2*HOUR).sweep()
+	if out := w.outbox(); len(out) != 2 || out[1].Payload.Text != "Mama Isti nanya video.\n\nLim nanya helm." {
+		t.Fatalf("%+v", out)
+	}
+}
+
 func TestRunSendsNowSchedulesTimedAndRemembers(t *testing.T) {
 	w := newWorld(t, nil)
 	w.answer(`{"items":[{"key":"cal:e1:leave","text":"30 menit lagi berangkat ke klinik.","sendAt":"2026-11-10T13:30:00+08:00"},{"key":"cal:e1:today","text":"Hari ini jam 14.00 ke klinik."}],"remember":[{"text":"Klinik minta datang 15 menit lebih awal","days":2}]}`)
 	w.sweep()
 	out := w.outbox()
-	if len(out) != 1 || out[0].Payload.Text != "Hari ini jam 14.00 ke klinik." || len(out[0].Payload.Actions) != 5 || out[0].Source != proactive.OutboxSourcePrefix+w.agent.ID {
+	if len(out) != 1 || out[0].Payload.Text != "Hari ini jam 14.00 ke klinik." || len(out[0].Payload.Actions) != 0 || out[0].Source != proactive.OutboxSourcePrefix+w.agent.ID {
 		t.Fatalf("%+v", out)
 	}
 	if n := w.nudge("cal:e1:today"); n.Status != proactive.StatusSent {
