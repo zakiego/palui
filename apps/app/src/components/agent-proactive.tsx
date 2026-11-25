@@ -562,6 +562,21 @@ function TestResult({ r, t }: { r: ProactiveTestResult; t: T }) {
   )
 }
 
+// The prompt split into plain text and mentions, for the highlight layer
+// behind the textarea. A mention with a problem is flagged.
+function promptParts(prompt: string, tools: ProactiveTool[]): { text: string; mention?: "ok" | "problem" }[] {
+  const out: { text: string; mention?: "ok" | "problem" }[] = []
+  let last = 0
+  for (const m of prompt.matchAll(MENTION_RE)) {
+    const at = (m.index ?? 0) + m[1].length
+    if (at > last) out.push({ text: prompt.slice(last, at) })
+    out.push({ text: "@" + m[2], mention: problemFor(m[2], tools) ? "problem" : "ok" })
+    last = at + m[2].length + 1
+  }
+  out.push({ text: prompt.slice(last) })
+  return out
+}
+
 // The textarea styles that decide where a character lands, copied onto the
 // mirror caretOffset measures in.
 const MIRROR_STYLES = [
@@ -595,6 +610,29 @@ function MentionTextarea({ id, value, onChange, tools, t, invalid }: { id: strin
   const count = useCount()
   const ref = React.useRef<HTMLTextAreaElement>(null)
   const listRef = React.useRef<HTMLDivElement>(null)
+  const backRef = React.useRef<HTMLDivElement>(null)
+  const parts = React.useMemo(() => promptParts(value, tools), [value, tools])
+
+  // The highlight layer copies the textarea's scroll, and its scrollbar's
+  // width so lines wrap at the same place.
+  const sync = React.useCallback(() => {
+    const box = ref.current
+    const back = backRef.current
+    if (!box || !back) return
+    const style = getComputedStyle(box)
+    const bar = box.offsetWidth - box.clientWidth - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth)
+    back.style.paddingRight = `calc(${style.paddingRight} + ${Math.max(0, bar)}px)`
+    back.scrollTop = box.scrollTop
+    back.scrollLeft = box.scrollLeft
+  }, [])
+  React.useLayoutEffect(sync, [sync, value])
+  React.useEffect(() => {
+    const box = ref.current
+    if (!box || typeof ResizeObserver === "undefined") return
+    const ro = new ResizeObserver(sync)
+    ro.observe(box)
+    return () => ro.disconnect()
+  }, [sync])
   const listId = React.useId()
   const [query, setQuery] = React.useState<{ start: number; text: string } | null>(null)
   const [active, setActive] = React.useState(0)
@@ -686,6 +724,25 @@ function MentionTextarea({ id, value, onChange, tools, t, invalid }: { id: strin
   let index = -1
   return (
     <div className="relative">
+      {/* The text is drawn here, with mentions as code chips, and the
+          textarea on top keeps its caret and selection but paints no text. */}
+      <div
+        ref={backRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg border border-transparent bg-background px-2.5 py-2 font-mono text-sm leading-relaxed [overflow-wrap:break-word] whitespace-pre-wrap text-foreground"
+      >
+        {parts.map((p, i) =>
+          p.mention ? (
+            <span key={i} data-mention={p.mention} className={p.mention === "ok" ? "rounded-sm bg-(--primary-subtle) text-brand dark:text-[color-mix(in_lch,var(--brand),white_35%)]" : "rounded-sm bg-destructive/12 text-destructive"}>
+              {p.text}
+            </span>
+          ) : (
+            <React.Fragment key={i}>{p.text}</React.Fragment>
+          ),
+        )}
+        {/* A trailing newline needs a character after it to take up a line. */}
+        {"\u200b"}
+      </div>
       <Textarea
         ref={ref}
         id={id}
@@ -698,7 +755,8 @@ function MentionTextarea({ id, value, onChange, tools, t, invalid }: { id: strin
         aria-controls={open ? listId : undefined}
         aria-activedescendant={open && options[active] ? `${listId}-${active}` : undefined}
         placeholder={t("proactive.promptPlaceholder")}
-        className="max-h-[60vh] min-h-40 overflow-y-auto font-mono text-sm leading-relaxed"
+        className="relative max-h-[60vh] min-h-40 overflow-y-auto bg-transparent font-mono text-sm leading-relaxed text-transparent"
+        onScroll={sync}
         onChange={(e) => {
           onChange(e.target.value)
           track(e.target)
