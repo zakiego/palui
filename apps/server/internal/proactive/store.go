@@ -96,7 +96,13 @@ func CheckTarget(q db.Q, chatID string) (db.Chat, error) {
 func Save(q db.Q, in SaveInput, now int64) (db.AgentProactive, Config, error) {
 	var out db.AgentProactive
 	var outCfg Config
-	err := q.Tx(func(tx db.Q) error {
+	// List the agent's tools before the transaction: the live host reads the
+	// database, and inside Tx that waits on the write connection Tx holds.
+	list, listed, err := toolsForSave(q, in, now)
+	if err != nil {
+		return out, outCfg, err
+	}
+	err = q.Tx(func(tx db.Q) error {
 		if _, ok, err := agents.Get(tx, in.AgentID); err != nil {
 			return err
 		} else if !ok {
@@ -132,16 +138,9 @@ func Save(q db.Q, in SaveInput, now int64) (db.AgentProactive, Config, error) {
 			if chatID == nil {
 				return bad("Pick a chat to send to first")
 			}
-			host := in.Tools
-			if host == nil {
-				host = DefaultToolHost()
-			}
-			if host == nil {
+			if !listed {
+				// Turned on by another save between the listing and here.
 				return bad("Proactive can't check the tools right now. Try again in a minute.")
-			}
-			list, err := host.Tools(context.Background(), in.AgentID, *chatID, now)
-			if err != nil {
-				return err
 			}
 			if err := Check(Mentions(cfg.Prompt), Infos(list)); err != nil {
 				return err
@@ -177,6 +176,39 @@ func Save(q db.Q, in SaveInput, now int64) (db.AgentProactive, Config, error) {
 		return err
 	})
 	return out, outCfg, err
+}
+
+// toolsForSave lists the agent's tools when the save would leave proactive on
+// with a chat, so Save can check the mentions. listed is false when there was
+// nothing to check.
+func toolsForSave(q db.Q, in SaveInput, now int64) (list []Tool, listed bool, err error) {
+	row, _, _, err := Get(q, in.AgentID)
+	if err != nil {
+		return nil, false, err
+	}
+	enabled := row.Enabled
+	if in.Enabled != nil {
+		enabled = *in.Enabled
+	}
+	chatID := row.ChatID
+	if in.ChatID != nil {
+		chatID = in.ChatID
+	}
+	if !enabled || chatID == nil || *chatID == "" {
+		return nil, false, nil
+	}
+	host := in.Tools
+	if host == nil {
+		host = DefaultToolHost()
+	}
+	if host == nil {
+		return nil, false, bad("Proactive can't check the tools right now. Try again in a minute.")
+	}
+	list, err = host.Tools(context.Background(), in.AgentID, *chatID, now)
+	if err != nil {
+		return nil, false, err
+	}
+	return list, true, nil
 }
 
 // Enabled lists the rows that are on.
