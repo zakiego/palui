@@ -14,19 +14,19 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Breaking
 
-- Proactive runs from a prompt you write now, and agents that had it on are paused. Write a prompt that mentions its tools, then save. Adds a migration.
+- Proactive runs from a prompt you write now, and agents that had it on are paused. Write a prompt that mentions its tools, then save. Adds a migration. ([#32](https://github.com/zakiego/palui/pull/32))
 
 ### Agents
 
-- Added: Proactive mentions any read tool with `@`, like `@gcal__get_calendar`, so every connector can be a source.
-- Added: Proactive memory keeps notes between runs, from the agent, the Proactive tab or your replies.
-- Added: Test run on the Proactive tab shows what would be sent, without sending anything.
+- Added: Proactive mentions any read tool with `@`, like `@gcal__get_calendar`, so every connector can be a source. ([#32](https://github.com/zakiego/palui/pull/32))
+- Added: Proactive memory keeps notes between runs, from the agent, the Proactive tab or your replies. ([#32](https://github.com/zakiego/palui/pull/32))
+- Added: Test run on the Proactive tab shows what would be sent, without sending anything. ([#32](https://github.com/zakiego/palui/pull/32))
 
 ### Tools
 
 - Changed: the host bridge speaks MCP spec 2026-07-28 as well as the older `initialize` flow, on `@modelcontextprotocol/server` v2. Existing clients keep working unchanged.
-- Added: Calendar feed connector reads any calendar from its secret iCal link, with recurring events expanded.
-- Added: WhatsApp inbox connector links your own number read only and lists chats waiting for your reply. Adds a migration.
+- Added: Calendar feed connector reads any calendar from its secret iCal link, with recurring events expanded. ([#32](https://github.com/zakiego/palui/pull/32))
+- Added: WhatsApp inbox connector links your own number read only and lists chats waiting for your reply. Adds a migration. ([#32](https://github.com/zakiego/palui/pull/32))
 
 ### Self-hosting
 
