@@ -497,6 +497,43 @@ func TestSaveRefusesTurningOnWithoutResolvableMentions(t *testing.T) {
 	tu.Must(t, err)
 }
 
+// dbTools reads the database the way the live host does (connectors, agent
+// permissions) before it answers.
+type dbTools struct {
+	fakeTools
+	d *db.DB
+}
+
+func (f *dbTools) Tools(ctx context.Context, agentID, chatID string, now int64) ([]proactive.Tool, error) {
+	var n int
+	if err := f.d.QueryRow("SELECT count(*) FROM connectors").Scan(&n); err != nil {
+		return nil, err
+	}
+	return f.fakeTools.Tools(ctx, agentID, chatID, now)
+}
+
+func TestSaveListsToolsOutsideItsTransaction(t *testing.T) {
+	d := tu.DB(t)
+	chat, err := chats.EnsureWebChat(d, NOW)
+	tu.Must(t, err)
+	a, err := agents.GetDefault(d, NOW)
+	tu.Must(t, err)
+	on := true
+	cfg := proactive.Defaults()
+	cfg.Prompt = prompt
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := proactive.Save(d, proactive.SaveInput{AgentID: a.ID, Enabled: &on, ChatID: &chat.ID, Config: &cfg, Tools: &dbTools{d: d}}, NOW)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		tu.Must(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Save waited on the database it holds: the live tool host reads it")
+	}
+}
+
 func TestTestRunWritesNothing(t *testing.T) {
 	w := newWorld(t, nil)
 	w.answer(`{"items":[{"key":"cal:e1:leave","text":"Berangkat.","sendAt":"2026-11-10T13:30:00+08:00"}],"remember":[{"text":"x"}]}`)
