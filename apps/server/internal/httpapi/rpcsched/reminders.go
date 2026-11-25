@@ -152,26 +152,31 @@ const (
 	finished        = "status IN ('done', 'cancelled')"
 )
 
-func getReminders(c *httpapi.Call) (any, error) {
-	q := c.DB()
+// chatRefs is every chat (allowed or not) by id, for the rows that point at one.
+func chatRefs(q db.Q) (map[string]*reminderChat, error) {
 	titles := map[string]*reminderChat{}
 	rows, err := q.Query("SELECT id, title, channel, external_id FROM chats")
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	for rows.Next() {
 		var ch reminderChat
 		var title *string
 		var ext string
 		if err := rows.Scan(&ch.ID, &title, &ch.Channel, &ext); err != nil {
-			rows.Close()
 			return nil, err
 		}
 		ch.Title = titleOr(title, ext)
 		titles[ch.ID] = &ch
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
+	return titles, rows.Err()
+}
+
+func getReminders(c *httpapi.Call) (any, error) {
+	q := c.DB()
+	titles, err := chatRefs(q)
+	if err != nil {
 		return nil, err
 	}
 	list := func(where, order string, limit int) ([]reminderView, error) {

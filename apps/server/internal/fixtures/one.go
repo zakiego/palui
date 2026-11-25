@@ -21,6 +21,9 @@ func one(k *Kit) {
 	k.Reminder(Reminder{ChatID: web.ID, Text: "Standup", RRule: ptr("FREQ=DAILY"), TZ: "Asia/Makassar", FireAt: now + 2*H, Status: "pending"})
 	k.Reminder(Reminder{ChatID: web.ID, Text: "Old one", TZ: "Asia/Makassar", FireAt: now - H, Status: "done", LastFiredAt: ptr(now - H)})
 
+	k.Watch(Watch{ChatID: web.ID, Topic: "Laporan keuangan", NextCheckAt: ptr(now + 30*MIN), ExpiresAt: now + D, Checks: 1, LastCheckAt: ptr(now - 30*MIN), LastSummary: "Belum ada.", TokensUsed: 1})
+	k.Watch(Watch{ChatID: web.ID, Topic: "Old watch", Status: "done", ExpiresAt: now + D, Checks: 1, LastCheckAt: ptr(now - H), Result: ptr("Sudah keluar."), TokensUsed: 1, EndedAt: ptr(now - H)})
+
 	flow := k.Flow(web, js(`{"name":"Air","triggers":[{"id":"main","kind":"schedule","start":"say","source":{"kind":"times","times":[{"time":"11:00"}]}}],"steps":[{"id":"say","kind":"message","text":"Minum air"}]}`), FlowOpts{})
 	k.FlowRun(flow, FlowRun{Status: "done", TriggerID: ptr("main"), StartedAt: now - MIN, Steps: []FlowStep{{StepID: "say", Kind: "message", Status: "ok", Output: obj("text", "Minum air")}}})
 

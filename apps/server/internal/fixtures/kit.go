@@ -471,6 +471,67 @@ func (k *Kit) Reminder(v Reminder) {
 		col{"tz", v.TZ}, col{"fire_at", v.FireAt}, col{"status", v.Status}, col{"smart_prompt", nullable(v.SmartPrompt)}, col{"last_fired_at", nullable(v.LastFiredAt)})
 }
 
+// Watch is one watches row (PLAN 6e). Status defaults to active; an active
+// or checking watch needs NextCheckAt, an ended one EndedAt.
+type Watch struct {
+	ChatID, Topic      string
+	Question, DoneWhen string
+	Status             string
+	EveryMin           int64
+	ExpiresAt          int64
+	NextCheckAt        *int64
+	Checks, Fails      int64
+	LastCheckAt        *int64
+	LastRunID          *string
+	LastError          *string
+	LastSummary        string
+	Result             *string
+	TokensUsed         int64
+	EndedAt            *int64
+	CreatedBy          string
+	CreatedAt          int64
+}
+
+func (k *Kit) Watch(v Watch) string {
+	id := secret.NewID("wat")
+	status := v.Status
+	if status == "" {
+		status = "active"
+	}
+	every := v.EveryMin
+	if every == 0 {
+		every = 30
+	}
+	question, doneWhen := v.Question, v.DoneWhen
+	if question == "" {
+		question = v.Topic
+	}
+	if doneWhen == "" {
+		doneWhen = "An official source says so."
+	}
+	created := v.CreatedAt
+	if created == 0 {
+		created = k.Now - v.Checks*every*60_000
+	}
+	var lease any
+	if status == "checking" {
+		lease = k.Now + 15*60_000
+	}
+	updated := k.Now
+	if v.EndedAt != nil {
+		updated = *v.EndedAt
+	} else if status != "active" && status != "checking" {
+		// An old ended row without ended_at last changed when it ran out.
+		updated = v.ExpiresAt
+	}
+	k.insert("watches", col{"id", id}, col{"chat_id", v.ChatID}, col{"created_by", v.CreatedBy}, col{"topic", v.Topic}, col{"question", question},
+		col{"done_when", doneWhen}, col{"every_min", every}, col{"expires_at", v.ExpiresAt}, col{"status", status}, col{"next_check_at", nullable(v.NextCheckAt)},
+		col{"lease_until", lease}, col{"checks", v.Checks}, col{"fails", v.Fails}, col{"last_check_at", nullable(v.LastCheckAt)}, col{"last_run_id", nullable(v.LastRunID)}, col{"last_error", nullable(v.LastError)},
+		col{"last_summary", v.LastSummary}, col{"tokens_used", v.TokensUsed}, col{"token_cap", int64(1_000_000)}, col{"result", nullable(v.Result)},
+		col{"ended_at", nullable(v.EndedAt)}, col{"created_at", created}, col{"updated_at", updated})
+	return id
+}
+
 // Contact is kit.contact's values.
 type Contact struct {
 	Name, Address string

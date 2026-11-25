@@ -19,8 +19,8 @@ var (
 
 // Huge holds the huge fixture's sizes (HUGE in huge.ts).
 var Huge = struct {
-	Flows, FlowRuns, FlowChats, Chats, Transcript, Upcoming, Recurring, Done, Jobs, Runs, Events, MCP, Hooks, Passkeys int64
-}{Flows: 120, FlowRuns: 1000, FlowChats: 2, Chats: 1284, Transcript: 2000, Upcoming: 1284, Recurring: 300, Done: 1284, Jobs: 120, Runs: 5000, Events: 12_000, MCP: 50, Hooks: 40, Passkeys: 25}
+	Flows, FlowRuns, FlowChats, Chats, Transcript, Upcoming, Recurring, Done, Jobs, Runs, Events, MCP, Hooks, Passkeys, ActiveWatches, EndedWatches int64
+}{Flows: 120, FlowRuns: 1000, FlowChats: 2, Chats: 1284, Transcript: 2000, Upcoming: 1284, Recurring: 300, Done: 1284, Jobs: 120, Runs: 5000, Events: 12_000, MCP: 50, Hooks: 40, Passkeys: 25, ActiveWatches: 260, EndedWatches: 400}
 
 func at[T any](list []T, i int64) T { return list[i%int64(len(list))] }
 
@@ -131,6 +131,14 @@ func huge(k *Kit) {
 			status = "done"
 		}
 		k.Reminder(Reminder{ChatID: chatAt(i), Text: fmt.Sprintf("%s #%d", at(hugeTasks, i), i), TZ: "Asia/Makassar", FireAt: now - (i+1)*H, Status: status, UpdatedAt: ptr(now - (i+1)*H)})
+	}
+
+	for i := int64(0); i < Huge.ActiveWatches; i++ {
+		k.Watch(Watch{ChatID: chatAt(i), Topic: fmt.Sprintf("%s #%d", at(hugeTasks, i), i), NextCheckAt: ptr(now + (i+1)*7*MIN), ExpiresAt: now + 7*D, Checks: i % 50, LastCheckAt: ptr(now - (i%30)*MIN), LastSummary: "Belum ada.", TokensUsed: (i % 50) * 9_000})
+	}
+	for i := int64(0); i < Huge.EndedWatches; i++ {
+		status := at([]string{"done", "expired", "cancelled", "failed"}, i)
+		k.Watch(Watch{ChatID: chatAt(i), Topic: fmt.Sprintf("%s #%d", at(hugeTasks, i), i), Status: status, ExpiresAt: now - i*H, Checks: 20, TokensUsed: 120_000, EndedAt: ptr(now - (i+1)*H)})
 	}
 
 	for i := Huge.Events; i > 0; i-- {
