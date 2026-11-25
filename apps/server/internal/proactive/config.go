@@ -256,6 +256,16 @@ func MergePatch(c Config, patch []byte) (Config, error) {
 	if err := json.Unmarshal(patch, &p); err != nil {
 		return Config{}, bad("The change isn't valid JSON")
 	}
+	// Models often send the object as a JSON string ("{\"prompt\": ...}").
+	// A string can't be a config, so read the object inside it.
+	if s, ok := p.(string); ok {
+		if err := json.Unmarshal([]byte(s), &p); err != nil {
+			return Config{}, bad(`The change must be a JSON object, like {"prompt": "..."}`)
+		}
+	}
+	if _, ok := p.(map[string]any); !ok {
+		return Config{}, bad(`The change must be a JSON object, like {"prompt": "..."}`)
+	}
 	merged, err := json.Marshal(mergeValue(doc, p))
 	if err != nil {
 		return Config{}, err
