@@ -110,3 +110,74 @@ func TestListAndCancelStayInTheChat(t *testing.T) {
 		t.Fatal("not in the ended list")
 	}
 }
+
+func TestWatchForStartAt(t *testing.T) {
+	t.Run("starts at the owner's wall-clock time, hours count from the start", func(t *testing.T) {
+		e := setup(t)
+		res := conntest.Call(t, e.tools, "watch_for", `{"topic":"Closing BBCA","question":"BBCA closing price on 11 Nov","doneWhen":"The final closing price for 11 Nov.","everyMin":15,"startAt":"2026-11-11T16:00","hours":5}`)
+		if !res.B("ok") {
+			t.Fatalf("%s", res)
+		}
+		// 16.00 WITA is 08.00 UTC, 30 hours after NOW (10.00 WITA the day before).
+		w, _, err := watches.Get(e.db, res.S("id"))
+		testutil.Must(t, err)
+		if w.StartsAt == nil || *w.StartsAt != NOW+30*3600_000 || *w.NextCheckAt != NOW+30*3600_000 || w.ExpiresAt != NOW+35*3600_000 {
+			t.Fatalf("%+v", w)
+		}
+		if want := `Oke, aku pantau "Closing BBCA" mulai Besok, Rabu 11 Nov, 16.00 WITA, tiap 15 menit sampai Besok, Rabu 11 Nov, 21.00 WITA. Sebelum itu nggak dicek sama sekali. Begitu ketemu aku kabarin di sini.`; res.S("message") != want {
+			t.Fatal(res.S("message"))
+		}
+		list := conntest.Call(t, e.tools, "list_watches", `{}`)
+		if !strings.Contains(list.String(), `"starts":"Besok, Rabu 11 Nov, 16.00 WITA"`) {
+			t.Fatalf("%s", list)
+		}
+	})
+	t.Run("reads startAt in the owner's zone, not UTC", func(t *testing.T) {
+		e := setup(t)
+		turn := e.turn
+		turn.TZ = "Asia/Jakarta"
+		tools := watchesconn.Tools(e.db, turn, func() int64 { return NOW })
+		res := conntest.Call(t, tools, "watch_for", `{"topic":"t","question":"q","doneWhen":"d","startAt":"2026-11-11T16:00","until":"2026-11-11T21:00"}`)
+		w, _, err := watches.Get(e.db, res.S("id"))
+		testutil.Must(t, err)
+		// 16.00 WIB is 09.00 UTC, an hour later than 16.00 WITA.
+		if !res.B("ok") || *w.StartsAt != NOW+31*3600_000 || w.ExpiresAt != NOW+36*3600_000 {
+			t.Fatalf("%s %+v", res, w)
+		}
+		if !strings.Contains(res.S("message"), "mulai Besok, Rabu 11 Nov, 16.00 WIB") {
+			t.Fatal(res.S("message"))
+		}
+	})
+	t.Run("without an end, it runs the default 7 days but never past 14 days from now", func(t *testing.T) {
+		e := setup(t)
+		res := conntest.Call(t, e.tools, "watch_for", `{"topic":"t","question":"q","doneWhen":"d","startAt":"2026-11-12T10:00"}`)
+		w, _, _ := watches.Get(e.db, res.S("id"))
+		if !res.B("ok") || w.ExpiresAt != NOW+(2+7)*24*3600_000 {
+			t.Fatalf("%s %+v", res, w)
+		}
+		res = conntest.Call(t, e.tools, "watch_for", `{"topic":"t","question":"q","doneWhen":"d","startAt":"2026-11-20T10:00"}`)
+		w, _, _ = watches.Get(e.db, res.S("id"))
+		if !res.B("ok") || w.ExpiresAt != NOW+14*24*3600_000 {
+			t.Fatalf("%s %+v", res, w)
+		}
+	})
+	t.Run("refuses a bad start", func(t *testing.T) {
+		e := setup(t)
+		for in, msg := range map[string]string{
+			`"startAt":"2026-11-10T09:00"`:                            "already passed",
+			`"startAt":"2026-11-11T21:00","until":"2026-11-11T16:00"`: "before the end",
+			`"startAt":"2026-11-11T16:00","until":"2026-11-11T16:00"`: "before the end",
+			`"startAt":"2026-11-25T10:00"`:                            "before the end",
+			`"startAt":"2026-11-24T10:00","hours":48`:                 "at most 14 days",
+			`"startAt":"2026-02-30T10:00"`:                            "",
+		} {
+			res := conntest.Call(t, e.tools, "watch_for", `{"topic":"t","question":"q","doneWhen":"d",`+in+`}`)
+			if res.B("ok") || !strings.Contains(res.S("error"), msg) {
+				t.Errorf("%s: %s", in, res)
+			}
+		}
+		if n, _ := watches.CountActive(e.db, e.chatID); n != 0 {
+			t.Fatal(n)
+		}
+	})
+}

@@ -1136,6 +1136,7 @@ export const en = {
   "watches.alreadyEnded": "It had already ended: {status}",
   "watches.failedChecks": "{n} failed in a row",
   "watches.noSummary": "Not checked yet",
+  "watches.startsAt": "Starts {time}",
   "watches.overdue": "overdue",
   "watches.actionsFor": "Actions for {text}",
   "watches.lastRun": "Open last check",

@@ -80,10 +80,14 @@ type CreateInput struct {
 	EveryMin int64
 	// Unix ms; must be in the future and at most MaxHours away.
 	ExpiresAt int64
+	// Unix ms; 0 starts now. Otherwise it must be in the future and before
+	// ExpiresAt, and nothing is checked until then.
+	StartsAt int64
 }
 
 // Create adds an active watch. Its first check is one interval from now (the
-// turn that made it has just looked), and never later than the expiry.
+// turn that made it has just looked), and never later than the expiry. With
+// StartsAt, the first check is exactly StartsAt.
 func Create(q db.Q, in CreateInput, now int64) (db.Watch, error) {
 	topic, question, doneWhen := strx.Trim(in.Topic), strx.Trim(in.Question), strx.Trim(in.DoneWhen)
 	switch {
@@ -113,6 +117,14 @@ func Create(q db.Q, in CreateInput, now int64) (db.Watch, error) {
 	if in.ExpiresAt > now+int64(MaxHours)*3600_000 {
 		return db.Watch{}, watchErr("A watch can run for at most %d days.", MaxHours/24)
 	}
+	if in.StartsAt != 0 {
+		if in.StartsAt <= now {
+			return db.Watch{}, watchErr("The start time has already passed. Leave startAt out to start now.")
+		}
+		if in.StartsAt >= in.ExpiresAt {
+			return db.Watch{}, watchErr("The start time must be before the end time.")
+		}
+	}
 	n, err := CountActive(q, in.ChatID)
 	if err != nil {
 		return db.Watch{}, err
@@ -121,12 +133,16 @@ func Create(q db.Q, in CreateInput, now int64) (db.Watch, error) {
 		return db.Watch{}, watchErr("This chat already has %d active watches, the most it can have. Cancel one first.", MaxActivePerChat)
 	}
 	next := min(now+every*60_000, in.ExpiresAt)
+	var startsAt *int64
+	if in.StartsAt != 0 {
+		next, startsAt = in.StartsAt, &in.StartsAt
+	}
 	var agentID *string
 	if in.AgentID != "" {
 		agentID = &in.AgentID
 	}
-	return db.ScanWatch(q.WQueryRow("INSERT INTO watches (id, chat_id, agent_id, created_by, topic, question, done_when, every_min, expires_at, status, next_check_at, token_cap, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.WatchCols,
-		secret.NewID("wat"), in.ChatID, agentID, strx.Slice16(in.CreatedBy, 100), topic, question, doneWhen, every, in.ExpiresAt, StatusActive, next, TokenCap, now, now))
+	return db.ScanWatch(q.WQueryRow("INSERT INTO watches (id, chat_id, agent_id, created_by, topic, question, done_when, every_min, expires_at, status, next_check_at, starts_at, token_cap, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING "+db.WatchCols,
+		secret.NewID("wat"), in.ChatID, agentID, strx.Slice16(in.CreatedBy, 100), topic, question, doneWhen, every, in.ExpiresAt, StatusActive, next, startsAt, TokenCap, now, now))
 }
 
 // CountActive counts a chat's watches that haven't ended.

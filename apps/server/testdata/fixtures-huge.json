@@ -321,10 +321,10 @@
    "last": null
   },
   "watches": {
-   "columns": ["id","chat_id","agent_id","created_by","topic","question","done_when","every_min","expires_at","status","next_check_at","lease_until","checks","fails","last_check_at","last_run_id","last_error","notes","last_summary","tokens_used","token_cap","result","outbox_id","ended_at","created_at","updated_at"],
+   "columns": ["id","chat_id","agent_id","created_by","topic","question","done_when","every_min","expires_at","status","next_check_at","lease_until","checks","fails","last_check_at","last_run_id","last_error","notes","last_summary","tokens_used","token_cap","result","outbox_id","ended_at","created_at","updated_at","starts_at"],
    "count": 660,
-   "first": ["\u003cwat#1\u003e","\u003cchat#3\u003e",null,"","Follow up deal #0","Follow up deal #0","An official source says so.",30,1795226400000,"active",1794622020000,null,0,0,1794621600000,null,null,"","Belum ada.",0,1000000,null,null,null,1794621600000,1794621600000],
-   "last": ["\u003cwat#2\u003e","\u003cchat#8\u003e",null,"","Transfer arisan #399","Transfer arisan #399","An official source says so.",30,1793185200000,"failed",null,null,20,0,null,null,null,"","",120000,1000000,null,null,1793181600000,1794585600000,1793181600000]
+   "first": ["\u003cwat#1\u003e","\u003cchat#3\u003e",null,"","Follow up deal #0","Follow up deal #0","An official source says so.",30,1795226400000,"active",1794622020000,null,0,0,1794621600000,null,null,"","Belum ada.",0,1000000,null,null,null,1794621600000,1794621600000,null],
+   "last": ["\u003cwat#2\u003e","\u003cchat#8\u003e",null,"","Transfer arisan #399","Transfer arisan #399","An official source says so.",30,1793185200000,"failed",null,null,20,0,null,null,null,"","",120000,1000000,null,null,1793181600000,1794585600000,1793181600000,null]
   }
  }
 }

@@ -9,6 +9,8 @@ export type WatchItem = {
   doneWhen: string
   everyMin: number
   expiresAt: number
+  // When checking begins; null means when it was made.
+  startsAt: number | null
   status: WatchStatus
   nextCheckAt: number | null
   checks: number

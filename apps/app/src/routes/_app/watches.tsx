@@ -145,7 +145,13 @@ function WatchTable({ rows, total, timezone, ended }: { rows: WatchItem[]; total
                   {body ? (
                     <ClampText text={body} lines={2} className={w.status === "failed" ? "mt-0.5 text-caption text-destructive-fg" : "mt-0.5 text-caption text-muted-foreground"} />
                   ) : (
-                    !ended && w.checks === 0 && <span className="mt-0.5 block text-caption text-muted-foreground">{t("watches.noSummary")}</span>
+                    !ended &&
+                    w.checks === 0 && (
+                      // Set to start later: nothing is checked until then.
+                      <span className="mt-0.5 block text-caption text-muted-foreground">
+                        {w.startsAt != null && w.startsAt > now ? t("watches.startsAt", { time: inZone(w.startsAt, timezone) }) : t("watches.noSummary")}
+                      </span>
+                    )
                   )}
                   <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted-foreground">
                     {w.status === "checking" && <StatusText tone="outline" className="@2xl/main:hidden">{label("watch.status", w.status)}</StatusText>}

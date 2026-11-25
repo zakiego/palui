@@ -1135,6 +1135,7 @@ export const id: Record<Key, string> = {
   "watches.alreadyEnded": "Sudah selesai duluan: {status}",
   "watches.failedChecks": "{n} kali gagal beruntun",
   "watches.noSummary": "Belum dicek",
+  "watches.startsAt": "Mulai {time}",
   "watches.overdue": "terlambat",
   "watches.actionsFor": "Tindakan untuk {text}",
   "watches.lastRun": "Buka cek terakhir",

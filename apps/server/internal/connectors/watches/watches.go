@@ -32,6 +32,7 @@ var Manifest = connectors.Manifest{
 		Commands: []string{"kabarin kalau <sesuatu> udah keluar", "tell me when <something> happens"},
 		Notes: []string{
 			"A watch checks with the agent's read tools (web search, fetch page, any read MCP tool) every 15 to 1440 minutes, 30 by default.",
+			"It can start later (\"mulai jam 16.00 besok\"): nothing is checked before its start time, and the first check runs right at it.",
 			"It posts once, with the answer and its source, and stops. It ends after 7 days by default, 14 days at most, with a short note if nothing was found.",
 			"Anyone the agent answers in a chat can set one there. A chat has at most 10 running, and each watch may spend up to 1,000,000 tokens.",
 		},
@@ -45,7 +46,8 @@ var (
 		zod.F("question", zod.String().Min(1).Max(watches.MaxQuestion).Describe("What to look for, with the context a fresh check needs (it won't see this chat): names, period, where it's likely to appear.")),
 		zod.F("doneWhen", zod.String().Min(1).Max(watches.MaxDoneWhen).Describe("What counts as found, strictly. Name what does NOT count, like claims already going around, so they don't trigger it. E.g. \"Danantara's audited 2025 net profit figure from its own release or BPK's audit opinion, reported by a major outlet. The Rp325,5 T and Rp326 T claims don't count.\"")),
 		zod.F("everyMin", zod.Int().Min(watches.MinEveryMin).Max(watches.MaxEveryMin).Optional().Describe("Minutes between checks, default 30. Use more for slow things (daily news: 240).")),
-		zod.F("hours", zod.Int().Min(1).Max(watches.MaxHours).Optional().Describe("How long to keep watching, in hours from now. Default 168 (7 days), at most 336 (14 days). Ignored when until is given.")),
+		zod.F("startAt", remconn.LocalDateTime().Optional().Describe("Start checking only at this wall-clock time (YYYY-MM-DDTHH:mm, in the owner's zone), when the thing can't happen before it, like a closing price, a result announced at a set hour or a release at a known time. Nothing is checked before it and the first check runs right at it. Leave it out to start now. Must be before the end and within 14 days from now.")),
+		zod.F("hours", zod.Int().Min(1).Max(watches.MaxHours).Optional().Describe("How long to keep watching, in hours from the start (startAt, or now). Default 168 (7 days). The end can be at most 336 hours (14 days) from now. Ignored when until is given.")),
 		zod.F("until", remconn.LocalDateTime().Optional().Describe("Or: watch until this wall-clock time (YYYY-MM-DDTHH:mm, in the owner's zone).")),
 	)
 	listInput = zod.Object(
@@ -67,14 +69,17 @@ func fail(err error) (any, error) {
 }
 
 func view(w db.Watch, tz string, now int64) any {
-	var next any
+	var next, starts any
 	if w.NextCheckAt != nil && !watches.Ended(w.Status) {
 		next = reminders.FormatWhen(*w.NextCheckAt, tz, now)
+	}
+	if w.StartsAt != nil {
+		starts = reminders.FormatWhen(*w.StartsAt, tz, now)
 	}
 	return kit.O(
 		"id", w.ID, "topic", w.Topic, "status", w.Status,
 		"question", w.Question, "doneWhen", w.DoneWhen,
-		"everyMin", w.EveryMin, "ends", reminders.FormatWhen(w.ExpiresAt, tz, now),
+		"everyMin", w.EveryMin, "starts", starts, "ends", reminders.FormatWhen(w.ExpiresAt, tz, now),
 		"nextCheck", next, "checks", w.Checks, "createdBy", w.CreatedBy,
 		"lastSummary", kit.If(w.LastSummary != "", w.LastSummary), "result", kit.StrPtr(w.Result),
 	)
@@ -116,31 +121,45 @@ func Tools(d *db.DB, turn connectors.TurnInfo, clock func() int64) *connectors.T
 		Data:  connectors.DataChat,
 		Class: "write",
 		Title: "Watch for something",
-		Tool: kit.Tool("Keep checking for something that isn't out yet and tell this chat once it is: an official figure, an announcement, a result, a release, a price or status change. Use it when someone asks to be told when something happens, or offer it when you find the answer doesn't exist yet but will (\"belum keluar, mau aku kabarin pas udah keluar?\"). Each check runs on its own later with your read tools and no chat history, so put everything it needs in question and doneWhen. It posts once with the answer and source, then stops; if the time runs out first, it posts a short note. Repeat the returned message so people know when it ends.", createInput,
+		Tool: kit.Tool("Keep checking for something that isn't out yet and tell this chat once it is: an official figure, an announcement, a result, a release, a price or status change. Use it when someone asks to be told when something happens, or offer it when you find the answer doesn't exist yet but will (\"belum keluar, mau aku kabarin pas udah keluar?\"). When it can't happen before a known time (a market close, an announcement at a set hour), set startAt so it doesn't spend checks before then. Each check runs on its own later with your read tools and no chat history, so put everything it needs in question and doneWhen. It posts once with the answer and source, then stops; if the time runs out first, it posts a short note. Repeat the returned message so people know when it ends.", createInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				now := clock()
 				tz, err := remconn.ZoneFor(d, turn, "")
 				if err != nil {
 					return nil, err
 				}
-				expires := now + watches.DefaultHours*3600_000
+				var starts int64
+				if s := in.S("startAt"); s != "" {
+					if starts, err = reminders.LocalToUTC(s, tz); err != nil {
+						return fail(err)
+					}
+				}
+				// hours count from the start.
+				from := max(now, starts)
+				expires := from + watches.DefaultHours*3600_000
 				if until := in.S("until"); until != "" {
 					if expires, err = reminders.LocalToUTC(until, tz); err != nil {
 						return fail(err)
 					}
 				} else if h, ok := in.Int("hours"); ok {
-					expires = now + h*3600_000
+					expires = from + h*3600_000
+				} else if starts != 0 {
+					// The default must still fit the 14-day cap from now.
+					expires = min(expires, now+watches.MaxHours*3600_000)
 				}
 				every, _ := in.Int("everyMin")
 				w, err := watches.Create(d, watches.CreateInput{
 					ChatID: chatID, AgentID: turn.AgentID, CreatedBy: creator(d, turn),
 					Topic: in.S("topic"), Question: in.S("question"), DoneWhen: in.S("doneWhen"),
-					EveryMin: every, ExpiresAt: expires,
+					EveryMin: every, ExpiresAt: expires, StartsAt: starts,
 				}, now)
 				if err != nil {
 					return fail(err)
 				}
 				msg := fmt.Sprintf("Oke, aku pantau \"%s\" tiap %s sampai %s. Begitu ketemu aku kabarin di sini.", w.Topic, everyText(w.EveryMin), reminders.FormatWhen(w.ExpiresAt, tz, now))
+				if w.StartsAt != nil {
+					msg = fmt.Sprintf("Oke, aku pantau \"%s\" mulai %s, tiap %s sampai %s. Sebelum itu nggak dicek sama sekali. Begitu ketemu aku kabarin di sini.", w.Topic, reminders.FormatWhen(*w.StartsAt, tz, now), everyText(w.EveryMin), reminders.FormatWhen(w.ExpiresAt, tz, now))
+				}
 				return kit.O("ok", true, "id", w.ID, "message", msg, "watch", view(w, tz, now)), nil
 			}),
 	})
