@@ -804,6 +804,33 @@
    "secretFields": []
   },
   {
+   "id": "watches",
+   "kind": "skill",
+   "name": "Watches",
+   "icon": "eye",
+   "summary": "Keep an eye on something and tell the chat once it happens.",
+   "builtin": true,
+   "setup": [],
+   "pauseNote": "Pausing hides the watch tools. Watches already set keep checking.",
+   "docs": {
+    "commands": [
+     "kabarin kalau <sesuatu> udah keluar",
+     "tell me when <something> happens"
+    ],
+    "notes": [
+     "A watch checks with the agent's read tools (web search, fetch page, any read MCP tool) every 15 to 1440 minutes, 30 by default.",
+     "It posts once, with the answer and its source, and stops. It ends after 7 days by default, 14 days at most, with a short note if nothing was found.",
+     "Anyone the agent answers in a chat can set one there. A chat has at most 10 running, and each watch may spend up to 1,000,000 tokens."
+    ]
+   },
+   "configKeys": [],
+   "configDefaults": {
+    "ok": true,
+    "value": {}
+   },
+   "secretFields": []
+  },
+  {
    "id": "outbound",
    "kind": "skill",
    "name": "Messages to contacts",
@@ -3325,6 +3352,119 @@
          "description": "Snooze until this wall-clock time instead of a preset.",
          "type": "string",
          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2})?$"
+        }
+       },
+       "required": [
+        "id"
+       ],
+       "additionalProperties": false
+      }
+     }
+    ]
+   }
+  ],
+  "watches": [
+   {
+    "variant": "default",
+    "tools": [
+     {
+      "name": "watch_for",
+      "title": "Watch for something",
+      "description": "Keep checking for something that isn't out yet and tell this chat once it is: an official figure, an announcement, a result, a release, a price or status change. Use it when someone asks to be told when something happens, or offer it when you find the answer doesn't exist yet but will (\"belum keluar, mau aku kabarin pas udah keluar?\"). Each check runs on its own later with your read tools and no chat history, so put everything it needs in question and doneWhen. It posts once with the answer and source, then stops; if the time runs out first, it posts a short note. Repeat the returned message so people know when it ends.",
+      "class": "write",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "topic": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 80,
+         "description": "A short label for the watch, in the chat's language, e.g. \"Laba resmi Danantara 2025\"."
+        },
+        "question": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 1000,
+         "description": "What to look for, with the context a fresh check needs (it won't see this chat): names, period, where it's likely to appear."
+        },
+        "doneWhen": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 1000,
+         "description": "What counts as found, strictly. Name what does NOT count, like claims already going around, so they don't trigger it. E.g. \"Danantara's audited 2025 net profit figure from its own release or BPK's audit opinion, reported by a major outlet. The Rp325,5 T and Rp326 T claims don't count.\""
+        },
+        "everyMin": {
+         "description": "Minutes between checks, default 30. Use more for slow things (daily news: 240).",
+         "type": "integer",
+         "minimum": 15,
+         "maximum": 1440
+        },
+        "hours": {
+         "description": "How long to keep watching, in hours from now. Default 168 (7 days), at most 336 (14 days). Ignored when until is given.",
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 336
+        },
+        "until": {
+         "description": "Or: watch until this wall-clock time (YYYY-MM-DDTHH:mm, in the owner's zone).",
+         "type": "string",
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2})?$"
+        }
+       },
+       "required": [
+        "topic",
+        "question",
+        "doneWhen"
+       ],
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "list_watches",
+      "title": "List watches",
+      "description": "List this chat's watches: running ones by next check, or ended ones (ended: true), latest first.",
+      "class": "read",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "ended": {
+         "default": false,
+         "description": "List ended watches (found, expired, cancelled) instead of running ones.",
+         "type": "boolean"
+        }
+       },
+       "additionalProperties": false
+      }
+     },
+     {
+      "name": "cancel_watch",
+      "title": "Cancel a watch",
+      "description": "Stop a watch in this chat. It stays in the ended list.",
+      "class": "write",
+      "untrusted": false,
+      "guestSafe": false,
+      "flowApproval": null,
+      "needsApproval": false,
+      "preview": false,
+      "inputSchema": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string",
+         "description": "Watch id from list_watches."
         }
        },
        "required": [

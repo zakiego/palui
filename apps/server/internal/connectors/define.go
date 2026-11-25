@@ -117,7 +117,7 @@ type TurnInfo struct {
 	ChatID string
 	// "" when there is no channel (flows, sources).
 	Channel string
-	// message, schedule, hook, approval, reminder or flow.
+	// message, schedule, hook, approval, reminder, flow or watch.
 	Trigger string
 	TZ      string
 	Now     int64

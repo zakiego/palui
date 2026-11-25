@@ -412,6 +412,7 @@ export const en = {
   "run.trigger.hook": "hook",
   "run.trigger.approval": "approval",
   "run.trigger.reminder": "reminder",
+  "run.trigger.watch": "watch",
   "run.tainted": "tainted",
   "run.notFound": "Run not found",
   "run.steps": "Steps",

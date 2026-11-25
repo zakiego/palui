@@ -128,6 +128,11 @@ func TestCollectFilters(t *testing.T) {
 	if got := names(o); got != "alpha__read,alpha__note,g__safe,g__unsafe" {
 		t.Fatal(got)
 	}
+	// A watch check: read tools only.
+	o.ReadOnly = true
+	if got := names(o); got != "alpha__read,g__safe,g__unsafe" {
+		t.Fatal(got)
+	}
 	o = opts(64, nil)
 	o.Scope = []string{"g"}
 	o.Permissions = &db.ToolPermissions{Tools: jsonx.NewMap[string]()}

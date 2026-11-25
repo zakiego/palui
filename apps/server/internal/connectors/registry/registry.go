@@ -32,6 +32,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/tgbot"
 	"github.com/zakiego/palui/apps/server/internal/connectors/voice"
 	"github.com/zakiego/palui/apps/server/internal/connectors/wainbox"
+	"github.com/zakiego/palui/apps/server/internal/connectors/watches"
 	"github.com/zakiego/palui/apps/server/internal/connectors/web"
 	"github.com/zakiego/palui/apps/server/internal/connectors/webfetch"
 	"github.com/zakiego/palui/apps/server/internal/connectors/whatsapp"
@@ -61,6 +62,7 @@ func Catalog() []Entry {
 		{"t3code", t3code.Runtime},
 		{"printer", printer.Runtime},
 		{"reminders", reminders.Runtime},
+		{"watches", watches.Runtime},
 		{"outbound", outbound.Runtime},
 		{"flows", flows.Runtime},
 		{"jobs", jobs.Runtime},

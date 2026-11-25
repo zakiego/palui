@@ -18,6 +18,7 @@ import notes from "./notes/manifest"
 import settings from "./settings/manifest"
 import recall from "./recall/manifest"
 import reminders from "./reminders/manifest"
+import watches from "./watches/manifest"
 import flows from "./flows/manifest"
 import remoteMcp from "./remote-mcp/manifest"
 import t3code from "./t3code/manifest"
@@ -46,6 +47,7 @@ export const manifests: Record<string, ConnectorManifest> = {
   t3code,
   printer,
   reminders,
+  watches,
   outbound,
   flows,
   jobs,

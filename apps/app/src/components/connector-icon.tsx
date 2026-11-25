@@ -9,6 +9,7 @@ import {
   RadarIcon,
   CalendarIcon,
   CpuIcon,
+  EyeIcon,
   GlobeIcon,
   KeyRoundIcon,
   MessageCircleIcon,
@@ -58,6 +59,7 @@ const ICONS: Record<string, Icon> = {
   paperclip: PaperclipIcon,
   printer: PrinterIcon,
   repeat: RepeatIcon,
+  eye: EyeIcon,
   workflow: WorkflowIcon,
   settings: SettingsIcon,
 }

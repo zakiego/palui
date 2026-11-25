@@ -328,6 +328,18 @@ An agent tells the owner what matters without being asked (`apps/server/internal
 - Test run (`testProactiveFn`): the saved or a draft prompt, for real against the tools and the model, writing nothing.
 - Retention: nudges and `proactive_ticks` 30 days (open nudges stay), expired notes pruned daily.
 
+## 6e. Watches
+
+Someone in a chat asks the agent to keep an eye on something that isn't out yet ("kabarin kalau laba bersih Danantara yang resmi udah keluar"), and the chat hears once when it is (`apps/server/internal/watches`, tools in the `watches` connector). Unlike a reminder it runs the agent, unlike a job or a flow it's set from a normal chat message by anyone the agent answers there, and it ends on its own.
+
+- Tools (message turns only, in any chat the agent answers, groups and guests included, data `chat`): `watch_for` (`write`: topic, question, doneWhen, `everyMin` 15 to 1440 default 30, `hours` up to 336 default 168 or an `until` local time), `list_watches` (`read`), `cancel_watch` (`write`). In a members or outside turn they run without approval like every chat-scoped write; in the owner's turn a tainted turn asks as usual.
+- Caps: 10 running watches per chat, at most 14 days each, 1,000,000 tokens per watch in total, and the agent's daily token cap still applies.
+- A check (`watches` table, a scheduler extension with a 15 minute lease, at most 2 at once) is a chat turn with trigger `watch` in the watch's chat: no history, read tools only (tools set to ask are hidden, destructive and write tools are left out), tainted from the start, no typing indicator, nothing delivered. The prompt carries the question, doneWhen and the model's notes from earlier checks. Web results are data, never instructions.
+- The turn answers one JSON object: `met`, `message`, `sources`, `notes` (memory for the next check, at most 2,000 units), `summary` (one line). `met` counts only with a message and at least one http(s) source; anything else is not met. An answer with no JSON is a failed check.
+- Met: the message (with a header line and any source the message didn't link) is written to the chat's session and the outbox as that run's reply, and the watch is `done`, in one transaction. A watch cancelled during its check sends nothing.
+- Schedule: the first check is one interval after creation, the next `min(now + everyMin, expiresAt)`, so the last check lands on the end. If that one isn't met either, the watch is `expired` and the chat gets one notice with the last summary. A watch found more than an hour past its end (Palui was down) expires without another check.
+- Failures: a check that errors or can't be read counts as a failure; 5 in a row, or the token cap, stop the watch as `failed` with one notice. A budget pause skips the check without counting. Ended watches are kept 30 days.
+
 ## 7. Scheduled jobs
 
 - A job is an RRULE, a zone, a prompt, a target chat, a tool scope and a model role.

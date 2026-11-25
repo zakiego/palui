@@ -31,6 +31,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 	"github.com/zakiego/palui/apps/server/internal/tools"
+	"github.com/zakiego/palui/apps/server/internal/watches"
 )
 
 // RunTurn is engine.RunTurn.
@@ -69,6 +70,20 @@ func JobTurn(runTurn RunTurn) jobs.RunTurn {
 	}
 }
 
+// WatchTurn adapts engine.RunTurn to a watch check: a "watch" turn in the
+// watch's chat that delivers nothing and starts tainted (it reads the web).
+// The engine reads its final text.
+func WatchTurn(runTurn RunTurn) func(watches.CheckRequest) (watches.CheckResponse, error) {
+	return func(r watches.CheckRequest) (watches.CheckResponse, error) {
+		deliver := false
+		res, err := runTurn(chat.TurnOptions{ChatID: r.ChatID, Trigger: "watch", Prompt: r.Prompt, ModelRole: "default", Deliver: &deliver, UntrustedInput: true})
+		if err != nil {
+			return watches.CheckResponse{}, err
+		}
+		return watches.CheckResponse{RunID: res.RunID, Text: res.Text, Status: res.Status}, nil
+	}
+}
+
 // OutboundFailed is outbox.WorkerOptions.OutboundFailed (outboundFailed).
 func OutboundFailed(log *logx.Logger) func(q db.Q, row db.Outbox, now int64) {
 	if log == nil {
@@ -96,6 +111,8 @@ type Options struct {
 	Running func() []connectors.RunningEntry
 	// FlowsSerial runs flow work in sweep order (tests).
 	FlowsSerial bool
+	// WatchesSerial runs watch checks inside the sweep (tests).
+	WatchesSerial bool
 	// Proactive is the proactive engine (docs/rfc/proactive.md), swept after
 	// the flow engine. Nil leaves proactive out.
 	Proactive *proactive.Engine
@@ -112,6 +129,8 @@ type Built struct {
 	FlowTools *flows.ConnectorFlowCaller
 	// Proactive is Options.Proactive (CheckNow for the dashboard and tools).
 	Proactive *proactive.Engine
+	// Watches checks the watches set from chat (PLAN 6e).
+	Watches *watches.Engine
 }
 
 func Build(o Options) *Built {
@@ -158,6 +177,8 @@ func Build(o Options) *Built {
 	if o.Proactive != nil {
 		exts = append(exts, o.Proactive)
 	}
+	we := watches.NewEngine(watches.Options{DB: o.DB, Log: log.Child(logx.Fields{"component": "watches"}), Clock: o.Clock, Check: WatchTurn(o.RunTurn), Serial: o.WatchesSerial})
+	exts = append(exts, we)
 	exts = append(append(exts, o.Extensions...), ob)
 	sched := reminders.NewScheduler(reminders.SchedulerOptions{
 		DB:     o.DB,
@@ -173,7 +194,8 @@ func Build(o Options) *Built {
 		Extensions:      exts,
 	})
 	clock := o.Clock
-	b := &Built{Scheduler: sched, Runner: runner, Outbound: ob, Flows: fe, FlowTools: flowTools, Proactive: o.Proactive}
+	b := &Built{Scheduler: sched, Runner: runner, Outbound: ob, Flows: fe, FlowTools: flowTools, Proactive: o.Proactive, Watches: we}
+	we.OnPoke(sched.Poke)
 	if o.Proactive != nil {
 		o.Proactive.OnPoke(sched.Poke)
 	}

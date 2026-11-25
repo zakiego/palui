@@ -45,7 +45,7 @@ var productTables = []string{
 	"contacts", "outbound_messages", "jobs", "routines", "routine_occurrences", "outbox", "events", "reports", "hooks", "custom_commands", "instructions",
 	"agents", "preferences", "attachment_shares", "saved_attachments", "usage", "settings", "flow_step_runs", "flow_runs", "flow_triggers",
 	"flow_versions", "flows", "agent_members", "member_accounts", "members", "chat_rules", "chat_rule_changes",
-	"agent_proactive", "nudges", "proactive_mutes", "proactive_ticks", "proactive_notes", "wa_inbox_chats",
+	"agent_proactive", "nudges", "proactive_mutes", "proactive_ticks", "proactive_notes", "wa_inbox_chats", "watches",
 }
 
 // RealDataError is the refusal on a database a fixture didn't fill.
