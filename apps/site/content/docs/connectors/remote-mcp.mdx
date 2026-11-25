@@ -26,7 +26,7 @@ None.
 - Only `https` URLs on public addresses. Private, loopback, link-local and Docker-internal targets are refused, and the host is resolved again on every request, so a name that later points inside is refused too. Redirects aren't followed.
 - No auth from chat. A server that needs a token is added on the Connectors page, so the token never goes through a chat message, an approval prompt or the logs.
 - Adding and removing always ask first. Scheduled jobs and hooks can't do either.
-- Servers added from chat get external trust: their results taint the turn, so later writes in that turn ask first. Tools start with the class their own hints suggest (read-only hints become `read`, everything else `write` or `destructive`). Review them on the Connectors page.
+- Servers added from chat get external trust: their results taint the turn, so later writes ask first with the agent's "Ask before writes after reading outside content" switch on. Tools start with the class their own hints suggest (read-only hints become `read`, everything else `write` or `destructive`). Review them on the Connectors page.
 - From chat, Palui can only remove servers it added from chat. Others are removed on the Connectors page.
 
 ## Pause and remove

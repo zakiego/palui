@@ -303,14 +303,16 @@ type Approval struct {
 	Status      string        `json:"status"`
 	DecidedAt   *int64        `json:"decidedAt"`
 	CreatedAt   int64         `json:"createdAt"`
+	// Why it was asked: a tools.Reason* code, nil on old rows.
+	Reason *string `json:"reason,omitempty"`
 }
 
-const ApprovalCols = "id, run_id, chat_id, ask_chat_id, approval_id, tool_call_id, tool, tool_class, args_preview, messages, context, prompt_msg_id, expires_at, status, decided_at, created_at"
+const ApprovalCols = "id, run_id, chat_id, ask_chat_id, approval_id, tool_call_id, tool, tool_class, args_preview, messages, context, prompt_msg_id, expires_at, status, decided_at, created_at, reason"
 
 func ScanApproval(s Scanner) (Approval, error) {
 	var a Approval
 	var ctx JSON[*jsonx.Object]
-	err := s.Scan(&a.ID, &a.RunID, &a.ChatID, &a.AskChatID, &a.ApprovalID, &a.ToolCallID, &a.Tool, &a.ToolClass, &a.ArgsPreview, &a.Messages, &ctx, &a.PromptMsgID, &a.ExpiresAt, &a.Status, &a.DecidedAt, &a.CreatedAt)
+	err := s.Scan(&a.ID, &a.RunID, &a.ChatID, &a.AskChatID, &a.ApprovalID, &a.ToolCallID, &a.Tool, &a.ToolClass, &a.ArgsPreview, &a.Messages, &ctx, &a.PromptMsgID, &a.ExpiresAt, &a.Status, &a.DecidedAt, &a.CreatedAt, &a.Reason)
 	a.Context = ctx.V
 	if a.Context == nil {
 		a.Context = jsonx.NewMap[any]()
@@ -586,6 +588,9 @@ type ToolPermissions struct {
 	Tools      *jsonx.Map[string] `json:"tools"`
 	Connectors *jsonx.Map[string] `json:"connectors,omitempty"`
 	Classes    *jsonx.Map[string] `json:"classes,omitempty"`
+	// Owner turns ask before writes after the conversation read untrusted
+	// content (the taint rules). Off: they follow the policy and class only.
+	AskAfterUntrusted bool `json:"askAfterUntrusted,omitempty"`
 }
 
 // ModelLink is one step of a model chain: a model connector, a model id and

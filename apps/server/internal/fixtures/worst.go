@@ -444,9 +444,11 @@ func worst(k *Kit) {
 
 	// Three approvals waiting at once, one of them already past its deadline.
 	k.Approval(Approval{RunID: bigRun, ChatID: web.ID, Tool: within(worstToolLong, L.toolName), ToolClass: "destructive",
-		ArgsPreview: ptr(within(fill(`{"ids":["`+worstPastedBlob[:120]+`"],"confirm":true,"url":"`+worstLongURL+`"}`, L.approvalArgs), L.approvalArgs)), ExpiresAt: now + 10*MIN, CreatedAt: now - 2*MIN})
+		ArgsPreview: ptr(within(fill(`{"ids":["`+worstPastedBlob[:120]+`"],"confirm":true,"url":"`+worstLongURL+`"}`, L.approvalArgs), L.approvalArgs)), ExpiresAt: now + 10*MIN, CreatedAt: now - 2*MIN,
+		// The longest reason the card explains.
+		Reason: ptr("sends-file")})
 	k.Approval(Approval{RunID: bigRun, ChatID: web.ID, Tool: "mcp-linear__delete_issue", ToolClass: "write", ArgsPreview: ptr(`{"id":"PAL-123"}`), ExpiresAt: now - 12*D, CreatedAt: now - 12*D - 10*MIN})
-	k.Approval(Approval{RunID: bigRun, ChatID: web.ID, Tool: "x__y", ToolClass: "read", ExpiresAt: now + 45_000, CreatedAt: now - MIN})
+	k.Approval(Approval{RunID: bigRun, ChatID: web.ID, Tool: "x__y", ToolClass: "read", ExpiresAt: now + 45_000, CreatedAt: now - MIN, Reason: ptr("set-to-ask")})
 
 	// --- jobs: listed oldest first, so the order here is the order on screen -----
 	var jobOrder int64

@@ -429,7 +429,7 @@ func sendToOwner(c *EngineCtx, from db.Chat, text string) {
 
 // SendApprovalPrompt is sendApprovalPrompt. The prompt is asked in the chat
 // the request came from, which is always the owner's (PLAN 19.4).
-func SendApprovalPrompt(c *EngineCtx, chat db.Chat, row db.Approval, title string) {
+func SendApprovalPrompt(c *EngineCtx, chat db.Chat, row db.Approval, title, settingsURL string) {
 	name := title
 	if name == "" {
 		name = strings.Replace(row.Tool, "__", " › ", 1)
@@ -445,9 +445,43 @@ func SendApprovalPrompt(c *EngineCtx, chat db.Chat, row db.Approval, title strin
 	if row.ArgsPreview != nil {
 		preview = *row.ArgsPreview
 	}
-	text := fmt.Sprintf("Boleh aku jalanin %s? (%s)\n%s\n\nBalas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.", name, kind, preview)
+	why := ""
+	if row.Reason != nil {
+		if r := approvalReasonID(*row.Reason); r != "" {
+			why = "\n\nKenapa nanya: " + r + "."
+			if settingsURL != "" {
+				why += " Atur di " + settingsURL
+			}
+		}
+	}
+	text := fmt.Sprintf("Boleh aku jalanin %s? (%s)\n%s%s\n\nBalas ya atau batal. Kalau 10 menit gak dijawab, aku anggap batal.", name, kind, preview, why)
 	c.send(chat, text, "approval:"+row.ID, SendExtra{Actions: []db.OutboxAction{{ID: "approve:" + row.ID, Label: "Ya"}, {ID: "deny:" + row.ID, Label: "Batal"}}})
-	c.Bus.Publish(TurnEvent{Type: "approval", ChatID: chat.ID, RunID: row.RunID, ApprovalID: row.ID, Tool: row.Tool, Class: row.ToolClass, ArgsPreview: preview})
+	reason := ""
+	if row.Reason != nil {
+		reason = *row.Reason
+	}
+	c.Bus.Publish(TurnEvent{Type: "approval", ChatID: chat.ID, RunID: row.RunID, ApprovalID: row.ID, Tool: row.Tool, Class: row.ToolClass, ArgsPreview: preview, Reason: reason})
+}
+
+// approvalReasonID is a tools.Reason* code in the owner's words (bot copy).
+func approvalReasonID(code string) string {
+	switch code {
+	case tools.ReasonSetToAsk:
+		return "tool ini kamu set \"tanya dulu\" di pengaturan agent"
+	case tools.ReasonToolRule:
+		return "pengaturan tool ini sendiri minta izin buat panggilan kayak gini"
+	case tools.ReasonDestructive:
+		return "ini tool destruktif, selalu nanya dulu kecuali kamu set \"izinkan\""
+	case tools.ReasonUnattended:
+		return "ini jalan otomatis (job, flow, watch atau hook), jadi semua aksi yang mengubah data nanya dulu"
+	case tools.ReasonUntrusted:
+		return "obrolan ini tadi baca konten dari luar, dan agent ini diset nanya dulu sebelum ngubah data setelah itu"
+	case tools.ReasonOthersWrote:
+		return "obrolan ini tadi baca tulisan orang lain, dan agent ini diset nanya dulu sebelum ngubah data setelah itu"
+	case tools.ReasonSendsFile:
+		return "ini ngirim file tersimpan setelah obrolan baca konten dari luar, dan agent ini diset nanya dulu"
+	}
+	return ""
 }
 
 // jobCap reads a job's name, cap and zone (jobs is M4's table; the row is
@@ -549,6 +583,11 @@ func taintFromReplay(calls []ToolCallRow, meta map[string]*tools.ToolMeta, taint
 		}
 		m := meta[pc.Tool]
 		if m != nil && !m.Untrusted {
+			continue
+		}
+		// Tool search is Palui's own and returns only tool names. It has no
+		// meta in a turn under the tool budget, which must not taint it.
+		if m == nil && pc.Tool == tools.SearchTool {
 			continue
 		}
 		if !tainted.Load() {
@@ -930,6 +969,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 		input                            any
 		inputJSON                        string
 	}
+	// Why each asked call asks, by tool call id (tools.Reason* codes).
+	var askedMu sync.Mutex
+	askedWhy := map[string]string{}
 	var requests []approvalReq
 	var model *models.FailoverModel
 	interrupted := false
@@ -1140,6 +1182,9 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				if !ok {
 					reason = "Denied by the owner"
 				}
+				if !approved && a.Reason != nil {
+					reason += "." + ApprovalNote(*a.Reason, ToolSettingsURL(c.AppURL, agent.Slug))
+				}
 				if open {
 					reason = tools.OutsideApprovalError
 				}
@@ -1262,6 +1307,10 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 						}
 					}
 					pastCalls = kept
+				}
+				settingsURL := ToolSettingsURL(c.AppURL, agent.Slug)
+				for i := range pastCalls {
+					pastCalls[i].SettingsURL = settingsURL
 				}
 				taintFromReplay(pastCalls, collected.Meta, &replayTainted, &othersWrote, rlog)
 			}
@@ -1390,24 +1439,34 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 					return false
 				}
 				// A tool's own rule asks first, and no per-agent "allow" skips it.
+				reason := ""
 				if meta != nil && meta.NeedsApproval != nil && safeNeedsApproval(meta.NeedsApproval, call.InputJSON) {
-					return true
+					reason = tools.ReasonToolRule
+				} else {
+					class, connectorID := "destructive", ""
+					if meta != nil {
+						class, connectorID = meta.Class, meta.ConnectorID
+					}
+					reason = tools.ApprovalReason(tools.ApprovalInput{
+						Class:             class,
+						Permission:        tools.PermissionFor(&perms, call.ToolName, connectorID, class),
+						OwnerTurn:         ownerTurn,
+						Tainted:           tainted.Load(),
+						ReplayTainted:     replayTainted.Load(),
+						OwnerReply:        meta != nil && meta.OwnerReply,
+						OthersWrote:       othersWrote.Load(),
+						Strict:            strict,
+						SendsFile:         len(attachments.FindRefs(call.Input)) > 0,
+						AskAfterUntrusted: perms.AskAfterUntrusted,
+					})
 				}
-				class, connectorID := "destructive", ""
-				if meta != nil {
-					class, connectorID = meta.Class, meta.ConnectorID
+				if reason != "" {
+					rlog.Info("tool call needs approval", logx.Fields{"tool": call.ToolName, "reason": reason})
+					askedMu.Lock()
+					askedWhy[call.ToolCallID] = reason
+					askedMu.Unlock()
 				}
-				return tools.NeedsApproval(tools.ApprovalInput{
-					Class:         class,
-					Permission:    tools.PermissionFor(&perms, call.ToolName, connectorID, class),
-					OwnerTurn:     ownerTurn,
-					Tainted:       tainted.Load(),
-					ReplayTainted: replayTainted.Load(),
-					OwnerReply:    meta != nil && meta.OwnerReply,
-					OthersWrote:   othersWrote.Load(),
-					Strict:        strict,
-					SendsFile:     len(attachments.FindRefs(call.Input)) > 0,
-				})
+				return reason != ""
 			},
 			Emit: func(p Part) {
 				switch p.Type {
@@ -1505,6 +1564,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				row, err := approvals.Create(q, approvals.CreateInput{
 					RunID: runID, ChatID: chat.ID, ApprovalID: r.approvalID, ToolCallID: r.toolCallID,
 					Tool: r.toolName, ToolClass: classOf(r.toolName), ArgsPreview: preview, Messages: db.RawJSON(stored), ContextJSON: ctxJSON,
+					Reason: askedWhy[r.toolCallID],
 				}, c.Clock(), c.ApprovalTTLMs)
 				if err != nil {
 					return err
@@ -1513,7 +1573,7 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				if meta != nil {
 					title = meta.Title
 				}
-				SendApprovalPrompt(c, chat, row, title)
+				SendApprovalPrompt(c, chat, row, title, ToolSettingsURL(c.AppURL, agent.Slug))
 			}
 			status = "awaiting_approval"
 		case status == "ok":

@@ -57,7 +57,7 @@ func demo(k *Kit) {
 	k.Tool(Tool{RunID: runID, ConnectorID: ptr("mcp-northwind"), Tool: "mcp-northwind__list_deals_for_the_current_week_grouped_by_stage_and_agent", Class: "read", Args: obj("stage", "masuk", "week", "2026-W46"), ResultPreview: ptr(`[{"id":"deal_01","title":"Rumah 2 lantai di Malang"}]`), Status: "ok", Ms: ptr[int64](1240), CreatedAt: now - 2*H + 1000})
 	k.Tool(Tool{RunID: runID, ConnectorID: ptr("reminders"), Tool: "reminders__set_reminder", Class: "write", Args: obj("text", "bayar listrik", "when", "besok 09:00"), ResultPreview: ptr("Besok, Rabu 11 Nov, 09.00 WITA"), Status: "ok", Ms: ptr[int64](85), CreatedAt: now - 2*H + 2000})
 	k.Message(web, "assistant", "Siap. Pengingat: Besok, Rabu 11 Nov, 09.00 WITA.\nPipeline Northwind minggu ini: 3 deal masuk, 1 survei.", now-2*H+9000, MsgExtra{RunID: &runID})
-	k.Approval(Approval{RunID: runID, ChatID: web.ID, Tool: "mcp-linear__delete_issue", ToolClass: "destructive", ArgsPreview: ptr(`{"id":"PAL-123"}`), ExpiresAt: now + 10*MIN, CreatedAt: now})
+	k.Approval(Approval{RunID: runID, ChatID: web.ID, Tool: "mcp-linear__delete_issue", ToolClass: "destructive", ArgsPreview: ptr(`{"id":"PAL-123"}`), ExpiresAt: now + 10*MIN, CreatedAt: now, Reason: ptr("destructive")})
 	k.Message(tg, "user", "https://example.com/a/very/long/url/that/never/breaks/naturally/0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz", now-H)
 
 	for i := int64(0); i < 14; i++ {

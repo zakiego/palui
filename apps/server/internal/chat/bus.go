@@ -30,9 +30,11 @@ type TurnEvent struct {
 	Status      string
 	ApprovalID  string
 	ArgsPreview string
-	MessageID   string
-	Role        string
-	Text        string
+	// approval: why it asks (a tools.Reason* code, "" when unknown).
+	Reason    string
+	MessageID string
+	Role      string
+	Text      string
 	// turn-end: nil when the turn had no error.
 	Error *string
 }
@@ -69,6 +71,9 @@ func (e TurnEvent) MarshalJSON() ([]byte, error) {
 		o.Set("tool", e.Tool)
 		o.Set("class", e.Class)
 		o.Set("argsPreview", e.ArgsPreview)
+		if e.Reason != "" {
+			o.Set("reason", e.Reason)
+		}
 	case "message":
 		o.Set("messageId", e.MessageID)
 		o.Set("role", e.Role)

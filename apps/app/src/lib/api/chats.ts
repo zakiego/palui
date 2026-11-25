@@ -1,6 +1,6 @@
 // Chats page: the list, a transcript, the web chat input and approvals.
 import { noInput, withInput } from "./client"
-import type { AgentChoice, Channel, ChatKind, MessageRole, MessageStatus, ReplyMode, ToolCallView, ToolClass } from "./types"
+import type { AgentChoice, ApprovalReason, Channel, ChatKind, MessageRole, MessageStatus, ReplyMode, ToolCallView, ToolClass } from "./types"
 
 export type ChatListItem = {
   id: string
@@ -62,8 +62,8 @@ export type Transcript = {
     autoSavedSize: number
   }
   messages: TranscriptMessage[]
-  approvals: { id: string; tool: string; class: ToolClass; argsPreview: string | null; expiresAt: number }[]
-  agent: { id: string; name: string; isDefault: boolean }
+  approvals: { id: string; tool: string; class: ToolClass; argsPreview: string | null; expiresAt: number; reason: ApprovalReason | null }[]
+  agent: { id: string; name: string; isDefault: boolean; slug: string }
   shared: boolean
   agents: AgentChoice[]
 }

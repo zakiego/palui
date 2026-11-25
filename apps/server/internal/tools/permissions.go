@@ -67,6 +67,9 @@ func ReadPermissions(raw []byte) db.ToolPermissions {
 	if v, ok := obj.Get("allowAll"); ok && v == true {
 		out.AllowAll = true
 	}
+	if v, ok := obj.Get("askAfterUntrusted"); ok && v == true {
+		out.AskAfterUntrusted = true
+	}
 	read := func(field string, valid func(string) bool) *jsonx.Map[string] {
 		m := jsonx.NewMap[string]()
 		if t, ok := obj.Get(field); ok {
@@ -162,12 +165,75 @@ type ApprovalInput struct {
 	Strict bool
 	// The call carries a saved file (a palui:attachment ref).
 	SendsFile bool
+	// The agent's "ask before writes after reading untrusted content" switch
+	// (ToolPermissions.AskAfterUntrusted): owner turns keep the taint rules.
+	AskAfterUntrusted bool
+}
+
+// Why a call waits for the owner. The codes are stored with the request
+// (pending_approvals.reason) and shown to the owner and the model.
+const (
+	// The owner set this tool, its group or its connector to "ask".
+	ReasonSetToAsk = "set-to-ask"
+	// The tool's own rule asks for this call (PaluiTool.NeedsApproval).
+	ReasonToolRule = "tool-rule"
+	// Destructive tools ask unless the owner set them to "allow".
+	ReasonDestructive = "destructive"
+	// A job, flow, watch or hook: nobody is watching, so every write asks.
+	ReasonUnattended = "unattended"
+	// The turn, or the history it replays, read untrusted content.
+	ReasonUntrusted = "untrusted"
+	// The turn read what other people wrote (another agent's chats or memory).
+	ReasonOthersWrote = "others-wrote"
+	// A saved file would leave after the turn read untrusted content.
+	ReasonSendsFile = "sends-file"
+)
+
+// ReasonText is what the model and the dashboard are told about a reason code.
+func ReasonText(code string) string {
+	switch code {
+	case ReasonSetToAsk:
+		return "the owner set this tool to ask first in the agent's tool settings"
+	case ReasonToolRule:
+		return "this tool's own setting asks before this kind of call"
+	case ReasonDestructive:
+		return "it is a destructive tool, and those always ask unless the owner sets them to allow"
+	case ReasonUnattended:
+		return "this turn runs unattended (a job, flow, watch or hook), so every write asks"
+	case ReasonUntrusted:
+		return "this conversation read untrusted content earlier, and the agent is set to ask before writes after that"
+	case ReasonOthersWrote:
+		return "this conversation read what other people wrote, and the agent is set to ask before writes after that"
+	case ReasonSendsFile:
+		return "the call sends a saved file after this conversation read untrusted content, and the agent is set to ask before that"
+	}
+	return "the approval rules asked for it"
 }
 
 // NeedsApproval says whether a call waits for the owner's yes.
 func NeedsApproval(i ApprovalInput) bool {
+	return ApprovalReason(i) != ""
+}
+
+// ApprovalReason is NeedsApproval with the reason: "" when the call runs on
+// its own, else one of the Reason codes.
+//
+// In the owner's own turn the answer depends only on the agent's policy and
+// the tool's class, never on what the conversation happened to read: "ask"
+// asks, "allow" runs, and with no entry read and write run while destructive
+// asks. The same tool on the same agent gets the same answer every time. The
+// taint rules (untrusted content, others' content, sending a saved file after
+// either) apply there only when the agent's AskAfterUntrusted switch is on.
+// Jobs, flows, watches and hooks keep every rule: nobody is there to notice.
+func ApprovalReason(i ApprovalInput) string {
 	if i.Permission == "ask" {
-		return true
+		return ReasonSetToAsk
+	}
+	if i.OwnerTurn && !i.Strict && !i.AskAfterUntrusted {
+		if i.Permission == "allow" || i.Class != "destructive" {
+			return ""
+		}
+		return ReasonDestructive
 	}
 	tainted := i.Tainted || i.ReplayTainted
 	// Recording the owner's answer to a check-in, in the owner's own turn, is
@@ -178,18 +244,24 @@ func NeedsApproval(i ApprovalInput) bool {
 	}
 	// A turn that read something untrusted never sends a saved file on its own.
 	if i.SendsFile && tainted {
-		return true
+		return ReasonSendsFile
 	}
 	// Anyone in another agent's chat can plant text for the owner's agent to
 	// read, so after that no write runs on its own, "allow" included.
 	if i.OthersWrote && (i.Class == "write" || i.Class == "destructive") {
-		return true
+		return ReasonOthersWrote
 	}
 	if i.Permission == "allow" && i.OwnerTurn {
-		return false
+		return ""
 	}
 	if i.Class == "destructive" {
-		return true
+		return ReasonDestructive
 	}
-	return i.Class == "write" && (tainted || i.Strict)
+	if i.Class == "write" && i.Strict {
+		return ReasonUnattended
+	}
+	if i.Class == "write" && tainted {
+		return ReasonUntrusted
+	}
+	return ""
 }

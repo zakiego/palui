@@ -535,11 +535,11 @@
    ]
   },
   "pending_approvals": {
-   "columns": ["id","run_id","chat_id","approval_id","tool_call_id","tool","tool_class","args_preview","messages","context","prompt_msg_id","expires_at","status","decided_at","created_at","ask_chat_id"],
+   "columns": ["id","run_id","chat_id","approval_id","tool_call_id","tool","tool_class","args_preview","messages","context","prompt_msg_id","expires_at","status","decided_at","created_at","ask_chat_id","reason"],
    "rows": [
-    ["<apr#1>","<run#1>","<chat#1>","<apr#1>",null,"mcp-northwind-kb__search_internal_knowledge_base_by_department_x","destructive","{\"ids\":[\"iVBORw0KGgoAAAANSUhEUgAAAoAAAAHgCAYAAAA10dzkAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH6AsLBAUNq0p8bwAAIABJREFUeJzs3XmYXFWd\"],\"confirm\":true,\"url\":\"https://example.com/workspaces/northwind-industries-holdings/projects/q3-launch/docs/9f8e7d6c5b4a?tab=comments&filter=unresolved&sort=newest\"}{\"id","[]","{}",null,1794622200000,"pending",null,1794621480000,null],
-    ["<apr#2>","<run#1>","<chat#1>","<apr#2>",null,"mcp-linear__delete_issue","write","{\"id\":\"PAL-123\"}","[]","{}",null,1793584800000,"pending",null,1793584200000,null],
-    ["<apr#3>","<run#1>","<chat#1>","<apr#3>",null,"x__y","read",null,"[]","{}",null,1794621645000,"pending",null,1794621540000,null]
+    ["<apr#1>","<run#1>","<chat#1>","<apr#1>",null,"mcp-northwind-kb__search_internal_knowledge_base_by_department_x","destructive","{\"ids\":[\"iVBORw0KGgoAAAANSUhEUgAAAoAAAAHgCAYAAAA10dzkAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH6AsLBAUNq0p8bwAAIABJREFUeJzs3XmYXFWd\"],\"confirm\":true,\"url\":\"https://example.com/workspaces/northwind-industries-holdings/projects/q3-launch/docs/9f8e7d6c5b4a?tab=comments&filter=unresolved&sort=newest\"}{\"id","[]","{}",null,1794622200000,"pending",null,1794621480000,null,"sends-file"],
+    ["<apr#2>","<run#1>","<chat#1>","<apr#2>",null,"mcp-linear__delete_issue","write","{\"id\":\"PAL-123\"}","[]","{}",null,1793584800000,"pending",null,1793584200000,null,null],
+    ["<apr#3>","<run#1>","<chat#1>","<apr#3>",null,"x__y","read",null,"[]","{}",null,1794621645000,"pending",null,1794621540000,null,"set-to-ask"]
    ]
   },
   "preferences": {

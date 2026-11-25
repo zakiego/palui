@@ -23,7 +23,7 @@ Two tools, both marked untrusted and both open to guests in a shared chat:
 ## Safety
 
 <Callout type="warn" title="Results taint the turn">
-  Anyone can write a web page, including text aimed at the model. Once a turn reads a fetched page, it's tainted: every `write` tool needs your approval for the rest of that turn, and recall auto-save skips it. See [The taint rule](/docs/concepts/taint-rule).
+  Anyone can write a web page, including text aimed at the model. Once a turn reads a fetched page, it's tainted: recall auto-save skips it, and with the agent's "Ask before writes after reading outside content" switch on, every `write` tool needs your approval after it. See [The taint rule](/docs/concepts/taint-rule).
 </Callout>
 
 - SSRF guard: every fetch the agent can steer goes through a guard that refuses requests to internal and private network addresses. A page can't trick Palui into reading services on your Docker host or your local network.

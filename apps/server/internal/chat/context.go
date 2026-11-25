@@ -21,6 +21,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/models"
 	"github.com/zakiego/palui/apps/server/internal/strx"
+	"github.com/zakiego/palui/apps/server/internal/tools"
 	"github.com/zakiego/palui/apps/server/internal/zone"
 )
 
@@ -524,6 +525,36 @@ func LoadHistory(q db.Q, sessionID string, summarizedUntil *int64) ([]db.Message
 type ToolCallRow struct {
 	db.ToolCall
 	AwaitingApproval bool
+	// ApprovalReason is the tools.Reason* code of the call's approval request
+	// ("" when it had none, or the request is from before reasons were kept),
+	// and ApprovalStatus that request's status.
+	ApprovalReason string
+	ApprovalStatus string
+	// SettingsURL is the agent's Tools tab, where the owner changes what asks.
+	SettingsURL string
+}
+
+// ApprovalNote tells the model why Palui asked the owner before a call and
+// where the owner changes that, so it can explain it instead of guessing.
+// "" when the reason isn't known.
+func ApprovalNote(reason, settingsURL string) string {
+	if reason == "" {
+		return ""
+	}
+	note := " Palui asked the owner first because " + tools.ReasonText(reason) + "."
+	if settingsURL != "" {
+		note += " The owner can change what asks first at " + settingsURL + "."
+	}
+	return note
+}
+
+// ToolSettingsURL is the agent's Tools tab on the dashboard, "" when the app
+// URL or the slug is unknown.
+func ToolSettingsURL(appURL, agentSlug string) string {
+	if appURL == "" || agentSlug == "" || !agentSlugLink.MatchString(agentSlug) {
+		return ""
+	}
+	return strings.TrimRight(appURL, "/") + "/app/agents/" + agentSlug + "?tab=tools"
 }
 
 const (
@@ -556,15 +587,16 @@ func LoadToolCalls(q db.Q, rows []db.Message) ([]ToolCallRow, error) {
 	for i, id := range runIDs {
 		args[i] = id
 	}
-	waiting := map[string]bool{}
-	wrows, err := q.Query("SELECT run_id, tool_call_id FROM pending_approvals WHERE run_id IN ("+placeholders(len(runIDs))+") AND status IN ('pending', 'approved')", args...)
+	type asked struct{ status, reason string }
+	requests := map[string]asked{}
+	wrows, err := q.Query("SELECT run_id, tool_call_id, status, reason FROM pending_approvals WHERE run_id IN ("+placeholders(len(runIDs))+") ORDER BY created_at ASC", args...)
 	if err != nil {
 		return nil, err
 	}
 	for wrows.Next() {
-		var runID string
-		var callID *string
-		if err := wrows.Scan(&runID, &callID); err != nil {
+		var runID, status string
+		var callID, reason *string
+		if err := wrows.Scan(&runID, &callID, &status, &reason); err != nil {
 			wrows.Close()
 			return nil, err
 		}
@@ -572,7 +604,11 @@ func LoadToolCalls(q db.Q, rows []db.Message) ([]ToolCallRow, error) {
 		if callID != nil {
 			c = *callID
 		}
-		waiting[runID+":"+c] = true
+		a := asked{status: status}
+		if reason != nil {
+			a.reason = *reason
+		}
+		requests[runID+":"+c] = a
 	}
 	wrows.Close()
 	crows, err := q.Query("SELECT "+db.ToolCallCols+" FROM tool_calls WHERE run_id IN ("+placeholders(len(runIDs))+") ORDER BY created_at ASC, rowid", args...)
@@ -582,7 +618,8 @@ func LoadToolCalls(q db.Q, rows []db.Message) ([]ToolCallRow, error) {
 	}
 	out := make([]ToolCallRow, len(calls))
 	for i, c := range calls {
-		out[i] = ToolCallRow{ToolCall: c, AwaitingApproval: waiting[c.ID]}
+		a := requests[c.ID]
+		out[i] = ToolCallRow{ToolCall: c, AwaitingApproval: a.status == "pending" || a.status == "approved", ApprovalReason: a.reason, ApprovalStatus: a.status}
 	}
 	return out, nil
 }
@@ -596,14 +633,18 @@ func replayedOutput(c ToolCallRow) models.ToolOutput {
 	switch c.Status {
 	case "pending":
 		if c.AwaitingApproval {
-			return models.OutputText("Not run yet: still waiting for the owner's approval.")
+			return models.OutputText("Not run yet: still waiting for the owner's approval." + ApprovalNote(c.ApprovalReason, c.SettingsURL))
 		}
 		return models.OutputText("No result: the turn stopped before this call finished.")
 	case "denied":
 		reason := "Not run: the owner did not approve it."
+		if c.ApprovalStatus == "expired" {
+			reason = "Not run: the owner didn't answer within 10 minutes."
+		}
 		if preview != "" && preview != "denied" {
 			reason = preview
 		}
+		reason += ApprovalNote(c.ApprovalReason, c.SettingsURL)
 		return models.OutputDenied(&reason)
 	case "error":
 		if preview == "" {

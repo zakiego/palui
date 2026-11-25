@@ -49,7 +49,7 @@ Auto-save keeps every photo and document sent in one chat, so people in a group 
 - If Telegram refuses a file as its kind (a photo too wide, voice notes turned off), it's sent again as a document.
 - The chat transcript on the Chats page lists each file the agent sent under its reply, with its type, name, size, caption and whether it was delivered. The web chat shows a line naming the file.
 
-Who can use it: it's a `write` tool scoped to the chat, the same as `save_attachment`. In your own chats it runs on its own, and asks first once the turn read something untrusted (see the [taint rule](/docs/concepts/taint-rule)). In a group or DM set up for guests, guests can ask for it too: it only ever sends into the chat they're in, and only files from that chat or the public web. Set the agent's guest tools to none to take it away.
+Who can use it: it's a `write` tool scoped to the chat, the same as `save_attachment`. In your own chats it runs on its own. It asks first once the turn read something untrusted only with the agent's "Ask before writes after reading outside content" switch on (see the [taint rule](/docs/concepts/taint-rule)). In a group or DM set up for guests, guests can ask for it too: it only ever sends into the chat they're in, and only files from that chat or the public web. Set the agent's guest tools to none to take it away.
 
 ## Limits and safety
 

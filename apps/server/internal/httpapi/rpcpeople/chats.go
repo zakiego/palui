@@ -19,6 +19,12 @@ type chatAgent struct {
 	IsDefault bool   `json:"isDefault"`
 }
 
+// transcriptAgent is chatAgent plus the slug the approval card links to.
+type transcriptAgent struct {
+	chatAgent
+	Slug string `json:"slug"`
+}
+
 type chatAgentOption struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
@@ -30,7 +36,7 @@ type chatAgentOption struct {
 
 type transcriptPage struct {
 	*transcriptView
-	Agent  chatAgent         `json:"agent"`
+	Agent  transcriptAgent   `json:"agent"`
 	Shared bool              `json:"shared"`
 	Agents []chatAgentOption `json:"agents"`
 }
@@ -92,7 +98,7 @@ func init() {
 				options = append(options, chatAgentOption{ID: a.ID, Name: a.Name, IsDefault: a.IsDefault, AvatarImage: a.AvatarImage, AvatarIcon: a.AvatarIcon, AvatarColor: a.AvatarColor})
 			}
 			// Who answers here (PLAN 19.2), and the agents it can switch to.
-			return transcriptPage{transcriptView: t, Agent: chatAgent{ID: agent.ID, Name: agent.Name, IsDefault: agent.IsDefault}, Shared: shared, Agents: options}, nil
+			return transcriptPage{transcriptView: t, Agent: transcriptAgent{chatAgent{ID: agent.ID, Name: agent.Name, IsDefault: agent.IsDefault}, agent.Slug}, Shared: shared, Agents: options}, nil
 		},
 	})
 
