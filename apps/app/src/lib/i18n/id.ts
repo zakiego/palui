@@ -411,6 +411,7 @@ export const id: Record<Key, string> = {
   "run.trigger.hook": "hook",
   "run.trigger.approval": "izin",
   "run.trigger.reminder": "pengingat",
+  "run.trigger.watch": "pantauan",
   "run.tainted": "tak tepercaya",
   "run.notFound": "Run tidak ditemukan",
   "run.steps": "Langkah",
