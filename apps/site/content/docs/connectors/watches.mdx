@@ -1,0 +1,47 @@
+---
+title: Watches
+description: The built-in Watches skill lets anyone in a chat ask the agent to keep checking for something and tell the chat once it happens.
+---
+
+Kind: `skill`. Built in. When the answer to a question doesn't exist yet but will, like an official figure released later today or a result announced next week, the agent can watch for it. It checks on a schedule, stays quiet while nothing has changed, posts once with the answer and its source, and stops.
+
+## Connect
+
+Nothing to set up. Watches is a built-in skill and is created on first boot. A check uses the agent's read tools, so give the agent something to look with, like [Web fetch](/docs/connectors/web-fetch) or a read MCP tool.
+
+## Tools
+
+| Tool | What it does |
+|---|---|
+| `watch_for` | Start a watch in this chat: what to look for, what counts as found, how often to check and until when. |
+| `list_watches` | List this chat's running or ended watches |
+| `cancel_watch` | Stop a watch |
+
+The tools are offered in normal chat turns, in any chat the agent answers. Anyone the agent answers there can start or cancel a watch, the same as a reminder.
+
+## How a check works
+
+- Every 30 minutes by default (15 to 1440), the agent runs a short check in the background. It sees the question, the condition and its own notes from earlier checks, not the chat history.
+- A check can only use read tools. It can't send, write or delete anything, and the chat doesn't see a typing indicator.
+- The condition is strict on purpose. "Official and audited, not the Rp326 T claim going around" means an old claim never triggers it.
+- When it's found, the chat gets one message with the answer and a source link, and the watch ends.
+- A watch ends after 7 days by default, 14 at most. If the last check still finds nothing, the chat gets one short note saying so.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Running watches per chat | 10 |
+| Longest watch | 14 days |
+| Tokens per watch, all checks together | 1,000,000 |
+| Failed checks in a row before it stops | 5 |
+
+The agent's daily token cap still applies to every check.
+
+## Safety
+
+Search results and web pages are untrusted. A check starts tainted and has no write tools, so the worst a page can do is mislead the check. A found answer needs at least one source link, and the message names it, so people in the chat can open it themselves.
+
+## Pause and remove
+
+Pausing hides the watch tools from the model, from the next turn on. Watches already set keep checking until they find it, end or are cancelled.
