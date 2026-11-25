@@ -1,6 +1,7 @@
 /**
- * Flip between light and dark. The theme starts on the system setting; the
- * first press pins the opposite of whatever is showing.
+ * The one-press switch between light and dark, in the header and on the login
+ * pages. The theme starts on the system setting; the first press pins the
+ * opposite of whatever is showing. Going back to System is in the account menu.
  *
  * The accessible name says where the button goes, not where you are, because
  * that is what pressing it does.
