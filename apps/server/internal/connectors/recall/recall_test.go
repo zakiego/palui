@@ -328,6 +328,19 @@ func TestClassesMCPToolsAddsForgetAndLocksATurnWithoutAScope(t *testing.T) {
 	if strings.Join(conntest.Of(res).Strs("containers", "container"), ",") != "default,zaki" {
 		t.Fatal(res)
 	}
+	// The Memory tab reads plain JSON values, not the API structs.
+	v, _ := res.Get("containers")
+	items, _ := v.([]any)
+	first, ok := items[0].(*jsonx.Object)
+	if !ok {
+		t.Fatalf("container item is %T, want *jsonx.Object", items[0])
+	}
+	if m, _ := first.Get("memories"); m != 3.0 {
+		t.Fatalf("memories is %T %v, want float64 3", m, m)
+	}
+	if got := jsonx.Stringify(first); got != `{"container":"default","memories":3,"documents":1,"lastActivity":1}` {
+		t.Fatal(got)
+	}
 }
 
 func TestLocksPaluiToTheOwnersContainerAndItsSharedList(t *testing.T) {

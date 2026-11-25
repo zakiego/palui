@@ -221,6 +221,9 @@ func agentMemory(c *httpapi.Call, a db.Agent) (agentMemoryT, error) {
 	if conn != nil {
 		if s, ok := configString(*conn, "container"); ok && s != "" {
 			configured = s
+		} else if s, ok := configString(*conn, "defaultContainer"); ok && s != "" {
+			// No container picked: saves go to recall's own default.
+			configured = s
 		}
 	}
 	container := configured

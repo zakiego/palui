@@ -618,9 +618,15 @@ func New(opts Options) *connectors.Runtime {
 					if err != nil {
 						return nil, err
 					}
+					// Plain JSON values (objects, float64 numbers), the shape the
+					// Memory tab reads, not the API structs.
 					items := make([]any, len(list))
 					for i, x := range list {
-						items[i] = x
+						var last any
+						if x.LastActivity != nil {
+							last = float64(*x.LastActivity)
+						}
+						items[i] = kit.O("container", x.Container, "memories", float64(x.Memories), "documents", float64(x.Documents), "lastActivity", last)
 					}
 					return kit.O("containers", items), nil
 				},
