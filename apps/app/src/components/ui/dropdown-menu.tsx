@@ -1,12 +1,16 @@
 "use client"
 
 import * as React from "react"
+import { CheckIcon } from "lucide-react"
 import {
   Menu,
   MenuContent,
   MenuGroup,
   MenuGroupLabel,
   MenuItem,
+  MenuItemIndicator,
+  MenuRadioGroup,
+  MenuRadioItem,
   MenuSeparator,
   MenuTrigger,
 } from "@ui-sdk/react/menu"
@@ -91,6 +95,35 @@ function DropdownMenuItem({
   )
 }
 
+function DropdownMenuRadioGroup<T extends string = string>(
+  props: React.ComponentProps<typeof MenuRadioGroup<T>>
+) {
+  return <MenuRadioGroup<T> {...props} />
+}
+
+function DropdownMenuRadioItem({
+  className,
+  children,
+  ...props
+}: Omit<React.ComponentProps<typeof MenuRadioItem>, "children"> & {
+  children?: React.ReactNode
+}) {
+  return (
+    <MenuRadioItem
+      className={cnState(
+        "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md py-1 ps-1.5 pe-8 text-sm outline-hidden select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-highlighted:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <MenuItemIndicator className="pointer-events-none absolute end-2 flex size-4 items-center justify-center">
+        <CheckIcon aria-hidden="true" />
+      </MenuItemIndicator>
+    </MenuRadioItem>
+  )
+}
+
 function DropdownMenuSeparator({
   className,
   ...props
@@ -105,5 +138,7 @@ export {
   DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
 }
