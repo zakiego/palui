@@ -13,7 +13,7 @@ Nothing to set up. Watches is a built-in skill and is created on first boot. A c
 
 | Tool | What it does |
 |---|---|
-| `watch_for` | Start a watch in this chat: what to look for, what counts as found, how often to check and until when. |
+| `watch_for` | Start a watch in this chat: what to look for, what counts as found, how often to check, when to start and until when. |
 | `list_watches` | List this chat's running or ended watches |
 | `cancel_watch` | Stop a watch |
 
@@ -23,6 +23,7 @@ The dashboard's Watches page lists every chat's watches, with the last summary, 
 
 ## How a check works
 
+- A watch can start later, like "mulai besok jam 16.00" for a closing price that can't exist before the market closes. Nothing is checked before the start, and the first check runs right at it. The start must be before the end, and the end stays within 14 days from now.
 - Every 30 minutes by default (15 to 1440), the agent runs a short check in the background. It sees the question, the condition and its own notes from earlier checks, not the chat history.
 - A check can only use read tools. It can't send, write or delete anything, and the chat doesn't see a typing indicator.
 - The condition is strict on purpose. "Official and audited, not the Rp326 T claim going around" means an old claim never triggers it.
