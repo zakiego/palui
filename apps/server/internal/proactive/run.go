@@ -24,8 +24,12 @@ import (
 )
 
 const (
-	// RunTimeout bounds a whole run.
-	RunTimeout = 2 * time.Minute
+	// RunTimeout bounds a whole run (inside TickLeaseMs).
+	RunTimeout = 4 * time.Minute
+	// MaxRunOutputTokens caps one model call of a run. With adaptive thinking
+	// the cap covers the thinking too, so it has room for a long think over
+	// many tool results and still the answer.
+	MaxRunOutputTokens = 16_000
 	// ToolTimeout bounds one tool call.
 	ToolTimeout = 20 * time.Second
 	// MaxSteps caps the model calls that may still call tools.
@@ -305,9 +309,10 @@ func Run(ctx context.Context, model models.LanguageModel, in RunInput) (RunResul
 	defs := toolDefs(in.Tools)
 	msgs := []models.Message{models.System(runSystem(in)), models.User(runUser(in))}
 	temp := 0.2
-	maxOut := 2500
+	maxOut := MaxRunOutputTokens
 	calls := 0
 	text := ""
+	finish := ""
 	for step := 0; ; step++ {
 		opts := models.CallOptions{Prompt: msgs, Tools: defs, Temperature: &temp, MaxOutputTokens: &maxOut}
 		last := step >= MaxSteps || calls >= MaxToolCalls
@@ -322,6 +327,7 @@ func Run(ctx context.Context, model models.LanguageModel, in RunInput) (RunResul
 		}
 		if len(g.ToolCalls) == 0 || last {
 			text = g.Text
+			finish = g.FinishReason.Unified
 			break
 		}
 		parts := []models.Part{}
@@ -363,6 +369,14 @@ func Run(ctx context.Context, model models.LanguageModel, in RunInput) (RunResul
 			res.Calls = append(res.Calls, call)
 		}
 		msgs = append(msgs, models.ToolMessage(results...))
+	}
+	if strings.TrimSpace(text) == "" {
+		// Never read as "nothing to say": the repair call would answer
+		// {"items":[]} for an empty answer.
+		if finish == "length" {
+			return res, errors.New("the model ran out of output tokens before it answered")
+		}
+		return res, errors.New("the model gave no answer")
 	}
 	out, err := ParseOutput(text, in.Now)
 	if err != nil {
