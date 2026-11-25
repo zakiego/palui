@@ -27,6 +27,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - Changed: the host bridge speaks MCP spec 2026-07-28 as well as the older `initialize` flow, on `@modelcontextprotocol/server` v2. Existing clients keep working unchanged.
 - Added: Calendar feed connector reads any calendar from its secret iCal link, with recurring events expanded. ([#32](https://github.com/zakiego/palui/pull/32))
 - Added: WhatsApp inbox connector links your own number read only and lists chats waiting for your reply. Adds a migration. ([#32](https://github.com/zakiego/palui/pull/32))
+- Added: Images and files an MCP tool returns are saved as chat attachments, so the agent can send them in the chat.
 
 ### API
 
