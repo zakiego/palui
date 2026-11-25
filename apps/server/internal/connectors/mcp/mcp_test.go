@@ -3,6 +3,7 @@ package mcp_test
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -281,7 +282,7 @@ type uploads struct {
 
 func setupFile(t *testing.T, trust string, got *uploads) (*connectors.RunningConnector, *connectors.ToolSet, string, string) {
 	srv := conntest.StartMCPServer(t, conntest.MCPOptions{Register: func(s *sdk.Server) {
-		conntest.AddRawTool(s, "upload_attachment", "Upload a file", `{"type":"object","properties":{"file":{"type":"string"}},"required":["file"]}`, nil, func(a map[string]any) *sdk.CallToolResult {
+		conntest.AddRawTool(s, "upload_attachment", "Upload a file", `{"type":"object","properties":{"file":{"type":"string","description":"The file as a base64 data URL."}},"required":["file"]}`, nil, func(a map[string]any) *sdk.CallToolResult {
 			file := a["file"].(string)
 			if strings.HasPrefix(file, "data:") {
 				got.mu.Lock()
@@ -289,6 +290,21 @@ func setupFile(t *testing.T, trust string, got *uploads) (*connectors.RunningCon
 				got.mu.Unlock()
 			}
 			return conntest.TextResult("got " + file)
+		})
+		// MCP Kandang's run tool, as in rpt_0mwvhdzd5rjnxrfngga.
+		conntest.AddRawTool(s, "run", "Run code in a sandbox", `{"type":"object","properties":{"language":{"type":"string","enum":["python","bash"]},"code":{"type":"string"},"files":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"content":{"type":"string","description":"The file's bytes, base64 encoded."}},"required":["name","content"],"additionalProperties":false}}},"required":["language","code"],"additionalProperties":false}`, nil, func(a map[string]any) *sdk.CallToolResult {
+			files, _ := a["files"].([]any)
+			for i, f := range files {
+				content := f.(map[string]any)["content"].(string)
+				data, err := base64.StdEncoding.DecodeString(content)
+				if err != nil {
+					return &sdk.CallToolResult{IsError: true, Content: []sdk.Content{&sdk.TextContent{Text: fmt.Sprintf("files[%d].content isn't valid base64: %v", i, err)}}}
+				}
+				got.mu.Lock()
+				got.list = append(got.list, "raw:"+string(data))
+				got.mu.Unlock()
+			}
+			return conntest.TextResult(fmt.Sprintf("ran with %d files", len(files)))
 		})
 	}})
 	f := ctx(t, config_(t, srv.URL, `,"authMode":"none"`), nil, trust)
@@ -321,6 +337,25 @@ func TestSendsTheFilesContentsToAnOwnServerInPlaceOfItsRef(t *testing.T) {
 	}
 	if out := exec(t, set, "upload_attachment", `{"file":"`+id+`"}`); out.S("content.0.text") != "got "+id {
 		t.Fatal(out)
+	}
+}
+
+func TestSendsAFileToKandangsNestedBase64Field(t *testing.T) {
+	got := &uploads{}
+	running, set, id, _ := setupFile(t, "own", got)
+	defer running.Stop(context.Background())
+	ref := "palui:attachment/" + id
+	out := exec(t, set, "run", `{"language":"python","code":"print(1)","files":[{"name":"foto1.jpg","content":"`+ref+`"},{"name":"foto2.jpg","content":"`+ref+`"}]}`)
+	if out.B("isError") || out.S("content.0.text") != "ran with 2 files" {
+		t.Fatal(out)
+	}
+	if len(got.list) != 2 || got.list[0] != "raw:"+string(jpeg) || got.list[1] != "raw:"+string(jpeg) {
+		t.Fatal(got.list)
+	}
+	// A ref inside other text never reaches the server.
+	r := exec(t, set, "run", `{"language":"python","code":"print(1)","files":[{"name":"a.jpg","content":"file: `+ref+`"}]}`)
+	if !r.B("isError") || !strings.Contains(r.S("content.0.text"), "files[0].content isn't on its own") || len(got.list) != 2 {
+		t.Fatal(r, got.list)
 	}
 }
 

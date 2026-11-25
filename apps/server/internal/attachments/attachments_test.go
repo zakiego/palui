@@ -217,20 +217,95 @@ func TestRefsSwapAnywhereInTheArgs(t *testing.T) {
 	d, chatID, _ := testutil.Setup(t)
 	row := save(t, d, attachments.SaveInput{ChatID: chatID, Title: "Struk laundry", MimeType: "image/jpeg", Bytes: JPEG}, NOW).Row
 	ref := attachments.Ref(row.ID)
-	args := parse(t, `{"file":"`+ref+`","name":"Struk","nested":{"files":["`+ref+`","keep me"]},"note":"see `+ref+`","n":3}`)
+	args := parse(t, `{"file":"`+ref+`","name":"Struk","nested":{"files":["`+ref+`","keep me"]},"imageUrl":"`+ref+`","n":3}`)
 	if ids := attachments.FindRefs(args); !reflect.DeepEqual(ids, []string{row.ID}) {
 		t.Fatal(ids)
 	}
 	out, err := attachments.ResolveRefs(d, args, attachments.ResolveOptions{ChatID: chatID, MasterKey: KEY})
 	testutil.Must(t, err)
-	url := "data:image/jpeg;base64," + b64(JPEG)
-	want := `{"file":"` + url + `","name":"Struk","nested":{"files":["` + url + `","keep me"]},"note":"see ` + ref + `","n":3}`
+	// No schema: raw base64, unless the field's name says URL.
+	raw, url := b64(JPEG), "data:image/jpeg;base64,"+b64(JPEG)
+	want := `{"file":"` + raw + `","name":"Struk","nested":{"files":["` + raw + `","keep me"]},"imageUrl":"` + url + `","n":3}`
 	if jsonx.Stringify(out) != want {
 		t.Fatal(jsonx.Stringify(out))
 	}
 	if f, _ := args.(*jsonx.Object).Get("file"); f != ref {
 		t.Fatal("args changed")
 	}
+}
+
+// The call from rpt_0mwvhdzd5rjnxrfngga: Kandang's run tool takes
+// files[].content as raw base64, and a data URL failed at byte 4.
+const kandangSchema = `{"type":"object","properties":{"language":{"type":"string","enum":["python","bash"]},"code":{"type":"string"},"files":{"type":"array","maxItems":20,"items":{"type":"object","properties":{"name":{"type":"string","description":"File name, without a directory."},"content":{"type":"string","description":"The file's bytes, base64 encoded."}},"required":["name","content"],"additionalProperties":false}}},"required":["language","code"],"additionalProperties":false}`
+
+func TestRefsFillKandangsNestedBase64Field(t *testing.T) {
+	d, chatID, _ := testutil.Setup(t)
+	a := save(t, d, attachments.SaveInput{ChatID: chatID, Title: "Foto 1", MimeType: "image/jpeg", Bytes: JPEG}, NOW).Row
+	b := save(t, d, attachments.SaveInput{ChatID: chatID, Title: "Foto 2", MimeType: "application/pdf", Bytes: PDF}, NOW).Row
+	args := parse(t, `{"language":"python","code":"print(1)","files":[{"name":"foto1.jpg","content":"`+attachments.Ref(a.ID)+`"},{"name":"foto2.pdf","content":"`+attachments.Ref(b.ID)+`"}]}`)
+	out, files, err := attachments.ResolveFileRefs(d, args, attachments.ResolveOptions{ChatID: chatID, MasterKey: KEY, Schema: []byte(kandangSchema)})
+	testutil.Must(t, err)
+	want := `{"language":"python","code":"print(1)","files":[{"name":"foto1.jpg","content":"` + b64(JPEG) + `"},{"name":"foto2.pdf","content":"` + b64(PDF) + `"}]}`
+	if jsonx.Stringify(out) != want || len(files) != 2 {
+		t.Fatal(jsonx.Stringify(out))
+	}
+}
+
+func TestRefsFollowTheFieldsSchema(t *testing.T) {
+	d, chatID, _ := testutil.Setup(t)
+	ref := attachments.Ref(save(t, d, attachments.SaveInput{ChatID: chatID, Title: "Struk", MimeType: "image/jpeg", Bytes: JPEG}, NOW).Row.ID)
+	raw, url := b64(JPEG), "data:image/jpeg;base64,"+b64(JPEG)
+	for _, c := range []struct{ name, field, want string }{
+		{"contentEncoding", `{"type":"string","contentEncoding":"base64"}`, raw},
+		{"format byte", `{"type":"string","format":"byte"}`, raw},
+		{"described as a data URL", `{"type":"string","description":"The image as a base64 data URL"}`, url},
+		{"format uri", `{"type":"string","format":"uri"}`, url},
+		{"nothing said", `{"type":"string"}`, raw},
+		{"through $ref and anyOf", `{"$ref":"#/$defs/blob"}`, url},
+	} {
+		schema := `{"type":"object","$defs":{"blob":{"anyOf":[{"type":"null"},{"type":"string","description":"A data: URL"}]}},"properties":{"doc":{"type":"object","properties":{"file":` + c.field + `}}}}`
+		out, err := attachments.ResolveRefs(d, parse(t, `{"doc":{"file":"`+ref+`"}}`), attachments.ResolveOptions{ChatID: chatID, MasterKey: KEY, Schema: []byte(schema)})
+		testutil.Must(t, err)
+		if got := jsonx.Stringify(out); got != `{"doc":{"file":"`+c.want+`"}}` {
+			t.Fatal(c.name, got)
+		}
+	}
+	tight := `{"type":"object","properties":{"file":{"type":"string","maxLength":4}}}`
+	if _, err := attachments.ResolveRefs(d, map[string]any{"file": ref}, attachments.ResolveOptions{ChatID: chatID, MasterKey: KEY, Schema: []byte(tight)}); err == nil || !strings.Contains(err.Error(), "over the 4 that field takes") {
+		t.Fatal(err)
+	} else if _, ok := err.(*attachments.RefError); !ok {
+		t.Fatal(err)
+	}
+}
+
+func TestRefsRefuseARefThatIsntTheWholeValue(t *testing.T) {
+	d, chatID, _ := testutil.Setup(t)
+	ref := attachments.Ref(save(t, d, attachments.SaveInput{ChatID: chatID, Title: "Struk", MimeType: "image/jpeg", Bytes: JPEG}, NOW).Row.ID)
+	opts := attachments.ResolveOptions{ChatID: chatID, MasterKey: KEY}
+	for _, args := range []string{
+		`{"files":[{"content":"see ` + ref + `"}]}`,
+		`{"file":"palui:attachment/not-an-id"}`,
+		`{"file":" ` + ref + `"}`,
+	} {
+		v := parse(t, args)
+		if !attachments.HasRefText(v) {
+			t.Fatal("missed", args)
+		}
+		_, err := attachments.ResolveRefs(d, v, opts)
+		if _, ok := err.(*attachments.RefError); !ok || !strings.Contains(err.Error(), "isn't on its own") {
+			t.Fatal(args, err)
+		}
+	}
+	if !strings.Contains(fmtErr(attachments.ResolveRefs(d, parse(t, `{"files":[{"content":"x `+ref+`"}]}`), opts)), "files[0].content") {
+		t.Fatal("no path")
+	}
+}
+
+func fmtErr(_ any, err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func TestRefsLeaveArgsWithoutRefsAlone(t *testing.T) {
@@ -261,7 +336,10 @@ func TestRefsRefuseFilesOverTheCallCap(t *testing.T) {
 	a := save(t, d, attachments.SaveInput{ChatID: chatID, Title: "a", MimeType: "image/jpeg", Bytes: JPEG}, NOW).Row
 	b := save(t, d, attachments.SaveInput{ChatID: chatID, Title: "b", MimeType: "image/jpeg", Bytes: append(append([]byte{}, JPEG...), 'x')}, NOW).Row
 	args := map[string]any{"files": []any{attachments.Ref(a.ID), attachments.Ref(b.ID)}}
-	if _, err := attachments.ResolveRefs(d, args, attachments.ResolveOptions{ChatID: chatID, MasterKey: KEY, MaxBytes: int64(len(JPEG) * 2)}); err == nil || !strings.Contains(err.Error(), "over the") {
+	if _, err := attachments.ResolveRefs(d, args, attachments.ResolveOptions{ChatID: chatID, MasterKey: KEY, MaxBytes: int64(len(JPEG) * 2)}); err == nil || !strings.Contains(err.Error(), "These files add up to") {
+		t.Fatal(err)
+	}
+	if _, err := attachments.ResolveRefs(d, map[string]any{"file": attachments.Ref(b.ID)}, attachments.ResolveOptions{ChatID: chatID, MasterKey: KEY, MaxBytes: int64(len(JPEG))}); err == nil || !strings.Contains(err.Error(), "This file is 11 B, over the 10 B") {
 		t.Fatal(err)
 	}
 	_, files, err := attachments.ResolveFileRefs(d, args, attachments.ResolveOptions{ChatID: chatID, MasterKey: KEY, MaxBytes: int64(len(JPEG)*2 + 1)})
@@ -278,6 +356,14 @@ func TestRefsScrubEchoedFilesAndLabelForApprovals(t *testing.T) {
 	testutil.Must(t, err)
 	result := parse(t, `{"content":[{"type":"text","text":"bad file: `+files[0].URL+`"}],"n":1}`)
 	if got := jsonx.Stringify(attachments.ScrubFileURLs(result, files)); got != `{"content":[{"type":"text","text":"bad file: `+ref+`"}],"n":1}` {
+		t.Fatal(got)
+	}
+	big := save(t, d, attachments.SaveInput{ChatID: chatID, Title: "Scan", MimeType: "application/pdf", Bytes: bytes.Repeat(PDF, 10)}, NOW).Row
+	bigRef := attachments.Ref(big.ID)
+	_, bigFiles, err := attachments.ResolveFileRefs(d, map[string]any{"file": bigRef}, attachments.ResolveOptions{ChatID: chatID, MasterKey: KEY})
+	testutil.Must(t, err)
+	echo := parse(t, `{"text":"got `+b64(bytes.Repeat(PDF, 10))+`"}`)
+	if got := jsonx.Stringify(attachments.ScrubFileURLs(echo, bigFiles)); got != `{"text":"got `+bigRef+`"}` {
 		t.Fatal(got)
 	}
 	labeled, err := attachments.LabelFileRefs(d, parse(t, `{"file":"`+ref+`","transactionId":"txn_1"}`))
