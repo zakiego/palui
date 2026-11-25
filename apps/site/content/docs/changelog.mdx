@@ -30,7 +30,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Self-hosting
 
-- Fixed: rerunning `ops/install-host-bridge.sh` or `ops/install-backup.sh` no longer fails with "Bootstrap failed: 5: Input/output error" and leaves the job unloaded. Both now wait for launchd to drop the old job before loading the new one.
+- Fixed: rerunning `ops/install-host-bridge.sh` or `ops/install-backup.sh` no longer fails with "Bootstrap failed: 5" and leaves the job unloaded. Both now wait for launchd to drop the old job first.
 
 ## 0.16.0 (2026-11-25)
 
