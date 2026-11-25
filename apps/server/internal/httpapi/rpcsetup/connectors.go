@@ -538,7 +538,9 @@ func setConnectorData(c *httpapi.Call) (any, error) {
 // applySuggestedToolClasses saves, for every tool of an MCP server the owner
 // hasn't classified yet, the class the server's annotations suggest. Until
 // then those tools run as destructive (fail closed); a saved class is never
-// touched, and a tool without annotations stays destructive. Owner only: the
+// touched, and a tool without class hints gets no pref, so it stays
+// unclassified (destructive) and a hint the server adds later can still fill
+// it. Owner only: the
 // annotations are the server's own word, so only the owner can take it.
 func applySuggestedToolClasses(c *httpapi.Call) (any, error) {
 	id := str(c, "id")

@@ -103,7 +103,7 @@ export type ProactivePatch = {
 
 // Limits the server enforces (internal/proactive), shown as counters.
 export const MAX_PROMPT_CHARS = 4000
-export const MAX_MENTIONS = 10
+export const MAX_MENTIONS = 16
 export const MAX_NOTE_CHARS = 300
 export const MAX_NOTES_CHARS = 4000
 

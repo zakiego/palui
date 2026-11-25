@@ -188,6 +188,18 @@ func TestConfigBoundsPatchAndUpgrade(t *testing.T) {
 	if next.QuietHours.Start != "23:00" || next.QuietHours.End != "07:00" || next.Prompt != "hi @a__b" {
 		t.Fatalf("%+v", next)
 	}
+	// The same patch sent as a JSON string, the way models often send it.
+	str, err := proactive.MergePatch(c, []byte(`"{\"quietHours\":{\"start\":\"23:00\"},\"prompt\":\"  hi @a__b \\r\\n\"}"`))
+	tu.Must(t, err)
+	if str != next {
+		t.Fatalf("string patch: %+v", str)
+	}
+	for _, notObject := range []string{`"hello"`, `"[1]"`, `[1]`, `3`} {
+		_, err := proactive.MergePatch(c, []byte(notObject))
+		if err == nil || !strings.Contains(err.Error(), "must be a JSON object") {
+			t.Errorf("%s: %v", notObject, err)
+		}
+	}
 	long := strings.Repeat("x", proactive.MaxPromptChars+1)
 	many := ""
 	for i := 0; i < proactive.MaxMentions+1; i++ {

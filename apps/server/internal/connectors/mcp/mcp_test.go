@@ -98,6 +98,15 @@ func TestTestListsToolsWithClassPrefill(t *testing.T) {
 	if got["search"] != "read" || got["add_note"] != "write" || got["delete_all"] != "destructive" || got["mystery"] != "destructive" || len(got) != 4 {
 		t.Fatal(got)
 	}
+	// Only tools with a class hint count as suggested: mystery has none.
+	hinted := map[string]bool{}
+	for _, x := range data.List("tools") {
+		v := conntest.Value{V: x}
+		hinted[v.S("name")] = v.B("hinted")
+	}
+	if !hinted["search"] || !hinted["add_note"] || !hinted["delete_all"] || hinted["mystery"] {
+		t.Fatal(hinted)
+	}
 }
 
 func TestRequiresTheBearerToken(t *testing.T) {
@@ -423,7 +432,9 @@ func TestSelectToolsCarriesTheSuggestionOnlyForUnclassifiedTools(t *testing.T) {
 }
 
 // "Use suggested classes": a pref for every listed tool without one, saved
-// prefs left byte for byte, an odd class read as destructive.
+// prefs left byte for byte, an odd class read as destructive, and a tool the
+// server sent no hints for left unclassified (rpt_0mwvv5qhz3okuxpir6e: an
+// unannotated get_notebook saved as destructive could never become read).
 func TestWithSuggestedFillsOnlyToolsWithoutASavedPref(t *testing.T) {
 	cfg := config_(t, "https://hub.example.com/mcp", `,"toolPrefs":{"search":{"enabled":false,"class":"destructive","flowApproval":"every_run"}}`)
 	listed, err := jsonx.ParseObject([]byte(`{"tools":[` +
@@ -431,6 +442,7 @@ func TestWithSuggestedFillsOnlyToolsWithoutASavedPref(t *testing.T) {
 		`{"name":"add_note","suggestedClass":"write","saved":false},` +
 		`{"name":"mystery","suggestedClass":"destructive","saved":false},` +
 		`{"name":"odd","suggestedClass":"admin","saved":false},` +
+		`{"name":"no_hints","suggestedClass":"destructive","hinted":false,"saved":false},` +
 		`{"suggestedClass":"read"},"junk"]}`))
 	testutil.Must(t, err)
 	prefs, n := mcpconn.WithSuggested(cfg, mcpconn.SuggestionsFrom(listed))

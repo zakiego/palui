@@ -68,6 +68,11 @@ func TestUpdateTurnsOnAndPatchesFromChat(t *testing.T) {
 	if !out.B("ok") || !out.B("enabled") || out.S("config.prompt") != "Check @gcal-1__get_calendar" || out.S("config.quietHours.start") != "23:00" || out.S("config.quietHours.end") != "07:00" || out.S("mentions.0") != "gcal-1__get_calendar" {
 		t.Fatalf("%s", out)
 	}
+	// The patch as a JSON string, as a model sent it in rpt_0mwvv5qhz3okuxpir6e.
+	out = conntest.Exec(t, pt.Tool, `{"patch":"{\"prompt\": \"Read @gcal-1__get_calendar first\"}"}`)
+	if !out.B("ok") || out.S("config.prompt") != "Read @gcal-1__get_calendar first" || out.S("config.quietHours.start") != "23:00" {
+		t.Fatalf("string patch: %s", out)
+	}
 	out = conntest.Exec(t, pt.Tool, `{"patch":{"checkEveryMin":1}}`)
 	if out.B("ok") || !strings.Contains(out.S("error"), "between 15 and 120") {
 		t.Fatalf("%s", out)

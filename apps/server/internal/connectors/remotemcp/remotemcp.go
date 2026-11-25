@@ -187,7 +187,13 @@ func Tools(deps Deps) *connectors.ToolSet {
 				listed := make([]any, len(defs))
 				for i, def := range defs {
 					cls := mcpconn.SuggestClass(def.Annotations)
-					prefs.Set(def.Name, kit.O("enabled", true, "class", cls))
+					if mcpconn.Hinted(def.Annotations) {
+						prefs.Set(def.Name, kit.O("enabled", true, "class", cls))
+					} else {
+						// No hints: left unclassified (destructive until the
+						// owner picks), so later hints can still fill it.
+						prefs.Set(def.Name, kit.O("enabled", true))
+					}
 					listed[i] = kit.O("name", id+"__"+def.Name, "class", cls, "description", strx.Slice16(def.Description, 200))
 				}
 				now := clock()

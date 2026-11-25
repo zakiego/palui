@@ -24,7 +24,7 @@ const ConfigSchema = 2
 const MaxPromptChars = 4000
 
 // MaxMentions caps the tools one prompt may mention.
-const MaxMentions = 10
+const MaxMentions = 16
 
 // Config is agent_proactive.config (RFC 9).
 type Config struct {
@@ -94,7 +94,7 @@ func (c Config) Validate() error {
 		return bad("The prompt can be at most %d characters", MaxPromptChars)
 	}
 	if n := len(Mentions(c.Prompt)); n > MaxMentions {
-		return bad("The prompt can mention at most %d tools, it mentions %d", MaxMentions, n)
+		return bad("The prompt can mention at most %d tools, it mentions %d. Drop the ones a run doesn't need", MaxMentions, n)
 	}
 	checks := []error{
 		between("Check every", c.CheckEveryMin, 15, 120),
@@ -255,6 +255,16 @@ func MergePatch(c Config, patch []byte) (Config, error) {
 	}
 	if err := json.Unmarshal(patch, &p); err != nil {
 		return Config{}, bad("The change isn't valid JSON")
+	}
+	// Models often send the object as a JSON string ("{\"prompt\": ...}").
+	// A string can't be a config, so read the object inside it.
+	if s, ok := p.(string); ok {
+		if err := json.Unmarshal([]byte(s), &p); err != nil {
+			return Config{}, bad(`The change must be a JSON object, like {"prompt": "..."}`)
+		}
+	}
+	if _, ok := p.(map[string]any); !ok {
+		return Config{}, bad(`The change must be a JSON object, like {"prompt": "..."}`)
 	}
 	merged, err := json.Marshal(mergeValue(doc, p))
 	if err != nil {
