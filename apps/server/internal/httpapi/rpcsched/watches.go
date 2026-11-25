@@ -44,6 +44,7 @@ type watchView struct {
 	DoneWhen    string        `json:"doneWhen"`
 	EveryMin    int64         `json:"everyMin"`
 	ExpiresAt   int64         `json:"expiresAt"`
+	StartsAt    *int64        `json:"startsAt"`
 	Status      string        `json:"status"`
 	NextCheckAt *int64        `json:"nextCheckAt"`
 	Checks      int64         `json:"checks"`
@@ -86,7 +87,7 @@ func getWatches(c *httpapi.Call) (any, error) {
 		out := []watchView{}
 		for _, w := range all {
 			out = append(out, watchView{
-				ID: w.ID, Topic: w.Topic, Question: w.Question, DoneWhen: w.DoneWhen, EveryMin: w.EveryMin, ExpiresAt: w.ExpiresAt,
+				ID: w.ID, Topic: w.Topic, Question: w.Question, DoneWhen: w.DoneWhen, EveryMin: w.EveryMin, ExpiresAt: w.ExpiresAt, StartsAt: w.StartsAt,
 				Status: w.Status, NextCheckAt: w.NextCheckAt, Checks: w.Checks, Fails: w.Fails, LastCheckAt: w.LastCheckAt,
 				LastRunID: w.LastRunID, LastError: w.LastError, LastSummary: w.LastSummary, Result: w.Result,
 				TokensUsed: w.TokensUsed, TokenCap: w.TokenCap, EndedAt: w.EndedAt, CreatedAt: w.CreatedAt, CreatedBy: w.CreatedBy,

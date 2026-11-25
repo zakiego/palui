@@ -764,13 +764,15 @@ type Watch struct {
 	EndedAt     *int64  `json:"endedAt"`
 	CreatedAt   int64   `json:"createdAt"`
 	UpdatedAt   int64   `json:"updatedAt"`
+	// StartsAt is when checking begins; nil means when it was made.
+	StartsAt *int64 `json:"startsAt"`
 }
 
-const WatchCols = "id, chat_id, agent_id, created_by, topic, question, done_when, every_min, expires_at, status, next_check_at, lease_until, checks, fails, last_check_at, last_run_id, last_error, notes, last_summary, tokens_used, token_cap, result, outbox_id, ended_at, created_at, updated_at"
+const WatchCols = "id, chat_id, agent_id, created_by, topic, question, done_when, every_min, expires_at, status, next_check_at, lease_until, checks, fails, last_check_at, last_run_id, last_error, notes, last_summary, tokens_used, token_cap, result, outbox_id, ended_at, created_at, updated_at, starts_at"
 
 func ScanWatch(s Scanner) (Watch, error) {
 	var w Watch
-	err := s.Scan(&w.ID, &w.ChatID, &w.AgentID, &w.CreatedBy, &w.Topic, &w.Question, &w.DoneWhen, &w.EveryMin, &w.ExpiresAt, &w.Status, &w.NextCheckAt, &w.LeaseUntil, &w.Checks, &w.Fails, &w.LastCheckAt, &w.LastRunID, &w.LastError, &w.Notes, &w.LastSummary, &w.TokensUsed, &w.TokenCap, &w.Result, &w.OutboxID, &w.EndedAt, &w.CreatedAt, &w.UpdatedAt)
+	err := s.Scan(&w.ID, &w.ChatID, &w.AgentID, &w.CreatedBy, &w.Topic, &w.Question, &w.DoneWhen, &w.EveryMin, &w.ExpiresAt, &w.Status, &w.NextCheckAt, &w.LeaseUntil, &w.Checks, &w.Fails, &w.LastCheckAt, &w.LastRunID, &w.LastError, &w.Notes, &w.LastSummary, &w.TokensUsed, &w.TokenCap, &w.Result, &w.OutboxID, &w.EndedAt, &w.CreatedAt, &w.UpdatedAt, &w.StartsAt)
 	return w, err
 }
 

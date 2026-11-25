@@ -819,6 +819,7 @@
     ],
     "notes": [
      "A watch checks with the agent's read tools (web search, fetch page, any read MCP tool) every 15 to 1440 minutes, 30 by default.",
+     "It can start later (\"mulai jam 16.00 besok\"): nothing is checked before its start time, and the first check runs right at it.",
      "It posts once, with the answer and its source, and stops. It ends after 7 days by default, 14 days at most, with a short note if nothing was found.",
      "Anyone the agent answers in a chat can set one there. A chat has at most 10 running, and each watch may spend up to 1,000,000 tokens."
     ]
@@ -3370,7 +3371,7 @@
      {
       "name": "watch_for",
       "title": "Watch for something",
-      "description": "Keep checking for something that isn't out yet and tell this chat once it is: an official figure, an announcement, a result, a release, a price or status change. Use it when someone asks to be told when something happens, or offer it when you find the answer doesn't exist yet but will (\"belum keluar, mau aku kabarin pas udah keluar?\"). Each check runs on its own later with your read tools and no chat history, so put everything it needs in question and doneWhen. It posts once with the answer and source, then stops; if the time runs out first, it posts a short note. Repeat the returned message so people know when it ends.",
+      "description": "Keep checking for something that isn't out yet and tell this chat once it is: an official figure, an announcement, a result, a release, a price or status change. Use it when someone asks to be told when something happens, or offer it when you find the answer doesn't exist yet but will (\"belum keluar, mau aku kabarin pas udah keluar?\"). When it can't happen before a known time (a market close, an announcement at a set hour), set startAt so it doesn't spend checks before then. Each check runs on its own later with your read tools and no chat history, so put everything it needs in question and doneWhen. It posts once with the answer and source, then stops; if the time runs out first, it posts a short note. Repeat the returned message so people know when it ends.",
       "class": "write",
       "untrusted": false,
       "guestSafe": false,
@@ -3405,8 +3406,13 @@
          "minimum": 15,
          "maximum": 1440
         },
+        "startAt": {
+         "description": "Start checking only at this wall-clock time (YYYY-MM-DDTHH:mm, in the owner's zone), when the thing can't happen before it, like a closing price, a result announced at a set hour or a release at a known time. Nothing is checked before it and the first check runs right at it. Leave it out to start now. Must be before the end and within 14 days from now.",
+         "type": "string",
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2})?$"
+        },
         "hours": {
-         "description": "How long to keep watching, in hours from now. Default 168 (7 days), at most 336 (14 days). Ignored when until is given.",
+         "description": "How long to keep watching, in hours from the start (startAt, or now). Default 168 (7 days). The end can be at most 336 hours (14 days) from now. Ignored when until is given.",
          "type": "integer",
          "minimum": 1,
          "maximum": 336

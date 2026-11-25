@@ -490,6 +490,7 @@ type Watch struct {
 	EndedAt            *int64
 	CreatedBy          string
 	CreatedAt          int64
+	StartsAt           *int64
 }
 
 func (k *Kit) Watch(v Watch) string {
@@ -528,7 +529,7 @@ func (k *Kit) Watch(v Watch) string {
 		col{"done_when", doneWhen}, col{"every_min", every}, col{"expires_at", v.ExpiresAt}, col{"status", status}, col{"next_check_at", nullable(v.NextCheckAt)},
 		col{"lease_until", lease}, col{"checks", v.Checks}, col{"fails", v.Fails}, col{"last_check_at", nullable(v.LastCheckAt)}, col{"last_run_id", nullable(v.LastRunID)}, col{"last_error", nullable(v.LastError)},
 		col{"last_summary", v.LastSummary}, col{"tokens_used", v.TokensUsed}, col{"token_cap", int64(1_000_000)}, col{"result", nullable(v.Result)},
-		col{"ended_at", nullable(v.EndedAt)}, col{"created_at", created}, col{"updated_at", updated})
+		col{"ended_at", nullable(v.EndedAt)}, col{"created_at", created}, col{"updated_at", updated}, col{"starts_at", nullable(v.StartsAt)})
 	return id
 }
 

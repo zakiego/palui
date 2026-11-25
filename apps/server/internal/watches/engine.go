@@ -260,6 +260,14 @@ func runTokens(q db.Q, runID string) int64 {
 	return in + out
 }
 
+// started is when the watch began checking: its start time, or when it was made.
+func started(w db.Watch) int64 {
+	if w.StartsAt != nil {
+		return *w.StartsAt
+	}
+	return w.CreatedAt
+}
+
 // Prompt is the check turn's message. The question and the condition are what
 // someone in the chat asked for; the notes are the model's own from earlier
 // checks. Everything the tools return is data.
@@ -295,7 +303,7 @@ or
 - notes: your memory for the next check, at most 1,500 characters: what you already found and where, so you don't count it as new next time.
 - summary: one line on where things stand now, shown if the watch ends without finding it.`,
 		w.ID, w.Question, w.DoneWhen,
-		reminders.FormatWhen(w.CreatedAt, tz, now), createdBy(w), reminders.FormatWhen(w.ExpiresAt, tz, now), w.Checks+1, last,
+		reminders.FormatWhen(started(w), tz, now), createdBy(w), reminders.FormatWhen(w.ExpiresAt, tz, now), w.Checks+1, last,
 		notes)
 }
 

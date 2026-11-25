@@ -283,3 +283,68 @@ func TestEngine(t *testing.T) {
 		}
 	})
 }
+
+func TestStartsAt(t *testing.T) {
+	in := func(chatID string, starts int64) watches.CreateInput {
+		return watches.CreateInput{ChatID: chatID, Topic: "Closing BBCA", Question: "BBCA closing price today", DoneWhen: "The final closing price for today.", EveryMin: 15, ExpiresAt: NOW + 30*HOUR, StartsAt: starts}
+	}
+	t.Run("no check before the start, the first one right at it", func(t *testing.T) {
+		d, chatID, _ := tu.Setup(t)
+		w, err := watches.Create(d, in(chatID, NOW+22*HOUR), NOW)
+		tu.Must(t, err)
+		if w.StartsAt == nil || *w.StartsAt != NOW+22*HOUR || *w.NextCheckAt != NOW+22*HOUR {
+			t.Fatalf("%+v", w)
+		}
+		clock := NOW
+		f := &fake{answers: []string{notMet, notMet}}
+		e := engine(d, f, &clock)
+		// Every 15 minutes up to a minute before the start: nothing runs.
+		for clock = NOW + 15*MIN; clock < NOW+22*HOUR; clock += 15 * MIN {
+			_, _ = e.Sweep(clock)
+		}
+		_, _ = e.Sweep(NOW + 22*HOUR - 1)
+		if len(f.calls) != 0 || get(t, d, w.ID).Checks != 0 {
+			t.Fatalf("checked %d times before the start", len(f.calls))
+		}
+		if due, ok, err := watches.NextDue(d); err != nil || !ok || due != NOW+22*HOUR {
+			t.Fatal(due, ok, err)
+		}
+		clock = NOW + 22*HOUR
+		_, _ = e.Sweep(clock)
+		got := get(t, d, w.ID)
+		if len(f.calls) != 1 || got.Checks != 1 || *got.NextCheckAt != clock+15*MIN {
+			t.Fatalf("%d calls, %+v", len(f.calls), got)
+		}
+		if !strings.Contains(f.calls[0].Prompt, "first check") {
+			t.Fatal(f.calls[0].Prompt)
+		}
+	})
+	t.Run("refuses a start that passed or isn't before the end", func(t *testing.T) {
+		d, chatID, _ := tu.Setup(t)
+		for _, c := range []struct {
+			starts int64
+			msg    string
+		}{
+			{NOW, "already passed"},
+			{NOW - HOUR, "already passed"},
+			{NOW + 30*HOUR, "before the end"},
+			{NOW + 31*HOUR, "before the end"},
+		} {
+			var we *watches.WatchError
+			if _, err := watches.Create(d, in(chatID, c.starts), NOW); !errors.As(err, &we) || !strings.Contains(we.Msg, c.msg) {
+				t.Fatalf("start %d: %v", c.starts-NOW, err)
+			}
+		}
+		if n := count(t, d, "SELECT count(*) FROM watches"); n != 0 {
+			t.Fatal(n)
+		}
+	})
+	t.Run("a watch without a start begins now as before", func(t *testing.T) {
+		d, chatID, _ := tu.Setup(t)
+		w, err := watches.Create(d, in(chatID, 0), NOW)
+		tu.Must(t, err)
+		if w.StartsAt != nil || *w.NextCheckAt != NOW+15*MIN {
+			t.Fatalf("%+v", w)
+		}
+	})
+}

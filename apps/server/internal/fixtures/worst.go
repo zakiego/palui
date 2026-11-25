@@ -556,7 +556,8 @@ func worst(k *Kit) {
 	remind(Reminder{ChatID: priya.ID, Text: "Old one", TZ: "Asia/Makassar", FireAt: now - 3*365*D, Status: "done", LastFiredAt: ptr(now - 3*365*D), UpdatedAt: ptr(now - 4000)})
 	remind(Reminder{ChatID: sam.ID, Text: "No timestamp", TZ: "UTC", FireAt: 0, Status: "done", UpdatedAt: ptr(now - 5000)})
 
-	// --- watches (PLAN 6e): topic at most 80 units, summary 300, message 3000 ---
+	// --- watches (PLAN 6e): topic at most 80 units, summary 300, message 3000.
+	// The CJK one hasn't started yet (starts_at) ---
 	watch := k.Watch
 	// Running, by next check. The first is overdue (Palui was down), one failure
 	// from stopping and one token from its cap.
@@ -567,7 +568,7 @@ func worst(k *Kit) {
 	watch(Watch{ChatID: arabic.ID, Topic: "إعلان نتائج القبول الجامعي", NextCheckAt: ptr(now + 4*MIN), ExpiresAt: now + 2*D, Checks: 3, LastCheckAt: ptr(now - 26*MIN), LastSummary: "لم يتم نشر النتائج بعد على الموقع الرسمي", TokensUsed: 12_480})
 	watch(Watch{ChatID: script.ID, Topic: "<script>alert(1)</script> &amp; **bold**", NextCheckAt: ptr(now + 20*MIN), ExpiresAt: now + 3*D, Checks: 1, LastCheckAt: ptr(now - 10*MIN), LastSummary: "<img src=x onerror=alert(1)>", TokensUsed: 2_100})
 	watch(Watch{ChatID: fox.ID, Topic: "🦊", NextCheckAt: ptr(now + 23*H), ExpiresAt: now + 23*H, EveryMin: 1440, Checks: 6, LastCheckAt: ptr(now - H), LastSummary: worstLongURL, TokensUsed: 48_000})
-	watch(Watch{ChatID: cjk.ID, Topic: "苹果新品发布会日期", NextCheckAt: ptr(now + 5*H), ExpiresAt: now + 14*D, EveryMin: 360, LastSummary: ""})
+	watch(Watch{ChatID: cjk.ID, Topic: "苹果新品发布会日期", NextCheckAt: ptr(now + 5*H), ExpiresAt: now + 14*D, EveryMin: 360, LastSummary: "", StartsAt: ptr(now + 5*H)})
 	// Ended, newest first.
 	watch(Watch{ChatID: family.ID, Topic: within(fill("Pengumuman hasil seleksi CPNS Kemenkeu formasi 2026 ", 80), 80), Status: "done", ExpiresAt: now + 5*D, Checks: 212, LastCheckAt: ptr(now - MIN), LastRunID: &bigRun,
 		LastSummary: "Sudah keluar.", Result: ptr(within(fill("Pengumuman resmi sudah terbit di "+worstLongURL+" , daftar nama ada di lampiran PDF halaman 4 sampai 37. ", 3000), 3000)),
