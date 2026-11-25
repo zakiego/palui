@@ -13,7 +13,7 @@ import (
 )
 
 // MaxMessageChars caps a proactive message (RFC 2).
-const MaxMessageChars = 700
+const MaxMessageChars = 1500
 
 // MaxFieldChars caps one value shown in a line.
 const MaxFieldChars = 200
@@ -101,23 +101,6 @@ func Label(n db.Nudge) string {
 		return Field(s.Title)
 	}
 	return n.Subject
-}
-
-// Buttons is the owner's actions on a proactive message (RFC 2): they apply
-// to every item the message carries.
-func Buttons(first db.Nudge, lang string) []db.OutboxAction {
-	id := first.ID
-	labels := [5]string{"Selesai", "1j", "3j", "Besok", "Jangan ingetin"}
-	if lang == "en" {
-		labels = [5]string{"Done", "1h", "3h", "Tomorrow", "Stop these"}
-	}
-	return []db.OutboxAction{
-		{ID: "ndg:done:" + id, Label: labels[0]},
-		{ID: "ndg:snooze:" + id + ":1h", Label: labels[1]},
-		{ID: "ndg:snooze:" + id + ":3h", Label: labels[2]},
-		{ID: "ndg:snooze:" + id + ":tomorrow", Label: labels[3]},
-		{ID: "ndg:mute:" + id, Label: labels[4]},
-	}
 }
 
 // agentModel resolves the agent's chain for a role, metered to the global and

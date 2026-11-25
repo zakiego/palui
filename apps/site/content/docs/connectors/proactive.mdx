@@ -28,7 +28,12 @@ starts, with the link. If an event moves, tell me right away.
 Check @wa-inbox__waiting_chats. Tell me about direct messages waiting for my reply
 for more than 2 hours, only when they look like they need an answer. Skip groups,
 promos, receipts and one-time codes.
+
+Start each message with "Hai Zaki 👋, ini yang perlu kamu cek:", then number the
+items, each with an emoji for where it came from.
 ```
+
+The prompt also sets how the messages read: greeting, order, numbering, emoji. Without that, the items found in one run go out as one message, one paragraph each.
 
 ## Mentions
 
@@ -66,7 +71,7 @@ When the tools return exactly what they returned last time and nothing else chan
 
 Proactive keeps short notes between runs, listed on the tab:
 
-- **Yours** never expire. Add them on the tab, from chat ("inget ya, Pak Budi selalu bales telat"), or by replying to a proactive message with something that isn't a button. The agent still answers that reply as usual.
+- **Yours** never expire. Add them on the tab, from chat ("inget ya, Pak Budi selalu bales telat"), or by replying to a proactive message with something that isn't "done", a snooze or "jangan ingetin". The agent still answers that reply as usual.
 - **The agent's** are things no tool will tell it again, like "Pak Budi promised the papers tomorrow". They expire after 7 days by default and 30 at most. **Keep** turns one into yours.
 
 Memory holds 50 notes or 4,000 characters. When it's full, the agent's oldest notes go first. Proactive memory is separate from the agent's long-term [memory](/docs/connectors/recall); a run can read that one by mentioning its tool.
@@ -82,7 +87,7 @@ All offered only in your own turns in your DM or the web chat:
 - `list_nudges` lists what proactive said today and what happened to each.
 - `check_proactive_now` runs within a minute.
 
-Each proactive message has buttons: **Selesai**, **1j**, **3j**, **Besok** and **Jangan ingetin**. On WhatsApp, reply to the message with "done", "tunda 3 jam" or "jangan ingetin".
+To act on a proactive message, reply to it with "done", "tunda 3 jam", "besok" or "jangan ingetin".
 
 ## Safety
 

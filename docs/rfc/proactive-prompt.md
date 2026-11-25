@@ -41,7 +41,7 @@ Non-goals
 | | Morning and evening summary times, on or off |
 | | Target chat (owner audience only) |
 | | Model role and the agent's daily token cap |
-| | Output: plain text, at most 700 characters per message, done, snooze (1h, 3h, tomorrow) and mute buttons |
+| | Output: plain text, at most 1,500 characters per message. The prompt sets the wording of what goes out now (`message`); no buttons, replies act on it (done, snooze 1h, 3h, tomorrow, mute) |
 | | Dedup by key, timed sends, expiry of stale items |
 
 ## 3. Mentions
