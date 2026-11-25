@@ -31,7 +31,7 @@ var want = map[string]string{
 	// connectors.ts
 	"getConnectorsPage": "GET", "getConnectorDetail": "GET", "pauseConnectorFn": "POST", "resumeConnectorFn": "POST",
 	"removeConnectorFn": "POST", "saveConnectorDraft": "POST", "connectConnectorFn": "POST", "testConnectorFn": "POST",
-	"connectorActionFn": "POST", "setWhatsAppOwnerFn": "POST", "setConnectorOwnerFn": "POST", "setConnectorDataFn": "POST", "applySuggestedToolClassesFn": "POST", "duplicateConnectorFn": "POST",
+	"connectorActionFn": "POST", "setWhatsAppOwnerFn": "POST", "setConnectorOwnerFn": "POST", "setConnectorDataFn": "POST", "applySuggestedToolClassesFn": "POST", "duplicateConnectorFn": "POST", "updateConnectorFn": "POST",
 	// dev-fixtures.ts
 	"getFixtureState": "GET", "setFixture": "POST",
 	// flows.ts
@@ -61,8 +61,8 @@ var want = map[string]string{
 var public = map[string]bool{"getSession": true, "getInvite": true, "acceptInvite": true}
 
 func TestEveryServerFunctionIsRegistered(t *testing.T) {
-	if len(want) != 107 {
-		t.Fatalf("the list has %d names, want 107", len(want))
+	if len(want) != 108 {
+		t.Fatalf("the list has %d names, want 108", len(want))
 	}
 	got := map[string]httpapi.Handler{}
 	for _, h := range httpapi.Handlers() {
