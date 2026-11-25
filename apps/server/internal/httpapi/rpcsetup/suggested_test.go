@@ -15,7 +15,8 @@ func TestApplySuggestedToolClassesFillsOnlyUnsavedTools(t *testing.T) {
 		`{"name":"search","suggestedClass":"read","saved":true},` +
 		`{"name":"add_note","suggestedClass":"write","saved":false},` +
 		`{"name":"list_todos","suggestedClass":"read","saved":false},` +
-		`{"name":"mystery","suggestedClass":"destructive","saved":false}]}}`))
+		`{"name":"mystery","suggestedClass":"destructive","saved":false},` +
+		`{"name":"get_notebook","suggestedClass":"destructive","hinted":false,"saved":false}]}}`))
 	testutil.Must(t, err)
 	actions := jsonx.NewMap[*jsonx.Object]()
 	actions.Set("listTools", listTools)

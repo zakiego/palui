@@ -72,6 +72,14 @@ func SuggestClass(a *sdk.ToolAnnotations) string {
 	return "destructive"
 }
 
+// Hinted says whether a tool's annotations say anything about its class. A
+// tool without readOnlyHint or destructiveHint gets "destructive" from
+// SuggestClass by default, which is no suggestion at all: it stays
+// unclassified until the owner picks a class.
+func Hinted(a *sdk.ToolAnnotations) bool {
+	return a != nil && (a.ReadOnlyHint || a.DestructiveHint != nil)
+}
+
 // AuthHeaders is authHeaders.
 func AuthHeaders(mode, headerName, token string) map[string]string {
 	if mode == "none" || token == "" {

@@ -177,7 +177,7 @@ func Listing(defs []ToolDef, prefs map[string]ToolPref) []any {
 		if t := d.DisplayTitle(); t != "" {
 			o.Set("title", t)
 		}
-		kit.Spread(o, kit.O("description", d.Description, "suggestedClass", suggested, "enabled", enabled, "class", class, "saved", saved, "flowApproval", fa))
+		kit.Spread(o, kit.O("description", d.Description, "suggestedClass", suggested, "hinted", Hinted(d.Annotations), "enabled", enabled, "class", class, "saved", saved, "flowApproval", fa))
 		out = append(out, o)
 	}
 	return out
@@ -223,7 +223,9 @@ type Suggestion struct {
 }
 
 // SuggestionsFrom reads the rows of a listTools answer. A class that isn't
-// read or write is destructive.
+// read or write is destructive. A row marked "hinted": false (the server sent
+// no class hints) is left out, so its tool stays unclassified instead of being
+// saved as destructive: a saved class sticks even after the server adds hints.
 func SuggestionsFrom(listed *jsonx.Object) []Suggestion {
 	var out []Suggestion
 	if listed == nil {
@@ -238,6 +240,9 @@ func SuggestionsFrom(listed *jsonx.Object) []Suggestion {
 		}
 		name := str(o, "name")
 		if name == "" {
+			continue
+		}
+		if h, ok := o.Get("hinted"); ok && h == false {
 			continue
 		}
 		cls := str(o, "suggestedClass")
