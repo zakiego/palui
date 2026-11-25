@@ -422,7 +422,8 @@ func New(opts Options) *connectors.Runtime {
 						if title == "" {
 							title = p.Def.Name
 						}
-						set.Set(p.Def.Name, connectors.PaluiTool{Tool: WithFileRefs(tool, c.DB, &t, untrusted, masterKey), Class: p.Class, Suggested: p.Suggested, Untrusted: untrusted, FlowApproval: p.FlowApproval, Title: title})
+						tool = WithResultFiles(WithFileRefs(tool, c.DB, &t, untrusted, masterKey), c.DB, &t, title, masterKey, nil)
+						set.Set(p.Def.Name, connectors.PaluiTool{Tool: tool, Class: p.Class, Suggested: p.Suggested, Untrusted: untrusted, FlowApproval: p.FlowApproval, Title: title})
 					}
 					return set, nil
 				},
