@@ -27,6 +27,7 @@ import (
 	settingsconn "github.com/zakiego/palui/apps/server/internal/connectors/settings"
 	t3conn "github.com/zakiego/palui/apps/server/internal/connectors/t3code"
 	wainboxconn "github.com/zakiego/palui/apps/server/internal/connectors/wainbox"
+	watchesconn "github.com/zakiego/palui/apps/server/internal/connectors/watches"
 	webfetchconn "github.com/zakiego/palui/apps/server/internal/connectors/webfetch"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
@@ -99,6 +100,7 @@ func catalogBuilders(t *testing.T, e *catalogEnv) map[string]map[string]*connect
 		"printer":     {"default": printerconn.Tools(e.db, e.owner, printerconn.Config{URL: "ipp://host.docker.internal:631/printers/My_Printer"}, printerconn.Options{})},
 		"outbound":    {"owner": must(outboundconn.Tools(e.db, e.owner, clock)), "unattended": must(outboundconn.Tools(e.db, unattended, clock))},
 		"reminders":   {"default": remindersconn.Tools(e.db, e.owner, clock)},
+		"watches":     {"default": watchesconn.Tools(e.db, e.owner, clock)},
 		"remote-mcp":  {"default": remotemcp.Tools(remotemcp.Deps{DB: e.db, MasterKey: testutil.TestKey, Clock: clock})},
 		"settings":    {"default": must(settingsconn.Tools(e.db, clock, "")), "agent": must(settingsconn.Tools(e.db, clock, e.agentID))},
 		"webfetch":    {"default": started(webfetchconn.Runtime)},
