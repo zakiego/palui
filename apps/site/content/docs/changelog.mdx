@@ -28,6 +28,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - Added: Calendar feed connector reads any calendar from its secret iCal link, with recurring events expanded. ([#32](https://github.com/zakiego/palui/pull/32))
 - Added: WhatsApp inbox connector links your own number read only and lists chats waiting for your reply. Adds a migration. ([#32](https://github.com/zakiego/palui/pull/32))
 - Added: Images and files an MCP tool returns are saved as chat attachments, so the agent can send them in the chat. ([#34](https://github.com/zakiego/palui/pull/34))
+- Fixed: a saved file passed to an MCP tool by its `fileRef` now arrives as raw base64 or a data URL, whichever the tool's field asks for, nested fields included. Before, every tool got a data URL, so tools like a code sandbox rejected it as invalid base64.
 
 ### API
 
