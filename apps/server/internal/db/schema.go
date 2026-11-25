@@ -730,6 +730,45 @@ func ScanReminder(s Scanner) (Reminder, error) {
 	return r, err
 }
 
+// Watch is a watches row (PLAN 6e). Status is active, checking, done,
+// expired, cancelled or failed.
+type Watch struct {
+	ID          string  `json:"id"`
+	ChatID      string  `json:"chatId"`
+	AgentID     *string `json:"agentId"`
+	CreatedBy   string  `json:"createdBy"`
+	Topic       string  `json:"topic"`
+	Question    string  `json:"question"`
+	DoneWhen    string  `json:"doneWhen"`
+	EveryMin    int64   `json:"everyMin"`
+	ExpiresAt   int64   `json:"expiresAt"`
+	Status      string  `json:"status"`
+	NextCheckAt *int64  `json:"nextCheckAt"`
+	LeaseUntil  *int64  `json:"leaseUntil"`
+	Checks      int64   `json:"checks"`
+	Fails       int64   `json:"fails"`
+	LastCheckAt *int64  `json:"lastCheckAt"`
+	LastRunID   *string `json:"lastRunId"`
+	LastError   *string `json:"lastError"`
+	Notes       string  `json:"notes"`
+	LastSummary string  `json:"lastSummary"`
+	TokensUsed  int64   `json:"tokensUsed"`
+	TokenCap    int64   `json:"tokenCap"`
+	Result      *string `json:"result"`
+	OutboxID    *string `json:"outboxId"`
+	EndedAt     *int64  `json:"endedAt"`
+	CreatedAt   int64   `json:"createdAt"`
+	UpdatedAt   int64   `json:"updatedAt"`
+}
+
+const WatchCols = "id, chat_id, agent_id, created_by, topic, question, done_when, every_min, expires_at, status, next_check_at, lease_until, checks, fails, last_check_at, last_run_id, last_error, notes, last_summary, tokens_used, token_cap, result, outbox_id, ended_at, created_at, updated_at"
+
+func ScanWatch(s Scanner) (Watch, error) {
+	var w Watch
+	err := s.Scan(&w.ID, &w.ChatID, &w.AgentID, &w.CreatedBy, &w.Topic, &w.Question, &w.DoneWhen, &w.EveryMin, &w.ExpiresAt, &w.Status, &w.NextCheckAt, &w.LeaseUntil, &w.Checks, &w.Fails, &w.LastCheckAt, &w.LastRunID, &w.LastError, &w.Notes, &w.LastSummary, &w.TokensUsed, &w.TokenCap, &w.Result, &w.OutboxID, &w.EndedAt, &w.CreatedAt, &w.UpdatedAt)
+	return w, err
+}
+
 // Job is a jobs row. Kind is job, heartbeat or briefing; ModelRole default,
 // fast or vision; Status idle or running. ToolScope nil means every enabled
 // connector.

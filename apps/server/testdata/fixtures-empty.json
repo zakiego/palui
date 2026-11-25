@@ -219,6 +219,10 @@
   "wa_inbox_chats": {
    "columns": ["connector_id","chat_jid","kind","name","last_in_at","last_out_at","waiting_since","unanswered","preview","updated_at"],
    "rows": []
+  },
+  "watches": {
+   "columns": ["id","chat_id","agent_id","created_by","topic","question","done_when","every_min","expires_at","status","next_check_at","lease_until","checks","fails","last_check_at","last_run_id","last_error","notes","last_summary","tokens_used","token_cap","result","outbox_id","ended_at","created_at","updated_at"],
+   "rows": []
   }
  }
 }
