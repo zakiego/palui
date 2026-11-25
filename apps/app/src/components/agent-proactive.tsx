@@ -5,6 +5,7 @@ import * as React from "react"
 import { BellIcon, BellOffIcon, BookmarkIcon, CircleAlertIcon, MoonIcon, PlayIcon, RefreshCwIcon, SunIcon, Trash2Icon, WrenchIcon } from "lucide-react"
 import { TelegramIcon, WhatsAppIcon } from "@/components/brand-icons"
 import { toast } from "sonner"
+import { bindLayer, position } from "@ui-sdk/core"
 
 import { SimpleSelect, type Option } from "@/components/simple-select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -562,24 +563,98 @@ function TestResult({ r, t }: { r: ProactiveTestResult; t: T }) {
   )
 }
 
+// The prompt split into plain text and mentions, for the highlight layer
+// behind the textarea. A mention with a problem is flagged.
+function promptParts(prompt: string, tools: ProactiveTool[]): { text: string; mention?: "ok" | "problem" }[] {
+  const out: { text: string; mention?: "ok" | "problem" }[] = []
+  let last = 0
+  for (const m of prompt.matchAll(MENTION_RE)) {
+    const at = (m.index ?? 0) + m[1].length
+    if (at > last) out.push({ text: prompt.slice(last, at) })
+    out.push({ text: "@" + m[2], mention: problemFor(m[2], tools) ? "problem" : "ok" })
+    last = at + m[2].length + 1
+  }
+  out.push({ text: prompt.slice(last) })
+  return out
+}
+
+// The textarea styles that decide where a character lands, copied onto the
+// mirror caretOffset measures in.
+const MIRROR_STYLES = [
+  "boxSizing", "fontFamily", "fontSize", "fontWeight", "fontStyle", "fontFeatureSettings", "fontVariationSettings", "letterSpacing", "lineHeight", "textTransform", "textIndent", "wordSpacing", "tabSize",
+  "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
+] as const
+
+// caretOffset is where character index sits inside the textarea's content,
+// before scrolling: a hidden copy of the text up to it, wrapped the same way.
+function caretOffset(el: HTMLTextAreaElement, index: number): { left: number; top: number; height: number } {
+  const style = getComputedStyle(el)
+  const mirror = document.createElement("div")
+  for (const k of MIRROR_STYLES) mirror.style[k] = style[k]
+  Object.assign(mirror.style, { position: "absolute", top: "0", left: "-9999px", visibility: "hidden", whiteSpace: "pre-wrap", overflowWrap: "break-word", width: `${el.clientWidth + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)}px` })
+  mirror.textContent = el.value.slice(0, index)
+  const mark = document.createElement("span")
+  mark.textContent = "\u200b"
+  mirror.append(mark)
+  document.body.append(mirror)
+  const out = { left: mark.offsetLeft, top: mark.offsetTop, height: mark.offsetHeight || parseFloat(style.lineHeight) || 20 }
+  mirror.remove()
+  return out
+}
+
 // MentionTextarea is a textarea that suggests tools after "@". It follows the
 // combobox pattern on the textbox itself: the list is announced through
 // aria-activedescendant, arrows move, Enter or Tab inserts, Escape closes.
+// The list sits in the top layer (ui-sdk's bindLayer), so the card's
+// overflow can't clip it, and it hangs under the "@" being typed.
 function MentionTextarea({ id, value, onChange, tools, t, invalid }: { id: string; value: string; onChange: (v: string) => void; tools: ProactiveTool[]; t: T; invalid: boolean }) {
   const count = useCount()
   const ref = React.useRef<HTMLTextAreaElement>(null)
+  const listRef = React.useRef<HTMLDivElement>(null)
+  const backRef = React.useRef<HTMLDivElement>(null)
+  const parts = React.useMemo(() => promptParts(value, tools), [value, tools])
+
+  // The highlight layer copies the textarea's scroll, and its scrollbar's
+  // width so lines wrap at the same place.
+  const sync = React.useCallback(() => {
+    const box = ref.current
+    const back = backRef.current
+    if (!box || !back) return
+    const style = getComputedStyle(box)
+    const bar = box.offsetWidth - box.clientWidth - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth)
+    back.style.paddingRight = `calc(${style.paddingRight} + ${Math.max(0, bar)}px)`
+    back.scrollTop = box.scrollTop
+    back.scrollLeft = box.scrollLeft
+  }, [])
+  React.useLayoutEffect(sync, [sync, value])
+  React.useEffect(() => {
+    const box = ref.current
+    if (!box || typeof ResizeObserver === "undefined") return
+    const ro = new ResizeObserver(sync)
+    ro.observe(box)
+    return () => ro.disconnect()
+  }, [sync])
   const listId = React.useId()
   const [query, setQuery] = React.useState<{ start: number; text: string } | null>(null)
   const [active, setActive] = React.useState(0)
 
-  const options = React.useMemo(() => {
+  // Read tools first (the only ones that can be picked), cut to 8, then
+  // grouped by connector so each one gets a single heading.
+  const groups = React.useMemo(() => {
     if (!query) return []
     const q = query.text.toLowerCase()
     const hit = (x: ProactiveTool) => !q || x.name.toLowerCase().includes(q) || x.connectorLabel.toLowerCase().includes(q) || (x.title ?? "").toLowerCase().includes(q)
     const list = tools.filter(hit)
-    // Read tools first: they're the only ones that can be picked.
-    return [...list.filter((x) => x.class === "read"), ...list.filter((x) => x.class !== "read")].slice(0, 8)
+    const picked = [...list.filter((x) => x.class === "read"), ...list.filter((x) => x.class !== "read")].slice(0, 8)
+    const byConnector = new Map<string, { label: string; tools: ProactiveTool[] }>()
+    for (const x of picked) {
+      const g = byConnector.get(x.connectorId) ?? { label: x.connectorLabel, tools: [] }
+      g.tools.push(x)
+      byConnector.set(x.connectorId, g)
+    }
+    return [...byConnector.entries()].map(([connectorId, g]) => ({ connectorId, ...g }))
   }, [query, tools])
+  const options = React.useMemo(() => groups.flatMap((g) => g.tools), [groups])
   const open = query !== null
   const firstRead = options.findIndex((o) => o.class === "read")
 
@@ -594,6 +669,29 @@ function MentionTextarea({ id, value, onChange, tools, t, invalid }: { id: strin
     }
   }
   React.useEffect(() => setActive(Math.max(0, firstRead)), [query?.text, firstRead])
+
+  const start = query?.start
+  React.useLayoutEffect(() => {
+    const box = ref.current
+    const list = listRef.current
+    if (start === undefined || !box || !list) return
+    const at = caretOffset(box, start)
+    const stopLayer = bindLayer(list, { topLayer: true, contains: (target) => box.contains(target), onDismiss: () => setQuery(null) })
+    // Under the "@", kept inside the textarea when that line scrolls away.
+    const anchor = {
+      getBoundingClientRect: () => {
+        const r = box.getBoundingClientRect()
+        const x = Math.min(r.left + at.left - box.scrollLeft, r.right - 16)
+        const y = Math.min(Math.max(r.top + at.top - box.scrollTop, r.top), r.bottom - at.height)
+        return { x, y, left: x, top: y, width: 0, height: at.height, right: x, bottom: y + at.height }
+      },
+    }
+    const stopPosition = position(anchor, list, { side: "bottom", align: "start", sideOffset: 6, collisionPadding: 8 })
+    return () => {
+      stopPosition()
+      stopLayer()
+    }
+  }, [start])
 
   const insert = (tool: ProactiveTool) => {
     const el = ref.current
@@ -619,8 +717,33 @@ function MentionTextarea({ id, value, onChange, tools, t, invalid }: { id: strin
     setActive(i)
   }
 
+  // Keep the active row in view when the arrows move past the list's edge.
+  React.useEffect(() => {
+    if (open) document.getElementById(`${listId}-${active}`)?.scrollIntoView?.({ block: "nearest" })
+  }, [open, active, listId])
+
+  let index = -1
   return (
     <div className="relative">
+      {/* The text is drawn here, with mentions as code chips, and the
+          textarea on top keeps its caret and selection but paints no text. */}
+      <div
+        ref={backRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg border border-transparent bg-background px-2.5 py-2 font-mono text-sm leading-relaxed [overflow-wrap:break-word] whitespace-pre-wrap text-foreground"
+      >
+        {parts.map((p, i) =>
+          p.mention ? (
+            <span key={i} data-mention={p.mention} className={p.mention === "ok" ? "rounded-sm bg-(--primary-subtle) text-brand dark:text-[color-mix(in_lch,var(--brand),white_35%)]" : "rounded-sm bg-destructive/12 text-destructive"}>
+              {p.text}
+            </span>
+          ) : (
+            <React.Fragment key={i}>{p.text}</React.Fragment>
+          ),
+        )}
+        {/* A trailing newline needs a character after it to take up a line. */}
+        {"\u200b"}
+      </div>
       <Textarea
         ref={ref}
         id={id}
@@ -629,10 +752,12 @@ function MentionTextarea({ id, value, onChange, tools, t, invalid }: { id: strin
         spellCheck={false}
         aria-invalid={invalid || undefined}
         aria-autocomplete="list"
+        aria-expanded={open}
         aria-controls={open ? listId : undefined}
         aria-activedescendant={open && options[active] ? `${listId}-${active}` : undefined}
         placeholder={t("proactive.promptPlaceholder")}
-        className="max-h-[60vh] min-h-40 overflow-y-auto font-mono text-sm leading-relaxed"
+        className="relative max-h-[60vh] min-h-40 overflow-y-auto bg-transparent font-mono text-sm leading-relaxed text-transparent"
+        onScroll={sync}
         onChange={(e) => {
           onChange(e.target.value)
           track(e.target)
@@ -655,40 +780,54 @@ function MentionTextarea({ id, value, onChange, tools, t, invalid }: { id: strin
         }}
       />
       {open && (
-        <ul id={listId} role="listbox" aria-label={t("proactive.prompt")} className="absolute inset-x-0 top-full z-20 mt-1 flex max-h-72 flex-col overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-md">
+        // Same surface as the Select popup: no motion, since it opens on
+        // every "@" while typing.
+        <div
+          ref={listRef}
+          id={listId}
+          role="listbox"
+          aria-label={t("proactive.prompt")}
+          className="fixed z-50 m-0 flex max-h-[min(20rem,var(--available-height))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-y-auto overscroll-contain rounded-xl border-0 bg-popover p-1 text-start text-popover-foreground shadow-(--shadow-elevated)"
+          onMouseDown={(e) => e.preventDefault()}
+        >
           {options.length === 0 ? (
-            <li role="presentation" className="px-2 py-1.5 text-sm text-muted-foreground">
+            <div role="presentation" className="px-2 py-1.5 text-sm text-muted-foreground">
               {tools.some((x) => x.class === "read") ? t("proactive.noMatch") : t("proactive.noTools")}
-            </li>
+            </div>
           ) : (
-            options.map((o, i) => {
-              const disabled = o.class !== "read"
-              return (
-                <li
-                  key={o.name}
-                  id={`${listId}-${i}`}
-                  role="option"
-                  aria-selected={i === active}
-                  aria-disabled={disabled || undefined}
-                  className={`flex min-w-0 cursor-default flex-col rounded-md px-2 py-1.5 ${i === active ? "bg-accent text-accent-foreground" : ""} ${disabled ? "opacity-50" : ""}`}
-                  onMouseDown={(e) => {
-                    e.preventDefault()
-                    insert(o)
-                  }}
-                  onMouseMove={() => !disabled && setActive(i)}
-                >
-                  <span className="flex min-w-0 items-baseline justify-between gap-2">
-                    <span className="truncate text-sm">{o.title ?? o.tool}</span>
-                    <span className="shrink-0 text-caption text-muted-foreground">{disabled ? t("proactive.onlyRead") : o.untrusted ? t("proactive.outsideData") : ""}</span>
-                  </span>
-                  <span className="truncate font-mono text-caption text-muted-foreground">
-                    {o.connectorLabel} · @{o.name}
-                  </span>
-                </li>
-              )
-            })
+            groups.map((g) => (
+              <div key={g.connectorId} role="group" aria-labelledby={`${listId}-g-${g.connectorId}`} className="flex flex-col not-first:mt-1">
+                <div id={`${listId}-g-${g.connectorId}`} role="presentation" className="truncate px-2 pt-1.5 pb-1 text-xs font-medium text-muted-foreground">
+                  {g.label}
+                </div>
+                {g.tools.map((o) => {
+                  const i = ++index
+                  const disabled = o.class !== "read"
+                  const tag = disabled ? t("proactive.onlyRead") : o.untrusted ? t("proactive.outsideData") : ""
+                  return (
+                    <div
+                      key={o.name}
+                      id={`${listId}-${i}`}
+                      role="option"
+                      aria-selected={i === active}
+                      aria-disabled={disabled || undefined}
+                      data-highlighted={i === active ? "" : undefined}
+                      className="flex min-w-0 cursor-pointer flex-col gap-0.5 rounded-lg px-2 py-1.5 pointer-coarse:py-2.5 select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground aria-disabled:cursor-default aria-disabled:opacity-50"
+                      onClick={() => insert(o)}
+                      onMouseMove={() => !disabled && i !== active && setActive(i)}
+                    >
+                      <span className="flex min-w-0 items-baseline justify-between gap-3">
+                        <span className="truncate text-sm">{o.title ?? o.tool}</span>
+                        {tag && <span className="shrink-0 text-xs text-muted-foreground">{tag}</span>}
+                      </span>
+                      <span className="truncate font-mono text-xs text-muted-foreground">@{o.name}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            ))
           )}
-        </ul>
+        </div>
       )}
       <span className="sr-only" aria-live="polite">
         {open ? count(options.filter((o) => o.class === "read").length, "proactive.suggestionsOne", "proactive.suggestionsMany") : ""}

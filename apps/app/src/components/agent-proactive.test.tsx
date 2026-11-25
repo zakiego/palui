@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 
@@ -116,6 +116,7 @@ test("typing @ suggests read tools; Enter inserts one and Save sends the prompt"
   await user.type(box, "Check @cal")
   const list = await screen.findByRole("listbox")
   expect(list.textContent).toContain("@gcal__get_calendar")
+  expect(within(list).getByRole("group", { name: "Google Calendar" })).toBeTruthy()
   await user.keyboard("{Enter}")
   expect((box as HTMLTextAreaElement).value).toBe("Check @gcal__get_calendar ")
   expect(screen.queryByRole("listbox")).toBeNull()
@@ -137,6 +138,18 @@ test("a write tool is listed but can't be picked, and a typed one is flagged", a
   await user.type(box, "Use @notes__add_note and @gone__x ")
   expect(screen.getByText(/can change things/)).toBeTruthy()
   expect(screen.getByText(/isn't available/)).toBeTruthy()
+  // The highlight layer marks both as problems, as code chips in the prompt.
+  const chips = [...document.querySelectorAll("[data-mention]")].map((el) => `${el.textContent}:${el.getAttribute("data-mention")}`)
+  expect(chips).toEqual(["@notes__add_note:problem", "@gone__x:problem"])
+})
+
+test("a usable mention is highlighted in the prompt", async () => {
+  api.getProactiveFn.mockResolvedValue(view({ config: { ...view().config, prompt: "Check @gcal__get_calendar now" } }))
+  render(<AgentProactive agentId="agt_palui" />)
+  await screen.findByRole("textbox", { name: "Proactive prompt" })
+  const chip = document.querySelector("[data-mention]")
+  expect(chip?.textContent).toBe("@gcal__get_calendar")
+  expect(chip?.getAttribute("data-mention")).toBe("ok")
 })
 
 test("test run shows what would be sent without saving", async () => {
