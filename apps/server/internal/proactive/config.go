@@ -1,7 +1,9 @@
 // Package proactive lets an agent tell the owner things nobody asked for
-// (docs/rfc/proactive.md): on a timer it collects from the calendar and the
-// owner's WhatsApp, keeps a ledger of what it already said (nudges), and sends
-// what's new through the outbox, within quiet hours and a rate limit.
+// (docs/rfc/proactive-prompt.md). The owner writes one prompt that mentions
+// the read tools it may use (@<connectorId>__<tool>); on a timer the engine
+// runs it as a small tool loop, keeps a ledger of what it already said
+// (nudges) and short notes between runs (memory), and sends what's new
+// through the outbox, within quiet hours and a rate limit.
 package proactive
 
 import (
@@ -11,32 +13,35 @@ import (
 	"strings"
 
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
+	"github.com/zakiego/palui/apps/server/internal/strx"
 )
 
-// ConfigSchema is the config format version.
-const ConfigSchema = 1
+// ConfigSchema is the config format version. 1 was the fixed calendar and
+// WhatsApp sources (docs/rfc/proactive.md); ParseConfig upgrades it.
+const ConfigSchema = 2
 
-// Config is agent_proactive.config (RFC 4.4).
+// MaxPromptChars caps the prompt (UTF-16 units).
+const MaxPromptChars = 4000
+
+// MaxMentions caps the tools one prompt may mention.
+const MaxMentions = 10
+
+// Config is agent_proactive.config (RFC 9).
 type Config struct {
-	Schema        int        `json:"schema"`
+	Schema int `json:"schema"`
+	// The owner's instructions, with @<connectorId>__<tool> mentions.
+	Prompt        string     `json:"prompt"`
 	CheckEveryMin int        `json:"checkEveryMin"`
-	MaxPerHour    int        `json:"maxPerHour"`
 	QuietHours    QuietHours `json:"quietHours"`
+	MaxPerHour    int        `json:"maxPerHour"`
 	Morning       Summary    `json:"morning"`
 	Evening       Summary    `json:"evening"`
-	// nil turns the source off.
-	Calendar *CalendarSource `json:"calendar"`
-	WhatsApp *WhatsAppSource `json:"whatsapp"`
-	// ContactsAuto gives the model the agent's memory profile to judge who
-	// matters. Contacts are always told, whatever the model thinks.
-	ContactsAuto bool      `json:"contactsAuto"`
-	Contacts     []Contact `json:"contacts"`
 	// "fast" or "default".
 	ModelRole string `json:"modelRole"`
 }
 
-// QuietHours: nothing is sent from Start to End (local "HH:MM"), except
-// urgent calendar nudges when UrgentPasses.
+// QuietHours: no runs and nothing sent from Start to End (local "HH:MM"),
+// except urgent timed items when UrgentPasses.
 type QuietHours struct {
 	Start        string `json:"start"`
 	End          string `json:"end"`
@@ -49,58 +54,18 @@ type Summary struct {
 	At string `json:"at"`
 }
 
-// CalendarSource reads a gcal connector, or with Tool an MCP connector's
-// Google Calendar style list_events tool (timeMin, timeMax, timeZone).
-type CalendarSource struct {
-	ConnectorID   string `json:"connectorId"`
-	Tool          string `json:"tool,omitempty"`
-	DepartLeadMin int    `json:"departLeadMin"`
-	OnlineLeadMin int    `json:"onlineLeadMin"`
-	NotifyChanges bool   `json:"notifyChanges"`
-}
-
-// WhatsAppSource reads wa-hub's list_chats over an MCP connector: the
-// connector's own list_chats, or Tool when wa-hub is behind a hub that
-// prefixes it ("wa-personal__list_chats" on MCP Hub).
-type WhatsAppSource struct {
-	ConnectorID   string `json:"connectorId"`
-	Tool          string `json:"tool,omitempty"`
-	Account       string `json:"account"`
-	WaitHours     int    `json:"waitHours"`
-	EscalateHours int    `json:"escalateHours"`
-	MaxAgeDays    int    `json:"maxAgeDays"`
-	SkipGroups    bool   `json:"skipGroups"`
-}
-
-// Contact is someone whose waiting chat is always told.
-type Contact struct {
-	// "wa:chat:<id>".
-	Subject string `json:"subject"`
-	Label   string `json:"label"`
-}
-
-// Defaults is a new agent's config: every source off until one is picked.
+// Defaults is a new agent's config: no prompt yet.
 func Defaults() Config {
 	return Config{
 		Schema:        ConfigSchema,
+		Prompt:        "",
 		CheckEveryMin: 30,
-		MaxPerHour:    4,
 		QuietHours:    QuietHours{Start: "22:00", End: "07:00", UrgentPasses: true},
+		MaxPerHour:    4,
 		Morning:       Summary{On: true, At: "07:00"},
 		Evening:       Summary{On: true, At: "20:00"},
-		ContactsAuto:  true,
-		Contacts:      []Contact{},
 		ModelRole:     "fast",
 	}
-}
-
-// DefaultCalendar and DefaultWhatsApp are a source's values when it's added.
-func DefaultCalendar(connectorID string) *CalendarSource {
-	return &CalendarSource{ConnectorID: connectorID, DepartLeadMin: 30, OnlineLeadMin: 10, NotifyChanges: true}
-}
-
-func DefaultWhatsApp(connectorID string) *WhatsAppSource {
-	return &WhatsAppSource{ConnectorID: connectorID, Account: "personal", WaitHours: 2, EscalateHours: 4, MaxAgeDays: 3, SkipGroups: true}
 }
 
 // ConfigError is a refusal the dashboard and the model can show as is.
@@ -111,8 +76,6 @@ func (e *ConfigError) Error() string { return e.Msg }
 func bad(format string, a ...any) error { return &ConfigError{fmt.Sprintf(format, a...)} }
 
 var hhmm = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
-var subjectRe = regexp.MustCompile(`^wa:chat:[A-Za-z0-9_-]{1,64}$`)
-var toolNameRe = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,128}$`)
 
 func between(name string, v, lo, hi int) error {
 	if v < lo || v > hi {
@@ -121,11 +84,17 @@ func between(name string, v, lo, hi int) error {
 	return nil
 }
 
-// Validate checks bounds and formats. Connectors are checked by the service,
-// which has the database.
+// Validate checks bounds and formats. Whether the mentions resolve is checked
+// by Save and by every run, which can see the agent's tools.
 func (c Config) Validate() error {
 	if c.Schema != ConfigSchema {
 		return bad("Unknown config schema %d", c.Schema)
+	}
+	if strx.Len16(c.Prompt) > MaxPromptChars {
+		return bad("The prompt can be at most %d characters", MaxPromptChars)
+	}
+	if n := len(Mentions(c.Prompt)); n > MaxMentions {
+		return bad("The prompt can mention at most %d tools, it mentions %d", MaxMentions, n)
 	}
 	checks := []error{
 		between("Check every", c.CheckEveryMin, 15, 120),
@@ -144,73 +113,130 @@ func (c Config) Validate() error {
 	if c.ModelRole != "fast" && c.ModelRole != "default" {
 		return bad("Model role must be fast or default")
 	}
-	if cal := c.Calendar; cal != nil {
-		if strings.TrimSpace(cal.ConnectorID) == "" {
-			return bad("Pick a calendar connector")
-		}
-		if cal.Tool != "" && !toolNameRe.MatchString(cal.Tool) {
-			return bad("Calendar tool must be an MCP tool name")
-		}
-		if err := between("Leave reminder", cal.DepartLeadMin, 0, 180); err != nil {
-			return err
-		}
-		if err := between("Online meeting reminder", cal.OnlineLeadMin, 0, 60); err != nil {
-			return err
-		}
-	}
-	if wa := c.WhatsApp; wa != nil {
-		if strings.TrimSpace(wa.ConnectorID) == "" {
-			return bad("Pick a WhatsApp connector")
-		}
-		if wa.Tool != "" && !toolNameRe.MatchString(wa.Tool) {
-			return bad("WhatsApp tool must be an MCP tool name")
-		}
-		if strings.TrimSpace(wa.Account) == "" || len(wa.Account) > 32 {
-			return bad("WhatsApp account must be 1 to 32 characters")
-		}
-		if err := between("Unanswered after", wa.WaitHours, 1, 24); err != nil {
-			return err
-		}
-		if err := between("Remind again after", wa.EscalateHours, 0, 24); err != nil {
-			return err
-		}
-		if err := between("Ignore waits older than", wa.MaxAgeDays, 1, 14); err != nil {
-			return err
-		}
-	}
-	if len(c.Contacts) > 100 {
-		return bad("At most 100 contacts")
-	}
-	seen := map[string]bool{}
-	for _, ct := range c.Contacts {
-		if !subjectRe.MatchString(ct.Subject) {
-			return bad("Contact %q isn't a WhatsApp chat", ct.Subject)
-		}
-		if seen[ct.Subject] {
-			return bad("Contact %q is listed twice", ct.Label)
-		}
-		seen[ct.Subject] = true
-		if l := strings.TrimSpace(ct.Label); l == "" || len([]rune(l)) > 80 {
-			return bad("Contact names must be 1 to 80 characters")
-		}
-	}
 	return nil
 }
 
+// configV1 is what schema 1 kept (docs/rfc/proactive.md 4.4), read only to
+// carry the timing over and write a starter prompt.
+type configV1 struct {
+	Calendar *struct {
+		DepartLeadMin int  `json:"departLeadMin"`
+		OnlineLeadMin int  `json:"onlineLeadMin"`
+		NotifyChanges bool `json:"notifyChanges"`
+	} `json:"calendar"`
+	WhatsApp *struct {
+		WaitHours     int  `json:"waitHours"`
+		EscalateHours int  `json:"escalateHours"`
+		SkipGroups    bool `json:"skipGroups"`
+	} `json:"whatsapp"`
+	Contacts []struct {
+		Label string `json:"label"`
+	} `json:"contacts"`
+}
+
 // ParseConfig reads a stored config, filling what an older row lacks from the
-// defaults so a newer field never reads as zero.
+// defaults so a newer field never reads as zero. A schema 1 config keeps its
+// timing, quiet hours, rate, summaries and model, and gets a starter prompt
+// built from its old sources (RFC 9).
 func ParseConfig(raw []byte) (Config, error) {
 	c := Defaults()
 	if len(raw) == 0 {
 		return c, nil
 	}
+	var head struct {
+		Schema int `json:"schema"`
+	}
+	if err := json.Unmarshal(raw, &head); err != nil {
+		return Config{}, err
+	}
+	if head.Schema < ConfigSchema {
+		var old configV1
+		if err := json.Unmarshal(raw, &old); err != nil {
+			return Config{}, err
+		}
+		// The shared fields kept their names.
+		var shared struct {
+			CheckEveryMin int         `json:"checkEveryMin"`
+			MaxPerHour    int         `json:"maxPerHour"`
+			QuietHours    *QuietHours `json:"quietHours"`
+			Morning       *Summary    `json:"morning"`
+			Evening       *Summary    `json:"evening"`
+			ModelRole     string      `json:"modelRole"`
+		}
+		if err := json.Unmarshal(raw, &shared); err != nil {
+			return Config{}, err
+		}
+		if shared.CheckEveryMin != 0 {
+			c.CheckEveryMin = shared.CheckEveryMin
+		}
+		if shared.MaxPerHour != 0 {
+			c.MaxPerHour = shared.MaxPerHour
+		}
+		if shared.QuietHours != nil {
+			c.QuietHours = *shared.QuietHours
+		}
+		if shared.Morning != nil {
+			c.Morning = *shared.Morning
+		}
+		if shared.Evening != nil {
+			c.Evening = *shared.Evening
+		}
+		if shared.ModelRole != "" {
+			c.ModelRole = shared.ModelRole
+		}
+		c.Prompt = starterFromV1(old)
+		return c, nil
+	}
 	if err := json.Unmarshal(raw, &c); err != nil {
 		return Config{}, err
 	}
-	if c.Contacts == nil {
-		c.Contacts = []Contact{}
-	}
 	return c, nil
+}
+
+// StarterPrompt is the prompt a new agent's editor offers: English, with the
+// places for mentions left for the owner to fill (RFC 9a).
+const StarterPrompt = `Check my calendar (mention its tool here) for the next 36 hours. If an event has a place to go to, tell me 30 minutes before I have to leave. If it's an online meeting, tell me 10 minutes before it starts, with the link. If an event moves, tell me right away.
+
+Check my chats (mention the tool here). Tell me about direct messages waiting for my reply for more than 2 hours, only when they look like they need an answer. Skip groups, promos, receipts and one-time codes. If I still haven't replied 4 hours after you told me, remind me once more.`
+
+func starterFromV1(old configV1) string {
+	var b strings.Builder
+	b.WriteString("Proactive used to read fixed sources. Mention the tools to read below, then turn it back on.\n\n")
+	if cal := old.Calendar; cal != nil {
+		fmt.Fprintf(&b, "Check my calendar (mention its tool here) for the next 36 hours. If an event has a place to go to, tell me %d minutes before I have to leave. If it's an online meeting, tell me %d minutes before it starts, with the link.", cal.DepartLeadMin, cal.OnlineLeadMin)
+		if cal.NotifyChanges {
+			b.WriteString(" If an event moves, tell me right away.")
+		}
+		b.WriteString("\n\n")
+	}
+	if wa := old.WhatsApp; wa != nil {
+		fmt.Fprintf(&b, "Check my chats (mention the tool here). Tell me about direct messages waiting for my reply for more than %d hours, only when they look like they need an answer.", wa.WaitHours)
+		if wa.SkipGroups {
+			b.WriteString(" Skip groups.")
+		}
+		b.WriteString(" Skip promos, receipts and one-time codes.")
+		if wa.EscalateHours > 0 {
+			fmt.Fprintf(&b, " If I still haven't replied %d hours after you told me, remind me once more.", wa.EscalateHours)
+		}
+		var names []string
+		for _, ct := range old.Contacts {
+			if l := strings.TrimSpace(ct.Label); l != "" && len(names) < 20 {
+				names = append(names, l)
+			}
+		}
+		if len(names) > 0 {
+			b.WriteString(" Always tell me about: " + strings.Join(names, ", ") + ".")
+		}
+		b.WriteString("\n\n")
+	}
+	if old.Calendar == nil && old.WhatsApp == nil {
+		return StarterPrompt
+	}
+	out := strings.TrimSpace(b.String())
+	if strx.Len16(out) > MaxPromptChars {
+		out = strx.Slice16(out, MaxPromptChars)
+	}
+	return out
 }
 
 // MarshalConfig writes the config with stable key order.
@@ -240,9 +266,7 @@ func MergePatch(c Config, patch []byte) (Config, error) {
 	if err := dec.Decode(&out); err != nil {
 		return Config{}, bad("The change doesn't fit the config: %s", err.Error())
 	}
-	if out.Contacts == nil {
-		out.Contacts = []Contact{}
-	}
+	out.Prompt = strings.TrimSpace(strings.ReplaceAll(out.Prompt, "\r\n", "\n"))
 	if err := out.Validate(); err != nil {
 		return Config{}, err
 	}

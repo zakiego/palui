@@ -224,6 +224,12 @@
    "first": null,
    "last": null
   },
+  "proactive_notes": {
+   "columns": ["id","agent_id","text","source","expires_at","created_at","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
   "proactive_ticks": {
    "columns": ["id","agent_id","started_at","finished_at","sources","found","sent","tokens","error"],
    "count": 0,
@@ -304,6 +310,12 @@
   },
   "verification": {
    "columns": ["id","identifier","value","expires_at","created_at","updated_at"],
+   "count": 0,
+   "first": null,
+   "last": null
+  },
+  "wa_inbox_chats": {
+   "columns": ["connector_id","chat_jid","kind","name","last_in_at","last_out_at","waiting_since","unanswered","preview","updated_at"],
    "count": 0,
    "first": null,
    "last": null

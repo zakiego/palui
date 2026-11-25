@@ -12,19 +12,25 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ## Unreleased
 
+### Breaking
+
+- Proactive runs from a prompt you write now, and agents that had it on are paused. Write a prompt that mentions its tools, then save. Adds a migration. ([#32](https://github.com/zakiego/palui/pull/32))
+
 ### Agents
 
-- Added: Proactive can read your calendar through an MCP server's Google Calendar tool, like MCP Hub's, so you don't need your own Google OAuth client. ([#26](https://github.com/zakiego/palui/pull/26))
-- Added: Proactive can read WhatsApp through MCP Hub's `wa-personal__list_chats` too, so wa-hub doesn't need its own connector. ([#27](https://github.com/zakiego/palui/pull/27))
-- Changed: Proactive reads a waiting chat's recent messages before telling you about it, and skips conversations that are already finished. ([#28](https://github.com/zakiego/palui/pull/28))
+- Added: Proactive mentions any read tool with `@`, like `@gcal__get_calendar`, so every connector can be a source. ([#32](https://github.com/zakiego/palui/pull/32))
+- Added: Proactive memory keeps notes between runs, from the agent, the Proactive tab or your replies. ([#32](https://github.com/zakiego/palui/pull/32))
+- Added: Test run on the Proactive tab shows what would be sent, without sending anything. ([#32](https://github.com/zakiego/palui/pull/32))
 
 ### Tools
 
 - Changed: the host bridge speaks MCP spec 2026-07-28 as well as the older `initialize` flow, on `@modelcontextprotocol/server` v2. Existing clients keep working unchanged.
+- Added: Calendar feed connector reads any calendar from its secret iCal link, with recurring events expanded. ([#32](https://github.com/zakiego/palui/pull/32))
+- Added: WhatsApp inbox connector links your own number read only and lists chats waiting for your reply. Adds a migration. ([#32](https://github.com/zakiego/palui/pull/32))
 
 ### Self-hosting
 
-- Fixed: rerunning `ops/install-host-bridge.sh` or `ops/install-backup.sh` no longer fails with "Bootstrap failed: 5: Input/output error" and leaves the job unloaded. Both now wait for launchd to drop the old job before loading the new one.
+- Fixed: rerunning `ops/install-host-bridge.sh` or `ops/install-backup.sh` no longer fails with "Bootstrap failed: 5" and leaves the job unloaded. Both now wait for launchd to drop the old job first.
 
 ## 0.16.0 (2026-11-25)
 

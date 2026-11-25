@@ -1,6 +1,8 @@
 package proactive_test
 
 import (
+	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -35,11 +37,19 @@ func TestToolsAreOnlyOfferedInTheOwnersOwnTurns(t *testing.T) {
 	}
 }
 
+// oneTool is a ToolHost with one read tool.
+type oneTool struct{}
+
+func (oneTool) Tools(context.Context, string, string, int64) ([]proactive.Tool, error) {
+	return []proactive.Tool{{Info: proactive.ToolInfo{Name: "gcal-1__get_calendar", ConnectorID: "gcal-1", Tool: "get_calendar", Class: "read"}, Execute: func(context.Context, json.RawMessage) (any, error) { return "[]", nil }}}, nil
+}
+
 func TestUpdateTurnsOnAndPatchesFromChat(t *testing.T) {
 	d := tu.DB(t)
 	web, err := chats.EnsureWebChat(d, tu.NOW)
 	tu.Must(t, err)
-	tu.SeedConnector(t, d, "gcal-1", "tools", tu.SeedOptions{Type: "gcal"}, tu.NOW)
+	proactive.SetToolHost(oneTool{})
+	t.Cleanup(func() { proactive.SetToolHost(nil) })
 	turn := connectors.TurnInfo{ChatID: web.ID, Trigger: "message", Mode: "owner", Now: tu.NOW}
 	set := proactiveconn.Tools(d, func() int64 { return tu.NOW }, turn)
 	pt, _ := set.Get("update_proactive")
@@ -47,11 +57,15 @@ func TestUpdateTurnsOnAndPatchesFromChat(t *testing.T) {
 		t.Fatal(pt.Class)
 	}
 	out := conntest.Exec(t, pt.Tool, `{"enabled":true,"chat":"this"}`)
-	if out.B("ok") || !strings.Contains(out.S("error"), "source") {
-		t.Fatalf("no source yet: %s", out)
+	if out.B("ok") || !strings.Contains(out.S("error"), "Mention at least one tool") {
+		t.Fatalf("no prompt yet: %s", out)
 	}
-	out = conntest.Exec(t, pt.Tool, `{"enabled":true,"chat":"this","patch":{"calendar":{"connectorId":"gcal-1","departLeadMin":45,"onlineLeadMin":10,"notifyChanges":true},"quietHours":{"start":"23:00"}}}`)
-	if !out.B("ok") || !out.B("enabled") || out.N("config.calendar.departLeadMin") != 45 || out.S("config.quietHours.start") != "23:00" || out.S("config.quietHours.end") != "07:00" {
+	out = conntest.Exec(t, pt.Tool, `{"enabled":true,"chat":"this","patch":{"prompt":"Check @gone__x"}}`)
+	if out.B("ok") || !strings.Contains(out.S("error"), "@gone__x "+proactive.ReasonNotFound) {
+		t.Fatalf("a mention that doesn't resolve: %s", out)
+	}
+	out = conntest.Exec(t, pt.Tool, `{"enabled":true,"chat":"this","patch":{"prompt":"Check @gcal-1__get_calendar","quietHours":{"start":"23:00"}}}`)
+	if !out.B("ok") || !out.B("enabled") || out.S("config.prompt") != "Check @gcal-1__get_calendar" || out.S("config.quietHours.start") != "23:00" || out.S("config.quietHours.end") != "07:00" || out.S("mentions.0") != "gcal-1__get_calendar" {
 		t.Fatalf("%s", out)
 	}
 	out = conntest.Exec(t, pt.Tool, `{"patch":{"checkEveryMin":1}}`)
@@ -75,17 +89,40 @@ func TestUpdateTurnsOnAndPatchesFromChat(t *testing.T) {
 	}
 }
 
+func TestMemoryToolsKeepOwnerNotes(t *testing.T) {
+	d := tu.DB(t)
+	web, err := chats.EnsureWebChat(d, tu.NOW)
+	tu.Must(t, err)
+	set := proactiveconn.Tools(d, func() int64 { return tu.NOW }, connectors.TurnInfo{ChatID: web.ID, Trigger: "message", Now: tu.NOW})
+	remember, _ := set.Get("remember_proactive")
+	out := conntest.Exec(t, remember.Tool, `{"text":"Pak Budi selalu bales telat"}`)
+	if !out.B("ok") || !strings.HasPrefix(out.S("id"), "pmem_") {
+		t.Fatalf("%s", out)
+	}
+	list, _ := set.Get("list_proactive_notes")
+	if got := conntest.Exec(t, list.Tool, `{}`); got.N("count") != 1 || got.S("notes.0.source") != "owner" {
+		t.Fatalf("%s", got)
+	}
+	forget, _ := set.Get("forget_proactive")
+	if got := conntest.Exec(t, forget.Tool, `{"id":"`+out.S("id")+`"}`); !got.B("ok") {
+		t.Fatalf("%s", got)
+	}
+	if got := conntest.Exec(t, list.Tool, `{}`); got.N("count") != 0 {
+		t.Fatalf("%s", got)
+	}
+}
+
 func TestMuteFindsARecentNudgeByName(t *testing.T) {
 	d := tu.DB(t)
 	web, err := chats.EnsureWebChat(d, tu.NOW)
 	tu.Must(t, err)
 	a, err := agents.GetDefault(d, tu.NOW)
 	tu.Must(t, err)
-	_, err = d.Exec("INSERT INTO nudges (id, agent_id, key, kind, subject, status, snapshot, created_at, updated_at) VALUES ('ndg_1', ?, 'wa:3:1', 'wa_waiting', 'wa:chat:3', 'sent', '{\"name\":\"Grup Kantor\"}', ?, ?)", a.ID, tu.NOW, tu.NOW)
+	_, err = d.Exec("INSERT INTO nudges (id, agent_id, key, kind, subject, status, snapshot, created_at, updated_at) VALUES ('ndg_1', ?, 'wa:3:1', 'item', 'wa:3', 'sent', '{\"text\":\"Grup Kantor nanya jadwal\"}', ?, ?)", a.ID, tu.NOW, tu.NOW)
 	tu.Must(t, err)
 	set := proactiveconn.Tools(d, func() int64 { return tu.NOW }, connectors.TurnInfo{ChatID: web.ID, Trigger: "message", Now: tu.NOW})
 	mute, _ := set.Get("mute_proactive")
-	if out := conntest.Exec(t, mute.Tool, `{"who":"kantor"}`); !out.B("ok") || out.S("muted") != "Grup Kantor" {
+	if out := conntest.Exec(t, mute.Tool, `{"who":"kantor"}`); !out.B("ok") || out.S("muted") != "Grup Kantor nanya jadwal" {
 		t.Fatalf("%s", out)
 	}
 	if out := conntest.Exec(t, mute.Tool, `{"who":"nobody"}`); out.B("ok") {

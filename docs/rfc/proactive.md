@@ -1,6 +1,6 @@
 # RFC: Proactive
 
-Status: accepted and built, 2026-11-24. Decisions are in section 17. Author: Palui agent session. Reviewer: the maintainer.
+Status: accepted and built, 2026-11-24. Decisions are in section 17. Sources, rules and templates superseded by `docs/rfc/proactive-prompt.md` (2026-11-25): wa-hub and MCP Hub only tools don't fit an open-source project, and fixed sources were too rigid. Author: Palui agent session. Reviewer: the maintainer.
 Scope: the design and its reasoning. Once accepted, the behavior moves to `docs/PLAN.md` (a new section next to 6c and 7, plus the tables in 9), and that section wins where the two differ.
 
 ## TL;DR

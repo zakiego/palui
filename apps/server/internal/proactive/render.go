@@ -1,19 +1,21 @@
 package proactive
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
+	"github.com/zakiego/palui/apps/server/internal/budget"
 	"github.com/zakiego/palui/apps/server/internal/db"
+	"github.com/zakiego/palui/apps/server/internal/models"
 	"github.com/zakiego/palui/apps/server/internal/reminders"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 )
 
-// MaxMessageChars caps a proactive message (RFC 8).
+// MaxMessageChars caps a proactive message (RFC 2).
 const MaxMessageChars = 700
 
-// MaxFieldChars caps one source field in a template (RFC 7).
+// MaxFieldChars caps one value shown in a line.
 const MaxFieldChars = 200
 
 var (
@@ -24,7 +26,18 @@ var (
 	markdown = regexp.MustCompile("[*_`~]")
 )
 
-// Field cleans one untrusted value for a template: one line, plain, capped.
+// Snapshot is what a nudge says, kept on its row. Name and Title are what
+// the fixed sources of schema 1 kept, read so old rows still have a label.
+type Snapshot struct {
+	Text   string `json:"text,omitempty"`
+	Urgent bool   `json:"urgent,omitempty"`
+	// Summaries: the date they cover ("2026-11-24").
+	Date  string `json:"date,omitempty"`
+	Name  string `json:"name,omitempty"`
+	Title string `json:"title,omitempty"`
+}
+
+// Field cleans one value for a line: one line, plain, capped.
 func Field(s string) string {
 	s = ctlAll.ReplaceAllString(s, " ")
 	s = markdown.ReplaceAllString(s, "")
@@ -48,6 +61,13 @@ func MessageText(s string) string {
 	return s
 }
 
+func loadTZ(tz string) *time.Location {
+	if l, err := time.LoadLocation(tz); err == nil && tz != "" {
+		return l
+	}
+	return time.UTC
+}
+
 func clock(ms int64, tz string) string { return reminders.FormatClock(ms, tz) }
 
 // when is "jam 14.30", "besok jam 09.00" or "Senin 30 Nov jam 09.00".
@@ -68,49 +88,13 @@ func snapshotOf(n db.Nudge) Snapshot {
 	return s
 }
 
-// Line is a nudge as one plain line, used for timed nudges and whenever the
-// model can't word a message (RFC 7, 8).
-func Line(n db.Nudge, tz string, now int64) string {
-	s := snapshotOf(n)
-	title := Field(s.Title)
-	if title == "" {
-		title = "(tanpa judul)"
-	}
-	switch n.Kind {
-	case KindCalDepart:
-		return fmt.Sprintf("🚗 %s %s di %s. Waktunya siap-siap berangkat.", title, when(s.Start, tz, now), Field(s.Location))
-	case KindCalStart:
-		return fmt.Sprintf("📹 %s mulai %s: %s", title, when(s.Start, tz, now), Field(s.MeetLink))
-	case KindCalChanged:
-		line := fmt.Sprintf("📅 Jadwal berubah: %s sekarang %s", title, when(s.Start, tz, now))
-		if loc := Field(s.Location); loc != "" {
-			line += " di " + loc
-		}
-		if s.PrevStart != 0 && s.PrevStart != s.Start {
-			line += " (tadinya " + when(s.PrevStart, tz, now) + ")"
-		}
-		return line + "."
-	case KindWAWaiting:
-		name := Field(s.Name)
-		if name == "" {
-			name = "Seseorang"
-		}
-		if s.Escalation {
-			return fmt.Sprintf("💬 Masih belum kebales: %s, nunggu dari %s.", name, when(s.AwaitingSince, tz, now))
-		}
-		line := fmt.Sprintf("💬 %s nunggu balasan dari %s", name, when(s.AwaitingSince, tz, now))
-		if p := Field(s.Preview); p != "" {
-			line += ": “" + p + "”"
-		}
-		return line
-	}
-	return title
-}
-
-// Label is a short name for a nudge in replies and the mute list.
+// Label is a short name for a nudge in replies, the activity list and the
+// mute list.
 func Label(n db.Nudge) string {
 	s := snapshotOf(n)
 	switch {
+	case s.Text != "":
+		return clip(Field(s.Text), 120)
 	case s.Name != "":
 		return Field(s.Name)
 	case s.Title != "":
@@ -119,19 +103,59 @@ func Label(n db.Nudge) string {
 	return n.Subject
 }
 
-// Buttons is the owner's actions on a proactive message (RFC 10). A message
-// with only calendar nudges gets mute alone: done or snooze on a "leave now"
-// means nothing.
-func Buttons(first db.Nudge, hasChat bool) []db.OutboxAction {
+// Buttons is the owner's actions on a proactive message (RFC 2): they apply
+// to every item the message carries.
+func Buttons(first db.Nudge, lang string) []db.OutboxAction {
 	id := first.ID
-	if !hasChat {
-		return []db.OutboxAction{{ID: "ndg:mute:" + id, Label: "Jangan ingetin"}}
+	labels := [5]string{"Selesai", "1j", "3j", "Besok", "Jangan ingetin"}
+	if lang == "en" {
+		labels = [5]string{"Done", "1h", "3h", "Tomorrow", "Stop these"}
 	}
 	return []db.OutboxAction{
-		{ID: "ndg:done:" + id, Label: "Selesai"},
-		{ID: "ndg:snooze:" + id + ":1h", Label: "1j"},
-		{ID: "ndg:snooze:" + id + ":3h", Label: "3j"},
-		{ID: "ndg:snooze:" + id + ":tomorrow", Label: "Besok"},
-		{ID: "ndg:mute:" + id, Label: "Jangan ingetin"},
+		{ID: "ndg:done:" + id, Label: labels[0]},
+		{ID: "ndg:snooze:" + id + ":1h", Label: labels[1]},
+		{ID: "ndg:snooze:" + id + ":3h", Label: labels[2]},
+		{ID: "ndg:snooze:" + id + ":tomorrow", Label: labels[3]},
+		{ID: "ndg:mute:" + id, Label: labels[4]},
 	}
+}
+
+// agentModel resolves the agent's chain for a role, metered to the global and
+// the agent's daily token counts. ok false: no model is running, or a budget
+// says stop.
+func agentModel(q db.Q, host models.ModelHost, a db.Agent, role string, now int64, clock func() int64, tokens *int64) (models.LanguageModel, bool, error) {
+	if host == nil {
+		return nil, false, nil
+	}
+	if c, err := budget.CheckGlobal(q, now); err != nil {
+		return nil, false, err
+	} else if !c.OK {
+		return nil, false, nil
+	}
+	if a.DailyTokenCap > 0 {
+		over, err := budget.AgentOverCap(q, a.ID, a.DailyTokenCap, now)
+		if err != nil {
+			return nil, false, err
+		}
+		if over {
+			return nil, false, nil
+		}
+	}
+	chain, err := models.ResolveAgentChain(q, host, a.ModelRoles.V, role)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(chain) == 0 {
+		return nil, false, nil
+	}
+	fm, err := models.NewFailoverModel(chain, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	return &models.MeteredModel{Model: fm, OnTokens: func(n int64) {
+		*tokens += n
+		at := clock()
+		_ = budget.RecordRunTokens(q, n, at)
+		_ = budget.RecordAgentTokens(q, a.ID, n, at)
+	}}, true, nil
 }

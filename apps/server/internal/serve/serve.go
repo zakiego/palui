@@ -22,6 +22,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/config"
 	"github.com/zakiego/palui/apps/server/internal/connectors"
 	"github.com/zakiego/palui/apps/server/internal/connectors/registry"
+	"github.com/zakiego/palui/apps/server/internal/connectors/wainbox"
 	"github.com/zakiego/palui/apps/server/internal/connectors/whatsapp"
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/deploynotice"
@@ -241,27 +242,23 @@ func (a *App) buildRuntime(d *db.DB, key string, startedAt int64) {
 	sup := connectors.NewSupervisor(connectors.SupervisorOptions{
 		DB: d, Registry: reg, Services: services, Log: log.Child(logx.Fields{"component": "supervisor"}),
 		MasterKey: key, DataDir: cfg.DataDir, Clock: o.Clock,
-		InUse:     func(id string) bool { return engine != nil && engine.InUse(id) },
-		OnRemoved: whatsapp.RemoveConnectorFiles(cfg.DataDir),
+		InUse: func(id string) bool { return engine != nil && engine.InUse(id) },
+		OnRemoved: func(row db.Connector, unlinked bool) error {
+			if err := whatsapp.RemoveConnectorFiles(cfg.DataDir)(row, unlinked); err != nil {
+				return err
+			}
+			return wainbox.RemoveChats(d)(row, unlinked)
+		},
 		OnOnline: func(string) {
 			if engine != nil {
 				engine.RetryNow()
 			}
 		},
 	})
-	tzOf := func() string {
-		tz, err := settings.Timezone(d)
-		if err != nil {
-			return "UTC"
-		}
-		return tz
-	}
-	pro := proactive.New(proactive.Options{
-		DB: d, Log: log.Child(logx.Fields{"component": "proactive"}), Clock: o.Clock,
-		Sources: proactive.LiveSources{Running: sup.Running, CallTool: tools.ConnectorToolCaller(sup.Running, tools.CallerOptions{Clock: o.Clock, TZ: tzOf})},
-		Models:  sup,
-		Profile: proactive.MemoryProfile(sup.Running),
-	})
+	proLog := log.Child(logx.Fields{"component": "proactive"})
+	proTools := proactive.LiveTools{DB: d, Running: sup.Running, Log: proLog}
+	proactive.SetToolHost(proTools)
+	pro := proactive.New(proactive.Options{DB: d, Log: proLog, Clock: o.Clock, Tools: proTools, Models: sup})
 	built := deps.Build(deps.Options{
 		DB: d, Log: log,
 		RunTurn:   func(t chat.TurnOptions) (chat.TurnResult, error) { return engine.RunTurn(t) },

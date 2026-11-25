@@ -8,6 +8,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/gateway"
 	"github.com/zakiego/palui/apps/server/internal/connectors/gcal"
 	"github.com/zakiego/palui/apps/server/internal/connectors/httpreq"
+	"github.com/zakiego/palui/apps/server/internal/connectors/ics"
 	"github.com/zakiego/palui/apps/server/internal/connectors/mcp"
 	"github.com/zakiego/palui/apps/server/internal/connectors/printer"
 	"github.com/zakiego/palui/apps/server/internal/connectors/recall"
@@ -15,6 +16,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/t3code"
 	"github.com/zakiego/palui/apps/server/internal/connectors/telegram"
 	"github.com/zakiego/palui/apps/server/internal/connectors/voice"
+	"github.com/zakiego/palui/apps/server/internal/connectors/wainbox"
 	"github.com/zakiego/palui/apps/server/internal/connectors/whatsapp"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/testutil"
@@ -31,6 +33,8 @@ var configSchemas = map[string]*zod.ObjectS{
 	"mcp":      mcp.ConfigZod,
 	"http":     httpreq.ConfigZod,
 	"gcal":     gcal.ConfigZod,
+	"ics":      ics.ConfigZod,
+	"wa-inbox": wainbox.ConfigZod,
 	"t3code":   t3code.ConfigZod,
 	"printer":  printer.ConfigZod,
 	"voice":    voice.ConfigZod,
@@ -45,6 +49,7 @@ var secretSchemas = map[string][]zod.Field{
 	"mcp":      mcp.SecretZod,
 	"http":     httpreq.SecretZod,
 	"gcal":     gcal.SecretZod,
+	"ics":      ics.SecretZod,
 	"t3code":   t3code.SecretZod,
 	"voice":    voice.SecretZod,
 }

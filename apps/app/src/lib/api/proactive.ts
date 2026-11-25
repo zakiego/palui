@@ -1,48 +1,24 @@
-// An agent's proactive settings (docs/rfc/proactive.md 12): the Proactive tab
-// on the agent page.
+// An agent's proactive settings (docs/rfc/proactive-prompt.md 12): the
+// Proactive tab on the agent page.
 import { withInput } from "./client"
-import type { ConnectorStatus } from "./types"
 
 export type ProactiveSummary = { on: boolean; at: string }
 
-export type CalendarSource = {
-  connectorId: string
-  // An MCP calendar: its Google Calendar style list_events tool.
-  tool?: string
-  departLeadMin: number
-  onlineLeadMin: number
-  notifyChanges: boolean
-}
-
-export type WhatsAppSource = {
-  connectorId: string
-  // wa-hub behind a hub: its prefixed list_chats ("wa-personal__list_chats").
-  tool?: string
-  account: string
-  waitHours: number
-  escalateHours: number
-  maxAgeDays: number
-  skipGroups: boolean
-}
-
-export type ProactiveContact = { subject: string; label: string }
-
 export type ProactiveConfig = {
   schema: number
+  // The owner's instructions, with @<connectorId>__<tool> mentions.
+  prompt: string
   checkEveryMin: number
-  maxPerHour: number
   quietHours: { start: string; end: string; urgentPasses: boolean }
+  maxPerHour: number
   morning: ProactiveSummary
   evening: ProactiveSummary
-  calendar: CalendarSource | null
-  whatsapp: WhatsAppSource | null
-  contactsAuto: boolean
-  contacts: ProactiveContact[]
   modelRole: "fast" | "default"
 }
 
-export type NudgeKind = "cal_depart" | "cal_start" | "cal_changed" | "wa_waiting" | "sum_morning" | "sum_evening"
-export type NudgeStatus = "pending" | "scheduled" | "firing" | "sent" | "done" | "snoozed" | "dropped" | "expired"
+// "item" is what a run said; rows from before prompts keep their old kinds.
+export type NudgeKind = "item" | "sum_morning" | "sum_evening" | (string & {})
+export type NudgeStatus = "pending" | "scheduled" | "firing" | "sent" | "done" | "snoozed" | "dropped" | "expired" | "tracking"
 
 export type ProactiveNudge = {
   id: string
@@ -52,16 +28,33 @@ export type ProactiveNudge = {
   label: string
   reason: string | null
   sentAt: number | null
-  escalatedAt: number | null
   wakeAt: number | null
   updatedAt: number
 }
 
-export type ProactiveConnector = {
+// A tool the prompt may mention.
+export type ProactiveTool = {
+  name: string
+  connectorId: string
+  connectorLabel: string
+  tool: string
+  class: "read" | "write" | "destructive"
+  suggestedClass?: string
+  title: string | null
+  untrusted: boolean
+}
+
+// A mention in the saved prompt; reason is "" when it resolves.
+export type ProactiveMention = { mention: string; reason: string }
+
+export type ProactiveNote = {
   id: string
-  label: string
-  status: ConnectorStatus
-  tool?: string
+  agentId: string
+  text: string
+  source: "owner" | "model"
+  expiresAt: number | null
+  createdAt: number
+  updatedAt: number
 }
 
 export type ProactiveView = {
@@ -72,12 +65,12 @@ export type ProactiveView = {
   lastTickAt: number | null
   nextTickAt: number | null
   config: ProactiveConfig
-  defaults: { calendar: CalendarSource; whatsapp: WhatsAppSource }
+  starter: string
   chats: { id: string; title: string; channel: string }[]
-  connectors: {
-    calendar: ProactiveConnector[]
-    whatsapp: ProactiveConnector[]
-  }
+  tools: ProactiveTool[]
+  mentions: ProactiveMention[]
+  notes: ProactiveNote[]
+  notesChars: number
   mutes: {
     agentId: string
     subject: string
@@ -89,13 +82,30 @@ export type ProactiveView = {
   sentToday: number
   tokensToday: number
   tokenCap: number
-  lastErrors: Partial<Record<"calendar" | "whatsapp", string>>
+  lastRun: { at: number; full: boolean; skipped: string; calls: number; error: string | null } | null
 }
 
-// A JSON merge patch: nested objects merge, null removes.
-export type ProactivePatch = {
-  [K in keyof ProactiveConfig]?: ProactiveConfig[K] extends object | null ? Partial<NonNullable<ProactiveConfig[K]>> | null | ProactiveConfig[K] : ProactiveConfig[K]
+export type ProactiveTestResult = {
+  calls: { tool: string; args: unknown; hash: string; error?: string }[]
+  items: { key: string; subject: string; text: string; sendAt: number | null; urgent: boolean; dropped?: string }[]
+  closed: string[]
+  remember: string[]
+  forget: string[]
+  ignored: string[]
+  tokens: number
+  error?: string
 }
+
+// A JSON merge patch: nested objects merge.
+export type ProactivePatch = {
+  [K in keyof ProactiveConfig]?: ProactiveConfig[K] extends object ? Partial<ProactiveConfig[K]> : ProactiveConfig[K]
+}
+
+// Limits the server enforces (internal/proactive), shown as counters.
+export const MAX_PROMPT_CHARS = 4000
+export const MAX_MENTIONS = 10
+export const MAX_NOTE_CHARS = 300
+export const MAX_NOTES_CHARS = 4000
 
 export const getProactiveFn = withInput<{ agentId: string }, ProactiveView>("getProactiveFn", "GET")
 export const saveProactiveFn = withInput<
@@ -109,3 +119,7 @@ export const saveProactiveFn = withInput<
 >("saveProactiveFn", "POST")
 export const unmuteProactiveFn = withInput<{ agentId: string; subject: string }, ProactiveView>("unmuteProactiveFn", "POST")
 export const checkProactiveNowFn = withInput<{ agentId: string }, ProactiveView>("checkProactiveNowFn", "POST")
+export const testProactiveFn = withInput<{ agentId: string; prompt?: string }, ProactiveTestResult>("testProactiveFn", "POST")
+export const addProactiveNoteFn = withInput<{ agentId: string; text: string }, ProactiveView>("addProactiveNoteFn", "POST")
+export const editProactiveNoteFn = withInput<{ agentId: string; noteId: string; text?: string; keep?: boolean }, ProactiveView>("editProactiveNoteFn", "POST")
+export const deleteProactiveNoteFn = withInput<{ agentId: string; noteId: string }, ProactiveView>("deleteProactiveNoteFn", "POST")

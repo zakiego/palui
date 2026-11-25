@@ -16,6 +16,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/gcal"
 	"github.com/zakiego/palui/apps/server/internal/connectors/hooks"
 	"github.com/zakiego/palui/apps/server/internal/connectors/httpreq"
+	"github.com/zakiego/palui/apps/server/internal/connectors/ics"
 	"github.com/zakiego/palui/apps/server/internal/connectors/jobs"
 	"github.com/zakiego/palui/apps/server/internal/connectors/mcp"
 	"github.com/zakiego/palui/apps/server/internal/connectors/notes"
@@ -30,6 +31,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/connectors/telegram"
 	"github.com/zakiego/palui/apps/server/internal/connectors/tgbot"
 	"github.com/zakiego/palui/apps/server/internal/connectors/voice"
+	"github.com/zakiego/palui/apps/server/internal/connectors/wainbox"
 	"github.com/zakiego/palui/apps/server/internal/connectors/web"
 	"github.com/zakiego/palui/apps/server/internal/connectors/webfetch"
 	"github.com/zakiego/palui/apps/server/internal/connectors/whatsapp"
@@ -54,6 +56,8 @@ func Catalog() []Entry {
 		{"mcp", mcp.Runtime},
 		{"http", httpreq.Runtime},
 		{"gcal", gcal.Runtime},
+		{"ics", ics.Runtime},
+		{"wa-inbox", wainbox.Runtime},
 		{"t3code", t3code.Runtime},
 		{"printer", printer.Runtime},
 		{"reminders", reminders.Runtime},

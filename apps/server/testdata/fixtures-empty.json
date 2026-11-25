@@ -152,6 +152,10 @@
    "columns": ["agent_id","subject","label","created_at"],
    "rows": []
   },
+  "proactive_notes": {
+   "columns": ["id","agent_id","text","source","expires_at","created_at","updated_at"],
+   "rows": []
+  },
   "proactive_ticks": {
    "columns": ["id","agent_id","started_at","finished_at","sources","found","sent","tokens","error"],
    "rows": []
@@ -210,6 +214,10 @@
   },
   "verification": {
    "columns": ["id","identifier","value","expires_at","created_at","updated_at"],
+   "rows": []
+  },
+  "wa_inbox_chats": {
+   "columns": ["connector_id","chat_jid","kind","name","last_in_at","last_out_at","waiting_since","unanswered","preview","updated_at"],
    "rows": []
   }
  }

@@ -82,6 +82,16 @@ type Options struct {
 	TypingMaxMs    int64
 	Timers         channelutil.Timers
 	Now            func() int64
+	// Manifest replaces the channel's manifest, for a connector type that
+	// reuses this runtime (the read-only WhatsApp inbox). nil keeps it.
+	Manifest *connectors.Manifest
+	// ReadOnly links the number but never answers: no owner identity is
+	// written, nothing reaches the router, and the connector isn't a channel,
+	// so the outbox can't send through it.
+	ReadOnly bool
+	// Observe sees every new message as it arrives, the owner's own included,
+	// before the channel filters them.
+	Observe func(s Socket, m *Message)
 }
 
 func (o Options) withDefaults(log *logx.Logger) Options {
@@ -162,10 +172,14 @@ func configString(c *jsonx.Object, key string) string {
 
 // New is createWhatsAppRuntime(overrides).
 func New(o Options) *connectors.Runtime {
+	m := Manifest
+	if o.Manifest != nil {
+		m = *o.Manifest
+	}
 	return &connectors.Runtime{
-		Manifest: Manifest,
+		Manifest: m,
 		Test: func(c connectors.Context) (connectors.TestResult, error) {
-			if configString(c.Config, "ownerPhone") == "" {
+			if !o.ReadOnly && configString(c.Config, "ownerPhone") == "" {
 				return connectors.TestResult{OK: false, Detail: "Enter the owner's phone number first."}, nil
 			}
 			if InspectSession(StorePathFor(c.DataDir, c.ID)) == SessionLinked {
@@ -190,7 +204,8 @@ var Runtime = New(Options{})
 // removeConnectorFiles): a removed WhatsApp connector's session store goes.
 func RemoveConnectorFiles(dataDir string) func(row db.Connector, unlinked bool) error {
 	return func(row db.Connector, _ bool) error {
-		if row.Type == "whatsapp" {
+		// The read-only inbox (connectors/wainbox) keeps its session the same way.
+		if row.Type == "whatsapp" || row.Type == "wa-inbox" {
 			return WipeSession(StorePathFor(dataDir, row.ID))
 		}
 		return nil
@@ -281,8 +296,9 @@ func start(c connectors.Context, o Options) (*connectors.RunningConnector, error
 	}
 
 	// Keep the owner identity in step with the configured number. Same number
-	// keeps the learned LID; a new number replaces the identity.
-	if phone := configString(c.Config, "ownerPhone"); phone != "" {
+	// keeps the learned LID; a new number replaces the identity. A read-only
+	// link never touches it.
+	if phone := configString(c.Config, "ownerPhone"); phone != "" && !o.ReadOnly {
 		want := owner.PhoneToJid(phone)
 		cur, ok, err := owner.GetOwner(c.DB, "whatsapp")
 		if err == nil && (!ok || cur.ExternalID != want) {
@@ -327,16 +343,19 @@ func start(c connectors.Context, o Options) (*connectors.RunningConnector, error
 	c.SetStatus("connecting", nil)
 	w.connect()
 
-	return &connectors.RunningConnector{
-		Stop:    func(context.Context) error { w.stop(); return nil },
-		Channel: w,
+	rc := &connectors.RunningConnector{
+		Stop: func(context.Context) error { w.stop(); return nil },
 		Live: func() *jsonx.Object {
 			w.mu.Lock()
 			defer w.mu.Unlock()
 			return w.live.Object()
 		},
 		Action: w.action,
-	}, nil
+	}
+	if !o.ReadOnly {
+		rc.Channel = w
+	}
+	return rc, nil
 }
 
 func (w *wa) ctx() context.Context {
@@ -621,6 +640,14 @@ func (w *wa) connect() {
 		current := s == w.sock
 		w.mu.Unlock()
 		if up.Type != "notify" || !current {
+			return
+		}
+		if w.o.Observe != nil {
+			for _, m := range up.Messages {
+				w.o.Observe(s, m)
+			}
+		}
+		if w.o.ReadOnly {
 			return
 		}
 		for _, m := range up.Messages {

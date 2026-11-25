@@ -8,6 +8,7 @@ import gateway from "./gateway/manifest"
 import gcal from "./gcal/manifest"
 import hooks from "./hooks/manifest"
 import http from "./http/manifest"
+import ics from "./ics/manifest"
 import jobs from "./jobs/manifest"
 import proactive from "./proactive/manifest"
 import mcp from "./mcp/manifest"
@@ -23,6 +24,7 @@ import t3code from "./t3code/manifest"
 import telegram from "./telegram/manifest"
 import tgbot from "./tgbot/manifest"
 import voice from "./voice/manifest"
+import waInbox from "./wa-inbox/manifest"
 import web from "./web/manifest"
 import webfetch from "./webfetch/manifest"
 import whatsapp from "./whatsapp/manifest"
@@ -39,6 +41,8 @@ export const manifests: Record<string, ConnectorManifest> = {
   mcp,
   http,
   gcal,
+  ics,
+  "wa-inbox": waInbox,
   t3code,
   printer,
   reminders,

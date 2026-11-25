@@ -19,7 +19,8 @@ var want = map[string]string{
 	"setChatReplyModeFn": "POST", "setChatAckFn": "POST", "setChatAllowedFn": "POST", "setChatDeployNoticeFn": "POST",
 	"getAgentMembersFn": "GET", "saveMemberFn": "POST", "setAgentMemberFn": "POST",
 	// proactive (agent page)
-	"getProactiveFn": "GET", "saveProactiveFn": "POST", "unmuteProactiveFn": "POST", "checkProactiveNowFn": "POST",
+	"getProactiveFn": "GET", "saveProactiveFn": "POST", "unmuteProactiveFn": "POST", "checkProactiveNowFn": "POST", "testProactiveFn": "POST",
+	"addProactiveNoteFn": "POST", "editProactiveNoteFn": "POST", "deleteProactiveNoteFn": "POST",
 	// chat rules (agent page)
 	"getChatRulesFn": "GET", "setMemberRulesFn": "POST", "deleteChatRuleFn": "POST", "undoChatRuleChangeFn": "POST",
 	// attachments.ts
@@ -60,8 +61,8 @@ var want = map[string]string{
 var public = map[string]bool{"getSession": true, "getInvite": true, "acceptInvite": true}
 
 func TestEveryServerFunctionIsRegistered(t *testing.T) {
-	if len(want) != 103 {
-		t.Fatalf("the list has %d names, want 103", len(want))
+	if len(want) != 107 {
+		t.Fatalf("the list has %d names, want 107", len(want))
 	}
 	got := map[string]httpapi.Handler{}
 	for _, h := range httpapi.Handlers() {

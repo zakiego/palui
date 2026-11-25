@@ -1,0 +1,45 @@
+---
+title: Calendar feed
+description: Read any calendar from its secret iCal link, with no OAuth app to set up.
+---
+
+Kind: `tools`. A calendar feed reads a calendar from its iCalendar link (RFC 5545), the format every calendar service can publish. It works with Google Calendar, iCloud, Outlook, Fastmail, Nextcloud and anything else that gives you an `.ics` address. It's read only, and you can add as many as you like: one per calendar.
+
+It's the easiest way to give [Proactive](/docs/connectors/proactive) a calendar: mention `@<connector id>__get_events` in the prompt.
+
+## Connect
+
+1. Copy the calendar's private iCal address:
+   - **Google Calendar**: Settings, pick the calendar, then **Secret address in iCal format**.
+   - **iCloud**: share the calendar as a public calendar and copy the `webcal://` link.
+   - **Outlook**: Settings, Calendar, Shared calendars, **Publish a calendar**, then the ICS link.
+   - **Fastmail, Nextcloud**: the calendar's subscription link.
+2. On the Connectors page, add **Calendar feed** and paste the address.
+3. Optionally add your email addresses, separated by commas, so invites you declined show as declined.
+4. Press Test. It reads the next 7 days and says how many events it found.
+
+## Settings
+
+| Setting | What it does |
+|---|---|
+| iCal address | The feed link. It's a secret: anyone with it can read the calendar, so it's encrypted at rest and never shown again. `webcal://` links are read over https. |
+| Your email addresses | Optional. An event where one of these addresses declined is marked `declined`. |
+
+## Tools
+
+- `get_events` (read) lists the events in a time range, sorted by start. It takes `from` and `to` (an ISO date-time or a date) or `days` (1 to 31, default 2 from now). Recurring events are expanded, each occurrence with its own stable id, and moved or skipped occurrences are respected. Each event has a title, start and end in your time zone (a date for all-day events), location, a video call link when there is one, and `declined` when you declined it. Cancelled events are left out.
+
+The feed is fetched at most every 5 minutes. Calendar services refresh their iCal links on their own schedule, from minutes (Fastmail, Nextcloud) to a few hours (Google), so a brand-new event may take a while to show up.
+
+## Safety
+
+<Callout type="warn" title="Event text is outside text">
+  Anyone can put text in your calendar by sending an invite. Results from this connector taint the turn, so any write after them asks you first.
+</Callout>
+
+- Errors never show the secret part of the link, only its host.
+- Time zones are read from the feed. IANA names (what Google, iCloud and Fastmail write) and the common Windows names Outlook writes are understood; anything else falls back to your time zone.
+
+## Pause and remove
+
+Pausing hides the tool. Removing deletes the link from Palui; the calendar isn't touched. To cut off access completely, reset the secret address in your calendar's settings.

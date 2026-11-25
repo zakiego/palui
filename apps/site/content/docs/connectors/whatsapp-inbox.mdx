@@ -1,0 +1,43 @@
+---
+title: WhatsApp inbox
+description: See which of your own WhatsApp chats wait for a reply. It links your number read only and never sends anything.
+---
+
+Kind: `tools`. The WhatsApp inbox links your personal number as one more device, the same way WhatsApp Web does, and keeps track of which chats are waiting for your reply. It never sends, reacts, types or marks anything read. It's the source [Proactive](/docs/connectors/proactive) uses for "who's waiting on me": mention `@<connector id>__waiting_chats` in the prompt.
+
+It's a different connector from the [WhatsApp channel](/docs/connectors/whatsapp), which is the number Palui chats from. Link your own number here, and keep the bot's number on the channel.
+
+## Connect
+
+1. On the Connectors page, add **WhatsApp inbox**.
+2. Link your number: type the pairing code shown in the dashboard on your phone (WhatsApp, Linked devices, Link a device, Link with phone number instead), or scan the QR code.
+3. That's it. The status turns on once the phone confirms.
+
+The inbox starts empty. Only messages that arrive after linking count: older chats aren't read back.
+
+## Settings
+
+| Setting | What it does |
+|---|---|
+| Phone number to link | Optional. Pairing codes are requested for this number; without it, link with the QR code. |
+
+## Tools
+
+- `waiting_chats` (read) lists chats waiting for your reply, the longest wait first: the chat's id (the number or group id), name, `waitingSince`, `waitingMinutes`, `unanswered` (how many messages wait) and `lastMessage`, a short preview. Direct messages only unless `include_groups` is true; `min_minutes` skips short waits.
+- `list_chats` (read) lists chats by their last activity, with when the last message came in and when you last replied.
+
+A chat stops waiting as soon as you reply from any device, your phone included. A reaction from you counts as a reply. Reactions from others, status updates, broadcast lists, newsletters and notes to yourself never count as a wait.
+
+## Safety
+
+<Callout type="warn" title="Previews go to your model provider">
+  When a tool runs, the chat names and previews it returns go to your model. They're written by other people, so they're treated as outside text: a turn that read them asks before any write.
+</Callout>
+
+- Per chat it keeps only the name, the kind, when the last message came in, when you last replied, how many messages wait and a 200-character preview of the newest one. Message bodies are never stored.
+- Chats quiet for 30 days are forgotten. Removing the connector forgets every chat and unlinks the device.
+- It can't be used to send: it isn't a channel, so the outbox has no way to route a message through it.
+
+## Pause and remove
+
+Pausing disconnects the device, so nothing new is recorded and the chats waiting stay as they were. Removing it unlinks the device from your WhatsApp and deletes what it recorded. You can also unlink it from your phone under Linked devices.

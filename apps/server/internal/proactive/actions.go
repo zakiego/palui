@@ -4,11 +4,14 @@ package proactive
 // before the model:
 //   FromCallback  Telegram buttons: "ndg:done:<id>", "ndg:snooze:<id>:<1h|3h|tomorrow>", "ndg:mute:<id>"
 //   FromText      WhatsApp replies quoting a proactive message: "done",
-//                 "tunda 3j", "jangan ingetin"...
+//                 "tunda 3j", "jangan ingetin"... Any other reply becomes an
+//                 owner note in proactive memory (RFC 8) and the turn goes on
+//                 as usual, so the agent still answers it.
 // An action applies to every nudge the message carried. Actions implements
 // chat.ReminderActions.
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 	"time"
@@ -85,10 +88,6 @@ func (Actions) FromText(q db.Q, text, replyTo, chatID string, now int64) (string
 	if replyTo == "" {
 		return "", false, nil
 	}
-	a := ParseText(text)
-	if a == nil {
-		return "", false, nil
-	}
 	var outboxID string
 	err := q.QueryRow("SELECT id FROM outbox WHERE channel_msg_id = ? AND source LIKE ? ORDER BY (chat_id = ?) DESC, rowid LIMIT 1", replyTo, OutboxSourcePrefix+"%", chatID).Scan(&outboxID)
 	if noRows(err) {
@@ -97,8 +96,40 @@ func (Actions) FromText(q db.Q, text, replyTo, chatID string, now int64) (string
 	if err != nil {
 		return "", false, err
 	}
+	a := ParseText(text)
+	if a == nil {
+		return "", false, rememberReply(q, outboxID, text, now)
+	}
 	reply, err := Apply(q, outboxID, chatID, *a, now)
 	return reply, err == nil, err
+}
+
+// rememberReply keeps the owner's reply to a proactive message as an owner
+// note, tied to what the message said, and looks again on the next sweep.
+func rememberReply(q db.Q, outboxID, text string, now int64) error {
+	rows, err := q.Query("SELECT "+db.NudgeCols+" FROM nudges WHERE outbox_id = ? ORDER BY created_at, id LIMIT 1", outboxID)
+	list, err := db.All(rows, err, db.ScanNudge)
+	if err != nil || len(list) == 0 {
+		return err
+	}
+	n := list[0]
+	body := strx.Trim(text)
+	if body == "" {
+		return nil
+	}
+	note := body
+	if n.Kind == KindItem {
+		note = "About \"" + clip(Label(n), 80) + "\": " + body
+	}
+	if _, err := AddNote(q, n.AgentID, note, NoteSourceOwner, 0, now); err != nil {
+		var ce *ConfigError
+		if errors.As(err, &ce) {
+			return nil // memory full: the turn still answers
+		}
+		return err
+	}
+	_, err = q.Exec("UPDATE agent_proactive SET next_tick_at = ? WHERE agent_id = ? AND enabled = 1 AND paused_reason IS NULL", now, n.AgentID)
+	return err
 }
 
 // Apply runs an action on every nudge of one proactive message.
