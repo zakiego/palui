@@ -102,6 +102,7 @@ export type SaveMemberInput = { agentId: string; id?: string; name: string; acco
 export type ToolPermissionsInput = {
   id: string
   allowAll?: boolean
+  askAfterUntrusted?: boolean
   tools?: { [tool: string]: ToolPermission | null }
   connectors?: { [connectorId: string]: ToolPermission | null }
   classes?: { [key: string]: ToolPermission | null }

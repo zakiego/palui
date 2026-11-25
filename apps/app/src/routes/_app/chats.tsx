@@ -50,11 +50,12 @@ import { Switch } from "@/components/ui/switch"
 import { setChatAgentFn, setChatAllowedFn, setChatReplyModeFn } from "@/lib/api/agents"
 import { deleteAutoSavedFn } from "@/lib/api/attachments"
 import { decideApproval, getChats, getTranscript, sendWebMessage, stopTurn } from "@/lib/api/chats"
+import type { ApprovalReason } from "@/lib/api/types"
 import { notifyUnauthorized } from "@/lib/api/client"
 import { ago, errorMessage, fileSize } from "@/lib/format"
 import { markdownToPlain } from "@/lib/markdown"
 import { transcriptToMarkdown } from "@/lib/transcript-text"
-import { useLabel, useT } from "@/lib/i18n"
+import { type Key, useLabel, useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_app/chats")({
@@ -358,7 +359,7 @@ function TranscriptPane({ transcript, isWeb }: { transcript: Transcript; isWeb: 
             {transcript.approvals.map((a) => (
               // content-visibility clips paint at the item box; the padding keeps the card's ring.
               <MessageScrollerItem key={a.id} className="p-px">
-                <ApprovalCard approval={{ id: a.id, tool: a.tool, class: a.class, argsPreview: a.argsPreview ?? "" }} onDone={refresh} />
+                <ApprovalCard approval={{ id: a.id, tool: a.tool, class: a.class, argsPreview: a.argsPreview ?? "", reason: a.reason }} agentSlug={transcript.agent.slug} onDone={refresh} />
               </MessageScrollerItem>
             ))}
           </MessageScrollerContent>
@@ -661,7 +662,18 @@ function ChatMessage({
   )
 }
 
-function ApprovalCard({ approval, onDone }: { approval: { id: string; tool: string; class: string; argsPreview: string }; onDone: () => void }) {
+// Why a request asks, in the owner's words (tools.Reason* on the server).
+const APPROVAL_WHY: Record<ApprovalReason, Key> = {
+  "set-to-ask": "chats.approvalWhy.set-to-ask",
+  "tool-rule": "chats.approvalWhy.tool-rule",
+  destructive: "chats.approvalWhy.destructive",
+  unattended: "chats.approvalWhy.unattended",
+  untrusted: "chats.approvalWhy.untrusted",
+  "others-wrote": "chats.approvalWhy.others-wrote",
+  "sends-file": "chats.approvalWhy.sends-file",
+}
+
+function ApprovalCard({ approval, agentSlug, onDone }: { approval: { id: string; tool: string; class: string; argsPreview: string; reason: ApprovalReason | null }; agentSlug: string; onDone: () => void }) {
   const t = useT()
   const label = useLabel()
   const [busy, setBusy] = React.useState<null | boolean>(null)
@@ -690,6 +702,16 @@ function ApprovalCard({ approval, onDone }: { approval: { id: string; tool: stri
       {approval.argsPreview && (
         <CardContent>
           <pre className="max-h-40 overflow-auto rounded-md bg-code p-2 font-mono text-xs break-all whitespace-pre-wrap">{approval.argsPreview}</pre>
+        </CardContent>
+      )}
+      {approval.reason && APPROVAL_WHY[approval.reason] && (
+        <CardContent className="text-sm text-muted-foreground">
+          <p>
+            {t(APPROVAL_WHY[approval.reason])}{" "}
+            <Link to="/agents/$slug" params={{ slug: agentSlug }} search={{ tab: "tools" }} className="underline underline-offset-2 hover:text-foreground">
+              {t("chats.approvalSettings")}
+            </Link>
+          </p>
         </CardContent>
       )}
       <CardFooter className="flex-wrap gap-2">

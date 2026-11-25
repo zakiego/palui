@@ -960,7 +960,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
   // Tool permissions save at once, like the scope. Rolled back when the save fails.
   const router = useRouter()
   const [permissions, setPermissions] = React.useState(agent.toolPermissions)
-  const savePermissions = async (patch: Partial<Record<PermissionLevel, Record<string, Permission | null>>> & { allowAll?: boolean }, next: typeof permissions) => {
+  const savePermissions = async (patch: Partial<Record<PermissionLevel, Record<string, Permission | null>>> & { allowAll?: boolean; askAfterUntrusted?: boolean }, next: typeof permissions) => {
     const before = permissions
     setPermissions(next)
     try {
@@ -973,6 +973,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
     }
   }
   const setAllowAll = (allowAll: boolean) => void savePermissions({ allowAll }, { ...permissions, allowAll })
+  const setAskAfterUntrusted = (askAfterUntrusted: boolean) => void savePermissions({ askAfterUntrusted }, { ...permissions, askAfterUntrusted })
   const setPermission = (level: PermissionLevel, key: string, p: Permission | null) => {
     const entries: Record<string, Permission> = { ...permissions[level] }
     if (p) entries[key] = p
@@ -983,7 +984,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
   const tools = data?.tools ?? null
   const groups = React.useMemo(() => groupTools(tools ?? [], query), [tools, query])
 
-  const youRule = permissions.allowAll ? t("agents.tools.youAllowAll") : t("agents.tools.youRule")
+  const youRule = permissions.allowAll ? t("agents.tools.youAllowAll") : permissions.askAfterUntrusted ? t("agents.tools.youRuleCareful") : t("agents.tools.youRule")
   // A group or someone else's DM, Palui's groups included: one tool set for
   // everyone there, never asking first.
   const sharedCount = tools?.filter((x) => inSharedChats(x, agent.guestTools, permissions)).length ?? null
@@ -1001,6 +1002,14 @@ function ToolsTab({ agent }: { agent: Agent }) {
           <FieldDescription>{t("agents.perm.allowAllHint")}</FieldDescription>
         </FieldContent>
         <Switch id="agent-allow-all" checked={permissions.allowAll} onCheckedChange={(v) => setAllowAll(v)} />
+      </Field>
+
+      <Field orientation="horizontal" className="max-w-2xl">
+        <FieldContent>
+          <FieldLabel htmlFor="agent-ask-after-untrusted">{t("agents.perm.askAfterUntrusted")}</FieldLabel>
+          <FieldDescription>{t("agents.perm.askAfterUntrustedHint")}</FieldDescription>
+        </FieldContent>
+        <Switch id="agent-ask-after-untrusted" checked={permissions.askAfterUntrusted ?? false} onCheckedChange={(v) => setAskAfterUntrusted(v)} />
       </Field>
 
       <ItemGroup className="gap-1">

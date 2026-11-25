@@ -32,7 +32,12 @@ export type ToolPermissions = {
   tools: { [tool: string]: ToolPermission }
   connectors?: { [connectorId: string]: ToolPermission }
   classes?: { [key: string]: ToolPermission }
+  // Owner turns ask before writes after reading untrusted content. Off (the
+  // default): they follow these entries and the tool class only.
+  askAfterUntrusted?: boolean
 }
+// Why an approval asks (tools.Reason* on the server).
+export type ApprovalReason = "set-to-ask" | "tool-rule" | "destructive" | "unattended" | "untrusted" | "others-wrote" | "sends-file"
 export type JobKind = "job" | "heartbeat" | "briefing"
 export type ModelRole = "default" | "fast" | "vision"
 export type ReminderStatus = "pending" | "firing" | "done" | "cancelled"
