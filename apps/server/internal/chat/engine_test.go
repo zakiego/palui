@@ -207,6 +207,22 @@ func TestCommands(t *testing.T) {
 		eq(t, tokenLine(), "Token hari ini: 0 / tanpa batas")
 	})
 
+	t.Run("every message turn auto-saves what's new, once", func(t *testing.T) {
+		var saved []connectors.SaveInput
+		mem := &connectors.MemoryHandle{AutoSave: true, Save: func(ctx context.Context, in connectors.SaveInput) error { saved = append(saved, in); return nil }}
+		h := basic(t, []models.Step{models.Say("halo juga"), models.Say("siap")}, extra{registry: map[string]*connectors.Runtime{"recall": conntest.MemoryRuntime(mem)}, rows: []chattest.Row{{"recall", "memory"}}})
+		h.sendIdle("halo palui")
+		eq(t, len(saved), 1)
+		eq(t, saved[0].Content, "Owner: halo palui\nPalui: halo juga")
+		h.Clock.Add(1_000)
+		h.sendIdle("ingat aku suka kopi")
+		eq(t, len(saved), 2)
+		eq(t, saved[1].Content, "Owner: ingat aku suka kopi\nPalui: siap")
+		// /new has nothing left to save.
+		h.sendIdle("/new")
+		eq(t, len(saved), 2)
+	})
+
 	t.Run("/new auto-saves then rotates the session", func(t *testing.T) {
 		var saved []connectors.SaveInput
 		mem := &connectors.MemoryHandle{AutoSave: true, Save: func(ctx context.Context, in connectors.SaveInput) error { saved = append(saved, in); return nil }}

@@ -19,6 +19,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/events"
 	"github.com/zakiego/palui/apps/server/internal/logx"
+	"github.com/zakiego/palui/apps/server/internal/memory"
 	"github.com/zakiego/palui/apps/server/internal/owner"
 	"github.com/zakiego/palui/apps/server/internal/strx"
 )
@@ -26,6 +27,9 @@ import (
 const (
 	ApprovalSweepMs = 15_000
 	DrainTimeoutMs  = 50_000
+	// AutoSaveTimeoutMs bounds the save after each turn; a failed save is
+	// retried after the next turn, since the session cursor doesn't move.
+	AutoSaveTimeoutMs = 10_000
 )
 
 // EngineOptions is EngineOptions.
@@ -189,10 +193,30 @@ func (e *Engine) runQueuedTurn(chatID string, ids []string) {
 		e.scheduleRetry(chatID, pending, r.RetryInMs)
 		return
 	}
-	if r.Status == "ok" && ok && chat.SessionID != nil {
-		if _, err := MaybeCompact(c, *chat.SessionID); err != nil {
-			panic(err)
-		}
+	if r.Status == "ok" {
+		e.afterTurn(chatID)
+	}
+}
+
+// afterTurn compacts the chat's session when it's long, then saves what's new
+// in it to memory, so every message reaches recall without waiting for /new.
+// The session is read again: a chat's first turn is the one that creates it.
+func (e *Engine) afterTurn(chatID string) {
+	c := e.Ctx
+	chat, ok, err := chats.Get(c.DB, chatID)
+	if err != nil {
+		panic(err)
+	}
+	if !ok || chat.SessionID == nil {
+		return
+	}
+	if _, err := MaybeCompact(c, *chat.SessionID); err != nil {
+		panic(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), AutoSaveTimeoutMs*time.Millisecond)
+	defer cancel()
+	if _, err := memory.AutoSave(ctx, c.DB, memory.Find(c.Host.Running()), *chat.SessionID, c.Log, nil, c.Clock()); err != nil {
+		c.Log.Warn("auto-save failed", logx.Fields{"chat_id": chatID, "error": err})
 	}
 }
 

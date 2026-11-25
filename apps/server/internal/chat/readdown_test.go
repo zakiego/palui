@@ -121,7 +121,9 @@ func TestReadDown(t *testing.T) {
 
 		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("baca halaman ini")
+		h.Clock.Add(1_000)
 		h.sendIdle("aku pindah ke Bandung bulan depan")
+		h.Clock.Add(1_000)
 		h.sendIdle("catat ya")
 		eq(t, len(notes.get()), 0)
 		eq(t, allApprovals(t, h.DB, "")[0].Tool, "notes__add")

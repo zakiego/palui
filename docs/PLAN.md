@@ -246,7 +246,7 @@ Budget
 - Test: `GET /health`, then `GET /v1/containers`.
 - Tools: recall's own `/mcp` endpoint, mounted as an MCP connector (`add_memory`, `search_memories`, `ask_memory`, `get_profile`, `list_memories`). Forget is `DELETE /v1/memories/:id`, one REST tool classed `destructive`.
 - Auto-recall (Switch): `GET /v1/profile?container=…&q=<message>` before a turn, 1.5 s timeout, skip rate shown on the card. Skipped for commands and messages under 4 words.
-- Auto-save (Switch): runs at session compaction and on `/new`, with `POST /v1/memories` sending my messages plus the final replies, never tool output. `source_id = <session>:<range>` keeps it idempotent. Tainted turns (section 10) are skipped.
+- Auto-save (Switch): runs after every turn (and at compaction, `/new` and an agent switch for anything left), with `POST /v1/memories` sending my messages plus the final replies, never tool output. `source_id = <session>:<range>` keeps it idempotent. Tainted turns (section 10) are skipped.
 
 ### 5.4 Tools: MCP servers
 
@@ -360,7 +360,7 @@ Someone in a chat asks the agent to keep an eye on something that isn't out yet 
 6. Approvals: tools that need approval (`destructive` always, `write` in tainted turns and jobs) use tool approval: the loop returns `tool-approval-request` parts and the turn ends. The `approvalId` and response messages are saved to `pending_approvals`, the queue is freed, and I get a prompt (buttons on Telegram, "ya/batal" on WhatsApp). The answer resumes it with a new call carrying a `tool-approval-response`. The loop ran the other calls of that step when it asked, so on an approved resume their results are marked as taken before the approved call ran (the model calls again for the current state). After 10 minutes it resumes with a denial so the model can close the loop. This survives restarts. When the same call (same tool, same arguments) is made again in that chat while a request for it still waits, the older request is dropped without a follow-up: only the newest prompt is live.
 7. Reply: written to the outbox, split and formatted per channel.
 8. Bookkeeping: tokens, tool calls and duration go into `runs`, tagged with `run_id` in logs.
-9. Compaction: past about 40 messages, the `fast` model writes a summary and older messages leave the context (they stay in the DB). Auto-save to recall runs here.
+9. Compaction: past about 40 messages, the `fast` model writes a summary and older messages leave the context (they stay in the DB). Auto-save to recall runs here for the folded part, then after the turn for the rest.
 
 Delivery is at least once. Outbox rows stuck in `sending` for more than 5 minutes go back to `pending`.
 
