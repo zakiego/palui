@@ -555,6 +555,30 @@ func TestSaveListsToolsOutsideItsTransaction(t *testing.T) {
 	}
 }
 
+func TestAnEmptyAnswerFailsTheRunInsteadOfSayingNothing(t *testing.T) {
+	w := newWorld(t, nil)
+	var maxOut int
+	cutOff := models.Step{Fn: func(_ context.Context, opts models.CallOptions) ([]models.Event, error) {
+		maxOut = *opts.MaxOutputTokens
+		return []models.Event{{Type: models.EventFinish, FinishReason: models.FinishReason{Unified: "length"}, Usage: models.MockUsage(10)}}, nil
+	}}
+	w.model.Push(models.CallTool("gcal__get_calendar", map[string]any{"from": "now"}, ""), cutOff)
+	res, err := w.e.TestRun(context.Background(), w.agent.ID, nil, NOW)
+	tu.Must(t, err)
+	if !strings.Contains(res.Error, "ran out of output tokens") || len(res.Items) != 0 {
+		t.Fatalf("%+v", res)
+	}
+	if maxOut != proactive.MaxRunOutputTokens {
+		t.Fatalf("a run's model call gets %d output tokens", maxOut)
+	}
+	// A live run with no answer counts as a failure, not a quiet run.
+	w.model.Push(models.CallTool("gcal__get_calendar", map[string]any{"from": "now"}, ""), models.Say("  "))
+	w.sweep()
+	if tl := w.ticks(); len(tl) == 0 || tl[0].Error == nil || !strings.Contains(*tl[0].Error, "no answer") {
+		t.Fatalf("the empty answer wasn't recorded as a failure: %+v", tl)
+	}
+}
+
 func TestTestRunWritesNothing(t *testing.T) {
 	w := newWorld(t, nil)
 	w.answer(`{"items":[{"key":"cal:e1:leave","text":"Berangkat.","sendAt":"2026-11-10T13:30:00+08:00"}],"remember":[{"text":"x"}]}`)
