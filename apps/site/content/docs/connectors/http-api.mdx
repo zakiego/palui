@@ -47,7 +47,7 @@ Limits: the agent sees at most about 16,000 characters of the body, Palui reads 
 ## Safety
 
 <Callout type="warn" title="Results taint the turn">
-  An API response is outside text, and it can contain text aimed at the model. Once a turn reads one, it's tainted: every `write` tool needs your approval for the rest of that turn, and recall auto-save skips it. See [The taint rule](/docs/concepts/taint-rule).
+  An API response is outside text, and it can contain text aimed at the model. Once a turn reads one, it's tainted: recall auto-save skips it, and with the agent's "Ask before writes after reading outside content" switch on, every `write` tool needs your approval after it. See [The taint rule](/docs/concepts/taint-rule).
 </Callout>
 
 - The key goes only to the allowed domains, only over https, and only to the default port (443). A URL or redirect with another port is refused.

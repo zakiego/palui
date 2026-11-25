@@ -39,12 +39,12 @@ cupsctl WebInterface=yes
 
 `printer_status` reads the queue. A printer that's off or asleep can still show `idle` until a job reaches it, so a job that was sent but didn't print usually means the printer needs waking up.
 
-`write` tools run right away in your own chat. They ask first after [untrusted content](/docs/concepts/taint-rule) in the same turn, and in scheduled jobs and hooks.
+`write` tools run right away in your own chat. They ask first in scheduled jobs and hooks, and after [untrusted content](/docs/concepts/taint-rule) when the agent's "Ask before writes after reading outside content" switch is on.
 
 ## Safety
 
 - Palui only prints files from the chat it's answering, or attachments saved in that chat.
-- Printing runs right away when you ask in your own chat. After untrusted content in the same turn, and in scheduled jobs and hooks, it asks for your approval first.
+- Printing runs right away when you ask in your own chat. In scheduled jobs and hooks, and after untrusted content with the agent's switch on, it asks for your approval first. Set it to ask on the Tools tab to always confirm.
 - Guests in a shared chat can't print.
 - Nothing is stored. The file goes from the chat to the print queue and Palui keeps only the job id it got back.
 

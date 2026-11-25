@@ -17,13 +17,13 @@ A tool with no class is treated as `destructive`. For MCP servers, the tool's `r
 
 ## When a tool needs approval
 
-| Class | Normal turn | Tainted turn | Scheduled job | Webhook summary |
+| Class | Your own chat | Your own chat, switch on, after untrusted content | Scheduled job | Webhook summary |
 |---|---|---|---|---|
 | `read` | Runs | Runs | Runs | No tools |
 | `write` | Runs | Needs approval | Needs approval | No tools |
 | `destructive` | Needs approval | Needs approval | Not available | No tools |
 
-A tainted turn is one that has read untrusted content. See [The taint rule](/docs/concepts/taint-rule). Webhook summaries run with zero tools. See [Inbound webhooks](/docs/connectors/webhooks). How approval works is on [Approvals](/docs/concepts/approvals).
+The switch is the agent's "Ask before writes after reading outside content" on its Tools tab, off by default. Without it, your own chats follow the first column whatever the conversation read. See [The taint rule](/docs/concepts/taint-rule). Webhook summaries run with zero tools. See [Inbound webhooks](/docs/connectors/webhooks). How approval works is on [Approvals](/docs/concepts/approvals).
 
 ## Per-tool switches
 

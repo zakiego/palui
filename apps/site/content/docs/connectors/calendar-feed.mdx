@@ -34,7 +34,7 @@ The feed is fetched at most every 5 minutes. Calendar services refresh their iCa
 ## Safety
 
 <Callout type="warn" title="Event text is outside text">
-  Anyone can put text in your calendar by sending an invite. Results from this connector taint the turn, so any write after them asks you first.
+  Anyone can put text in your calendar by sending an invite. Results from this connector taint the turn, so with the agent's "Ask before writes after reading outside content" switch on, any write after them asks you first.
 </Callout>
 
 - Errors never show the secret part of the link, only its host.

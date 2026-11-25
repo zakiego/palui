@@ -41,11 +41,11 @@ The token is full access, so threads Palui starts run like the ones you start yo
 
 A thread link looks like `…/threads/<environmentId>/<threadId>`. The first id is your T3 Code install and is the same for every thread. The last part is the thread id.
 
-`write` tools run right away in your own chat. They ask first after [untrusted content](/docs/concepts/taint-rule) in the same turn, and in scheduled jobs and hooks.
+`write` tools run right away in your own chat. They ask first in scheduled jobs and hooks, and after [untrusted content](/docs/concepts/taint-rule) when the agent's "Ask before writes after reading outside content" switch is on.
 
 ## Safety
 
-- Threads run with full access on the T3 Code machine, like the ones you start yourself. Palui starts them only when you ask in your own chat. After untrusted content in the same turn, and in scheduled jobs and hooks, starting or messaging a thread asks for your approval first. Stopping a thread always asks.
+- Threads run with full access on the T3 Code machine, like the ones you start yourself. Palui starts them only when you ask in your own chat. In scheduled jobs and hooks, and after untrusted content with the agent's "Ask before writes after reading outside content" switch on, starting or messaging a thread asks for your approval first. Set the tools to ask on the Tools tab to always confirm. Stopping a thread always asks.
 - New threads get their own git worktree, so your checkout stays as it was unless you ask Palui to work in place.
 - The token is stored encrypted and never shown. The pairing code works once, so a leaked old code is useless.
 

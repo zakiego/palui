@@ -5,8 +5,23 @@ description: Risky tool calls wait for your yes. Pending approvals are saved, su
 
 Some tool calls need your yes before they run. Which ones depends on the [tool class](/docs/concepts/tool-classes):
 
-- `destructive` tools always need approval.
-- `write` tools need approval in [tainted turns](/docs/concepts/taint-rule) and in [scheduled jobs](/docs/concepts/jobs).
+- `destructive` tools always need approval, unless you set them to allow on the agent's Tools tab.
+- `write` tools need approval in [scheduled jobs](/docs/concepts/jobs), flows, watches and hooks. In your own chats they run, unless you set them to ask, or turn on the agent's ["Ask before writes after reading outside content"](/docs/concepts/taint-rule#ask-before-writes-after-reading-outside-content) switch.
+- A tool you set to ask always asks.
+
+In your own chats the answer depends only on the agent's settings and the tool's class, so the same tool gets the same answer every time.
+
+## Why it asked
+
+Every prompt says why it asked and links to the agent's Tools tab, where you change it. The dashboard's approval card shows the same reason. The model is told too, so when you ask "kenapa harus nanya?", it can answer with the real reason instead of guessing. The reasons:
+
+| Reason | What to change |
+|---|---|
+| The tool is set to ask | Its entry on the Tools tab |
+| The tool's own setting asks (a message to a contact, an HTTP API set to ask) | That connector's setting |
+| A destructive tool | Set it to allow on the Tools tab |
+| It ran on its own (a job, flow, watch or hook) | Nothing: every write asks there |
+| The chat read outside content, other people's chats, or a saved file would leave after that | The agent's "Ask before writes after reading outside content" switch |
 
 ## How it works
 

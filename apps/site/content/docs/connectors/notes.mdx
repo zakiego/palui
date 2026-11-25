@@ -45,7 +45,7 @@ The three chat rule tools only show up in a shared chat of only you and members,
   An instruction is persistent prompt text, so a web page or MCP result that talked Palui into saving one would stick around. That's why saving or deleting an instruction is `destructive`: it always asks you first, shows the full text in the approval, and scheduled jobs and hooks can't do it at all.
 </Callout>
 
-- Preferences are shown to the model as data, not instructions. Setting one is a `write`, so it asks first whenever the turn is tainted.
+- Preferences are shown to the model as data, not instructions. Setting one is a `write`, so it asks first in a tainted turn when the agent's "Ask before writes after reading outside content" switch is on.
 - Every change made from chat is logged on the Activity page.
 
 ## Pause and remove
