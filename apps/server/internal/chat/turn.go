@@ -159,7 +159,7 @@ func (c *EngineCtx) SetDraining(v bool) { c.draining.Store(v) }
 // TurnOptions are TurnOptions: how a turn starts.
 type TurnOptions struct {
 	ChatID string
-	// message, schedule, hook, approval, reminder or flow.
+	// message, schedule, hook, approval, reminder, flow or watch.
 	Trigger string
 	Prompt  string
 	JobID   string
@@ -316,7 +316,7 @@ func rememberLoaded(q db.Q, sessionID string, names []string) error {
 }
 
 func unattended(origin string) bool {
-	return origin == "schedule" || origin == "reminder" || origin == "flow"
+	return origin == "schedule" || origin == "reminder" || origin == "flow" || origin == "watch"
 }
 
 // IsSilent is isSilent: only the final step's text is judged against the token.
@@ -901,7 +901,8 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 	channel := channelOf(c, chat)
 	typing := func(on bool) {
 		t, ok := channel.(connectors.Typer)
-		if !ok {
+		// A watch check runs quietly in the background: no typing, no ack.
+		if !ok || origin == "watch" {
 			return
 		}
 		reaction := ""
@@ -1079,10 +1080,12 @@ func ExecuteTurn(c *EngineCtx, input ExecInput) (TurnResult, error) {
 				Scope:              scopeList,
 				Only:               onlyList,
 				ExcludeDestructive: unattended(origin),
-				Permissions:        &perms,
-				HideAsk:            open,
-				Audience:           collectAudience,
-				Sticky:             sticky,
+				// A watch check only looks things up, and never stops to ask.
+				ReadOnly:    origin == "watch",
+				Permissions: &perms,
+				HideAsk:     open || origin == "watch",
+				Audience:    collectAudience,
+				Sticky:      sticky,
 				OnLoad: func(names []string) {
 					if chat.SessionID != nil {
 						if err := rememberLoaded(q, *chat.SessionID, names); err != nil {

@@ -196,6 +196,8 @@ type CollectOptions struct {
 	Only []string
 	// Jobs and hooks never get destructive tools.
 	ExcludeDestructive bool
+	// Only read tools (watch checks).
+	ReadOnly bool
 	// The agent's tool permissions: tools they turn off are left out.
 	Permissions *db.ToolPermissions
 	// Also leave out the tools they set to ask (a turn with no approvals).
@@ -264,6 +266,9 @@ func Collect(ctx context.Context, running []connectors.RunningEntry, opts Collec
 				continue
 			}
 			if opts.ExcludeDestructive && cls == "destructive" {
+				continue
+			}
+			if opts.ReadOnly && cls != "read" {
 				continue
 			}
 			name := Namespaced(e.ID, toolName)

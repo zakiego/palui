@@ -19,7 +19,7 @@ const TTLMs = 10 * 60_000
 // `context`). Field order follows the TS type. Rows written by the TS build
 // may carry keys in another order; the row's Context keeps them as stored.
 type ResumeContext struct {
-	// "message", "schedule", "hook", "approval", "reminder" or "flow".
+	// "message", "schedule", "hook", "approval", "reminder", "flow" or "watch".
 	Trigger string `json:"trigger"`
 	// The trigger of the turn that asked; schedule and hook keep their stricter policy on resume.
 	OriginTrigger string    `json:"originTrigger"`
