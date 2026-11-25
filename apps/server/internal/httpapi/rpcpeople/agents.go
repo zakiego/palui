@@ -406,6 +406,7 @@ func init() {
 		Input: zod.Object(
 			zod.F("id", agentID),
 			zod.F("allowAll", zod.Optional(zod.Bool())),
+			zod.F("askAfterUntrusted", zod.Optional(zod.Bool())),
 			zod.F("tools", zod.Optional(zod.Record(zod.Nullable(zod.Enum("allow", "ask", "deny"))).Keys(zod.String().Max(64)))),
 			zod.F("connectors", zod.Optional(zod.Record(zod.Nullable(zod.Enum("allow", "ask", "deny"))).Keys(zod.String().Max(100)))),
 			zod.F("classes", zod.Optional(zod.Record(zod.Nullable(zod.Enum("allow", "ask", "deny"))).Keys(zod.String().Max(120)))),
@@ -417,6 +418,10 @@ func init() {
 			if v, ok := o.Get("allowAll"); ok {
 				b := v.(bool)
 				patch.AllowAll = &b
+			}
+			if v, ok := o.Get("askAfterUntrusted"); ok {
+				b := v.(bool)
+				patch.AskAfterUntrusted = &b
 			}
 			patch.Tools = permissionEntries(o, "tools")
 			patch.Connectors = permissionEntries(o, "connectors")

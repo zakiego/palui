@@ -42,12 +42,13 @@ func readDownWorld(t *testing.T, steps ...models.Step) (*world, *executedLog) {
 }
 
 func TestReadDown(t *testing.T) {
-	t.Run("reading another agent's chat taints the owner's turn, so a write after it asks", func(t *testing.T) {
+	t.Run("ask-after-untrusted on: reading another agent's chat taints the owner's turn, so a write after it asks", func(t *testing.T) {
 		h, notes := readDownWorld(t,
 			models.CallTool("chats__read_agent_chat", objOf("chat", "chat_club"), "r1"),
 			models.CallTool("notes__add", objOf("text", "club meets friday"), "n1"),
 		)
 
+		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("apa kata grup buku hari ini?")
 		eq(t, len(notes.get()), 0)
 		p := allApprovals(t, h.DB, "")[0]
@@ -61,13 +62,14 @@ func TestReadDown(t *testing.T) {
 		}
 	})
 
-	t.Run("with allow-all on, a write after reading another agent's chat still asks", func(t *testing.T) {
+	t.Run("ask-after-untrusted on: with allow-all on, a write after reading another agent's chat still asks", func(t *testing.T) {
 		h, notes := readDownWorld(t,
 			models.CallTool("chats__read_agent_chat", objOf("chat", "chat_club"), "r1"),
 			models.CallTool("notes__add", objOf("text", "planted"), "n1"),
 		)
 		allowAll(t, h.DB, "", nil)
 
+		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("apa kata grup buku hari ini?")
 		eq(t, len(notes.get()), 0)
 		p := allApprovals(t, h.DB, "")[0]
@@ -77,7 +79,7 @@ func TestReadDown(t *testing.T) {
 		}
 	})
 
-	t.Run("the next turn replays the read, so it starts tainted and a write asks even with allow-all", func(t *testing.T) {
+	t.Run("ask-after-untrusted on: the next turn replays the read, so it starts tainted and a write asks even with allow-all", func(t *testing.T) {
 		h, notes := readDownWorld(t,
 			models.CallTool("chats__read_agent_chat", objOf("chat", "chat_club"), "r1"),
 			models.Say("Grup buku lagi bahas jadwal."),
@@ -85,6 +87,7 @@ func TestReadDown(t *testing.T) {
 		)
 		allowAll(t, h.DB, "", nil)
 
+		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("apa kata grup buku hari ini?")
 		eq(t, count(t, h.DB, "pending_approvals"), 0)
 		h.sendIdle("oke makasih")
@@ -97,7 +100,7 @@ func TestReadDown(t *testing.T) {
 		}
 	})
 
-	t.Run("an ordinary untrusted call in the history makes a later write ask, but plain turns stay untainted and auto-saved", func(t *testing.T) {
+	t.Run("ask-after-untrusted on: an ordinary untrusted call in the history makes a later write ask, but plain turns stay untainted and auto-saved", func(t *testing.T) {
 		notes := &executedLog{}
 		saved := &executedLog{}
 		mem := memHandle(func(in connectors.SaveInput) { saved.add(in.Content) }, nil, false, true)
@@ -116,6 +119,7 @@ func TestReadDown(t *testing.T) {
 			rows: []chattest.Row{{"web", "tools"}, {"notes", "tools"}, {"recall", "memory"}},
 		})
 
+		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("baca halaman ini")
 		h.sendIdle("aku pindah ke Bandung bulan depan")
 		h.sendIdle("catat ya")
@@ -156,7 +160,7 @@ func TestReadDown(t *testing.T) {
 		eq(t, count(t, h.DB, "runs WHERE tainted = 1"), 0)
 	})
 
-	t.Run("a replayed call to a missing read-down tool still asks with allow-all", func(t *testing.T) {
+	t.Run("ask-after-untrusted on: a replayed call to a missing read-down tool still asks with allow-all", func(t *testing.T) {
 		h, notes := readDownWorld(t,
 			models.CallTool("chats__read_agent_chat", objOf("chat", "chat_club"), "r1"),
 			models.Say("Grup buku lagi bahas jadwal."),
@@ -164,6 +168,7 @@ func TestReadDown(t *testing.T) {
 		)
 		allowAll(t, h.DB, "", nil)
 
+		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("apa kata grup buku hari ini?")
 		testutil.Must(t, connectors.Pause(h.DB, "chats", "", 1))
 		h.sendIdle("oke makasih")

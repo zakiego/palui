@@ -169,7 +169,7 @@
    ]
   },
   "pending_approvals": {
-   "columns": ["id","run_id","chat_id","approval_id","tool_call_id","tool","tool_class","args_preview","messages","context","prompt_msg_id","expires_at","status","decided_at","created_at","ask_chat_id"],
+   "columns": ["id","run_id","chat_id","approval_id","tool_call_id","tool","tool_class","args_preview","messages","context","prompt_msg_id","expires_at","status","decided_at","created_at","ask_chat_id","reason"],
    "rows": []
   },
   "preferences": {

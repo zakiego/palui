@@ -77,6 +77,8 @@ type CreateInput struct {
 	// ContextJSON, when set, is stored instead of Context: the turn writes the
 	// object in the TS key order, nulls included (toolScope: null).
 	ContextJSON *jsonx.Object
+	// Why it is asked: a tools.Reason* code ("" stores NULL).
+	Reason string
 }
 
 func Create(q db.Q, in CreateInput, now int64, ttlMs int64) (db.Approval, error) {
@@ -97,8 +99,12 @@ func Create(q db.Q, in CreateInput, now int64, ttlMs int64) (db.Approval, error)
 	if len(msgs) == 0 {
 		msgs = db.RawJSON("[]")
 	}
-	return db.ScanApproval(q.WQueryRow("INSERT INTO pending_approvals (id, run_id, chat_id, approval_id, tool_call_id, tool, tool_class, args_preview, messages, context, expires_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?) RETURNING "+db.ApprovalCols,
-		secret.NewID("apr"), in.RunID, in.ChatID, in.ApprovalID, in.ToolCallID, in.Tool, in.ToolClass, in.ArgsPreview, msgs, ctx, now+ttlMs, now))
+	var reason *string
+	if in.Reason != "" {
+		reason = &in.Reason
+	}
+	return db.ScanApproval(q.WQueryRow("INSERT INTO pending_approvals (id, run_id, chat_id, approval_id, tool_call_id, tool, tool_class, args_preview, messages, context, expires_at, status, created_at, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?) RETURNING "+db.ApprovalCols,
+		secret.NewID("apr"), in.RunID, in.ChatID, in.ApprovalID, in.ToolCallID, in.Tool, in.ToolClass, in.ArgsPreview, msgs, ctx, now+ttlMs, now, reason))
 }
 
 func Get(q db.Q, id string) (db.Approval, bool, error) {

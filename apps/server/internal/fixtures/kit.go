@@ -439,12 +439,14 @@ type Approval struct {
 	RunID, ChatID, Tool, ToolClass string
 	ArgsPreview                    *string
 	ExpiresAt, CreatedAt           int64
+	// Why it asks (a tools.Reason* code); nil like rows from before reasons.
+	Reason *string
 }
 
 func (k *Kit) Approval(v Approval) {
 	id := secret.NewID("apr")
 	k.insert("pending_approvals", col{"id", id}, col{"approval_id", id}, col{"messages", "[]"}, col{"run_id", v.RunID}, col{"chat_id", v.ChatID},
-		col{"tool", v.Tool}, col{"tool_class", v.ToolClass}, col{"args_preview", nullable(v.ArgsPreview)}, col{"expires_at", v.ExpiresAt}, col{"created_at", v.CreatedAt})
+		col{"tool", v.Tool}, col{"tool_class", v.ToolClass}, col{"args_preview", nullable(v.ArgsPreview)}, col{"expires_at", v.ExpiresAt}, col{"created_at", v.CreatedAt}, col{"reason", nullable(v.Reason)})
 }
 
 // Reminder is kit.reminder's values.

@@ -201,7 +201,7 @@ func memHandle(save func(in connectors.SaveInput), recall func(q string, o conne
 }
 
 func TestTaint(t *testing.T) {
-	t.Run("an untrusted tool result makes a later write tool need approval and skips auto-save", func(t *testing.T) {
+	t.Run("ask-after-untrusted on: an untrusted tool result makes a later write tool need approval and skips auto-save", func(t *testing.T) {
 		notes := &executedLog{}
 		saved := &executedLog{}
 		mem := memHandle(func(in connectors.SaveInput) { saved.add(in.Content) }, nil, false, true)
@@ -213,6 +213,7 @@ func TestTaint(t *testing.T) {
 			},
 			rows: []chattest.Row{{"webfetch", "tools"}, {"notes", "tools"}, {"recall", "memory"}},
 		})
+		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("halo palui")
 		h.sendIdle("baca http://x")
 		eq(t, len(notes.get()), 0)
@@ -224,7 +225,7 @@ func TestTaint(t *testing.T) {
 		jsonEq(t, saved.get(), `["Owner: halo palui\nPalui: halo"]`)
 	})
 
-	t.Run("a write tool called in the same step as an untrusted read still needs approval", func(t *testing.T) {
+	t.Run("ask-after-untrusted on: a write tool called in the same step as an untrusted read still needs approval", func(t *testing.T) {
 		notes := &executedLog{}
 		h := basic(t, []models.Step{models.CallTools(models.ScriptedCall{ToolName: "webfetch__fetch", Input: objOf("url", "http://x"), ToolCallID: "f1"}, models.ScriptedCall{ToolName: "notes__add", Input: objOf("text", "baca lagi besok"), ToolCallID: "n1"})}, extra{
 			registry: map[string]*connectors.Runtime{
@@ -233,6 +234,7 @@ func TestTaint(t *testing.T) {
 			},
 			rows: []chattest.Row{{"webfetch", "tools"}, {"notes", "tools"}},
 		})
+		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("baca http://x lalu ingetin aku")
 		eq(t, len(notes.get()), 0)
 		p := allApprovals(t, h.DB, "")[0]
@@ -271,7 +273,7 @@ func TestTaint(t *testing.T) {
 		}
 	})
 
-	t.Run("an owner reply runs without approval after an untrusted call in an earlier turn", func(t *testing.T) {
+	t.Run("ask-after-untrusted on: an owner reply runs without approval after an untrusted call in an earlier turn", func(t *testing.T) {
 		answers, notes := &executedLog{}, &executedLog{}
 		h := basic(t, []models.Step{
 			models.CallTool("webfetch__fetch", objOf("url", "http://x"), "f1"), models.Say("ini isinya"),
@@ -285,6 +287,7 @@ func TestTaint(t *testing.T) {
 			},
 			rows: []chattest.Row{{"webfetch", "tools"}, {"flows", "tools"}, {"notes", "tools"}},
 		})
+		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("baca http://x")
 		h.sendIdle("maghrib sudah")
 		jsonEq(t, answers.get(), `["done"]`)
@@ -295,7 +298,7 @@ func TestTaint(t *testing.T) {
 		eq(t, allApprovals(t, h.DB, "")[0].Tool, "notes__add")
 	})
 
-	t.Run("an owner reply still asks after an untrusted call in the same turn", func(t *testing.T) {
+	t.Run("ask-after-untrusted on: an owner reply still asks after an untrusted call in the same turn", func(t *testing.T) {
 		answers := &executedLog{}
 		h := basic(t, []models.Step{models.CallTool("webfetch__fetch", objOf("url", "http://x"), "f1"), models.CallTool("flows__answer", objOf("answer", "done"), "a1")}, extra{
 			registry: map[string]*connectors.Runtime{
@@ -304,6 +307,7 @@ func TestTaint(t *testing.T) {
 			},
 			rows: []chattest.Row{{"webfetch", "tools"}, {"flows", "tools"}},
 		})
+		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("baca http://x")
 		eq(t, len(answers.get()), 0)
 		eq(t, allApprovals(t, h.DB, "")[0].Tool, "flows__answer")
@@ -328,6 +332,17 @@ func allowAll(t *testing.T, q db.Q, agentID string, perms *jsonx.Map[*string]) {
 	}
 	yes := true
 	need(agents.SetToolPermissions(q, agentID, agents.PermissionsPatch{AllowAll: &yes, Tools: perms}, 1))
+}
+
+// askAfterUntrusted turns on the agent's "ask before writes after reading
+// untrusted content" switch, which brings the taint rules into owner turns.
+func askAfterUntrusted(t *testing.T, q db.Q, agentID string) {
+	t.Helper()
+	if agentID == "" {
+		agentID = need(agents.GetDefault(q, 1)).ID
+	}
+	yes := true
+	need(agents.SetToolPermissions(q, agentID, agents.PermissionsPatch{AskAfterUntrusted: &yes}, 1))
 }
 
 func insertHook(t *testing.T, h *world, id, mode, text string) {

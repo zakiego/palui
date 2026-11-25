@@ -504,15 +504,28 @@ func TestAgentsToolsAndApprovals(t *testing.T) {
 		eq(t, count(t, h.DB, "outbox WHERE source LIKE 'approval:%'"), 0)
 	})
 
-	t.Run("after reading untrusted text, sending a saved file asks even with allow-all", func(t *testing.T) {
+	t.Run("ask-after-untrusted on: after reading untrusted text, sending a saved file asks even with allow-all", func(t *testing.T) {
 		ran := &executedLog{}
 		reg := agentToolRegistry(ran)
 		reg["files"] = toolsRT("files", tools("send", connectors.PaluiTool{Class: "read", Tool: conntest.FnTool("send a file", func(*jsonx.Object) (any, error) { ran.add("send"); return "ok", nil })}))
 		h := agentsWorld(t, []models.Step{models.CallTool("web__fetch", objOf(), "c1"), models.CallTool("files__send", objOf("file", "palui:attachment/att_ktp"), "c2"), models.Say("done")}, extra{registry: reg, rows: append(append([]chattest.Row{}, webAlphaRows...), chattest.Row{"files", "tools"})})
 		allowAll(t, h.DB, "", nil)
+		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("ringkas halaman ini")
 		jsonEq(t, ran.get(), `["fetch"]`)
-		eq(t, allApprovals(t, h.DB, "")[0].Tool, "files__send")
+		p := allApprovals(t, h.DB, "")[0]
+		eq(t, p.Tool, "files__send")
+		eq(t, *p.Reason, "sends-file")
+	})
+
+	t.Run("by default, a call carrying a saved file runs in the owner's turn after reading untrusted text", func(t *testing.T) {
+		ran := &executedLog{}
+		reg := agentToolRegistry(ran)
+		reg["files"] = toolsRT("files", tools("send", connectors.PaluiTool{Class: "read", Tool: conntest.FnTool("send a file", func(*jsonx.Object) (any, error) { ran.add("send"); return "ok", nil })}))
+		h := agentsWorld(t, []models.Step{models.CallTool("web__fetch", objOf(), "c1"), models.CallTool("files__send", objOf("file", "palui:attachment/att_ktp"), "c2"), models.Say("done")}, extra{registry: reg, rows: append(append([]chattest.Row{}, webAlphaRows...), chattest.Row{"files", "tools"})})
+		h.sendIdle("ringkas halaman ini")
+		jsonEq(t, ran.get(), `["fetch","send"]`)
+		eq(t, count(t, h.DB, "pending_approvals"), 0)
 	})
 
 	t.Run("the owner in the group gets the outside set", func(t *testing.T) {

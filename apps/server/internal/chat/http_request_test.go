@@ -105,9 +105,10 @@ func TestHTTPRequestTools(t *testing.T) {
 		notContains(t, prompt, "mengubah data")
 	})
 
-	t.Run("allow: a read runs with the key, then a plain write asks because the turn is tainted", func(t *testing.T) {
+	t.Run("allow, ask-after-untrusted on: a read runs with the key, then a plain write asks because the turn is tainted", func(t *testing.T) {
 		n, notes := &httpNet{}, &executedLog{}
 		h := httpWorld(t, "allow", n, notes, getQuota(), models.CallTool("alpha__note", objOf("text", "x"), "n1"))
+		askAfterUntrusted(t, h.DB, "")
 		h.sendIdle("cek kuota lalu catat")
 		calls := n.calls()
 		eq(t, len(calls), 1)
@@ -129,15 +130,26 @@ func TestHTTPRequestTools(t *testing.T) {
 		}
 	})
 
-	t.Run("allow: a write asks in a clean turn, and runs when the agent allows that tool", func(t *testing.T) {
+	t.Run("allow: a write runs in the owner's turn, asks with ask-after-untrusted on, and runs again when the agent allows that tool", func(t *testing.T) {
+		// The write's own response is untrusted, so with the switch on it taints
+		// the turn at call time and asks.
 		n := &httpNet{}
 		h := httpWorld(t, "allow", n, &executedLog{}, postItem(), models.Say("ok"))
 		h.sendIdle("tambah item")
-		eq(t, lastRunStatus(t, h), "awaiting_approval")
-		eq(t, len(n.calls()), 0)
+		eq(t, count(t, h.DB, "pending_approvals"), 0)
+		eq(t, len(n.calls()), 1)
 
 		n = &httpNet{}
 		h = httpWorld(t, "allow", n, &executedLog{}, postItem(), models.Say("ok"))
+		askAfterUntrusted(t, h.DB, "")
+		h.sendIdle("tambah item")
+		eq(t, lastRunStatus(t, h), "awaiting_approval")
+		eq(t, len(n.calls()), 0)
+		eq(t, *allApprovals(t, h.DB, "")[0].Reason, "untrusted")
+
+		n = &httpNet{}
+		h = httpWorld(t, "allow", n, &executedLog{}, postItem(), models.Say("ok"))
+		askAfterUntrusted(t, h.DB, "")
 		setToolPermission(t, h, "http-example__http_request_write", "allow")
 		h.sendIdle("tambah item")
 		eq(t, count(t, h.DB, "pending_approvals"), 0)

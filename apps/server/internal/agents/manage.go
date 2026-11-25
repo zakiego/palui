@@ -554,10 +554,11 @@ func Update(q db.Q, id string, patch Input, now int64) (db.Agent, error) {
 // Tools, Connectors and Classes set one entry each, a nil value putting it
 // back to the default. Classes keys are "<connectorId>:<class>".
 type PermissionsPatch struct {
-	AllowAll   *bool
-	Tools      *jsonx.Map[*string]
-	Connectors *jsonx.Map[*string]
-	Classes    *jsonx.Map[*string]
+	AllowAll          *bool
+	AskAfterUntrusted *bool
+	Tools             *jsonx.Map[*string]
+	Connectors        *jsonx.Map[*string]
+	Classes           *jsonx.Map[*string]
 }
 
 // applyPermissions writes one patch map onto its stored map.
@@ -606,7 +607,11 @@ func SetToolPermissions(q db.Q, id string, patch PermissionsPatch, now int64) (d
 	if patch.AllowAll != nil {
 		allowAll = *patch.AllowAll
 	}
-	out := db.ToolPermissions{AllowAll: allowAll, Tools: ts}
+	askAfter := next.AskAfterUntrusted
+	if patch.AskAfterUntrusted != nil {
+		askAfter = *patch.AskAfterUntrusted
+	}
+	out := db.ToolPermissions{AllowAll: allowAll, Tools: ts, AskAfterUntrusted: askAfter}
 	if cs.Len() > 0 {
 		out.Connectors = cs
 	}
@@ -617,7 +622,7 @@ func SetToolPermissions(q db.Q, id string, patch PermissionsPatch, now int64) (d
 		return db.Agent{}, errf("At most %d tool permissions.", tools.MaxToolPermissions)
 	}
 	value := db.NullJSON[db.ToolPermissions]{}
-	if allowAll || tools.Entries(out) > 0 {
+	if allowAll || askAfter || tools.Entries(out) > 0 {
 		value = db.SomeJSON(out)
 	}
 	return db.ScanAgent(q.WQueryRow("UPDATE agents SET tool_permissions = ?, updated_at = ? WHERE id = ? RETURNING "+db.AgentCols, value, now, id))

@@ -191,6 +191,8 @@ type transcriptApproval struct {
 	Class       string  `json:"class"`
 	ArgsPreview *string `json:"argsPreview"`
 	ExpiresAt   int64   `json:"expiresAt"`
+	// Why it asks: a tools.Reason* code, null on old rows.
+	Reason *string `json:"reason"`
 }
 
 type transcriptView struct {
@@ -304,7 +306,7 @@ func transcript(q db.Q, chatID string) (*transcriptView, error) {
 	}
 	approvals := make([]transcriptApproval, 0, len(pending))
 	for _, a := range pending {
-		approvals = append(approvals, transcriptApproval{ID: a.ID, Tool: a.Tool, Class: a.ToolClass, ArgsPreview: a.ArgsPreview, ExpiresAt: a.ExpiresAt})
+		approvals = append(approvals, transcriptApproval{ID: a.ID, Tool: a.Tool, Class: a.ToolClass, ArgsPreview: a.ArgsPreview, ExpiresAt: a.ExpiresAt, Reason: a.Reason})
 	}
 	autoSaved, autoSize, err := attachments.AutoCount(q, chat.ID)
 	if err != nil {
