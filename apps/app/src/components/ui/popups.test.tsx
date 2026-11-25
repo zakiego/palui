@@ -34,6 +34,8 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu"
@@ -125,6 +127,30 @@ test("menu items run their onSelect and the trigger is named for its row", async
   expect(result.ok, result.error?.message).toBe(true)
   expect(ran).toEqual(["10m", "cancel"])
   approve = false
+})
+
+test("menu radio items mark the current value and keep the menu open", async () => {
+  function Themes() {
+    const [theme, setTheme] = React.useState("dark")
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="ghost">Account</Button>} />
+        <DropdownMenuContent>
+          <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+            <DropdownMenuLabel>Theme</DropdownMenuLabel>
+            <DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+  render(<Themes />)
+  await userEvent.click(screen.getByRole("button", { name: "Account" }))
+  expect((await screen.findByRole("menuitemradio", { name: "Dark" })).getAttribute("aria-checked")).toBe("true")
+  await userEvent.click(screen.getByRole("menuitemradio", { name: "Light" }))
+  expect(screen.getByRole("menuitemradio", { name: "Light" }).getAttribute("aria-checked")).toBe("true")
+  expect(screen.getByRole("menuitemradio", { name: "Dark" }).getAttribute("aria-checked")).toBe("false")
 })
 
 test("popover opens from its trigger and is named by its title", async () => {
