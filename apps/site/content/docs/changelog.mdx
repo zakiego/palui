@@ -8,7 +8,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - While the version starts with `0.`, the v1 scope below is still being built. A minor bump (`0.2.0`) adds features or changes behavior. A patch bump (`0.1.1`) only fixes things.
 - `1.0.0` is the release where the v1 scope is done. From then on, a major bump means you have to do something when you upgrade, and the release notes say what.
 - Each release groups its changes by feature. Changes that need action from you on upgrade come first, under "Breaking".
-- Each entry ends with the PR that made it. "old #N" is a PR from before the project moved to its public repository, so it has no link. "Adds a migration" means rolling back past that release needs the pre-deploy snapshot.
+- Each entry ends with the PR that made it. "old #N" is a PR from before the project moved to its public repository, so it has no link. "Adds a migration" means rolling back past that release needs the pre-deploy snapshot. ([#47](https://github.com/zakiego/palui/pull/47))
 
 ## Unreleased
 
@@ -22,7 +22,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - Added: Proactive memory keeps notes between runs, from the agent, the Proactive tab or your replies. ([#32](https://github.com/zakiego/palui/pull/32))
 - Added: Test run on the Proactive tab shows what would be sent, without sending anything. ([#32](https://github.com/zakiego/palui/pull/32))
 - Added: Watches. Anyone in a chat can ask the agent to watch for something, and it posts once when found. Adds a migration; rolling back needs the pre-deploy snapshot. ([#36](https://github.com/zakiego/palui/pull/36))
-- Added: a watch can start at a set time ("mulai besok jam 16.00"), so nothing is checked before then. Adds a migration; rolling back past this release needs the pre-deploy snapshot.
+- Added: a watch can start at a set time ("mulai besok jam 16.00"), so nothing is checked before then. Adds a migration; rolling back past this release needs the pre-deploy snapshot. ([#47](https://github.com/zakiego/palui/pull/47))
 - Added: A Watches page in the dashboard lists every chat's watches and cancels running ones, also over admin MCP. ([#40](https://github.com/zakiego/palui/pull/40))
 - Fixed: Proactive activity shows the real WhatsApp and Telegram logos instead of a chat bubble. ([#41](https://github.com/zakiego/palui/pull/41))
 - Changed: a Proactive prompt can mention up to 16 tools (was 10), and the tab shows the count against that cap. ([#46](https://github.com/zakiego/palui/pull/46))
