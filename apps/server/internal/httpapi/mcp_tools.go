@@ -133,6 +133,8 @@ func MCPTools() []MCPTool {
 		{Name: "create_reminder", RPC: "createReminderFn", Title: "Create reminder", Description: "Create a reminder in a chat at fireAtIso (in tz), optionally repeating with an rrule."},
 		{Name: "cancel_reminder", RPC: "cancelReminderFn", Title: "Cancel reminder", Description: "Cancel a reminder.", Destructive: true},
 		{Name: "snooze_reminder", RPC: "snoozeReminderFn", Title: "Snooze reminder", Description: "Snooze a reminder by 10m, 1h or to tomorrow."},
+		{Name: "list_watches", RPC: "getWatches", Title: "List watches", Description: "Watches in every chat: running ones by next check, then recently ended ones, with the last summary, checks and tokens used."},
+		{Name: "cancel_watch", RPC: "cancelWatchFn", Title: "Cancel watch", Description: "Stop a running watch. It sends nothing more.", Destructive: true},
 
 		// Outbound
 		{Name: "get_outbound", RPC: "getOutbound", Title: "Get outbound", Description: "Outbound messaging: whether it's on, the limits, contacts with their policy, and scheduled messages."},
