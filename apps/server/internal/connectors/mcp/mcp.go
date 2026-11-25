@@ -275,9 +275,11 @@ func refused(text string) *jsonx.Object {
 	return kit.O("isError", true, "content", []any{kit.O("type", "text", "text", text)})
 }
 
-// WithFileRefs swaps palui:attachment/<id> refs for data URLs just before the
-// call. An external server never gets the owner's files; a refused ref comes
-// back as an MCP error result.
+// WithFileRefs swaps palui:attachment/<id> refs for the file just before the
+// call, as raw base64 or a data URL per the tool's input schema. An external
+// server never gets the owner's files; a refused ref (wrapped in text, from
+// another chat, too big) comes back as an MCP error result and the call is
+// never made, so a server never sees the ref's text in place of a file.
 func WithFileRefs(t connectors.Tool, d *db.DB, turn *connectors.TurnInfo, untrusted bool, key func() string) connectors.Tool {
 	exec := t.Execute
 	if exec == nil {
@@ -285,13 +287,13 @@ func WithFileRefs(t connectors.Tool, d *db.DB, turn *connectors.TurnInfo, untrus
 	}
 	t.Execute = func(ctx context.Context, input json.RawMessage, call connectors.ToolCallInfo) (any, error) {
 		v, err := jsonx.Parse(input)
-		if err != nil || len(attachments.FindRefs(v)) == 0 {
+		if err != nil || !attachments.HasRefText(v) {
 			return exec(ctx, input, call)
 		}
 		if untrusted || turn == nil {
 			return refused("Saved files can only be sent to a server the owner marked as their own."), nil
 		}
-		resolved, files, err := attachments.ResolveFileRefs(d, v, attachments.ResolveOptions{ChatID: turn.ChatID, MasterKey: key()})
+		resolved, files, err := attachments.ResolveFileRefs(d, v, attachments.ResolveOptions{ChatID: turn.ChatID, MasterKey: key(), Schema: t.InputSchema})
 		if err != nil {
 			var re *attachments.RefError
 			if errors.As(err, &re) {
