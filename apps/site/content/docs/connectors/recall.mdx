@@ -1,6 +1,6 @@
 ---
 title: recall
-description: Connect recall as Palui's long-term memory, with memory tools, auto-recall before a turn and auto-save at compaction.
+description: Connect recall as Palui's long-term memory, with memory tools, auto-recall before a turn and auto-save after every turn.
 ---
 
 Kind: `memory`. [Recall](https://github.com/zakiego/recall) is an open-source, self-hosted memory service. Palui uses it for long-term memory: memory tools the model can call, auto-recall before each turn, and auto-save of your conversations. See [Memory](/docs/concepts/memory) for how the pieces fit.
@@ -21,7 +21,7 @@ Kind: `memory`. [Recall](https://github.com/zakiego/recall) is an open-source, s
 | API key | | Secret. Write-only, shown masked as `rcl_••••` plus the last 4 characters (no tail for values of 12 characters or fewer). |
 | Container | `default` | Which recall container holds Palui's memories |
 | Auto-recall | Switch | Fetch your profile before each turn |
-| Auto-save | Switch | Save conversations at compaction and on `/new` |
+| Auto-save | Switch | Save conversations after every turn |
 
 ## Tools
 
@@ -37,7 +37,7 @@ Before a turn, Palui calls `GET /v1/profile` with your message as the query, wit
 
 ## Auto-save
 
-At session compaction and on `/new`, Palui sends your messages plus the final replies to `POST /v1/memories`. It never sends tool output. Tainted turns are skipped. Each save has a source id built from the session and message range, so retries don't duplicate.
+After every turn, Palui sends the new messages plus the final replies to `POST /v1/memories`. Compaction, `/new` and an agent switch save whatever is left. A save that fails is retried after the next turn. It never sends tool output. Tainted turns are skipped. Each save has a source id built from the session and message range, so retries don't duplicate.
 
 ## Pause and remove
 
