@@ -24,7 +24,7 @@ const ConfigSchema = 2
 const MaxPromptChars = 4000
 
 // MaxMentions caps the tools one prompt may mention.
-const MaxMentions = 10
+const MaxMentions = 16
 
 // Config is agent_proactive.config (RFC 9).
 type Config struct {
@@ -94,7 +94,7 @@ func (c Config) Validate() error {
 		return bad("The prompt can be at most %d characters", MaxPromptChars)
 	}
 	if n := len(Mentions(c.Prompt)); n > MaxMentions {
-		return bad("The prompt can mention at most %d tools, it mentions %d", MaxMentions, n)
+		return bad("The prompt can mention at most %d tools, it mentions %d. Drop the ones a run doesn't need", MaxMentions, n)
 	}
 	checks := []error{
 		between("Check every", c.CheckEveryMin, 15, 120),

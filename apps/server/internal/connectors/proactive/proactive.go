@@ -148,7 +148,7 @@ func Tools(d *db.DB, clock func() int64, turn connectors.TurnInfo) *connectors.T
 	})
 	set.Set("update_proactive", connectors.PaluiTool{
 		Data: connectors.DataAgent, Class: "write", Title: "Change proactive settings",
-		Tool: kit.Tool("Change this agent's proactive settings. enabled turns it on or off; chat \"this\" makes the current chat the target; patch is a JSON merge patch on the config (keys: prompt, the owner's instructions in English that mention the read tools a run may use as @<connectorId>__<tool>, at most 4000 characters and 10 tools; checkEveryMin 15-120; maxPerHour 1-10; quietHours {start,end,urgentPasses}, no runs and no messages inside them; morning {on,at}; evening {on,at}; modelRole fast|default). Times are HH:MM. Turning it on checks every mention.", updateInput,
+		Tool: kit.Tool("Change this agent's proactive settings. enabled turns it on or off; chat \"this\" makes the current chat the target; patch is a JSON merge patch on the config (keys: prompt, the owner's instructions in English that mention the read tools a run may use as @<connectorId>__<tool>, at most 4000 characters and 16 tools; checkEveryMin 15-120; maxPerHour 1-10; quietHours {start,end,urgentPasses}, no runs and no messages inside them; morning {on,at}; evening {on,at}; modelRole fast|default). Times are HH:MM. Turning it on checks every mention.", updateInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				now := clock()
 				a, err := agentFor(d, turn)

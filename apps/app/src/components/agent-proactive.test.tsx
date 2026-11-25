@@ -15,7 +15,7 @@ const api = vi.hoisted(() => ({
   editProactiveNoteFn: vi.fn(),
   deleteProactiveNoteFn: vi.fn(),
   MAX_PROMPT_CHARS: 4000,
-  MAX_MENTIONS: 10,
+  MAX_MENTIONS: 16,
   MAX_NOTE_CHARS: 300,
   MAX_NOTES_CHARS: 4000,
 }))
@@ -120,7 +120,7 @@ test("typing @ suggests read tools; Enter inserts one and Save sends the prompt"
   await user.keyboard("{Enter}")
   expect((box as HTMLTextAreaElement).value).toBe("Check @gcal__get_calendar ")
   expect(screen.queryByRole("listbox")).toBeNull()
-  expect(screen.getByText("1 tool")).toBeTruthy()
+  expect(screen.getByText("1 / 16 tools")).toBeTruthy()
   await user.click(screen.getByRole("button", { name: "Save prompt" }))
   expect(api.saveProactiveFn).toHaveBeenCalledWith({ data: { agentId: "agt_palui", config: { prompt: "Check @gcal__get_calendar " } } })
 })

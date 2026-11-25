@@ -412,7 +412,6 @@ export function AgentProactive({ agentId }: { agentId: string }) {
 type Save = (input: { enabled?: boolean; chatId?: string; config?: ProactivePatch }) => Promise<boolean>
 
 function PromptEditor({ view, save, t }: { view: ProactiveView; save: Save; t: T }) {
-  const count = useCount()
   const saved = view.config.prompt
   const [draft, setDraft] = React.useState(saved)
   const [saving, setSaving] = React.useState(false)
@@ -456,7 +455,7 @@ function PromptEditor({ view, save, t }: { view: ProactiveView; save: Save; t: T
         </FieldLabel>
         <MentionTextarea id="proactive-prompt" value={draft} onChange={setDraft} tools={view.tools} t={t} invalid={tooLong || tooMany} />
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-caption text-muted-foreground tabular-nums">
-          <span className={tooMany ? "text-destructive" : undefined}>{count(mentions.length, "proactive.mentionsOne", "proactive.mentionsMany")}</span>
+          <span className={tooMany ? "text-destructive" : undefined}>{t("proactive.mentionsOf", { n: mentions.length.toLocaleString(), max: MAX_MENTIONS.toLocaleString() })}</span>
           <span className={tooLong ? "text-destructive" : undefined}>{t("proactive.chars", { n: chars.toLocaleString(), max: MAX_PROMPT_CHARS.toLocaleString() })}</span>
         </div>
       </Field>
