@@ -24,8 +24,8 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - Added: Watches. Anyone in a chat can ask the agent to watch for something, and it posts once when found. Adds a migration; rolling back needs the pre-deploy snapshot. ([#36](https://github.com/zakiego/palui/pull/36))
 - Added: A Watches page in the dashboard lists every chat's watches and cancels running ones, also over admin MCP. ([#40](https://github.com/zakiego/palui/pull/40))
 - Fixed: Proactive activity shows the real WhatsApp and Telegram logos instead of a chat bubble. ([#41](https://github.com/zakiego/palui/pull/41))
-- Changed: a Proactive prompt can mention up to 16 tools (was 10), and the tab shows the count against that cap.
-- Fixed: asking the agent to change Proactive settings no longer fails with "cannot unmarshal string" when the model sends the change as text.
+- Changed: a Proactive prompt can mention up to 16 tools (was 10), and the tab shows the count against that cap. ([#46](https://github.com/zakiego/palui/pull/46))
+- Fixed: asking the agent to change Proactive settings no longer fails with "cannot unmarshal string" when the model sends the change as text. ([#46](https://github.com/zakiego/palui/pull/46))
 - Fixed: the Proactive `@` menu no longer gets cut off by the card, and prompt mentions show as colored code, red when unusable. ([#39](https://github.com/zakiego/palui/pull/39))
 
 ### Tools
@@ -37,7 +37,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - Added: Images and files an MCP tool returns are saved as chat attachments, so the agent can send them in the chat. ([#34](https://github.com/zakiego/palui/pull/34))
 - Added: Every approval says why it asked, in the prompt, on the dashboard and to the agent, with a link to the Tools tab. Adds a migration. ([#37](https://github.com/zakiego/palui/pull/37))
 - Added: "Ask before writes after reading outside content" switch on an agent's Tools tab brings back the old taint rule for your chats. ([#37](https://github.com/zakiego/palui/pull/37))
-- Fixed: "Use suggested classes" leaves an MCP tool the server gives no hints for unclassified instead of saving it as destructive, so it can still be set to read later.
+- Fixed: "Use suggested classes" leaves an MCP tool the server gives no hints for unclassified instead of saving it as destructive, so it can still be set to read later. ([#46](https://github.com/zakiego/palui/pull/46))
 - Fixed: the printer no longer prints a file you sent without saying print. It asks first unless your message says print or cetak. ([#45](https://github.com/zakiego/palui/pull/45))
 - Fixed: saved files passed to MCP tools by `fileRef` now arrive as raw base64 or a data URL, whichever the tool asks for, so sandboxes stop rejecting them. ([#35](https://github.com/zakiego/palui/pull/35))
 
