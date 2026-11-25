@@ -496,7 +496,12 @@
   },
   "watches": {
    "columns": ["id","chat_id","agent_id","created_by","topic","question","done_when","every_min","expires_at","status","next_check_at","lease_until","checks","fails","last_check_at","last_run_id","last_error","notes","last_summary","tokens_used","token_cap","result","outbox_id","ended_at","created_at","updated_at"],
-   "rows": []
+   "rows": [
+    ["\u003cwat#1\u003e","\u003cchat#2\u003e",null,"Rizky","Laba bersih resmi Danantara 2025","Kabarin kalau laba bersih Danantara yang resmi udah keluar","An official source says so.",30,1795053600000,"active",1794622320000,null,14,0,1794620520000,"\u003crun#1\u003e",null,"","Belum ada rilis resmi. Situs Danantara masih memuat laporan semester 1.",182400,1000000,null,null,null,1794596400000,1794621600000],
+    ["\u003cwat#2\u003e","\u003cchat#2\u003e",null,"","Tiket konser Hindia Jakarta","Tiket konser Hindia Jakarta","An official source says so.",60,1794794400000,"checking",1794621600000,1794622500000,3,0,1794618000000,null,null,"","Promotor baru umumkan tanggal, penjualan belum dibuka.",21900,1000000,null,null,null,1794610800000,1794621600000],
+    ["\u003cwat#3\u003e","\u003cchat#2\u003e",null,"","Pengumuman CPNS 2026","Pengumuman CPNS 2026","An official source says so.",30,1794967200000,"done",null,null,31,0,1794610800000,null,null,"","Sudah keluar.",402000,1000000,"Pengumuman hasil seleksi administrasi CPNS 2026 sudah terbit di sscasn.bkn.go.id.",null,1794610800000,1794565800000,1794610800000],
+    ["\u003cwat#4\u003e","\u003cchat#2\u003e",null,"","Harga emas Antam di bawah 1,5 juta","Harga emas Antam di bawah 1,5 juta","An official source says so.",360,1794448800000,"expired",null,null,28,0,1794448800000,null,null,"","Masih 1.612.000 per gram.",96000,1000000,null,null,1794448800000,1794016800000,1794448800000]
+   ]
   }
  }
 }

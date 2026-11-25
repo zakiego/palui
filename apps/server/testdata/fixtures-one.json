@@ -259,7 +259,10 @@
   },
   "watches": {
    "columns": ["id","chat_id","agent_id","created_by","topic","question","done_when","every_min","expires_at","status","next_check_at","lease_until","checks","fails","last_check_at","last_run_id","last_error","notes","last_summary","tokens_used","token_cap","result","outbox_id","ended_at","created_at","updated_at"],
-   "rows": []
+   "rows": [
+    ["\u003cwat#1\u003e","\u003cchat#1\u003e",null,"","Laporan keuangan","Laporan keuangan","An official source says so.",30,1794708000000,"active",1794623400000,null,1,0,1794619800000,null,null,"","Belum ada.",1,1000000,null,null,null,1794619800000,1794621600000],
+    ["\u003cwat#2\u003e","\u003cchat#1\u003e",null,"","Old watch","Old watch","An official source says so.",30,1794708000000,"done",null,null,1,0,1794618000000,null,null,"","",1,1000000,"Sudah keluar.",null,1794618000000,1794619800000,1794618000000]
+   ]
   }
  }
 }

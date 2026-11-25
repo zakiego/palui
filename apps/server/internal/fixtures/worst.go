@@ -556,6 +556,28 @@ func worst(k *Kit) {
 	remind(Reminder{ChatID: priya.ID, Text: "Old one", TZ: "Asia/Makassar", FireAt: now - 3*365*D, Status: "done", LastFiredAt: ptr(now - 3*365*D), UpdatedAt: ptr(now - 4000)})
 	remind(Reminder{ChatID: sam.ID, Text: "No timestamp", TZ: "UTC", FireAt: 0, Status: "done", UpdatedAt: ptr(now - 5000)})
 
+	// --- watches (PLAN 6e): topic at most 80 units, summary 300, message 3000 ---
+	watch := k.Watch
+	// Running, by next check. The first is overdue (Palui was down), one failure
+	// from stopping and one token from its cap.
+	watch(Watch{ChatID: family.ID, Topic: within(fill("Laba bersih resmi Danantara 2026 dari laporan keuangan teraudit ", 80), 80), Question: within(fill(worstParagraph, 1000), 1000),
+		NextCheckAt: ptr(now - 2*H), ExpiresAt: now + 13*D, EveryMin: 15, Checks: 1_284, Fails: 4, LastCheckAt: ptr(now - 2*H - 15*MIN), LastRunID: &bigRun, LastError: ptr(worstStackFirst),
+		LastSummary: within(fill("Belum ada rilis resmi; "+worstLongURL+" masih memuat laporan kuartal lalu. ", 300), 300), TokensUsed: 999_999, CreatedBy: "Keluarga Besar Bani H. Abdul Karim Hasan"})
+	watch(Watch{ChatID: worstRemoved, Topic: "x", Status: "checking", NextCheckAt: ptr(now - 30_000), ExpiresAt: now + H})
+	watch(Watch{ChatID: arabic.ID, Topic: "إعلان نتائج القبول الجامعي", NextCheckAt: ptr(now + 4*MIN), ExpiresAt: now + 2*D, Checks: 3, LastCheckAt: ptr(now - 26*MIN), LastSummary: "لم يتم نشر النتائج بعد على الموقع الرسمي", TokensUsed: 12_480})
+	watch(Watch{ChatID: script.ID, Topic: "<script>alert(1)</script> &amp; **bold**", NextCheckAt: ptr(now + 20*MIN), ExpiresAt: now + 3*D, Checks: 1, LastCheckAt: ptr(now - 10*MIN), LastSummary: "<img src=x onerror=alert(1)>", TokensUsed: 2_100})
+	watch(Watch{ChatID: fox.ID, Topic: "🦊", NextCheckAt: ptr(now + 23*H), ExpiresAt: now + 23*H, EveryMin: 1440, Checks: 6, LastCheckAt: ptr(now - H), LastSummary: worstLongURL, TokensUsed: 48_000})
+	watch(Watch{ChatID: cjk.ID, Topic: "苹果新品发布会日期", NextCheckAt: ptr(now + 5*H), ExpiresAt: now + 14*D, EveryMin: 360, LastSummary: ""})
+	// Ended, newest first.
+	watch(Watch{ChatID: family.ID, Topic: within(fill("Pengumuman hasil seleksi CPNS Kemenkeu formasi 2026 ", 80), 80), Status: "done", ExpiresAt: now + 5*D, Checks: 212, LastCheckAt: ptr(now - MIN), LastRunID: &bigRun,
+		LastSummary: "Sudah keluar.", Result: ptr(within(fill("Pengumuman resmi sudah terbit di "+worstLongURL+" , daftar nama ada di lampiran PDF halaman 4 sampai 37. ", 3000), 3000)),
+		TokensUsed: 640_212, EndedAt: ptr(now - MIN)})
+	watch(Watch{ChatID: jo.ID, Topic: "Tiket konser", Status: "failed", ExpiresAt: now + D, Checks: 9, Fails: 5, LastCheckAt: ptr(now - 2*H), LastError: ptr(worstStack), TokensUsed: 31_000, EndedAt: ptr(now - 2*H)})
+	watch(Watch{ChatID: worstRemoved, Topic: "Harga emas Antam turun di bawah 1,5 juta", Status: "expired", ExpiresAt: now - 3*D, Checks: 672, LastCheckAt: ptr(now - 3*D), LastRunID: ptr("run_0mhremoved0000000000"), LastSummary: "Masih 1.612.000 per gram.", TokensUsed: 1_000_000, EndedAt: ptr(now - 3*D)})
+	watch(Watch{ChatID: vietnamese.ID, Topic: "Đặng Thị Ngọc Hân: kết quả thi", Status: "cancelled", ExpiresAt: now + 7*D, EndedAt: ptr(now - 4*D)})
+	// An old row without ended_at sorts by updated_at.
+	watch(Watch{ChatID: sam.ID, Topic: "No end time", Status: "expired", ExpiresAt: now - 20*D, Checks: 1})
+
 	// --- events: written last, so these are the first rows of the Activity list ---
 	for _, e := range []Event{
 		{At: now - 3*365*D, Level: "info", ConnectorID: ptr("telegram"), Message: "on"},

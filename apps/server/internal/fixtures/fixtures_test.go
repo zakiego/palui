@@ -122,6 +122,9 @@ func TestDevFixtures(t *testing.T) {
 		if n := count(t, d, "flows"); n != h.Flows {
 			t.Fatalf("%d flows", n)
 		}
+		if n := count(t, d, "watches"); n != h.ActiveWatches+h.EndedWatches {
+			t.Fatalf("%d watches", n)
+		}
 		if n := count(t, d, "reminders"); n != h.Upcoming+h.Recurring+h.Done {
 			t.Fatalf("%d reminders", n)
 		}
