@@ -1,6 +1,6 @@
 // Package memory ports memory/index.ts (PLAN 5.3): auto-recall before a turn
-// and auto-save at compaction and on /new, through the first running memory
-// connector.
+// and auto-save after every turn (and at compaction and on /new), through the
+// first running memory connector.
 package memory
 
 import (

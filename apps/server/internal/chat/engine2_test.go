@@ -594,10 +594,15 @@ func TestMemory(t *testing.T) {
 		if ses.SummarizedUntil == nil || *ses.SummarizedUntil <= 0 {
 			t.Fatal(ses.SummarizedUntil)
 		}
-		eq(t, *ses.SavedToRecallAt, *ses.SummarizedUntil)
-		eq(t, len(saved.get()), 1)
+		// Each turn saves what's new: the first turn, then the folded part at
+		// compaction, then the rest after it.
+		eq(t, *ses.SavedToRecallAt > *ses.SummarizedUntil, true)
+		eq(t, len(saved.get()), 3)
 		contains(t, saved.get()[0], "Owner: mulai")
-		notContains(t, saved.get()[0], "m39")
+		contains(t, saved.get()[1], "m0")
+		notContains(t, saved.get()[1], "m39")
+		contains(t, saved.get()[2], "m39")
+		contains(t, saved.get()[2], "Owner: lanjut")
 		eq(t, need(budget.TokensToday(h.DB, h.Clock.Now())), int64(45))
 	})
 }
