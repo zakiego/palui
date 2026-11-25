@@ -7,6 +7,7 @@ package printer
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -53,7 +54,7 @@ var Manifest = connectors.Manifest{
 		Notes: []string{
 			"Prints PDFs, JPEGs and PNGs sent in the chat or saved as attachments.",
 			"Use the Mac's CUPS queue, not the printer's own address: many printers only take raster formats, and CUPS converts the file for them.",
-			"Printing is a write tool: it runs right away in your own chat, and asks first after untrusted content or in a scheduled job.",
+			"Palui prints right away only when your own message asks for it (like 'print ini' or 'cetak'). A file sent with no caption, untrusted content or a scheduled job asks you first.",
 		},
 	},
 	ConfigZod:   ConfigZod,
@@ -340,6 +341,58 @@ func pick(d *db.DB, turn connectors.TurnInfo, in kit.Input, key string) (file, a
 	return fromCandidate(candidates[pickN-1]), nil, nil
 }
 
+// printWordRe matches a print request in the owner's own words: print, cetak
+// and their Indonesian forms (ngeprint, diprint, printin, cetakin, the common
+// typo ngerpint). "printer" alone doesn't count: asking about the printer
+// isn't asking it to print.
+var printWordRe = regexp.MustCompile(`(?i)(^|[^\p{L}])(nge-?|di-?|ter)?(print|prin|rpint|cetak)(kan|in|nya|lah|aja)?($|[^\p{L}])`)
+
+// AsksToPrint reports whether the owner's text asks for a print.
+func AsksToPrint(text string) bool {
+	return printWordRe.MatchString(text)
+}
+
+// printNeedsApproval says whether a print waits for the owner's yes. Paper
+// and ink can't be taken back, so the model's guess isn't enough: it prints
+// straight away only when the owner's messages in this turn say print. A file
+// sent with no caption, or a print the model promised earlier, asks first.
+func printNeedsApproval(turn connectors.TurnInfo) bool {
+	if turn.Origin != "message" || turn.Mode != "owner" || turn.OwnerText == nil {
+		return true
+	}
+	return !AsksToPrint(*turn.OwnerText)
+}
+
+// printPreview is the approval prompt's text.
+func printPreview(d *db.DB, turn connectors.TurnInfo, raw []byte, key string) string {
+	in, err := kit.Decode(raw)
+	name := "file di pesan ini"
+	if err == nil {
+		if in.True("earlier") {
+			name = "file dari pesan sebelumnya"
+		}
+		if f, refusal, err := pick(d, turn, in, key); err == nil && refusal == nil {
+			name = f.name
+		}
+	}
+	lines := []string{"Print " + name + "?"}
+	if err == nil {
+		if n, ok := in.Int("copies"); ok && n > 1 {
+			lines = append(lines, fmt.Sprintf("Rangkap: %d", n))
+		}
+		if p := in.S("pages"); p != "" {
+			lines = append(lines, "Halaman: "+p)
+		}
+		if p := in.S("paper"); p != "" {
+			lines = append(lines, "Kertas: "+p)
+		}
+		if in.S("color") == "gray" {
+			lines = append(lines, "Hitam putih")
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 // Tools are the printer's tools for one turn.
 func Tools(d *db.DB, turn connectors.TurnInfo, cfg Config, opts Options) *connectors.ToolSet {
 	hc := opts.client()
@@ -382,7 +435,11 @@ func Tools(d *db.DB, turn connectors.TurnInfo, cfg Config, opts Options) *connec
 		Data:  connectors.DataChat,
 		Class: "write",
 		Title: "Print a file",
-		Tool: kit.Tool("Print a PDF, JPEG or PNG on the printer. By default it prints the file in the current message. A file from an earlier message can be printed with `earlier: true` (call it without `nomor` first to see the recent files), and a saved file with its attachment_id. Only print when the owner asks. Never tell the owner it printed unless this tool returned ok, and even then say it was sent to the printer: ask them to check the tray.", printInput,
+		// Paper and ink can't be taken back: no explicit "print" from the
+		// owner in this turn means asking first, whatever the class rules say.
+		NeedsApproval: func(json.RawMessage) bool { return printNeedsApproval(turn) },
+		Preview:       func(raw json.RawMessage) string { return printPreview(d, turn, raw, opts.key()) },
+		Tool: kit.Tool("Print a PDF, JPEG or PNG on the printer. By default it prints the file in the current message. A file from an earlier message can be printed with `earlier: true` (call it without `nomor` first to see the recent files), and a saved file with its attachment_id. Only print when the owner asks for it in his own words: a file sent with no caption is not a print request, and neither is a print you offered or promised earlier (\"kirim filenya, nanti kuprint\"), because the owner may send that file for something else. When you can't read the file or it's unclear the owner wants it printed, ask him first instead of calling this tool. A call without a clear print request waits for the owner's yes. Never tell the owner it printed unless this tool returned ok, and even then say it was sent to the printer: ask them to check the tray.", printInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				if turn.ChatID == "" {
 					return kit.Fail("There is no chat to print from in this run."), nil

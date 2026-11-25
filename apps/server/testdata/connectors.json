@@ -755,7 +755,7 @@
     "notes": [
      "Prints PDFs, JPEGs and PNGs sent in the chat or saved as attachments.",
      "Use the Mac's CUPS queue, not the printer's own address: many printers only take raster formats, and CUPS converts the file for them.",
-     "Printing is a write tool: it runs right away in your own chat, and asks first after untrusted content or in a scheduled job."
+     "Palui prints right away only when your own message asks for it (like 'print ini' or 'cetak'). A file sent with no caption, untrusted content or a scheduled job asks you first."
     ]
    },
    "configKeys": [
@@ -4388,13 +4388,13 @@
      {
       "name": "print_file",
       "title": "Print a file",
-      "description": "Print a PDF, JPEG or PNG on the printer. By default it prints the file in the current message. A file from an earlier message can be printed with `earlier: true` (call it without `nomor` first to see the recent files), and a saved file with its attachment_id. Only print when the owner asks. Never tell the owner it printed unless this tool returned ok, and even then say it was sent to the printer: ask them to check the tray.",
+      "description": "Print a PDF, JPEG or PNG on the printer. By default it prints the file in the current message. A file from an earlier message can be printed with `earlier: true` (call it without `nomor` first to see the recent files), and a saved file with its attachment_id. Only print when the owner asks for it in his own words: a file sent with no caption is not a print request, and neither is a print you offered or promised earlier (\"kirim filenya, nanti kuprint\"), because the owner may send that file for something else. When you can't read the file or it's unclear the owner wants it printed, ask him first instead of calling this tool. A call without a clear print request waits for the owner's yes. Never tell the owner it printed unless this tool returned ok, and even then say it was sent to the printer: ask them to check the tray.",
       "class": "write",
       "untrusted": false,
       "guestSafe": false,
       "flowApproval": null,
-      "needsApproval": false,
-      "preview": false,
+      "needsApproval": true,
+      "preview": true,
       "inputSchema": {
        "$schema": "http://json-schema.org/draft-07/schema#",
        "type": "object",

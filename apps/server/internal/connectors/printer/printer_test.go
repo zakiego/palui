@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -449,5 +450,106 @@ func TestStatusShowsStateInkAndWaitingJobs(t *testing.T) {
 	want := `{"ok":true,"printer":"Ink Tank 100","state":"idle","problems":["media-empty-error"],"acceptingJobs":true,"prints":["PDF","JPEG","PNG"],"ink":[{"name":"Black","percent":70}],"jobs":[{"id":5,"name":"a.pdf","state":"pending"},{"id":6,"name":"b.jpg","state":"processing"}]}`
 	if s := jsonx.Stringify(got.V); s != want {
 		t.Errorf("got  %s\nwant %s", s, want)
+	}
+}
+
+func TestAsksToPrintOnlyWhenTheOwnerSaysPrint(t *testing.T) {
+	for text, want := range map[string]bool{
+		"print ini":                       true,
+		"PRINT":                           true,
+		"tolong ngeprint dong":            true,
+		"nge-print yang tadi":             true,
+		"Perlu ngerpint ini":              true,
+		"diprint 2 rangkap ya":            true,
+		"printin halaman 1":               true,
+		"cetakin A4":                      true,
+		"":                                false,
+		"printernya nyala?":               false,
+		"sprint review besok":             false,
+		"blueprint rumah":                 false,
+		"ini tanggal menginap hotelnya":   false,
+		"cek tanggal check-in di sini ya": false,
+	} {
+		if got := AsksToPrint(text); got != want {
+			t.Errorf("AsksToPrint(%q) = %v, want %v", text, got, want)
+		}
+	}
+}
+
+func ownerTurn(e env, text string) connectors.TurnInfo {
+	turn := e.turn
+	turn.Origin, turn.Mode = "message", "owner"
+	if text != "" {
+		turn.OwnerText = &text
+	}
+	return turn
+}
+
+func printTool(t *testing.T, d *db.DB, turn connectors.TurnInfo, url string) connectors.PaluiTool {
+	t.Helper()
+	pt, ok := Tools(d, turn, Config{URL: url}, Options{Key: func() string { return KEY }}).Get("print_file")
+	if !ok || pt.NeedsApproval == nil || pt.Preview == nil {
+		t.Fatal("print_file has no approval rule")
+	}
+	return pt
+}
+
+// Rpt rpt_0mwvtuo1aaci2gqrnq6: the owner once said "Perlu ngerpint ini" about
+// a Drive link, Palui answered "kirim ke sini sebagai file, nanti langsung
+// kuprint", and turns later a caption-less PDF (sent for something else) got
+// printed with no question asked.
+func TestAFileWithNoCaptionAfterAnEarlierPrintPromiseAsksFirst(t *testing.T) {
+	e := setup(t)
+	inbound(t, e.db, e.chatID, "run_0", nil, NOW-3600_000, "Perlu ngerpint ini https://drive.google.com/file/d/x")
+	inbound(t, e.db, e.chatID, "run_1", []media{{"kind": "document", "mimeType": "application/pdf", "filename": "91fb6954.pdf", "data": PDF}}, NOW, "")
+	pt := printTool(t, e.db, ownerTurn(e, ""), "ipp://x/printers/y")
+	if !pt.NeedsApproval(json.RawMessage(`{}`)) {
+		t.Fatal("a caption-less file printed without asking")
+	}
+	if got := pt.Preview(json.RawMessage(`{"copies":2}`)); got != "Print 91fb6954.pdf?\nRangkap: 2" {
+		t.Errorf("preview %q", got)
+	}
+	// Words that aren't a print request ask too.
+	if !printTool(t, e.db, ownerTurn(e, "ini tanggal menginapnya"), "ipp://x/printers/y").NeedsApproval(nil) {
+		t.Error("a caption without print didn't ask")
+	}
+}
+
+func TestAFileCaptionedPrintPrintsRightAway(t *testing.T) {
+	e := setup(t)
+	f := cupsQueue()
+	url := serve(t, f)
+	inbound(t, e.db, e.chatID, "run_1", []media{{"kind": "document", "mimeType": "application/pdf", "filename": "tiket.pdf", "data": PDF}}, NOW, "print ini")
+	turn := ownerTurn(e, "print ini")
+	if printTool(t, e.db, turn, url).NeedsApproval(json.RawMessage(`{}`)) {
+		t.Fatal("an explicit print request asked first")
+	}
+	got := conntest.Call(t, Tools(e.db, turn, Config{URL: url}, Options{Key: func() string { return KEY }}), "print_file", `{}`)
+	if got.Get("ok") != true {
+		t.Fatalf("got %s", jsonx.Stringify(got.V))
+	}
+	if _, ok := f.last(opPrintJob); !ok {
+		t.Fatal("no Print-Job")
+	}
+}
+
+func TestAPrintRequestNamingAnEarlierFileRunsRightAway(t *testing.T) {
+	e := setup(t)
+	inbound(t, e.db, e.chatID, "run_0", []media{{"kind": "document", "mimeType": "application/pdf", "filename": "tiket.pdf", "data": PDF}}, NOW-60_000, "")
+	if printTool(t, e.db, ownerTurn(e, "tolong print pdf yang tadi"), "ipp://x/printers/y").NeedsApproval(json.RawMessage(`{"earlier":true}`)) {
+		t.Error("an explicit request for the earlier file asked first")
+	}
+}
+
+func TestPrintingOutsideTheOwnersOwnMessageAsksFirst(t *testing.T) {
+	e := setup(t)
+	for _, turn := range []connectors.TurnInfo{
+		e.turn, // no origin: a job or a flow
+		func() connectors.TurnInfo { t := ownerTurn(e, "print ini"); t.Origin = "schedule"; return t }(),
+		func() connectors.TurnInfo { t := ownerTurn(e, "print ini"); t.Mode = "members"; return t }(),
+	} {
+		if !printTool(t, e.db, turn, "ipp://x/printers/y").NeedsApproval(nil) {
+			t.Errorf("turn %+v printed without asking", turn)
+		}
 	}
 }

@@ -35,7 +35,7 @@ export default defineManifest({
     notes: [
       "Prints PDFs, JPEGs and PNGs sent in the chat or saved as attachments.",
       "Use the Mac's CUPS queue, not the printer's own address: many printers only take raster formats, and CUPS converts the file for them.",
-      "Printing is a write tool: it runs right away in your own chat, and asks first after untrusted content or in a scheduled job.",
+      "Palui prints right away only when your own message asks for it (like 'print ini' or 'cetak'). A file sent with no caption, untrusted content or a scheduled job asks you first.",
     ],
   },
 })
