@@ -32,7 +32,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Tools
 
-- Changed: the host bridge speaks MCP spec 2026-07-28 as well as the older `initialize` flow, on `@modelcontextprotocol/server` v2. Existing clients keep working unchanged.
+- Changed: the host bridge speaks MCP spec 2026-07-28 as well as the older `initialize` flow, on `@modelcontextprotocol/server` v2. Existing clients keep working unchanged. ([#29](https://github.com/zakiego/palui/pull/29))
 - Changed: In your own chats, approvals follow the agent's Tools tab and tool class only, so a tool no longer runs once and asks the next time. ([#37](https://github.com/zakiego/palui/pull/37))
 - Added: Calendar feed connector reads any calendar from its secret iCal link, with recurring events expanded. ([#32](https://github.com/zakiego/palui/pull/32))
 - Added: WhatsApp inbox connector links your own number read only and lists chats waiting for your reply. Adds a migration. ([#32](https://github.com/zakiego/palui/pull/32))
@@ -54,7 +54,7 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 
 ### Self-hosting
 
-- Fixed: rerunning `ops/install-host-bridge.sh` or `ops/install-backup.sh` no longer fails with "Bootstrap failed: 5" and leaves the job unloaded. Both now wait for launchd to drop the old job first.
+- Fixed: rerunning `ops/install-host-bridge.sh` or `ops/install-backup.sh` no longer fails with "Bootstrap failed: 5" and leaves the job unloaded. Both now wait for launchd to drop the old job first. ([#30](https://github.com/zakiego/palui/pull/30))
 
 ## 0.16.0 (2026-11-25)
 
