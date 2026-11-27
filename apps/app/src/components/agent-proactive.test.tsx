@@ -166,7 +166,7 @@ test("test run shows what would be sent without saving", async () => {
 })
 
 test("memory: add a note, keep the agent's, delete one", async () => {
-  const note = (id: string, source: "owner" | "model", text: string) => ({ id, agentId: "agt_palui", text, source, expiresAt: source === "model" ? Date.now() + 2.5 * 86_400_000 : null, createdAt: NOW, updatedAt: NOW })
+  const note = (id: string, source: "owner" | "reply" | "model", text: string, expires = source !== "owner") => ({ id, agentId: "agt_palui", text, source, expiresAt: expires ? Date.now() + 2.5 * 86_400_000 : null, createdAt: NOW, updatedAt: NOW })
   const withNotes = view({ notes: [note("pmem_1", "owner", "Skip the bank group"), note("pmem_2", "model", "Pak Budi promised the papers tomorrow")], notesChars: 55 })
   api.getProactiveFn.mockResolvedValue(withNotes)
   api.addProactiveNoteFn.mockResolvedValue(withNotes)
@@ -184,6 +184,27 @@ test("memory: add a note, keep the agent's, delete one", async () => {
   await user.click(screen.getAllByRole("button", { name: "Delete note" })[0])
   expect(api.deleteProactiveNoteFn).toHaveBeenCalledWith({ data: { agentId: "agt_palui", noteId: "pmem_1" } })
   await waitFor(() => expect(screen.getByText("No notes yet. Reply to a proactive message to add one.")).toBeTruthy())
+})
+
+test("memory: replies and dated notes say when they go, and a note can get an expiry", async () => {
+  const note = (id: string, source: "owner" | "reply", text: string, expires: boolean) => ({ id, agentId: "agt_palui", text, source, expiresAt: expires ? Date.now() + 2.5 * 86_400_000 : null, createdAt: NOW, updatedAt: NOW })
+  const withNotes = view({
+    notes: [note("pmem_1", "owner", "Call 26 Nov batal", true), note("pmem_2", "reply", 'About "Grup bank": ini', true), note("pmem_3", "reply", 'About "Lama": itu', false)],
+    notesChars: 60,
+  })
+  api.getProactiveFn.mockResolvedValue(withNotes)
+  api.addProactiveNoteFn.mockResolvedValue(withNotes)
+  const user = userEvent.setup()
+  render(<AgentProactive agentId="agt_palui" />)
+  expect(await screen.findByText("You · 3 days left")).toBeTruthy()
+  expect(screen.getByText("Your reply · 3 days left")).toBeTruthy()
+  expect(screen.getByText("Your reply · saved automatically")).toBeTruthy()
+  expect(screen.getAllByRole("button", { name: "Keep this note" })).toHaveLength(3)
+  await user.click(screen.getByRole("combobox", { name: "Expires" }))
+  await user.click(await screen.findByRole("option", { name: "After 7 days" }))
+  await user.type(screen.getByRole("textbox", { name: "Add note" }), "Cuti minggu ini")
+  await user.click(screen.getByRole("button", { name: "Add note" }))
+  expect(api.addProactiveNoteFn).toHaveBeenCalledWith({ data: { agentId: "agt_palui", text: "Cuti minggu ini", days: 7 } })
 })
 
 test("a load error offers to try again", async () => {

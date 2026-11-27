@@ -51,7 +51,8 @@ export type ProactiveNote = {
   id: string
   agentId: string
   text: string
-  source: "owner" | "model"
+  // reply: the owner's reply to a proactive message, saved on its own.
+  source: "owner" | "reply" | "model"
   expiresAt: number | null
   createdAt: number
   updatedAt: number
@@ -120,6 +121,6 @@ export const saveProactiveFn = withInput<
 export const unmuteProactiveFn = withInput<{ agentId: string; subject: string }, ProactiveView>("unmuteProactiveFn", "POST")
 export const checkProactiveNowFn = withInput<{ agentId: string }, ProactiveView>("checkProactiveNowFn", "POST")
 export const testProactiveFn = withInput<{ agentId: string; prompt?: string }, ProactiveTestResult>("testProactiveFn", "POST")
-export const addProactiveNoteFn = withInput<{ agentId: string; text: string }, ProactiveView>("addProactiveNoteFn", "POST")
+export const addProactiveNoteFn = withInput<{ agentId: string; text: string; days?: number }, ProactiveView>("addProactiveNoteFn", "POST")
 export const editProactiveNoteFn = withInput<{ agentId: string; noteId: string; text?: string; keep?: boolean }, ProactiveView>("editProactiveNoteFn", "POST")
 export const deleteProactiveNoteFn = withInput<{ agentId: string; noteId: string }, ProactiveView>("deleteProactiveNoteFn", "POST")

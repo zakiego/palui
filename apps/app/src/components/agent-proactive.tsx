@@ -835,16 +835,28 @@ function MentionTextarea({ id, value, onChange, tools, t, invalid }: { id: strin
   )
 }
 
+// Expiry choices for a note the owner adds; "" never expires.
+const NOTE_DAYS = ["", "1", "3", "7", "30"]
+
+// noteWho is who wrote a note and how long it has left.
+function noteWho(n: ProactiveNote, days: number, t: T, count: ReturnType<typeof useCount>) {
+  if (n.source === "model") return count(days, "proactive.noteDaysOne", "proactive.noteDaysMany")
+  if (n.source === "reply") return n.expiresAt ? count(days, "proactive.noteReplyDaysOne", "proactive.noteReplyDaysMany") : t("proactive.noteReply")
+  return n.expiresAt ? count(days, "proactive.noteYouDaysOne", "proactive.noteYouDaysMany") : t("proactive.noteYou")
+}
+
 function Memory({ view, t, count, act, agentId }: { view: ProactiveView; t: T; count: ReturnType<typeof useCount>; act: (call: () => Promise<ProactiveView>) => Promise<boolean>; agentId: string }) {
   const [text, setText] = React.useState("")
+  const [days, setDays] = React.useState("")
   const [busy, setBusy] = React.useState<string | null>(null)
   const add = async () => {
     const v = text.trim()
     if (!v) return
     setBusy("add")
-    if (await act(() => addProactiveNoteFn({ data: { agentId, text: v } }))) setText("")
+    if (await act(() => addProactiveNoteFn({ data: days ? { agentId, text: v, days: Number(days) } : { agentId, text: v } }))) setText("")
     setBusy(null)
   }
+  const dayOptions = NOTE_DAYS.map((d) => ({ value: d, label: d ? count(Number(d), "proactive.noteForDaysOne", "proactive.noteForDaysMany") : t("proactive.noteNever") }))
   const now = Date.now()
   return (
     <FieldGroup>
@@ -860,10 +872,10 @@ function Memory({ view, t, count, act, agentId }: { view: ProactiveView; t: T; c
                   <ItemTitle dir="auto" className="line-clamp-none w-full font-normal [overflow-wrap:anywhere]">
                     {n.text}
                   </ItemTitle>
-                  <ItemDescription>{n.source === "owner" ? t("proactive.noteYou") : count(days, "proactive.noteDaysOne", "proactive.noteDaysMany")}</ItemDescription>
+                  <ItemDescription>{noteWho(n, days, t, count)}</ItemDescription>
                 </ItemContent>
                 <ItemActions>
-                  {n.source === "model" && (
+                  {(n.source !== "owner" || n.expiresAt !== null) && (
                     <Button
                       variant="ghost"
                       size="icon-sm"
@@ -906,6 +918,7 @@ function Memory({ view, t, count, act, agentId }: { view: ProactiveView; t: T; c
         }}
       >
         <Input aria-label={t("proactive.addNote")} placeholder={t("proactive.notePlaceholder")} maxLength={MAX_NOTE_CHARS} value={text} onChange={(e) => setText(e.target.value)} className="min-w-0 flex-1" />
+        <SimpleSelect aria-label={t("proactive.noteExpiry")} value={days} options={dayOptions} onChange={setDays} className="shrink-0 @md/main:w-48" />
         <Button type="submit" variant="outline" disabled={!text.trim() || busy === "add"}>
           {busy === "add" && <Spinner data-icon="inline-start" />}
           {t("proactive.addNote")}
