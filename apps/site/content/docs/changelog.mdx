@@ -26,6 +26,9 @@ Palui Agent uses [semantic versioning](https://semver.org). Each release is a gi
 - Added: A Watches page in the dashboard lists every chat's watches and cancels running ones, also over admin MCP. ([#40](https://github.com/zakiego/palui/pull/40))
 - Fixed: Proactive activity shows the real WhatsApp and Telegram logos instead of a chat bubble. ([#41](https://github.com/zakiego/palui/pull/41))
 - Changed: a Proactive prompt can mention up to 16 tools (was 10), and the tab shows the count against that cap. ([#46](https://github.com/zakiego/palui/pull/46))
+- Added: your Proactive memory notes can expire on a date or after some days, from chat or the Proactive tab.
+- Changed: replies to proactive messages are kept as reply notes for 3 days instead of forever. Adds a migration.
+- Changed: when Proactive memory is full, expired and reply notes make room first, and the agent gets a list of notes to delete.
 - Fixed: asking the agent to change Proactive settings no longer fails with "cannot unmarshal string" when the model sends the change as text. ([#46](https://github.com/zakiego/palui/pull/46))
 - Fixed: the Proactive `@` menu no longer gets cut off by the card, and prompt mentions show as colored code, red when unusable. ([#39](https://github.com/zakiego/palui/pull/39))
 - Changed: recall auto-save runs after every turn, so what you say reaches memory right away instead of waiting for 40 messages or `/new`. ([#49](https://github.com/zakiego/palui/pull/49))
