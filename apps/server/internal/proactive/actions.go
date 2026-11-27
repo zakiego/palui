@@ -104,8 +104,12 @@ func (Actions) FromText(q db.Q, text, replyTo, chatID string, now int64) (string
 	return reply, err == nil, err
 }
 
-// rememberReply keeps the owner's reply to a proactive message as an owner
+// rememberReply keeps the owner's reply to a proactive message as a reply
 // note, tied to what the message said, and looks again on the next sweep.
+// The chat turn sees the same reply and saves anything lasting with
+// remember_proactive, so the raw reply only bridges the next few runs: it
+// expires after ReplyNoteDays and is the first owner-side note to go when
+// memory is full.
 func rememberReply(q db.Q, outboxID, text string, now int64) error {
 	rows, err := q.Query("SELECT "+db.NudgeCols+" FROM nudges WHERE outbox_id = ? ORDER BY created_at, id LIMIT 1", outboxID)
 	list, err := db.All(rows, err, db.ScanNudge)
@@ -121,7 +125,7 @@ func rememberReply(q db.Q, outboxID, text string, now int64) error {
 	if n.Kind == KindItem {
 		note = "About \"" + clip(Label(n), 80) + "\": " + body
 	}
-	if _, err := AddNote(q, n.AgentID, note, NoteSourceOwner, 0, now); err != nil {
+	if _, err := AddNote(q, n.AgentID, note, NoteSourceReply, 0, now); err != nil {
 		var ce *ConfigError
 		if errors.As(err, &ce) {
 			return nil // memory full: the turn still answers

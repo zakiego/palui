@@ -2,12 +2,16 @@ package proactive
 
 // Memory (RFC 8): short notes carried between runs. The model adds them
 // through "remember" and removes them through "forget"; the owner adds them on
-// the tab, from chat, or by replying to a proactive message. Owner notes never
-// expire and are never dropped on their own; model notes expire and are the
-// first to go when memory is full.
+// the tab or from chat. A reply to a proactive message is kept as a reply
+// note: the owner's words, but saved without asking, so it expires after
+// ReplyNoteDays unless the owner keeps it. Owner notes never expire unless the
+// owner gave them a date, and are never dropped on their own. When memory is
+// full, model notes go first, then expiring reply notes; an owner note that
+// still doesn't fit is refused with the notes worth deleting.
 
 import (
 	"strings"
+	"time"
 
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/secret"
@@ -16,8 +20,11 @@ import (
 
 const (
 	// NoteSourceOwner and NoteSourceModel are who wrote a note.
+	// NoteSourceReply is the owner's reply to a proactive message, saved on
+	// its own.
 	NoteSourceOwner = "owner"
 	NoteSourceModel = "model"
+	NoteSourceReply = "reply"
 	// MaxNoteChars caps one note (UTF-16 units).
 	MaxNoteChars = 300
 	// MaxNotes and MaxNotesChars cap one agent's memory.
@@ -26,11 +33,43 @@ const (
 	// Model note lifetimes, in days.
 	NoteDaysDefault = 7
 	NoteDaysMax     = 30
-	dayMs           = 24 * 3600_000
+	// ReplyNoteDays is how long a reply note lives.
+	ReplyNoteDays = 3
+	// OwnerNoteDaysMax caps an owner note's optional lifetime.
+	OwnerNoteDaysMax = 365
+	dayMs            = 24 * 3600_000
+	// fullListed caps the notes a NotesFullError names.
+	fullListed = 10
 )
 
 // NotesFull is the refusal for an owner note that doesn't fit.
 const NotesFull = "Proactive memory is full. Delete an old note first."
+
+// NotesFullError is the refusal for a note that doesn't fit, with the notes
+// the caller could delete: the oldest owner notes and the reply notes, oldest
+// first. It unwraps to a ConfigError so callers that only check for one keep
+// working.
+type NotesFullError struct {
+	ConfigError
+	Count, Chars int
+	Oldest       []db.ProactiveNote
+	Replies      []db.ProactiveNote
+}
+
+func (e *NotesFullError) Unwrap() error { return &e.ConfigError }
+
+func notesFull(list []db.ProactiveNote) *NotesFullError {
+	e := &NotesFullError{ConfigError: ConfigError{NotesFull}, Count: len(list), Chars: notesChars(list), Oldest: []db.ProactiveNote{}, Replies: []db.ProactiveNote{}}
+	for _, x := range list {
+		switch {
+		case x.Source == NoteSourceReply && len(e.Replies) < fullListed:
+			e.Replies = append(e.Replies, x)
+		case x.Source == NoteSourceOwner && len(e.Oldest) < fullListed:
+			e.Oldest = append(e.Oldest, x)
+		}
+	}
+	return e
+}
 
 // cleanNote is one note as stored: one paragraph, plain, capped.
 func cleanNote(s string) string {
@@ -42,10 +81,10 @@ func cleanNote(s string) string {
 	return s
 }
 
-// Notes lists an agent's live notes: owner notes first, then the model's,
-// oldest first within each.
+// Notes lists an agent's live notes: owner notes first, then replies, then the
+// model's, oldest first within each.
 func Notes(q db.Q, agentID string, now int64) ([]db.ProactiveNote, error) {
-	rows, err := q.Query("SELECT "+db.ProactiveNoteCols+" FROM proactive_notes WHERE agent_id = ? AND (expires_at IS NULL OR expires_at > ?) ORDER BY (source = 'owner') DESC, created_at, id", agentID, now)
+	rows, err := q.Query("SELECT "+db.ProactiveNoteCols+" FROM proactive_notes WHERE agent_id = ? AND (expires_at IS NULL OR expires_at > ?) ORDER BY CASE source WHEN 'owner' THEN 0 WHEN 'reply' THEN 1 ELSE 2 END, created_at, id", agentID, now)
 	return db.All(rows, err, db.ScanProactiveNote)
 }
 
@@ -57,16 +96,66 @@ func notesChars(list []db.ProactiveNote) int {
 	return n
 }
 
-// AddNote stores a note. A model note that doesn't fit pushes out the oldest
-// model notes; an owner note that doesn't fit after that is refused. days is
-// a model note's lifetime (0 means the default); owner notes ignore it.
+// AddNote stores a note. days is its lifetime: for a model note 0 means
+// NoteDaysDefault (at most NoteDaysMax), for an owner note 0 means it never
+// expires (at most OwnerNoteDaysMax), and a reply note always lives
+// ReplyNoteDays.
 func AddNote(q db.Q, agentID, text, source string, days int, now int64) (db.ProactiveNote, error) {
+	var expires *int64
+	switch source {
+	case NoteSourceModel:
+		if days <= 0 {
+			days = NoteDaysDefault
+		}
+		days = min(days, NoteDaysMax)
+	case NoteSourceReply:
+		days = ReplyNoteDays
+	default:
+		days = min(max(days, 0), OwnerNoteDaysMax)
+	}
+	if days > 0 {
+		e := now + int64(days)*dayMs
+		expires = &e
+	}
+	return addNote(q, agentID, text, source, expires, now)
+}
+
+// AddOwnerNoteUntil stores an owner note that expires at until (Unix ms),
+// which must be in the future and within OwnerNoteDaysMax.
+func AddOwnerNoteUntil(q db.Q, agentID, text string, until, now int64) (db.ProactiveNote, error) {
+	if until <= now {
+		return db.ProactiveNote{}, bad("That date has already passed")
+	}
+	if until > now+int64(OwnerNoteDaysMax)*dayMs {
+		return db.ProactiveNote{}, bad("A note can expire at most %d days from now", OwnerNoteDaysMax)
+	}
+	return addNote(q, agentID, text, NoteSourceOwner, &until, now)
+}
+
+// EndOfDay is the end of a local date (YYYY-MM-DD) in tz, as Unix ms: the
+// moment a note "until" that date expires.
+func EndOfDay(date, tz string) (int64, error) {
+	d, err := time.ParseInLocation("2006-01-02", date, loadTZ(tz))
+	if err != nil {
+		return 0, bad("Use a date like 2026-11-30")
+	}
+	return d.AddDate(0, 0, 1).UnixMilli(), nil
+}
+
+// addNote stores a note. Expired notes are dropped first. A note that doesn't
+// fit pushes out the oldest model notes; an owner or reply note then pushes
+// out the oldest expiring reply notes. A model note that still doesn't fit is
+// dropped quietly; any other is refused with a NotesFullError.
+func addNote(q db.Q, agentID, text, source string, expires *int64, now int64) (db.ProactiveNote, error) {
 	text = cleanNote(text)
 	if text == "" {
 		return db.ProactiveNote{}, bad("A note can't be empty")
 	}
 	var out db.ProactiveNote
 	err := q.Tx(func(tx db.Q) error {
+		if _, err := tx.Exec("DELETE FROM proactive_notes WHERE agent_id = ? AND expires_at IS NOT NULL AND expires_at <= ?", agentID, now); err != nil {
+			return err
+		}
 		list, err := Notes(tx, agentID, now)
 		if err != nil {
 			return err
@@ -77,34 +166,35 @@ func AddNote(q db.Q, agentID, text, source string, days int, now int64) (db.Proa
 				return nil
 			}
 		}
+		// evictable: the model's notes for anyone, then reply notes that
+		// expire anyway (not legacy ones without a date) for the owner.
+		evictable := func(x db.ProactiveNote) int {
+			switch {
+			case x.Source == NoteSourceModel:
+				return 0
+			case x.Source == NoteSourceReply && x.ExpiresAt != nil && source != NoteSourceModel:
+				return 1
+			}
+			return -1
+		}
 		fits := func() bool { return len(list)+1 <= MaxNotes && notesChars(list)+strx.Len16(text) <= MaxNotesChars }
 		for !fits() {
-			oldest := -1
+			pick := -1
 			for i, x := range list {
-				if x.Source == NoteSourceModel {
-					oldest = i
-					break
+				if r := evictable(x); r >= 0 && (pick < 0 || r < evictable(list[pick])) {
+					pick = i
 				}
 			}
-			if oldest < 0 {
+			if pick < 0 {
 				if source == NoteSourceModel {
-					return nil // memory is full of owner notes: drop the model's quietly
+					return nil // memory is full of the owner's notes: drop the model's quietly
 				}
-				return bad(NotesFull)
+				return notesFull(list)
 			}
-			if _, err := tx.Exec("DELETE FROM proactive_notes WHERE id = ?", list[oldest].ID); err != nil {
+			if _, err := tx.Exec("DELETE FROM proactive_notes WHERE id = ?", list[pick].ID); err != nil {
 				return err
 			}
-			list = append(list[:oldest], list[oldest+1:]...)
-		}
-		var expires *int64
-		if source == NoteSourceModel {
-			if days <= 0 {
-				days = NoteDaysDefault
-			}
-			days = min(days, NoteDaysMax)
-			e := now + int64(days)*dayMs
-			expires = &e
+			list = append(list[:pick], list[pick+1:]...)
 		}
 		out, err = db.ScanProactiveNote(tx.WQueryRow("INSERT INTO proactive_notes (id, agent_id, text, source, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING "+db.ProactiveNoteCols,
 			secret.NewID("pmem"), agentID, text, source, expires, now, now))
@@ -113,8 +203,8 @@ func AddNote(q db.Q, agentID, text, source string, days int, now int64) (db.Proa
 	return out, err
 }
 
-// EditNote changes a note's text, or with keep turns a model note into an
-// owner note that never expires. ok false when it doesn't exist.
+// EditNote changes a note's text, or with keep turns a model or reply note
+// (or a dated owner note) into an owner note that never expires. ok false when it doesn't exist.
 func EditNote(q db.Q, agentID, id string, text *string, keep bool, now int64) (bool, error) {
 	if text != nil {
 		t := cleanNote(*text)

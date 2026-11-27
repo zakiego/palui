@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/zakiego/palui/apps/server/internal/db"
 	"github.com/zakiego/palui/apps/server/internal/jsonx"
 	"github.com/zakiego/palui/apps/server/internal/proactive"
+	"github.com/zakiego/palui/apps/server/internal/settings"
 	"github.com/zakiego/palui/apps/server/internal/zod"
 )
 
@@ -42,6 +44,8 @@ var Manifest = connectors.Manifest{
 	ParseConfig: kit.ParseConfig(zod.Object()),
 }
 
+var dateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
 var (
 	getInput    = zod.Object()
 	updateInput = zod.Object(
@@ -58,6 +62,8 @@ var (
 	)
 	rememberInput = zod.Object(
 		zod.F("text", zod.String().Trim().Min(1).Max(proactive.MaxNoteChars).Describe("The note, one short sentence, e.g. \"Pak Budi always replies late, don't remind me twice\".")),
+		zod.F("until", zod.String().Trim().Regex(dateRe, `^\d{4}-\d{2}-\d{2}$`, "Use a date like 2026-11-30").Optional().Describe("Forget the note after this local date (YYYY-MM-DD, in the owner's zone), for a note about one day or event, e.g. \"call on 26 Nov is cancelled\" until 2026-11-26. Leave both until and days out for a standing rule.")),
+		zod.F("days", zod.Int().Min(1).Max(proactive.OwnerNoteDaysMax).Optional().Describe("Or: forget the note after this many days, e.g. 7 for \"this week\". Ignored when until is given.")),
 	)
 	forgetInput = zod.Object(
 		zod.F("id", zod.String().Trim().Min(1).Max(100).Describe("The note id (pmem_...) from list_proactive_notes.")),
@@ -96,7 +102,24 @@ func Offer(q db.Q, turn connectors.TurnInfo) (bool, error) {
 	return !shared, err
 }
 
+func noteOut(n db.ProactiveNote) any {
+	return kit.O("id", n.ID, "text", n.Text, "source", n.Source, "expiresAt", n.ExpiresAt, "createdAt", n.CreatedAt)
+}
+
 func refusal(err error) (any, error) {
+	var full *proactive.NotesFullError
+	if errors.As(err, &full) {
+		oldest := make([]any, len(full.Oldest))
+		for i, n := range full.Oldest {
+			oldest[i] = noteOut(n)
+		}
+		replies := make([]any, len(full.Replies))
+		for i, n := range full.Replies {
+			replies[i] = noteOut(n)
+		}
+		msg := fmt.Sprintf("Proactive memory is full (%d notes, %d of %d characters). Ask the owner which notes to delete, or delete ones that are clearly stale (a past date, a duplicate of a cleaner note, a raw reply already saved as a rule) with forget_proactive, then try again. Never delete a standing rule the owner gave without asking.", full.Count, full.Chars, proactive.MaxNotesChars)
+		return kit.O("ok", false, "error", msg, "oldestOwnerNotes", oldest, "replyNotes", replies), nil
+	}
 	var ce *proactive.ConfigError
 	if errors.As(err, &ce) {
 		return kit.O("ok", false, "error", ce.Msg), nil
@@ -187,7 +210,7 @@ func Tools(d *db.DB, clock func() int64, turn connectors.TurnInfo) *connectors.T
 	})
 	set.Set("list_proactive_notes", connectors.PaluiTool{
 		Data: connectors.DataAgent, Class: "read", Title: "List proactive memory",
-		Tool: kit.Tool("The notes proactive carries between runs: the owner's (never expire) and its own (expire). Each has an id.", getInput,
+		Tool: kit.Tool("The notes proactive carries between runs. source is owner (written by the owner; never expire unless given a date), reply (the owner's raw reply to a proactive message, saved on its own; expires after 3 days) or model (proactive's own; expire). Each has an id and expiresAt (Unix ms, null for never).", getInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				a, err := agentFor(d, turn)
 				if err != nil {
@@ -199,29 +222,44 @@ func Tools(d *db.DB, clock func() int64, turn connectors.TurnInfo) *connectors.T
 				}
 				out := make([]any, len(list))
 				for i, n := range list {
-					out[i] = kit.O("id", n.ID, "text", n.Text, "source", n.Source, "expiresAt", n.ExpiresAt)
+					out[i] = noteOut(n)
 				}
 				return kit.O("ok", true, "count", len(out), "notes", out), nil
 			}),
 	})
 	set.Set("remember_proactive", connectors.PaluiTool{
 		Data: connectors.DataAgent, Class: "write", Title: "Add to proactive memory",
-		Tool: kit.Tool("Keep a note for this agent's proactive runs, as the owner's instruction: who matters, what to skip, a promise someone made. It never expires.", rememberInput,
+		Tool: kit.Tool("Keep a note for this agent's proactive runs, as the owner's instruction: who matters, what to skip, a promise someone made. A standing rule (\"skip Find My emails\") never expires: leave until and days out. A note tied to a date or a short stretch (\"26 Nov all sorted, don't remind me\", \"call on 26 Nov is cancelled\", \"on leave this week\") gets until (the last day it matters) or days, so it cleans itself up. Replies to proactive messages are already kept for 3 days on their own; save one here only when it's a lasting rule, reworded as one.", rememberInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
+				now := clock()
 				a, err := agentFor(d, turn)
 				if err != nil {
 					return nil, err
 				}
-				n, err := proactive.AddNote(d, a.ID, in.S("text"), proactive.NoteSourceOwner, 0, clock())
+				var n db.ProactiveNote
+				if until := in.S("until"); until != "" {
+					tz, tzErr := settings.Timezone(d)
+					if tzErr != nil {
+						return nil, tzErr
+					}
+					end, dateErr := proactive.EndOfDay(until, tz)
+					if dateErr != nil {
+						return refusal(dateErr)
+					}
+					n, err = proactive.AddOwnerNoteUntil(d, a.ID, in.S("text"), end, now)
+				} else {
+					days, _ := in.Int("days")
+					n, err = proactive.AddNote(d, a.ID, in.S("text"), proactive.NoteSourceOwner, int(days), now)
+				}
 				if err != nil {
 					return refusal(err)
 				}
-				return kit.O("ok", true, "id", n.ID, "text", n.Text), nil
+				return kit.O("ok", true, "id", n.ID, "text", n.Text, "expiresAt", n.ExpiresAt), nil
 			}),
 	})
 	set.Set("forget_proactive", connectors.PaluiTool{
 		Data: connectors.DataAgent, Class: "write", Title: "Remove from proactive memory",
-		Tool: kit.Tool("Delete one proactive memory note by its id.", forgetInput,
+		Tool: kit.Tool("Delete one proactive memory note by its id. Fine for reply notes and notes about a date that has passed; ask the owner before deleting a standing rule they wrote.", forgetInput,
 			func(ctx context.Context, in kit.Input, call connectors.ToolCallInfo) (any, error) {
 				a, err := agentFor(d, turn)
 				if err != nil {

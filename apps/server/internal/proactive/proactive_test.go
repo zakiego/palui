@@ -483,7 +483,101 @@ func TestNotesKeepOwnerNotesAndPushOutTheModels(t *testing.T) {
 	}
 }
 
-func TestAReplyThatIsntAnActionBecomesAnOwnerNote(t *testing.T) {
+func TestOwnerNotesCanExpire(t *testing.T) {
+	d := tu.DB(t)
+	a, err := agents.GetDefault(d, NOW)
+	tu.Must(t, err)
+	n, err := proactive.AddNote(d, a.ID, "Lagi cuti minggu ini", proactive.NoteSourceOwner, 7, NOW)
+	tu.Must(t, err)
+	if n.Source != proactive.NoteSourceOwner || n.ExpiresAt == nil || *n.ExpiresAt != NOW+7*24*HOUR {
+		t.Fatalf("%+v", n)
+	}
+	forever, err := proactive.AddNote(d, a.ID, "Skip email Find My", proactive.NoteSourceOwner, 0, NOW)
+	tu.Must(t, err)
+	if forever.ExpiresAt != nil {
+		t.Fatalf("an owner note without days never expires: %+v", forever)
+	}
+	end, err := proactive.EndOfDay("2026-11-26", "Asia/Makassar")
+	tu.Must(t, err)
+	if want := time.Date(2026, 11, 27, 0, 0, 0, 0, time.FixedZone("WITA", 8*3600)).UnixMilli(); end != want {
+		t.Fatalf("end of day: %d want %d", end, want)
+	}
+	if _, err := proactive.EndOfDay("26 Nov", "Asia/Makassar"); err == nil {
+		t.Fatal("a bad date")
+	}
+	if _, err := proactive.AddOwnerNoteUntil(d, a.ID, "Call batal", NOW-1, NOW); err == nil {
+		t.Fatal("a date in the past")
+	}
+	u, err := proactive.AddOwnerNoteUntil(d, a.ID, "Call batal", NOW+2*24*HOUR, NOW)
+	tu.Must(t, err)
+	if u.ExpiresAt == nil || *u.ExpiresAt != NOW+2*24*HOUR {
+		t.Fatalf("%+v", u)
+	}
+	list, err := proactive.Notes(d, a.ID, NOW+3*24*HOUR)
+	tu.Must(t, err)
+	if len(list) != 2 {
+		t.Fatalf("the dated note is gone after its day: %+v", list)
+	}
+	// Keep turns a dated owner note into one that never expires.
+	ok, err := proactive.EditNote(d, a.ID, n.ID, nil, true, NOW+1)
+	tu.Must(t, err)
+	list, err = proactive.Notes(d, a.ID, NOW+30*24*HOUR)
+	tu.Must(t, err)
+	if !ok || len(list) != 2 {
+		t.Fatalf("%+v", list)
+	}
+}
+
+func TestFullMemoryDropsExpiredAndReplyNotesThenListsWhatToDelete(t *testing.T) {
+	d := tu.DB(t)
+	a, err := agents.GetDefault(d, NOW)
+	tu.Must(t, err)
+	long := strings.Repeat("x", proactive.MaxNoteChars-1)
+	slots := proactive.MaxNotesChars / proactive.MaxNoteChars
+	// An expired owner note, a legacy reply note (no expiry), an expiring
+	// reply note, then owner notes until memory is full.
+	e, err := proactive.AddNote(d, a.ID, long+"!", proactive.NoteSourceOwner, 1, NOW)
+	tu.Must(t, err)
+	_, err = d.Exec("INSERT INTO proactive_notes (id, agent_id, text, source, expires_at, created_at, updated_at) VALUES ('pmem_legacy', ?, ?, 'reply', NULL, ?, ?)", a.ID, "About \"Grup bank\": ini", NOW, NOW)
+	tu.Must(t, err)
+	r, err := proactive.AddNote(d, a.ID, long+"r", proactive.NoteSourceReply, 0, NOW+1)
+	tu.Must(t, err)
+	at := NOW + 2*24*HOUR
+	for i := 0; i < slots; i++ {
+		_, err := proactive.AddNote(d, a.ID, long+string(rune('a'+i)), proactive.NoteSourceOwner, 0, at+int64(i))
+		tu.Must(t, err)
+	}
+	// The expired note went first, then the expiring reply made room.
+	list, err := proactive.Notes(d, a.ID, at+100)
+	tu.Must(t, err)
+	for _, n := range list {
+		if n.ID == r.ID || n.ID == e.ID {
+			t.Fatalf("should be gone: %+v", n)
+		}
+	}
+	// A model note never pushes out a reply or an owner note.
+	m, err := proactive.AddNote(d, a.ID, long+"#", proactive.NoteSourceModel, 0, at+200)
+	tu.Must(t, err)
+	if m.ID != "" {
+		t.Fatalf("dropped quietly: %+v", m)
+	}
+	// Now only owner notes and the legacy reply are left: refused, with what
+	// to delete. The legacy reply is never dropped on its own.
+	_, err = proactive.AddNote(d, a.ID, long+"z", proactive.NoteSourceOwner, 0, at+300)
+	var full *proactive.NotesFullError
+	if !errors.As(err, &full) {
+		t.Fatalf("%v", err)
+	}
+	var ce *proactive.ConfigError
+	if !errors.As(err, &ce) || !strings.Contains(ce.Msg, "full") {
+		t.Fatalf("still a ConfigError: %v", err)
+	}
+	if len(full.Replies) != 1 || full.Replies[0].ID != "pmem_legacy" || len(full.Oldest) == 0 || !strings.HasSuffix(full.Oldest[0].Text, "a") || full.Count != len(list) {
+		t.Fatalf("%+v", full)
+	}
+}
+
+func TestAReplyThatIsntAnActionBecomesAReplyNote(t *testing.T) {
 	w := newWorld(t, nil)
 	w.answer(`{"items":[{"key":"wa:46:1","text":"Grup bank nanya OTP."}]}`)
 	w.sweep()
@@ -497,8 +591,12 @@ func TestAReplyThatIsntAnActionBecomesAnOwnerNote(t *testing.T) {
 	}
 	notes, err := proactive.Notes(w.d, w.agent.ID, NOW+MIN)
 	tu.Must(t, err)
-	if len(notes) != 1 || notes[0].Source != proactive.NoteSourceOwner || !strings.Contains(notes[0].Text, "yang dari bank nggak usah") || !strings.Contains(notes[0].Text, "Grup bank") {
+	if len(notes) != 1 || notes[0].Source != proactive.NoteSourceReply || !strings.HasPrefix(notes[0].Text, "About \"Grup bank") || !strings.HasSuffix(notes[0].Text, "\": yang dari bank nggak usah") {
 		t.Fatalf("%+v", notes)
+	}
+	// A reply is kept for a few days, not forever.
+	if notes[0].ExpiresAt == nil || *notes[0].ExpiresAt != NOW+MIN+int64(proactive.ReplyNoteDays)*24*HOUR {
+		t.Fatalf("a reply note expires: %+v", notes[0])
 	}
 	if r := w.row(); *r.NextTickAt != NOW+MIN {
 		t.Fatalf("the next run comes now: %d", *r.NextTickAt)

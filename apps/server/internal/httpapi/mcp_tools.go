@@ -115,8 +115,8 @@ func MCPTools() []MCPTool {
 		{Name: "unmute_proactive", RPC: "unmuteProactiveFn", Title: "Unmute proactive subject", Description: "Let proactive remind about a muted chat or event again.", Idempotent: true},
 		{Name: "check_proactive_now", RPC: "checkProactiveNowFn", Title: "Check proactive now", Description: "Run an agent's proactive check right away instead of waiting for the next one."},
 		{Name: "test_proactive", RPC: "testProactiveFn", Title: "Test proactive prompt", Description: "Run an agent's proactive prompt (the saved one, or prompt) for real against its tools and model, and return what it would send and remember, without sending or saving anything."},
-		{Name: "add_proactive_note", RPC: "addProactiveNoteFn", Title: "Add proactive note", Description: "Add an owner note to an agent's proactive memory. Owner notes never expire."},
-		{Name: "edit_proactive_note", RPC: "editProactiveNoteFn", Title: "Edit proactive note", Description: "Change a proactive memory note's text, or keep a note the model wrote so it never expires.", Idempotent: true},
+		{Name: "add_proactive_note", RPC: "addProactiveNoteFn", Title: "Add proactive note", Description: "Add an owner note to an agent's proactive memory. It never expires unless days is given (1-365), for a note tied to a date."},
+		{Name: "edit_proactive_note", RPC: "editProactiveNoteFn", Title: "Edit proactive note", Description: "Change a proactive memory note's text, or keep a note (the model's, a saved reply, or a dated one) so it never expires.", Idempotent: true},
 		{Name: "delete_proactive_note", RPC: "deleteProactiveNoteFn", Title: "Delete proactive note", Description: "Delete a proactive memory note.", Destructive: true},
 
 		// Jobs, flows, reminders

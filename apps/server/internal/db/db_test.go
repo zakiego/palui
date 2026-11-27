@@ -44,7 +44,7 @@ func TestReportsADatabaseBehindTheCode(t *testing.T) {
 	}
 	defer d.Close()
 	st, _ := db.GetSchemaState(d)
-	if st.OK || st.Reason != "behind" || len(st.Missing) != 33 {
+	if st.OK || st.Reason != "behind" || len(st.Missing) != 34 {
 		t.Fatalf("%+v", st)
 	}
 }
@@ -57,7 +57,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	}
 	var n int
 	_ = d.QueryRow("SELECT count(*) FROM _migrations").Scan(&n)
-	if n != 33 {
+	if n != 34 {
 		t.Fatal(n)
 	}
 }
@@ -167,5 +167,54 @@ func TestDefaultAgentVoiceNotesMigration(t *testing.T) {
 				t.Fatalf("default %d (want %d), other %d (want 0)", def, tc.wantDef, other)
 			}
 		})
+	}
+}
+
+// 0033 marks the owner notes an earlier build saved from a reply as reply
+// notes, and touches nothing else.
+func TestReplyNotesMigrationOnlyMarksAutoSavedReplies(t *testing.T) {
+	d, err := db.Open(":memory:", db.OpenOptions{NoMigrate: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	all := db.Migrations()
+	n := 0
+	for n < len(all) && all[n].Name != "0033_proactive_reply_notes" {
+		n++
+	}
+	if err := db.Migrate(d, all[:n]); err != nil {
+		t.Fatal(err)
+	}
+	rows := [][]any{
+		{"pmem_a", `About "Grup bank nanya OTP.": yang dari bank nggak usah`, "owner", nil},
+		{"pmem_b", "Skip email Find My", "owner", nil},
+		{"pmem_c", `About "x": y`, "model", int64(5)},
+		{"pmem_d", `About this week: cuti`, "owner", nil},
+	}
+	for _, r := range rows {
+		if _, err := d.Exec("INSERT INTO proactive_notes (id, agent_id, text, source, expires_at, created_at, updated_at) VALUES (?, 'agt', ?, ?, ?, 1, 1)", r[0], r[1], r[2], r[3]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Migrate(d, all); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	q, err := d.Query("SELECT id, source FROM proactive_notes WHERE expires_at IS NULL OR id = 'pmem_c'")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.Close()
+	for q.Next() {
+		var id, src string
+		if err := q.Scan(&id, &src); err != nil {
+			t.Fatal(err)
+		}
+		got[id] = src
+	}
+	want := map[string]string{"pmem_a": "reply", "pmem_b": "owner", "pmem_c": "model", "pmem_d": "owner"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("%v", got)
 	}
 }

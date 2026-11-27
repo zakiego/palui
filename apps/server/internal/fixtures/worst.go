@@ -859,14 +859,21 @@ func worstProactive(k *Kit, web db.Chat) {
 	for i, label := range []string{within("Grup Alumni SMA Negeri 1 Banjarmasin Angkatan 2009 (resmi, jangan keluar)", 120), "J", "خادم الملفات", "🦊", worstEmail} {
 		k.insert("proactive_mutes", col{"agent_id", agentID}, col{"subject", fmt.Sprintf("wa:%d", 200+i)}, col{"label", label}, col{"created_at", now - int64(i+1)*D})
 	}
-	// Memory at its limits: the longest notes, owner and model, until the
-	// character budget is spent.
+	// Memory at its limits: the longest notes, owner, reply and model, some
+	// dated, until the character budget is spent.
 	noteText := strx.Slice16(worstParagraph+" "+worstParagraph, proactive.MaxNoteChars-1) + "…"
 	used := 0
 	for i := 0; i < proactive.MaxNotes && used+strx.Len16(noteText) <= proactive.MaxNotesChars; i++ {
 		source, expires := proactive.NoteSourceOwner, any(nil)
-		if i%2 == 1 {
+		switch {
+		case i%2 == 1:
 			source, expires = proactive.NoteSourceModel, now+int64(1+i%30)*D
+		case i == 4:
+			source, expires = proactive.NoteSourceReply, now+int64(proactive.ReplyNoteDays)*D
+		case i == 6:
+			source, expires = proactive.NoteSourceOwner, now+int64(proactive.OwnerNoteDaysMax)*D
+		case i == 8:
+			source = proactive.NoteSourceReply // saved before replies expired
 		}
 		t := noteText
 		if i == 1 {

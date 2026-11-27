@@ -156,7 +156,7 @@ func runUser(in RunInput) string {
 	b.WriteString("<instructions>\n" + strings.TrimSpace(in.Config.Prompt) + "\n</instructions>\n")
 	var owner, mine []db.ProactiveNote
 	for _, n := range in.Notes {
-		if n.Source == NoteSourceOwner {
+		if n.Source == NoteSourceOwner || n.Source == NoteSourceReply {
 			owner = append(owner, n)
 		} else {
 			mine = append(mine, n)
@@ -165,7 +165,11 @@ func runUser(in RunInput) string {
 	if len(owner) > 0 {
 		b.WriteString("\nThe owner's notes (instructions from the owner):\n")
 		for _, n := range owner {
-			fmt.Fprintf(&b, "- [%s] %s\n", n.ID, n.Text)
+			left := ""
+			if n.ExpiresAt != nil {
+				left = fmt.Sprintf(" (%d days left)", max(1, (*n.ExpiresAt-in.Now+dayMs-1)/dayMs))
+			}
+			fmt.Fprintf(&b, "- [%s] %s%s\n", n.ID, n.Text, left)
 		}
 	}
 	if len(mine) > 0 {
