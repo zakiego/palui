@@ -108,12 +108,49 @@ func TestMemoryToolsKeepOwnerNotes(t *testing.T) {
 	if got := conntest.Exec(t, list.Tool, `{}`); got.N("count") != 1 || got.S("notes.0.source") != "owner" {
 		t.Fatalf("%s", got)
 	}
+	if out.Get("expiresAt") != nil {
+		t.Fatalf("a standing rule never expires: %s", out)
+	}
+	dated := conntest.Exec(t, remember.Tool, `{"text":"Call 26 Nov batal","until":"2026-11-26"}`)
+	if !dated.B("ok") || dated.Get("expiresAt") == nil {
+		t.Fatalf("%s", dated)
+	}
+	week := conntest.Exec(t, remember.Tool, `{"text":"Lagi cuti","days":7}`)
+	if !week.B("ok") || week.N("expiresAt") != float64(tu.NOW+7*24*3600_000) {
+		t.Fatalf("%s", week)
+	}
+	if got := conntest.Exec(t, remember.Tool, `{"text":"Kemarin","until":"2000-01-01"}`); got.B("ok") {
+		t.Fatalf("a past date: %s", got)
+	}
+	for _, id := range []string{dated.S("id"), week.S("id")} {
+		_, err := d.Exec("DELETE FROM proactive_notes WHERE id = ?", id)
+		tu.Must(t, err)
+	}
 	forget, _ := set.Get("forget_proactive")
 	if got := conntest.Exec(t, forget.Tool, `{"id":"`+out.S("id")+`"}`); !got.B("ok") {
 		t.Fatalf("%s", got)
 	}
 	if got := conntest.Exec(t, list.Tool, `{}`); got.N("count") != 0 {
 		t.Fatalf("%s", got)
+	}
+}
+
+func TestRememberWhenFullListsNotesToDelete(t *testing.T) {
+	d := tu.DB(t)
+	web, err := chats.EnsureWebChat(d, tu.NOW)
+	tu.Must(t, err)
+	a, err := agents.GetDefault(d, tu.NOW)
+	tu.Must(t, err)
+	long := strings.Repeat("x", proactive.MaxNoteChars-1)
+	for i := 0; i < proactive.MaxNotesChars/proactive.MaxNoteChars; i++ {
+		_, err := proactive.AddNote(d, a.ID, long+string(rune('a'+i)), proactive.NoteSourceOwner, 0, tu.NOW+int64(i))
+		tu.Must(t, err)
+	}
+	set := proactiveconn.Tools(d, func() int64 { return tu.NOW + 100 }, connectors.TurnInfo{ChatID: web.ID, Trigger: "message", Now: tu.NOW})
+	remember, _ := set.Get("remember_proactive")
+	out := conntest.Exec(t, remember.Tool, `{"text":"`+long+`z"}`)
+	if out.B("ok") || !strings.Contains(out.S("error"), "full") || !strings.HasPrefix(out.S("oldestOwnerNotes.0.id"), "pmem_") || out.Get("replyNotes") == nil {
+		t.Fatalf("%s", out)
 	}
 }
 

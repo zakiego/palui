@@ -2519,7 +2519,7 @@
      {
       "name": "list_proactive_notes",
       "title": "List proactive memory",
-      "description": "The notes proactive carries between runs: the owner's (never expire) and its own (expire). Each has an id.",
+      "description": "The notes proactive carries between runs. source is owner (written by the owner; never expire unless given a date), reply (the owner's raw reply to a proactive message, saved on its own; expires after 3 days) or model (proactive's own; expire). Each has an id and expiresAt (Unix ms, null for never).",
       "class": "read",
       "untrusted": false,
       "guestSafe": false,
@@ -2536,7 +2536,7 @@
      {
       "name": "remember_proactive",
       "title": "Add to proactive memory",
-      "description": "Keep a note for this agent's proactive runs, as the owner's instruction: who matters, what to skip, a promise someone made. It never expires.",
+      "description": "Keep a note for this agent's proactive runs, as the owner's instruction: who matters, what to skip, a promise someone made. A standing rule (\"skip Find My emails\") never expires: leave until and days out. A note tied to a date or a short stretch (\"26 Nov all sorted, don't remind me\", \"call on 26 Nov is cancelled\", \"on leave this week\") gets until (the last day it matters) or days, so it cleans itself up. Replies to proactive messages are already kept for 3 days on their own; save one here only when it's a lasting rule, reworded as one.",
       "class": "write",
       "untrusted": false,
       "guestSafe": false,
@@ -2552,6 +2552,17 @@
          "minLength": 1,
          "maxLength": 300,
          "description": "The note, one short sentence, e.g. \"Pak Budi always replies late, don't remind me twice\"."
+        },
+        "until": {
+         "description": "Forget the note after this local date (YYYY-MM-DD, in the owner's zone), for a note about one day or event, e.g. \"call on 26 Nov is cancelled\" until 2026-11-26. Leave both until and days out for a standing rule.",
+         "type": "string",
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "days": {
+         "description": "Or: forget the note after this many days, e.g. 7 for \"this week\". Ignored when until is given.",
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 365
         }
        },
        "required": [
@@ -2563,7 +2574,7 @@
      {
       "name": "forget_proactive",
       "title": "Remove from proactive memory",
-      "description": "Delete one proactive memory note by its id.",
+      "description": "Delete one proactive memory note by its id. Fine for reply notes and notes about a date that has passed; ask the owner before deleting a standing rule they wrote.",
       "class": "write",
       "untrusted": false,
       "guestSafe": false,

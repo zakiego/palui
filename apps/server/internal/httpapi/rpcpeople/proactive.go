@@ -179,18 +179,27 @@ func init() {
 	})
 	httpapi.Register(httpapi.Handler{
 		Name: "addProactiveNoteFn", Method: http.MethodPost, Guard: httpapi.Writer,
-		Input: zod.Object(zod.F("agentId", agentID), zod.F("text", zod.String().Trim().Min(1).Max(proactive.MaxNoteChars*2))),
+		Input: zod.Object(
+			zod.F("agentId", agentID),
+			zod.F("text", zod.String().Trim().Min(1).Max(proactive.MaxNoteChars*2)),
+			zod.F("days", zod.Int().Min(1).Max(proactive.OwnerNoteDaysMax).Optional()),
+		),
 		Fn: func(c *httpapi.Call) (any, error) {
-			o := c.Obj()
-			id, _ := o.Get("agentId")
-			text, _ := o.Get("text")
-			if err := mustAgent(c.DB(), id.(string)); err != nil {
+			var in struct {
+				AgentID string `json:"agentId"`
+				Text    string `json:"text"`
+				Days    int    `json:"days"`
+			}
+			if err := c.Decode(&in); err != nil {
 				return nil, err
 			}
-			if _, err := proactive.AddNote(c.DB(), id.(string), text.(string), proactive.NoteSourceOwner, 0, c.Now()); err != nil {
+			if err := mustAgent(c.DB(), in.AgentID); err != nil {
+				return nil, err
+			}
+			if _, err := proactive.AddNote(c.DB(), in.AgentID, in.Text, proactive.NoteSourceOwner, in.Days, c.Now()); err != nil {
 				return nil, failConfig(err)
 			}
-			return proactiveFor(c, id.(string))
+			return proactiveFor(c, in.AgentID)
 		},
 	})
 	httpapi.Register(httpapi.Handler{
