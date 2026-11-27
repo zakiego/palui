@@ -1023,8 +1023,9 @@ func ScanProactiveMute(s Scanner) (ProactiveMute, error) {
 }
 
 // ProactiveNote is a proactive_notes row: one memory note an agent's
-// proactive runs carry between runs. Source is owner or model; owner notes
-// never expire.
+// proactive runs carry between runs. Source is owner, reply (the owner's
+// reply to a proactive message, saved on its own) or model. Owner notes never
+// expire unless the owner gave them a date; ExpiresAt nil is never.
 type ProactiveNote struct {
 	ID        string `json:"id"`
 	AgentID   string `json:"agentId"`
